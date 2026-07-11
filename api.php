@@ -1,0 +1,875 @@
+<?php
+// บังคับให้เริ่มเปิดใช้งาน Session และระบุประเภทการตอบกลับเป็น JSON
+require_once 'auth_helper.php';
+header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Cache-Control: post-check=0, pre-check=0', false);
+header('Pragma: no-cache');
+
+// ดึงข้อมูลที่ส่งมาจากกล่อง Request (กรณีส่งมาเป็น Raw JSON)
+$input_raw = file_get_contents('php://input');
+$request_data = json_decode($input_raw, true);
+
+// ค้นหา action ที่ต้องการเรียกใช้งาน
+$action = isset($_GET['action']) ? $_GET['action'] : (isset($request_data['action']) ? $request_data['action'] : '');
+
+if (empty($action)) {
+    echo json_encode(['success' => false, 'error' => 'No action specified']);
+    exit;
+}
+
+try {
+    switch ($action) {
+        
+        // 1. ตรวจสอบการเข้าสู่ระบบ
+        case 'check_login':
+            $role = isset($request_data['role']) ? $request_data['role'] : '';
+            $loginId = isset($request_data['loginId']) ? trim($request_data['loginId']) : '';
+            $remember = isset($request_data['remember']) ? (bool)$request_data['remember'] : false;
+            
+            if ($role === 'teacher') {
+                if ($loginId === 'admin') {
+                    $_SESSION['user'] = [
+                        'id' => 'admin',
+                        'name' => 'ครูผู้สอน',
+                        'role' => 'teacher'
+                    ];
+                    
+                    if ($remember) {
+                        $cookie_val = json_encode(['role' => $role, 'loginId' => $loginId]);
+                        setcookie('remember_user', $cookie_val, time() + 30 * 24 * 60 * 60, '/', '', isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on', true);
+                    }
+                    
+                    echo json_encode(['success' => true, 'user' => $_SESSION['user']]);
+                } else {
+                    echo json_encode(['success' => false, 'error' => 'รหัสผ่านคุณครูไม่ถูกต้อง']);
+                }
+            } else if ($role === 'student') {
+                // ค้นหารหัสนักเรียนในตาราง SQL
+                $stmt = $pdo->prepare('SELECT * FROM students WHERE student_id = ?');
+                $stmt->execute([$loginId]);
+                $student = $stmt->fetch();
+                
+                if ($student) {
+                    $_SESSION['user'] = [
+                        'id' => $student['student_id'],
+                        'name' => $student['student_name'],
+                        'role' => 'student'
+                    ];
+                    
+                    if ($remember) {
+                        $cookie_val = json_encode(['role' => $role, 'loginId' => $loginId]);
+                        setcookie('remember_user', $cookie_val, time() + 30 * 24 * 60 * 60, '/', '', isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on', true);
+                    }
+                    
+                    echo json_encode(['success' => true, 'user' => $_SESSION['user']]);
+                } else {
+                    echo json_encode(['success' => false, 'error' => 'ไม่พบรหัสประจำตัวนักเรียนนี้ในระบบ']);
+                }
+            } else {
+                echo json_encode(['success' => false, 'error' => 'บทบาทการใช้งานไม่ถูกต้อง']);
+            }
+            break;
+            
+        // 2. ออกจากระบบ (ทำลาย Session)
+        case 'logout':
+            if (isset($_COOKIE['remember_user'])) {
+                setcookie('remember_user', '', time() - 3600, '/');
+            }
+            session_destroy();
+            echo json_encode(['success' => true]);
+            break;
+            
+        // 3. ดึงสถานะปัจจุบันของสมาชิกที่ล็อกอินอยู่
+        case 'get_current_user':
+            if (isset($_SESSION['user'])) {
+                echo json_encode(['success' => true, 'user' => $_SESSION['user']]);
+            } else {
+                echo json_encode(['success' => false, 'error' => 'Not logged in']);
+            }
+            break;
+
+        // 4. ดึงรายชื่อนักเรียนทั้งหมด
+        case 'get_students_list':
+            $stmt = $pdo->query('SELECT student_id, student_name FROM students ORDER BY student_id ASC');
+            $students = [];
+            while ($row = $stmt->fetch()) {
+                $students[$row['student_id']] = $row['student_name'];
+            }
+            echo json_encode(['success' => true, 'students' => $students]);
+            break;
+
+        // 5. บันทึกผลการประเมิน (Insert / Update)
+        case 'save_evaluation':
+            // ป้องกันการแอบบันทึกโดยไม่ล็อกอิน
+            if (!isset($_SESSION['user'])) {
+                echo json_encode(['success' => false, 'error' => 'ต้องเข้าสู่ระบบก่อนบันทึกข้อมูล']);
+                exit;
+            }
+            
+            $data = isset($request_data['data']) ? $request_data['data'] : null;
+            if (!$data) {
+                echo json_encode(['success' => false, 'error' => 'No data provided']);
+                exit;
+            }
+            
+            $studentId = $data['studentId'];
+            $studentName = $data['studentName'];
+            $evaluatorType = $data['evaluatorType'];
+            $evaluatorName = $data['evaluatorName'];
+            $scores = $data['scores'];
+            $totalScore = $data['totalScore'];
+            $qualityLevel = $data['qualityLevel'];
+            // คำแนะนำเชิงคุณภาพจากเพื่อน (ใช้เฉพาะโหมด 'เพื่อนประเมิน')
+            $peerStrength    = isset($data['peerStrength'])    ? trim($data['peerStrength'])    : null;
+            $peerImprovement = isset($data['peerImprovement']) ? trim($data['peerImprovement']) : null;
+            $peerEncouragement = isset($data['peerEncouragement']) ? trim($data['peerEncouragement']) : null;
+            
+            // เตรียมคิวรีและทำการ Upsert
+            $sql = 'INSERT INTO evaluations (
+                        student_id, evaluator_type, evaluator_name,
+                        score_1_1, score_1_2, score_1_3,
+                        score_2_1, score_2_2,
+                        score_3_1, score_3_2, score_3_3,
+                        score_4_1, score_4_2, score_4_3,
+                        total_score, quality_level,
+                        peer_strength, peer_improvement, peer_encouragement
+                    ) VALUES (
+                        :student_id, :evaluator_type, :evaluator_name,
+                        :s1_1, :s1_2, :s1_3,
+                        :s2_1, :s2_2,
+                        :s3_1, :s3_2, :s3_3,
+                        :s4_1, :s4_2, :s4_3,
+                        :total_score, :quality_level,
+                        :peer_strength, :peer_improvement, :peer_encouragement
+                    )
+                    ON DUPLICATE KEY UPDATE
+                        score_1_1 = VALUES(score_1_1),
+                        score_1_2 = VALUES(score_1_2),
+                        score_1_3 = VALUES(score_1_3),
+                        score_2_1 = VALUES(score_2_1),
+                        score_2_2 = VALUES(score_2_2),
+                        score_3_1 = VALUES(score_3_1),
+                        score_3_2 = VALUES(score_3_2),
+                        score_3_3 = VALUES(score_3_3),
+                        score_4_1 = VALUES(score_4_1),
+                        score_4_2 = VALUES(score_4_2),
+                        score_4_3 = VALUES(score_4_3),
+                        total_score = VALUES(total_score),
+                        quality_level = VALUES(quality_level),
+                        peer_strength = VALUES(peer_strength),
+                        peer_improvement = VALUES(peer_improvement),
+                        peer_encouragement = VALUES(peer_encouragement),
+                        timestamp = CURRENT_TIMESTAMP';
+            
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([
+                ':student_id'          => $studentId,
+                ':evaluator_type'      => $evaluatorType,
+                ':evaluator_name'      => $evaluatorName,
+                ':s1_1'                => $scores['1.1'],
+                ':s1_2'                => $scores['1.2'],
+                ':s1_3'                => $scores['1.3'],
+                ':s2_1'                => $scores['2.1'],
+                ':s2_2'                => $scores['2.2'],
+                ':s3_1'                => $scores['3.1'],
+                ':s3_2'                => $scores['3.2'],
+                ':s3_3'                => $scores['3.3'],
+                ':s4_1'                => $scores['4.1'],
+                ':s4_2'                => $scores['4.2'],
+                ':s4_3'                => $scores['4.3'],
+                ':total_score'         => $totalScore,
+                ':quality_level'       => $qualityLevel,
+                ':peer_strength'       => $peerStrength,
+                ':peer_improvement'    => $peerImprovement,
+                ':peer_encouragement'  => $peerEncouragement
+            ]);
+            
+            echo json_encode(['success' => true]);
+            break;
+
+        // 6. ดึงข้อมูลคะแนนสะสม 3 ทิศทางของนักเรียน 1 คน
+        case 'get_student_scores':
+            $studentId = isset($_GET['studentId']) ? $_GET['studentId'] : '';
+            if (empty($studentId)) {
+                echo json_encode(['success' => false, 'error' => 'Student ID required']);
+                exit;
+            }
+            
+            // ดึงข้อมูลการประเมินพร้อมชื่อนักเรียน
+            $stmt = $pdo->prepare('
+                SELECT e.*, s.student_name 
+                FROM evaluations e
+                JOIN students s ON e.student_id = s.student_id
+                WHERE e.student_id = ?
+            ');
+            $stmt->execute([$studentId]);
+            $rows = $stmt->fetchAll();
+            
+            $results = [];
+            foreach ($rows as $row) {
+                $results[] = [
+                    'timestamp'     => $row['timestamp'],
+                    'studentId'     => $row['student_id'],
+                    'studentName'   => $row['student_name'],
+                    'evaluatorType' => $row['evaluator_type'],
+                    'evaluatorName' => $row['evaluator_name'],
+                    'totalScore'    => (float)$row['total_score'],
+                    'qualityLevel'  => $row['quality_level'],
+                    'rawScores'     => [
+                        'content'   => (float)$row['score_1_1'] + (float)$row['score_1_2'] + (float)$row['score_1_3'],
+                        'structure' => (float)$row['score_2_1'] + (float)$row['score_2_2'],
+                        'language'  => (float)$row['score_3_1'] + (float)$row['score_3_2'] + (float)$row['score_3_3'],
+                        'mechanics' => (float)$row['score_4_1'] + (float)$row['score_4_2'] + (float)$row['score_4_3'],
+                        'details'   => [
+                            '1.1' => (float)$row['score_1_1'], '1.2' => (float)$row['score_1_2'], '1.3' => (float)$row['score_1_3'],
+                            '2.1' => (float)$row['score_2_1'], '2.2' => (float)$row['score_2_2'],
+                            '3.1' => (float)$row['score_3_1'], '3.2' => (float)$row['score_3_2'], '3.3' => (float)$row['score_3_3'],
+                            '4.1' => (float)$row['score_4_1'], '4.2' => (float)$row['score_4_2'], '4.3' => (float)$row['score_4_3']
+                        ]
+                    ]
+                ];
+            }
+            
+            echo json_encode(['success' => true, 'data' => $results]);
+            break;
+
+        // 7. ดึงการประเมินแบบเจาะจง 1 รายการเพื่อเอาคะแนนไปแสดงคืนค่าไว้บนฟอร์ม
+        case 'get_single_evaluation':
+            $studentId = isset($request_data['studentId']) ? $request_data['studentId'] : '';
+            $evaluatorType = isset($request_data['evaluatorType']) ? $request_data['evaluatorType'] : '';
+            $evaluatorName = isset($request_data['evaluatorName']) ? $request_data['evaluatorName'] : '';
+            
+            if (empty($studentId) || empty($evaluatorType) || empty($evaluatorName)) {
+                echo json_encode(['success' => false, 'error' => 'Missing parameters']);
+                exit;
+            }
+            
+            $stmt = $pdo->prepare('
+                SELECT * FROM evaluations 
+                WHERE student_id = ? AND evaluator_type = ? AND evaluator_name = ?
+            ');
+            $stmt->execute([$studentId, $evaluatorType, $evaluatorName]);
+            $row = $stmt->fetch();
+            
+            if ($row) {
+                echo json_encode([
+                    'success' => true,
+                    'found'   => true,
+                    'scores'  => [
+                        '1.1' => (float)$row['score_1_1'], '1.2' => (float)$row['score_1_2'], '1.3' => (float)$row['score_1_3'],
+                        '2.1' => (float)$row['score_2_1'], '2.2' => (float)$row['score_2_2'],
+                        '3.1' => (float)$row['score_3_1'], '3.2' => (float)$row['score_3_2'], '3.3' => (float)$row['score_3_3'],
+                        '4.1' => (float)$row['score_4_1'], '4.2' => (float)$row['score_4_2'], '4.3' => (float)$row['score_4_3']
+                    ],
+                    'peerFeedback' => [
+                        'strength'     => $row['peer_strength']     ?? '',
+                        'improvement'  => $row['peer_improvement']  ?? '',
+                        'encouragement'=> $row['peer_encouragement'] ?? ''
+                    ]
+                ]);
+            } else {
+                echo json_encode(['success' => true, 'found' => false]);
+            }
+            break;
+
+        // 8. ดึงภาพรวมแดชบอร์ดความคืบหน้าของห้องเรียน
+        case 'get_all_students_summary':
+            // ดึงรายชื่อนักเรียนทั้งหมด
+            $stmt_std = $pdo->query('SELECT student_id, student_name FROM students ORDER BY student_id ASC');
+            $summary = [];
+            while ($row = $stmt_std->fetch()) {
+                $summary[$row['student_id']] = [
+                    'self'            => false,
+                    'peer'            => false,
+                    'teacher'         => false,
+                    'selfScore'       => null,
+                    'peerScore'       => null,
+                    'teacherScore'    => null,
+                    'avgScore'        => 0,
+                    'count'           => 0,
+                    'totalScoreAcc'   => 0,
+                    // สะสมด้านย่อย 11 ด้าน
+                    's11_acc'         => 0, 's12_acc' => 0, 's13_acc' => 0,
+                    's21_acc'         => 0, 's22_acc' => 0,
+                    's31_acc'         => 0, 's32_acc' => 0, 's33_acc' => 0,
+                    's41_acc'         => 0, 's42_acc' => 0, 's43_acc' => 0,
+                    // ค่าเฉลี่ยหลัก 4 ด้าน
+                    'avg_c'           => 0,
+                    'avg_s'           => 0,
+                    'avg_l'           => 0,
+                    'avg_m'           => 0,
+                    // ค่าเฉลี่ยย่อย 11 ด้าน
+                    'avg_1_1'         => 0, 'avg_1_2' => 0, 'avg_1_3' => 0,
+                    'avg_2_1'         => 0, 'avg_2_2' => 0,
+                    'avg_3_1'         => 0, 'avg_3_2' => 0, 'avg_3_3' => 0,
+                    'avg_4_1'         => 0, 'avg_4_2' => 0, 'avg_4_3' => 0,
+                    'teacher_c'       => null,
+                    'teacher_s'       => null,
+                    'teacher_l'       => null,
+                    'teacher_m'       => null
+                ];
+            }
+            
+            // ดึงผลคะแนนประเมินที่มีอยู่ทั้งหมด พร้อมคะแนนรายด้านย่อย
+            $stmt_eval = $pdo->query('SELECT student_id, evaluator_type, total_score,
+                score_1_1, score_1_2, score_1_3,
+                score_2_1, score_2_2,
+                score_3_1, score_3_2, score_3_3,
+                score_4_1, score_4_2, score_4_3
+                FROM evaluations');
+            while ($row = $stmt_eval->fetch()) {
+                $sId = $row['student_id'];
+                $type = $row['evaluator_type'];
+                $score = (float)$row['total_score'];
+                
+                if (isset($summary[$sId])) {
+                    if ($type === 'ตนเองประเมิน') {
+                        $summary[$sId]['self'] = true;
+                        $summary[$sId]['selfScore'] = $score;
+                    } else if ($type === 'เพื่อนประเมิน') {
+                        $summary[$sId]['peer'] = true;
+                        $summary[$sId]['peerScore'] = $score;
+                    } else if ($type === 'ครูประเมิน') {
+                        $summary[$sId]['teacher'] = true;
+                        $summary[$sId]['teacherScore'] = $score;
+                        $summary[$sId]['teacher_c'] = (float)$row['score_1_1'] + (float)$row['score_1_2'] + (float)$row['score_1_3'];
+                        $summary[$sId]['teacher_s'] = (float)$row['score_2_1'] + (float)$row['score_2_2'];
+                        $summary[$sId]['teacher_l'] = (float)$row['score_3_1'] + (float)$row['score_3_2'] + (float)$row['score_3_3'];
+                        $summary[$sId]['teacher_m'] = (float)$row['score_4_1'] + (float)$row['score_4_2'] + (float)$row['score_4_3'];
+                    }
+                    
+                    $summary[$sId]['totalScoreAcc'] += $score;
+                    $summary[$sId]['s11_acc'] += (float)$row['score_1_1'];
+                    $summary[$sId]['s12_acc'] += (float)$row['score_1_2'];
+                    $summary[$sId]['s13_acc'] += (float)$row['score_1_3'];
+                    $summary[$sId]['s21_acc'] += (float)$row['score_2_1'];
+                    $summary[$sId]['s22_acc'] += (float)$row['score_2_2'];
+                    $summary[$sId]['s31_acc'] += (float)$row['score_3_1'];
+                    $summary[$sId]['s32_acc'] += (float)$row['score_3_2'];
+                    $summary[$sId]['s33_acc'] += (float)$row['score_3_3'];
+                    $summary[$sId]['s41_acc'] += (float)$row['score_4_1'];
+                    $summary[$sId]['s42_acc'] += (float)$row['score_4_2'];
+                    $summary[$sId]['s43_acc'] += (float)$row['score_4_3'];
+                    $summary[$sId]['count']++;
+                }
+            }
+            
+            // คำนวณหาค่าเฉลี่ยสะสมและค่าเฉลี่ยสะสมรายด้านย่อย
+            foreach ($summary as $key => &$data) {
+                if ($data['count'] > 0) {
+                    $data['avgScore'] = (float)number_format($data['totalScoreAcc'] / $data['count'], 2, '.', '');
+                    $data['avg_1_1'] = (float)number_format($data['s11_acc'] / $data['count'], 2, '.', '');
+                    $data['avg_1_2'] = (float)number_format($data['s12_acc'] / $data['count'], 2, '.', '');
+                    $data['avg_1_3'] = (float)number_format($data['s13_acc'] / $data['count'], 2, '.', '');
+                    $data['avg_2_1'] = (float)number_format($data['s21_acc'] / $data['count'], 2, '.', '');
+                    $data['avg_2_2'] = (float)number_format($data['s22_acc'] / $data['count'], 2, '.', '');
+                    $data['avg_3_1'] = (float)number_format($data['s31_acc'] / $data['count'], 2, '.', '');
+                    $data['avg_3_2'] = (float)number_format($data['s32_acc'] / $data['count'], 2, '.', '');
+                    $data['avg_3_3'] = (float)number_format($data['s33_acc'] / $data['count'], 2, '.', '');
+                    $data['avg_4_1'] = (float)number_format($data['s41_acc'] / $data['count'], 2, '.', '');
+                    $data['avg_4_2'] = (float)number_format($data['s42_acc'] / $data['count'], 2, '.', '');
+                    $data['avg_4_3'] = (float)number_format($data['s43_acc'] / $data['count'], 2, '.', '');
+                    
+                    // คำนวณค่าเฉลี่ยด้านหลักจากผลรวมเฉลี่ยด้านย่อยแบบทศนิยมแม่นยำ
+                    $data['avg_c'] = (float)number_format(($data['s11_acc'] + $data['s12_acc'] + $data['s13_acc']) / $data['count'], 2, '.', '');
+                    $data['avg_s'] = (float)number_format(($data['s21_acc'] + $data['s22_acc']) / $data['count'], 2, '.', '');
+                    $data['avg_l'] = (float)number_format(($data['s31_acc'] + $data['s32_acc'] + $data['s33_acc']) / $data['count'], 2, '.', '');
+                    $data['avg_m'] = (float)number_format(($data['s41_acc'] + $data['s42_acc'] + $data['s43_acc']) / $data['count'], 2, '.', '');
+                }
+            }
+            
+            echo json_encode(['success' => true, 'data' => $summary]);
+            break;
+
+        // ==========================================
+        // เครื่องมือสะท้อนคิดและการประเมินเพิ่มเติม (Reflection Tools Actions)
+        // ==========================================
+
+        case 'bulk_save_writing_problems':
+            $list = isset($request_data['list']) ? $request_data['list'] : [];
+            if (empty($list)) {
+                echo json_encode(['success' => false, 'error' => 'No data list provided']);
+                exit;
+            }
+            
+            $pdo->beginTransaction();
+            try {
+                $stmt = $pdo->prepare('
+                    INSERT INTO writing_problems (
+                        student_id,
+                        prob_1_1, sol_1_1, prob_1_2, sol_1_2, prob_1_3, sol_1_3,
+                        prob_2_1, sol_2_1, prob_2_2, sol_2_2,
+                        prob_3_1, sol_3_1, prob_3_2, sol_3_2, prob_3_3, sol_3_3,
+                        prob_4_1, sol_4_1, prob_4_2, sol_4_2, prob_4_3, sol_4_3
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE
+                        prob_1_1 = VALUES(prob_1_1), sol_1_1 = VALUES(sol_1_1),
+                        prob_1_2 = VALUES(prob_1_2), sol_1_2 = VALUES(sol_1_2),
+                        prob_1_3 = VALUES(prob_1_3), sol_1_3 = VALUES(sol_1_3),
+                        prob_2_1 = VALUES(prob_2_1), sol_2_1 = VALUES(sol_2_1),
+                        prob_2_2 = VALUES(prob_2_2), sol_2_2 = VALUES(sol_2_2),
+                        prob_3_1 = VALUES(prob_3_1), sol_3_1 = VALUES(sol_3_1),
+                        prob_3_2 = VALUES(prob_3_2), sol_3_2 = VALUES(sol_3_2),
+                        prob_3_3 = VALUES(prob_3_3), sol_3_3 = VALUES(sol_3_3),
+                        prob_4_1 = VALUES(prob_4_1), sol_4_1 = VALUES(sol_4_1),
+                        prob_4_2 = VALUES(prob_4_2), sol_4_2 = VALUES(sol_4_2),
+                        prob_4_3 = VALUES(prob_4_3), sol_4_3 = VALUES(sol_4_3)
+                ');
+                foreach ($list as $row) {
+                    $p = isset($row['problems']) ? $row['problems'] : [];
+                    $stmt->execute([
+                        $row['studentId'],
+                        isset($p['prob_1_1']) ? $p['prob_1_1'] : null, isset($p['sol_1_1']) ? $p['sol_1_1'] : null,
+                        isset($p['prob_1_2']) ? $p['prob_1_2'] : null, isset($p['sol_1_2']) ? $p['sol_1_2'] : null,
+                        isset($p['prob_1_3']) ? $p['prob_1_3'] : null, isset($p['sol_1_3']) ? $p['sol_1_3'] : null,
+                        isset($p['prob_2_1']) ? $p['prob_2_1'] : null, isset($p['sol_2_1']) ? $p['sol_2_1'] : null,
+                        isset($p['prob_2_2']) ? $p['prob_2_2'] : null, isset($p['sol_2_2']) ? $p['sol_2_2'] : null,
+                        isset($p['prob_3_1']) ? $p['prob_3_1'] : null, isset($p['sol_3_1']) ? $p['sol_3_1'] : null,
+                        isset($p['prob_3_2']) ? $p['prob_3_2'] : null, isset($p['sol_3_2']) ? $p['sol_3_2'] : null,
+                        isset($p['prob_3_3']) ? $p['prob_3_3'] : null, isset($p['sol_3_3']) ? $p['sol_3_3'] : null,
+                        isset($p['prob_4_1']) ? $p['prob_4_1'] : null, isset($p['sol_4_1']) ? $p['sol_4_1'] : null,
+                        isset($p['prob_4_2']) ? $p['prob_4_2'] : null, isset($p['sol_4_2']) ? $p['sol_4_2'] : null,
+                        isset($p['prob_4_3']) ? $p['prob_4_3'] : null, isset($p['sol_4_3']) ? $p['sol_4_3'] : null
+                    ]);
+                }
+                $pdo->commit();
+                echo json_encode(['success' => true]);
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+            exit;
+
+        case 'bulk_save_self_checklists':
+            $list = isset($request_data['list']) ? $request_data['list'] : [];
+            if (empty($list)) {
+                echo json_encode(['success' => false, 'error' => 'No data list provided']);
+                exit;
+            }
+            
+            $pdo->beginTransaction();
+            try {
+                $stmt = $pdo->prepare('
+                    INSERT INTO self_checklists (
+                        student_id,
+                        check_1_1, check_1_2, check_1_3,
+                        check_2_1, check_2_2,
+                        check_3_1, check_3_2, check_3_3,
+                        check_4_1, check_4_2, check_4_3,
+                        notes
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE
+                        check_1_1 = VALUES(check_1_1), check_1_2 = VALUES(check_1_2), check_1_3 = VALUES(check_1_3),
+                        check_2_1 = VALUES(check_2_1), check_2_2 = VALUES(check_2_2),
+                        check_3_1 = VALUES(check_3_1), check_3_2 = VALUES(check_3_2), check_3_3 = VALUES(check_3_3),
+                        check_4_1 = VALUES(check_4_1), check_4_2 = VALUES(check_4_2), check_4_3 = VALUES(check_4_3),
+                        notes = VALUES(notes)
+                ');
+                foreach ($list as $row) {
+                    $c = isset($row['checklist']) ? $row['checklist'] : [];
+                    $stmt->execute([
+                        $row['studentId'],
+                        isset($c['1.1']) ? $c['1.1'] : 'ต้องปรับปรุง',
+                        isset($c['1.2']) ? $c['1.2'] : 'ต้องปรับปรุง',
+                        isset($c['1.3']) ? $c['1.3'] : 'ต้องปรับปรุง',
+                        isset($c['2.1']) ? $c['2.1'] : 'ต้องปรับปรุง',
+                        isset($c['2.2']) ? $c['2.2'] : 'ต้องปรับปรุง',
+                        isset($c['3.1']) ? $c['3.1'] : 'ต้องปรับปรุง',
+                        isset($c['3.2']) ? $c['3.2'] : 'ต้องปรับปรุง',
+                        isset($c['3.3']) ? $c['3.3'] : 'ต้องปรับปรุง',
+                        isset($c['4.1']) ? $c['4.1'] : 'ต้องปรับปรุง',
+                        isset($c['4.2']) ? $c['4.2'] : 'ต้องปรับปรุง',
+                        isset($c['4.3']) ? $c['4.3'] : 'ต้องปรับปรุง',
+                        isset($row['notes']) ? $row['notes'] : ''
+                    ]);
+                }
+                $pdo->commit();
+                echo json_encode(['success' => true]);
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+            exit;
+
+        case 'bulk_save_peer_reviews':
+            $list = isset($request_data['list']) ? $request_data['list'] : [];
+            if (empty($list)) {
+                echo json_encode(['success' => false, 'error' => 'No data list provided']);
+                exit;
+            }
+            
+            $pdo->beginTransaction();
+            try {
+                $stmt = $pdo->prepare('
+                    INSERT INTO peer_reviews (
+                        student_id, reviewer_id,
+                        score_1_1, score_1_2, score_1_3, score_1_4,
+                        score_2_1, score_2_2,
+                        score_3_1, score_3_2, score_3_3, score_3_4,
+                        score_4_1, score_4_2, score_4_3,
+                        strength, improvement, encouragement
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE
+                        score_1_1 = VALUES(score_1_1), score_1_2 = VALUES(score_1_2), score_1_3 = VALUES(score_1_3), score_1_4 = VALUES(score_1_4),
+                        score_2_1 = VALUES(score_2_1), score_2_2 = VALUES(score_2_2),
+                        score_3_1 = VALUES(score_3_1), score_3_2 = VALUES(score_3_2), score_3_3 = VALUES(score_3_3), score_3_4 = VALUES(score_3_4),
+                        score_4_1 = VALUES(score_4_1), score_4_2 = VALUES(score_4_2), score_4_3 = VALUES(score_4_3),
+                        strength = VALUES(strength), improvement = VALUES(improvement), encouragement = VALUES(encouragement)
+                ');
+                foreach ($list as $row) {
+                    $s = isset($row['scores']) ? $row['scores'] : [];
+                    $stmt->execute([
+                        $row['studentId'],
+                        $row['reviewerId'],
+                        isset($s['1.1']) ? $s['1.1'] : 'ปรับปรุง',
+                        isset($s['1.2']) ? $s['1.2'] : 'ปรับปรุง',
+                        isset($s['1.3']) ? $s['1.3'] : 'ปรับปรุง',
+                        isset($s['1.4']) ? $s['1.4'] : 'ปรับปรุง',
+                        isset($s['2.1']) ? $s['2.1'] : 'ปรับปรุง',
+                        isset($s['2.2']) ? $s['2.2'] : 'ปรับปรุง',
+                        isset($s['3.1']) ? $s['3.1'] : 'ปรับปรุง',
+                        isset($s['3.2']) ? $s['3.2'] : 'ปรับปรุง',
+                        isset($s['3.3']) ? $s['3.3'] : 'ปรับปรุง',
+                        isset($s['3.4']) ? $s['3.4'] : 'ปรับปรุง',
+                        isset($s['4.1']) ? $s['4.1'] : 'ปรับปรุง',
+                        isset($s['4.2']) ? $s['4.2'] : 'ปรับปรุง',
+                        isset($s['4.3']) ? $s['4.3'] : 'ปรับปรุง',
+                        isset($row['strength']) ? $row['strength'] : '',
+                        isset($row['improvement']) ? $row['improvement'] : '',
+                        isset($row['encouragement']) ? $row['encouragement'] : ''
+                    ]);
+                }
+                $pdo->commit();
+                echo json_encode(['success' => true]);
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+            exit;
+
+        case 'bulk_save_learning_reflections':
+            $list = isset($request_data['list']) ? $request_data['list'] : [];
+            if (empty($list)) {
+                echo json_encode(['success' => false, 'error' => 'No data list provided']);
+                exit;
+            }
+            
+            $pdo->beginTransaction();
+            try {
+                $stmt = $pdo->prepare('
+                    INSERT INTO learning_reflections (
+                        student_id, content_structure, language_mechanics, feedback_applied, future_goals
+                    ) VALUES (?, ?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE
+                        content_structure = VALUES(content_structure),
+                        language_mechanics = VALUES(language_mechanics),
+                        feedback_applied = VALUES(feedback_applied),
+                        future_goals = VALUES(future_goals)
+                ');
+                foreach ($list as $row) {
+                    $stmt->execute([
+                        $row['studentId'],
+                        isset($row['content_structure']) ? $row['content_structure'] : '',
+                        isset($row['language_mechanics']) ? $row['language_mechanics'] : '',
+                        isset($row['feedback_applied']) ? $row['feedback_applied'] : '',
+                        isset($row['future_goals']) ? $row['future_goals'] : ''
+                    ]);
+                }
+                $pdo->commit();
+                echo json_encode(['success' => true]);
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+            exit;
+
+        case 'save_writing_problems':
+            $studentId = isset($request_data['studentId']) ? $request_data['studentId'] : '';
+            if (empty($studentId)) {
+                echo json_encode(['success' => false, 'error' => 'Student ID is required']);
+                exit;
+            }
+            $p = isset($request_data['problems']) ? $request_data['problems'] : [];
+            
+            $stmt = $pdo->prepare('
+                INSERT INTO writing_problems (
+                    student_id,
+                    prob_1_1, sol_1_1, prob_1_2, sol_1_2, prob_1_3, sol_1_3,
+                    prob_2_1, sol_2_1, prob_2_2, sol_2_2,
+                    prob_3_1, sol_3_1, prob_3_2, sol_3_2, prob_3_3, sol_3_3,
+                    prob_4_1, sol_4_1, prob_4_2, sol_4_2, prob_4_3, sol_4_3
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                    prob_1_1 = VALUES(prob_1_1), sol_1_1 = VALUES(sol_1_1),
+                    prob_1_2 = VALUES(prob_1_2), sol_1_2 = VALUES(sol_1_2),
+                    prob_1_3 = VALUES(prob_1_3), sol_1_3 = VALUES(sol_1_3),
+                    prob_2_1 = VALUES(prob_2_1), sol_2_1 = VALUES(sol_2_1),
+                    prob_2_2 = VALUES(prob_2_2), sol_2_2 = VALUES(sol_2_2),
+                    prob_3_1 = VALUES(prob_3_1), sol_3_1 = VALUES(sol_3_1),
+                    prob_3_2 = VALUES(prob_3_2), sol_3_2 = VALUES(sol_3_2),
+                    prob_3_3 = VALUES(prob_3_3), sol_3_3 = VALUES(sol_3_3),
+                    prob_4_1 = VALUES(prob_4_1), sol_4_1 = VALUES(sol_4_1),
+                    prob_4_2 = VALUES(prob_4_2), sol_4_2 = VALUES(sol_4_2),
+                    prob_4_3 = VALUES(prob_4_3), sol_4_3 = VALUES(sol_4_3)
+            ');
+            $stmt->execute([
+                $studentId,
+                isset($p['prob_1_1']) ? $p['prob_1_1'] : null, isset($p['sol_1_1']) ? $p['sol_1_1'] : null,
+                isset($p['prob_1_2']) ? $p['prob_1_2'] : null, isset($p['sol_1_2']) ? $p['sol_1_2'] : null,
+                isset($p['prob_1_3']) ? $p['prob_1_3'] : null, isset($p['sol_1_3']) ? $p['sol_1_3'] : null,
+                isset($p['prob_2_1']) ? $p['prob_2_1'] : null, isset($p['sol_2_1']) ? $p['sol_2_1'] : null,
+                isset($p['prob_2_2']) ? $p['prob_2_2'] : null, isset($p['sol_2_2']) ? $p['sol_2_2'] : null,
+                isset($p['prob_3_1']) ? $p['prob_3_1'] : null, isset($p['sol_3_1']) ? $p['sol_3_1'] : null,
+                isset($p['prob_3_2']) ? $p['prob_3_2'] : null, isset($p['sol_3_2']) ? $p['sol_3_2'] : null,
+                isset($p['prob_3_3']) ? $p['prob_3_3'] : null, isset($p['sol_3_3']) ? $p['sol_3_3'] : null,
+                isset($p['prob_4_1']) ? $p['prob_4_1'] : null, isset($p['sol_4_1']) ? $p['sol_4_1'] : null,
+                isset($p['prob_4_2']) ? $p['prob_4_2'] : null, isset($p['sol_4_2']) ? $p['sol_4_2'] : null,
+                isset($p['prob_4_3']) ? $p['prob_4_3'] : null, isset($p['sol_4_3']) ? $p['sol_4_3'] : null
+            ]);
+            echo json_encode(['success' => true]);
+            break;
+
+        case 'get_writing_problems':
+            $studentId = isset($_GET['studentId']) ? $_GET['studentId'] : '';
+            if (empty($studentId)) {
+                echo json_encode(['success' => false, 'error' => 'Student ID is required']);
+                exit;
+            }
+            $stmt = $pdo->prepare('SELECT * FROM writing_problems WHERE student_id = ?');
+            $stmt->execute([$studentId]);
+            $row = $stmt->fetch();
+            echo json_encode(['success' => true, 'data' => $row ? $row : null]);
+            break;
+
+        case 'save_self_checklist':
+            $studentId = isset($request_data['studentId']) ? $request_data['studentId'] : '';
+            if (empty($studentId)) {
+                echo json_encode(['success' => false, 'error' => 'Student ID is required']);
+                exit;
+            }
+            $c = isset($request_data['checklist']) ? $request_data['checklist'] : [];
+            $notes = isset($request_data['notes']) ? $request_data['notes'] : '';
+            
+            $stmt = $pdo->prepare('
+                INSERT INTO self_checklists (
+                    student_id,
+                    check_1_1, check_1_2, check_1_3,
+                    check_2_1, check_2_2,
+                    check_3_1, check_3_2, check_3_3,
+                    check_4_1, check_4_2, check_4_3,
+                    notes
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                    check_1_1 = VALUES(check_1_1), check_1_2 = VALUES(check_1_2), check_1_3 = VALUES(check_1_3),
+                    check_2_1 = VALUES(check_2_1), check_2_2 = VALUES(check_2_2),
+                    check_3_1 = VALUES(check_3_1), check_3_2 = VALUES(check_3_2), check_3_3 = VALUES(check_3_3),
+                    check_4_1 = VALUES(check_4_1), check_4_2 = VALUES(check_4_2), check_4_3 = VALUES(check_4_3),
+                    notes = VALUES(notes)
+            ');
+            $stmt->execute([
+                $studentId,
+                isset($c['1.1']) ? $c['1.1'] : 'ต้องปรับปรุง',
+                isset($c['1.2']) ? $c['1.2'] : 'ต้องปรับปรุง',
+                isset($c['1.3']) ? $c['1.3'] : 'ต้องปรับปรุง',
+                isset($c['2.1']) ? $c['2.1'] : 'ต้องปรับปรุง',
+                isset($c['2.2']) ? $c['2.2'] : 'ต้องปรับปรุง',
+                isset($c['3.1']) ? $c['3.1'] : 'ต้องปรับปรุง',
+                isset($c['3.2']) ? $c['3.2'] : 'ต้องปรับปรุง',
+                isset($c['3.3']) ? $c['3.3'] : 'ต้องปรับปรุง',
+                isset($c['4.1']) ? $c['4.1'] : 'ต้องปรับปรุง',
+                isset($c['4.2']) ? $c['4.2'] : 'ต้องปรับปรุง',
+                isset($c['4.3']) ? $c['4.3'] : 'ต้องปรับปรุง',
+                $notes
+            ]);
+            echo json_encode(['success' => true]);
+            break;
+
+        case 'get_self_checklist':
+            $studentId = isset($_GET['studentId']) ? $_GET['studentId'] : '';
+            if (empty($studentId)) {
+                echo json_encode(['success' => false, 'error' => 'Student ID is required']);
+                exit;
+            }
+            $stmt = $pdo->prepare('SELECT * FROM self_checklists WHERE student_id = ?');
+            $stmt->execute([$studentId]);
+            $row = $stmt->fetch();
+            echo json_encode(['success' => true, 'data' => $row ? $row : null]);
+            break;
+
+        case 'save_peer_review':
+            $studentId = isset($request_data['studentId']) ? $request_data['studentId'] : '';
+            $reviewerId = isset($request_data['reviewerId']) ? $request_data['reviewerId'] : '';
+            if (empty($studentId) || empty($reviewerId)) {
+                echo json_encode(['success' => false, 'error' => 'Student ID and Reviewer ID are required']);
+                exit;
+            }
+            $s = isset($request_data['scores']) ? $request_data['scores'] : [];
+            $strength = isset($request_data['strength']) ? $request_data['strength'] : '';
+            $improvement = isset($request_data['improvement']) ? $request_data['improvement'] : '';
+            $encouragement = isset($request_data['encouragement']) ? $request_data['encouragement'] : '';
+            
+            $stmt = $pdo->prepare('
+                INSERT INTO peer_reviews (
+                    student_id, reviewer_id,
+                    score_1_1, score_1_2, score_1_3, score_1_4,
+                    score_2_1, score_2_2,
+                    score_3_1, score_3_2, score_3_3, score_3_4,
+                    score_4_1, score_4_2, score_4_3,
+                    strength, improvement, encouragement
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                    score_1_1 = VALUES(score_1_1), score_1_2 = VALUES(score_1_2), score_1_3 = VALUES(score_1_3), score_1_4 = VALUES(score_1_4),
+                    score_2_1 = VALUES(score_2_1), score_2_2 = VALUES(score_2_2),
+                    score_3_1 = VALUES(score_3_1), score_3_2 = VALUES(score_3_2), score_3_3 = VALUES(score_3_3), score_3_4 = VALUES(score_3_4),
+                    score_4_1 = VALUES(score_4_1), score_4_2 = VALUES(score_4_2), score_4_3 = VALUES(score_4_3),
+                    strength = VALUES(strength), improvement = VALUES(improvement), encouragement = VALUES(encouragement)
+            ');
+            $stmt->execute([
+                $studentId, $reviewerId,
+                isset($s['1.1']) ? $s['1.1'] : 'ปรับปรุง',
+                isset($s['1.2']) ? $s['1.2'] : 'ปรับปรุง',
+                isset($s['1.3']) ? $s['1.3'] : 'ปรับปรุง',
+                isset($s['1.4']) ? $s['1.4'] : 'ปรับปรุง',
+                isset($s['2.1']) ? $s['2.1'] : 'ปรับปรุง',
+                isset($s['2.2']) ? $s['2.2'] : 'ปรับปรุง',
+                isset($s['3.1']) ? $s['3.1'] : 'ปรับปรุง',
+                isset($s['3.2']) ? $s['3.2'] : 'ปรับปรุง',
+                isset($s['3.3']) ? $s['3.3'] : 'ปรับปรุง',
+                isset($s['3.4']) ? $s['3.4'] : 'ปรับปรุง',
+                isset($s['4.1']) ? $s['4.1'] : 'ปรับปรุง',
+                isset($s['4.2']) ? $s['4.2'] : 'ปรับปรุง',
+                isset($s['4.3']) ? $s['4.3'] : 'ปรับปรุง',
+                $strength, $improvement, $encouragement
+            ]);
+            echo json_encode(['success' => true]);
+            break;
+
+        case 'get_peer_reviews':
+            $studentId = isset($_GET['studentId']) ? $_GET['studentId'] : '';
+            if (empty($studentId)) {
+                echo json_encode(['success' => false, 'error' => 'Student ID is required']);
+                exit;
+            }
+            $stmt = $pdo->prepare('
+                SELECT pr.*, s.student_name AS reviewer_name 
+                FROM peer_reviews pr
+                JOIN students s ON pr.reviewer_id = s.student_id
+                WHERE pr.student_id = ?
+            ');
+            $stmt->execute([$studentId]);
+            $rows = $stmt->fetchAll();
+            echo json_encode(['success' => true, 'data' => $rows]);
+            break;
+
+        case 'save_learning_reflection':
+            $studentId = isset($request_data['studentId']) ? $request_data['studentId'] : '';
+            if (empty($studentId)) {
+                echo json_encode(['success' => false, 'error' => 'Student ID is required']);
+                exit;
+            }
+            $cs = isset($request_data['content_structure']) ? $request_data['content_structure'] : '';
+            $lm = isset($request_data['language_mechanics']) ? $request_data['language_mechanics'] : '';
+            $fa = isset($request_data['feedback_applied']) ? $request_data['feedback_applied'] : '';
+            $fg = isset($request_data['future_goals']) ? $request_data['future_goals'] : '';
+            
+            $stmt = $pdo->prepare('
+                INSERT INTO learning_reflections (
+                    student_id, content_structure, language_mechanics, feedback_applied, future_goals
+                ) VALUES (?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                    content_structure = VALUES(content_structure),
+                    language_mechanics = VALUES(language_mechanics),
+                    feedback_applied = VALUES(feedback_applied),
+                    future_goals = VALUES(future_goals)
+            ');
+            $stmt->execute([$studentId, $cs, $lm, $fa, $fg]);
+            echo json_encode(['success' => true]);
+            break;
+
+        case 'get_learning_reflection':
+            $studentId = isset($_GET['studentId']) ? $_GET['studentId'] : '';
+            if (empty($studentId)) {
+                echo json_encode(['success' => false, 'error' => 'Student ID is required']);
+                exit;
+            }
+            $stmt = $pdo->prepare('SELECT * FROM learning_reflections WHERE student_id = ?');
+            $stmt->execute([$studentId]);
+            $row = $stmt->fetch();
+            echo json_encode(['success' => true, 'data' => $row ? $row : null]);
+            break;
+
+        case 'get_reflection_summary':
+            $total_students_res = $pdo->query('SELECT COUNT(*) FROM students')->fetchColumn();
+            
+            $prob_count = $pdo->query('SELECT COUNT(*) FROM writing_problems')->fetchColumn();
+            $chk_count = $pdo->query('SELECT COUNT(*) FROM self_checklists')->fetchColumn();
+            $peer_count = $pdo->query('SELECT COUNT(DISTINCT student_id) FROM peer_reviews')->fetchColumn();
+            $ref_count = $pdo->query('SELECT COUNT(*) FROM learning_reflections')->fetchColumn();
+            
+            // ปัญหาล่าสุด
+            $stmt_probs = $pdo->query('
+                SELECT wp.*, s.student_name 
+                FROM writing_problems wp
+                JOIN students s ON wp.student_id = s.student_id
+                ORDER BY wp.created_at DESC LIMIT 5
+            ');
+            $recent_problems = $stmt_probs->fetchAll();
+            
+            // รีวิวล่าสุด
+            $stmt_peers = $pdo->query('
+                SELECT pr.*, s.student_name, r.student_name AS reviewer_name 
+                FROM peer_reviews pr
+                JOIN students s ON pr.student_id = s.student_id
+                JOIN students r ON pr.reviewer_id = r.student_id
+                ORDER BY pr.created_at DESC LIMIT 5
+            ');
+            $recent_peers = $stmt_peers->fetchAll();
+            
+            echo json_encode([
+                'success' => true,
+                'stats' => [
+                    'total_students' => (int)$total_students_res,
+                    'problems_completed' => (int)$prob_count,
+                    'checklists_completed' => (int)$chk_count,
+                    'peer_reviews_completed' => (int)$peer_count,
+                    'reflections_completed' => (int)$ref_count
+                ],
+                'recent_problems' => $recent_problems,
+                'recent_peers' => $recent_peers
+            ]);
+            break;
+
+        // N. ดึงข้อมูลบันทึกการสะท้อนการเรียนรู้ (Learning Reflection)
+        case 'get_reflection_data':
+            $studentId = isset($_GET['studentId']) ? trim($_GET['studentId']) : '';
+            if (empty($studentId)) {
+                echo json_encode(['success' => false, 'error' => 'Student ID required']);
+                exit;
+            }
+            $stmt = $pdo->prepare('SELECT * FROM learning_reflections WHERE student_id = ?');
+            $stmt->execute([$studentId]);
+            $row = $stmt->fetch();
+            if ($row) {
+                echo json_encode([
+                    'success' => true,
+                    'found'   => true,
+                    'data' => [
+                        'content_structure'  => $row['content_structure']  ?? '',
+                        'language_mechanics' => $row['language_mechanics'] ?? '',
+                        'feedback_applied'   => $row['feedback_applied']   ?? '',
+                        'future_goals'       => $row['future_goals']       ?? ''
+                    ]
+                ]);
+            } else {
+                echo json_encode(['success' => true, 'found' => false, 'data' => null]);
+            }
+            break;
+
+        default:
+            echo json_encode(['success' => false, 'error' => 'Action not found']);
+            break;
+    }
+} catch (Exception $e) {
+    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+}

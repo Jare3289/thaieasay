@@ -1,0 +1,161 @@
+:root {
+  --primary-navy: #0f172a;       /* สีกรมท่าลึก หรูหราเป็นทางการ */
+  --secondary-blue: #1e3a8a;     /* สีน้ำเงินหลวง มั่นคง น่าเชื่อถือ */
+  --accent-teal: #0d9488;        /* สีเทล/เขียวหัวเป็ด วิชาการและการเติบโต */
+  --light-blue: #f0f9ff;
+  --light-teal: #f0fdfa;
+  --light-slate: #f8fafc;
+  --border-gray: #e2e8f0;
+}
+
+body { 
+  font-family: 'Google Sans', sans-serif; 
+  background-color: var(--light-slate);
+  color: #334155;
+}
+
+/* สไตล์ Navbar สไตล์ทางการและน่าเชื่อถือ */
+.navbar-academic {
+  background: linear-gradient(135deg, var(--primary-navy) 0%, var(--secondary-blue) 100%);
+  border-bottom: 3px solid var(--accent-teal);
+}
+
+/* สไตล์ปุ่มประเมินที่ซ่อนปุ่มวิทยุดั้งเดิม */
+.score-radio { 
+  display: none; 
+}
+
+/* สไตล์กล่องเกณฑ์คะแนน (Rubric Card) - ซ่อนคะแนนจริงเพื่อลดอคติ */
+.rubric-card {
+  border: 2px solid #e2e8f0;
+  background-color: #ffffff;
+  border-radius: 12px;
+  padding: 18px 16px;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  height: 100%;
+  position: relative;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.rubric-card:hover {
+  border-color: var(--secondary-blue);
+  background-color: var(--light-blue);
+  transform: translateY(-2px);
+}
+
+/* สีของกล่องตามการเลือกคะแนนจริง แบบเรียบหรูเป็นมืออาชีพ */
+.score-radio[value="4"]:checked + .rubric-card { border-color: var(--accent-teal); background-color: var(--light-teal); color: #0f766e; }
+.score-radio[value="3"]:checked + .rubric-card { border-color: var(--secondary-blue); background-color: var(--light-blue); color: #1e40af; }
+.score-radio[value="2"]:checked + .rubric-card { border-color: #64748b; background-color: #f8fafc; color: #475569; }
+.score-radio[value="1"]:checked + .rubric-card { border-color: #d97706; background-color: #fffbeb; color: #b45309; }
+.score-radio[value="0"]:checked + .rubric-card { border-color: #ef4444; background-color: #fef2f2; color: #b91c1c; }
+
+.score-radio:checked + .rubric-card {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transform: translateY(-3px);
+}
+
+/* วงกลมสัญลักษณ์ Check Circle ด้านใน Card */
+.check-circle {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid #cbd5e1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: transparent;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.score-radio:checked + .rubric-card .check-circle {
+  color: white;
+}
+.score-radio[value="4"]:checked + .rubric-card .check-circle { border-color: var(--accent-teal); background-color: var(--accent-teal); }
+.score-radio[value="3"]:checked + .rubric-card .check-circle { border-color: var(--secondary-blue); background-color: var(--secondary-blue); }
+.score-radio[value="2"]:checked + .rubric-card .check-circle { border-color: #64748b; background-color: #64748b; }
+.score-radio[value="1"]:checked + .rubric-card .check-circle { border-color: #d97706; background-color: #d97706; }
+.score-radio[value="0"]:checked + .rubric-card .check-circle { border-color: #ef4444; background-color: #ef4444; }
+
+/* ปุ่มและกรอบสไตล์สุภาพ */
+.btn-primary {
+  background-color: var(--secondary-blue);
+  border-color: var(--secondary-blue);
+  color: white;
+}
+.btn-primary:hover, .btn-primary:focus {
+  background-color: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+.btn-success {
+  background-color: var(--accent-teal);
+  border-color: var(--accent-teal);
+}
+.btn-success:hover {
+  background-color: #0f766e;
+  border-color: #0f766e;
+}
+
+.btn-secondary-custom {
+  background-color: #475569;
+  border-color: #475569;
+  color: white;
+}
+.btn-secondary-custom:hover {
+  background-color: #334155;
+  border-color: #334155;
+  color: white;
+}
+
+/* การ์ดเมนูหลักแบบหรูหราเป็นทางการ */
+.menu-card {
+  background: white;
+  border: 1px solid var(--border-gray);
+  border-radius: 12px;
+  padding: 24px;
+  transition: all 0.3s ease;
+  height: 100%;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.menu-card:hover {
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+  border-color: var(--secondary-blue);
+  transform: translateY(-3px);
+}
+
+.toast-container-custom {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1060;
+}
+
+/* ปรับปรุงโครงสร้างตารางภาพรวมชั้นเรียนไม่ให้สไลด์บีบ (Usability Table Fix) */
+.table-classroom {
+  min-width: 850px; /* บังคับขนาดตารางขั้นต่ำเพื่อป้องกันการบีบอัดข้อมูลบนมือถือ */
+}
+
+.table-responsive {
+  border-radius: 10px;
+  border: 1px solid var(--border-gray);
+  overflow-x: auto; /* เปิดให้เลื่อนขวา-ซ้ายแบบราบรื่นบนจอเล็ก */
+}
+
+.hover-row:hover {
+  background-color: var(--light-blue) !important;
+}
+
+/* สไตล์สีป้ายระดับความสอดคล้อง/ประเมินที่ตัดกันชัดเจน */
+.badge-blue { background-color: #eff6ff; color: #1d4ed8; border: 1px solid #dbeafe; }
+.badge-teal { background-color: #f0fdf4; color: #15803d; border: 1px solid #dcfce7; }
+.badge-coral { background-color: #fff7ed; color: #c2410c; border: 1px solid #ffedd5; }
