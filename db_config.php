@@ -94,6 +94,17 @@ try {
     try { $pdo->exec("ALTER TABLE evaluations ADD COLUMN peer_strength TEXT NULL AFTER quality_level"); } catch (PDOException $e) {}
     try { $pdo->exec("ALTER TABLE evaluations ADD COLUMN peer_improvement TEXT NULL AFTER peer_strength"); } catch (PDOException $e) {}
     try { $pdo->exec("ALTER TABLE evaluations ADD COLUMN peer_encouragement TEXT NULL AFTER peer_improvement"); } catch (PDOException $e) {}
+
+    // Add test_phase column and modify unique index unique_eval
+    try { $pdo->exec("ALTER TABLE evaluations ADD COLUMN test_phase VARCHAR(20) DEFAULT 'posttest' AFTER evaluator_name"); } catch (PDOException $e) {}
+    try { $pdo->exec("ALTER TABLE evaluations DROP INDEX unique_eval"); } catch (PDOException $e) {}
+    try { $pdo->exec("ALTER TABLE evaluations ADD UNIQUE KEY unique_eval (student_id, evaluator_type, evaluator_name, test_phase)"); } catch (PDOException $e) {}
+
+    // เพิ่มคอลัมน์ created_at ในกรณีที่ตารางถูกสร้างในเวอร์ชันเก่าที่ยังไม่มีคอลัมน์นี้
+    try { $pdo->exec("ALTER TABLE writing_problems ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"); } catch (PDOException $e) {}
+    try { $pdo->exec("ALTER TABLE self_checklists ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"); } catch (PDOException $e) {}
+    try { $pdo->exec("ALTER TABLE peer_reviews ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"); } catch (PDOException $e) {}
+    try { $pdo->exec("ALTER TABLE learning_reflections ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"); } catch (PDOException $e) {}
 } catch (PDOException $e) {
     // ส่งข้อมูลข้อผิดพลาดกลับเป็น JSON กรณีเรียกใช้ผ่าน AJAX
     header('Content-Type: application/json; charset=utf-8');

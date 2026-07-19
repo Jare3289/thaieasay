@@ -106,6 +106,20 @@ require_once 'header.php';
       </div>
     </div>
   </div>
+  <?php elseif ($sessionUser['role'] === 'expert'): ?>
+  <!-- แผงสำหรับผู้เชี่ยวชาญ (Expert Menu) -->
+  <div id="menuExpert" class="row g-4 justify-content-center">
+    <div class="col-md-5 col-sm-12">
+      <a href="evaluation.php?mode=expert" class="btn menu-card w-100 py-5 text-decoration-none">
+        <div class="text-center w-100">
+          <div class="fs-1 mb-3">🎓</div>
+          <h4 class="fw-bold text-dark mb-2">ประเมินและให้คะแนนผลงาน (ผู้เชี่ยวชาญ)</h4>
+          <p class="text-muted small font-light">ทำการประเมินและให้คะแนนเรียงความของนักเรียนตามเกณฑ์ Inter-rater Reliability (ผู้ประเมินร่วม)</p>
+        </div>
+        <span class="text-primary text-center fw-bold small mt-3 d-block">เปิดหน้าฟอร์มประเมิน &rarr;</span>
+      </a>
+    </div>
+  </div>
   <?php else: ?>
   <!-- แผงสำหรับคุณครู (Teacher Menu) -->
   <div id="menuTeacher" class="row g-4">

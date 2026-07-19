@@ -24,13 +24,17 @@ require_once 'header.php';
         <div class="mb-3">
           <label class="form-label fw-bold text-secondary">บทบาทผู้เข้าใช้งาน</label>
           <div class="row g-2">
-            <div class="col-6">
+            <div class="col-4">
               <input type="radio" name="loginRole" value="student" id="roleStudent" class="btn-check" checked onchange="toggleLoginType()">
-              <label class="btn btn-outline-primary w-100 py-2.5 rounded-3 fw-bold" for="roleStudent">👨‍🎓 นักเรียน</label>
+              <label class="btn btn-outline-primary w-100 py-2.5 rounded-3 fw-bold small" for="roleStudent" style="font-size: 0.85rem; padding: 10px 2px;">👨‍🎓 นักเรียน</label>
             </div>
-            <div class="col-6">
+            <div class="col-4">
               <input type="radio" name="loginRole" value="teacher" id="roleTeacher" class="btn-check" onchange="toggleLoginType()">
-              <label class="btn btn-outline-success w-100 py-2.5 rounded-3 fw-bold" for="roleTeacher">👩‍🏫 ครูผู้สอน</label>
+              <label class="btn btn-outline-success w-100 py-2.5 rounded-3 fw-bold small" for="roleTeacher" style="font-size: 0.85rem; padding: 10px 2px;">👩‍🏫 ครูผู้สอน</label>
+            </div>
+            <div class="col-4">
+              <input type="radio" name="loginRole" value="expert" id="roleExpert" class="btn-check" onchange="toggleLoginType()">
+              <label class="btn btn-outline-warning w-100 py-2.5 rounded-3 fw-bold small" for="roleExpert" style="font-size: 0.85rem; padding: 10px 2px;">🎓 ผู้เชี่ยวชาญ</label>
             </div>
           </div>
         </div>
@@ -60,14 +64,18 @@ require_once 'header.php';
 <script>
   // สลับการระบุประเภทช่องป้อนข้อมูล
   function toggleLoginType() {
-    const isTeacher = document.querySelector('input[name="loginRole"]:checked').value === 'teacher';
+    const role = document.querySelector('input[name="loginRole"]:checked').value;
     const label = document.getElementById('loginIdLabel');
     const input = document.getElementById('loginId');
     
-    if (isTeacher) {
+    if (role === 'teacher') {
       label.textContent = "รหัสผ่านครูผู้สอน";
       input.placeholder = "ใส่รหัสผ่านเพื่อเข้าใช้งาน";
       input.type = "password";
+    } else if (role === 'expert') {
+      label.textContent = "รหัสประจำตัวผู้เชี่ยวชาญ";
+      input.placeholder = "ใส่รหัสผู้เชี่ยวชาญ (admin1 หรือ admin2)";
+      input.type = "text";
     } else {
       label.textContent = "รหัสประจำตัวนักเรียน";
       input.placeholder = "ใส่รหัสประจำตัว 5 หลัก";

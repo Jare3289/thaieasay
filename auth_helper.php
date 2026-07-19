@@ -40,6 +40,13 @@ if (!isset($_SESSION['user']) && isset($_COOKIE['remember_user'])) {
                 'name' => 'ครูผู้สอน',
                 'role' => 'teacher'
             ];
+        } else if ($role === 'expert' && ($loginId === 'admin1' || $loginId === 'admin2')) {
+            $expertNum = ($loginId === 'admin1') ? '1' : '2';
+            $_SESSION['user'] = [
+                'id' => $loginId,
+                'name' => 'ผู้เชี่ยวชาญ ' . $expertNum,
+                'role' => 'expert'
+            ];
         } else if ($role === 'student') {
             try {
                 $stmt = $pdo->prepare('SELECT * FROM students WHERE student_id = ?');

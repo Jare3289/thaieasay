@@ -81,13 +81,13 @@ $role = $sessionUser['role'];
                       <td><textarea name="sol_1_2" class="form-control form-control-sm" rows="2" placeholder="ระบุแนวทางแก้ไข..."></textarea></td>
                     </tr>
                     <tr>
-                      <td class="ps-3 small">1.3 การขยายความและให้เหตุผล</td>
+                      <td class="ps-3 small">1.3 การขยายความและเหตุผล</td>
                       <td><textarea name="prob_1_3" class="form-control form-control-sm" rows="2" placeholder="ระบุปัญหา..."></textarea></td>
                       <td><textarea name="sol_1_3" class="form-control form-control-sm" rows="2" placeholder="ระบุแนวทางแก้ไข..."></textarea></td>
                     </tr>
                     
                     <!-- ด้านองค์ประกอบและการลำดับ -->
-                    <tr class="table-light"><td colspan="3" class="fw-bold">2) ด้านองค์ประกอบและการลำดับเรื่อง</td></tr>
+                    <tr class="table-light"><td colspan="3" class="fw-bold">2) ด้านองค์ประกอบและการลำดับ</td></tr>
                     <tr>
                       <td class="ps-3 small">2.1 ความครบถ้วนขององค์ประกอบ</td>
                       <td><textarea name="prob_2_1" class="form-control form-control-sm" rows="2" placeholder="ระบุปัญหา..."></textarea></td>
@@ -184,7 +184,7 @@ $role = $sessionUser['role'];
                     </tr>
 
                     <!-- ด้านองค์ประกอบ -->
-                    <tr class="table-light"><td colspan="5" class="fw-bold">2. ด้านองค์ประกอบและการลำดับเรื่อง</td></tr>
+                    <tr class="table-light"><td colspan="5" class="fw-bold">2. ด้านองค์ประกอบและการลำดับ</td></tr>
                     <tr>
                       <td class="small">2.1 องค์ประกอบครบถ้วน</td>
                       <td class="small text-muted">งานเขียนมีองค์ประกอบ 3 ส่วน ครบถ้วนในสัดส่วนที่เหมาะสม และมีกลวิธีนำเสนอที่น่าสนใจ</td>
@@ -359,106 +359,84 @@ $role = $sessionUser['role'];
               </div>
             </div>
 
-            <!-- แผงควบคุมการนำเข้าข้อมูลระดับห้องเรียนด้วย Excel (ซ่อน/แสดง) -->
+            <style>
+              .hover-card:hover {
+                transform: translateY(-4px);
+                box-shadow: 0 10px 20px rgba(0,0,0,0.08) !important;
+                border-color: #0ea5e9 !important;
+              }
+              .sub-tab-btn.active {
+                background-color: #0ea5e9 !important;
+                color: #fff !important;
+              }
+              .sub-tab-btn {
+                color: #64748b;
+                border: 1px solid #cbd5e1;
+                border-radius: 50px;
+                padding: 0.5rem 1.25rem;
+                font-weight: 600;
+                transition: all 0.2s;
+              }
+              .sub-tab-btn:hover {
+                background-color: #f1f5f9;
+                color: #0f172a;
+              }
+              .monitoring-text-area {
+                font-size: 0.8rem;
+                line-height: 1.4;
+                max-height: 150px;
+                overflow-y: auto;
+              }
+            </style>
+
             <div class="mb-4">
-              <button class="btn btn-sm btn-outline-secondary fw-bold rounded-pill px-3 py-1" type="button"
-                      data-bs-toggle="collapse" data-bs-target="#excelImportPanel"
-                      aria-expanded="false" aria-controls="excelImportPanel">
-                <i class="bi bi-table"></i> 📊 แผงนำเข้าข้อมูลด้วย Excel (คลิกเพื่อเปิด/ปิด)
-              </button>
-              <div class="collapse mt-3" id="excelImportPanel">
-                <div class="card border-0 shadow-sm p-4 rounded-4 text-start bg-white border-start border-4 border-success">
-                  <div class="d-flex align-items-center mb-3">
-                    <span class="fs-4 me-2">📊</span>
-                    <div>
-                      <h6 class="fw-bold text-dark mb-0">แผงควบคุมการนำเข้าข้อมูลสะท้อนคิดทั้งห้องเรียนด้วย Excel (สำหรับครูผู้สอน)</h6>
-                      <span class="text-muted small">ดาวน์โหลดเทมเพลตสำหรับทั้งห้องเรียน กรอกข้อมูลออฟไลน์ตามคอลัมน์โดยระบุรหัสนักเรียนเป็นหลัก (Primary Key) คีย์แรก จากนั้นนำเข้าไฟล์เพื่อบันทึกพร้อมกันทันที</span>
-                    </div>
+              <ul class="nav nav-pills gap-2 mb-4 justify-content-center" id="monitoringTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link sub-tab-btn active" id="pill-obstacles-tab" data-bs-toggle="pill" data-bs-target="#pill-obstacles" type="button" role="tab" aria-controls="pill-obstacles" aria-selected="true">
+                    📝 1. อุปสรรคและแผนการแก้ปัญหา (<span id="countObstacles">0</span> คน)
+                  </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link sub-tab-btn" id="pill-checklist-tab" data-bs-toggle="pill" data-bs-target="#pill-checklist" type="button" role="tab" aria-controls="pill-checklist" aria-selected="false">
+                    📋 2. การตรวจสอบตนเอง (<span id="countChecklist">0</span> คน)
+                  </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link sub-tab-btn" id="pill-reflection-tab" data-bs-toggle="pill" data-bs-target="#pill-reflection" type="button" role="tab" aria-controls="pill-reflection" aria-selected="false">
+                    💡 3. การสะท้อนคิดการเรียนรู้ (<span id="countReflection">0</span> คน)
+                  </button>
+                </li>
+              </ul>
+
+              <div class="tab-content" id="monitoringTabContent">
+                <!-- Tab 1: อุปสรรคการเขียน -->
+                <div class="tab-pane fade show active" id="pill-obstacles" role="tabpanel" aria-labelledby="pill-obstacles-tab">
+                  <!-- Keyword trends panel -->
+                  <div class="card border-0 bg-light p-3 mb-4 rounded-4" id="obstaclesTrendsPanel" style="display: none;">
+                    <h6 class="fw-bold text-dark mb-2"><i class="bi bi-graph-up-arrow text-danger"></i> 📊 คำสำคัญที่เป็นประเด็นบ่อยในห้องเรียน (Obstacle Keywords)</h6>
+                    <div class="row g-2" id="obstaclesTrendsContainer"></div>
                   </div>
-                  <div class="row g-3">
-                    <!-- 1. ปัญหาการเขียน -->
-                    <div class="col-md-6 col-lg-3 col-12">
-                      <div class="p-3 border rounded-3 bg-light h-100">
-                        <strong class="text-dark small d-block mb-2">📝 1. ปัญหาการเขียน (Obstacles)</strong>
-                        <div class="d-flex flex-column gap-2">
-                          <button type="button" class="btn btn-outline-success btn-sm fw-bold rounded-pill text-nowrap" onclick="downloadClassObstaclesTemplate()">
-                            <i class="bi bi-download"></i> โหลดเทมเพลตทั้งชั้น
-                          </button>
-                          <label class="btn btn-success btn-sm fw-bold rounded-pill mb-0 cursor-pointer text-white text-nowrap">
-                            <i class="bi bi-upload"></i> นำเข้าไฟล์ CSV
-                            <input type="file" accept=".csv" style="display: none;" onchange="importClassObstaclesCSV(this)">
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-                    <!-- 2. เช็คลิสต์ตนเอง -->
-                    <div class="col-md-6 col-lg-3 col-12">
-                      <div class="p-3 border rounded-3 bg-light h-100">
-                        <strong class="text-dark small d-block mb-2">📋 2. ตรวจสอบตนเอง (Checklist)</strong>
-                        <div class="d-flex flex-column gap-2">
-                          <button type="button" class="btn btn-outline-success btn-sm fw-bold rounded-pill text-nowrap" onclick="downloadClassChecklistTemplate()">
-                            <i class="bi bi-download"></i> โหลดเทมเพลตทั้งชั้น
-                          </button>
-                          <label class="btn btn-success btn-sm fw-bold rounded-pill mb-0 cursor-pointer text-white text-nowrap">
-                            <i class="bi bi-upload"></i> นำเข้าไฟล์ CSV
-                            <input type="file" accept=".csv" style="display: none;" onchange="importClassChecklistCSV(this)">
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-                    <!-- 3. สะท้อนการเรียนรู้ -->
-                    <div class="col-md-6 col-lg-3 col-12">
-                      <div class="p-3 border rounded-3 bg-light h-100">
-                        <strong class="text-dark small d-block mb-2">💡 3. บันทึกสะท้อนคิด (Reflection)</strong>
-                        <div class="d-flex flex-column gap-2">
-                          <button type="button" class="btn btn-outline-success btn-sm fw-bold rounded-pill text-nowrap" onclick="downloadClassReflectionTemplate()">
-                            <i class="bi bi-download"></i> โหลดเทมเพลตทั้งชั้น
-                          </button>
-                          <label class="btn btn-success btn-sm fw-bold rounded-pill mb-0 cursor-pointer text-white text-nowrap">
-                            <i class="bi bi-upload"></i> นำเข้าไฟล์ CSV
-                            <input type="file" accept=".csv" style="display: none;" onchange="importClassReflectionCSV(this)">
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-                    <!-- 4. ประเมินโดยเพื่อน (ใช้สำหรับนำเข้าคะแนนการประเมินเพื่อนจาก evaluation.php แบบกลุ่ม) -->
-                    <div class="col-md-6 col-lg-3 col-12">
-                      <div class="p-3 border rounded-3 bg-light h-100">
-                        <strong class="text-dark small d-block mb-2">👥 4. ประเมินผลงานโดยเพื่อน (Peer)</strong>
-                        <div class="d-flex flex-column gap-2">
-                          <button type="button" class="btn btn-outline-success btn-sm fw-bold rounded-pill text-nowrap" onclick="downloadClassPeerReviewTemplate()">
-                            <i class="bi bi-download"></i> โหลดเทมเพลตทั้งชั้น
-                          </button>
-                          <label class="btn btn-success btn-sm fw-bold rounded-pill mb-0 cursor-pointer text-white text-nowrap">
-                            <i class="bi bi-upload"></i> นำเข้าไฟล์ CSV
-                            <input type="file" accept=".csv" style="display: none;" onchange="importClassPeerReviewCSV(this)">
-                          </label>
-                        </div>
-                      </div>
-                    </div>
+                  <div class="row g-3" id="gridObstacles">
+                    <div class="text-center py-5 text-muted">กำลังโหลดรายงานอุปสรรคการเขียน...</div>
                   </div>
                 </div>
-              </div>
-            </div>
 
-
-            <div class="row g-4">
-              <!-- รายการปัญหาที่ส่งล่าสุด -->
-              <div class="col-md-6 col-sm-12">
-                <div class="card border-0 shadow-sm p-3 bg-white h-100 rounded-3">
-                  <h6 class="fw-bold text-dark border-bottom pb-2 mb-3"><i class="bi bi-exclamation-triangle-fill text-warning"></i> อุปสรรคและแผนการแก้ปัญหาการเขียนล่าสุดของนักเรียน</h6>
-                  <div id="recentProblemsContainer" class="small text-muted" style="max-height: 350px; overflow-y: auto;">
-                    กำลังโหลดอุปสรรคการเขียนล่าสุด...
+                <!-- Tab 2: ตรวจสอบตนเอง -->
+                <div class="tab-pane fade" id="pill-checklist" role="tabpanel" aria-labelledby="pill-checklist-tab">
+                  <div class="row g-3" id="gridChecklist">
+                    <div class="text-center py-5 text-muted">กำลังโหลดรายงานการตรวจสอบตนเอง...</div>
                   </div>
                 </div>
-              </div>
 
-              <!-- รายการคำแนะนำและข้อเสนอแนะเพื่อนประเมินล่าสุด -->
-              <div class="col-md-6 col-sm-12">
-                <div class="card border-0 shadow-sm p-3 bg-white h-100 rounded-3">
-                  <h6 class="fw-bold text-dark border-bottom pb-2 mb-3"><i class="bi bi-chat-text-fill text-primary"></i> คำวิจารณ์และข้อเสนอแนะเพื่อนประเมินล่าสุด</h6>
-                  <div id="recentCommentsContainer" class="small text-muted" style="max-height: 350px; overflow-y: auto;">
-                    กำลังโหลดคำวิจารณ์ล่าสุด...
+                <!-- Tab 3: สะท้อนคิด -->
+                <div class="tab-pane fade" id="pill-reflection" role="tabpanel" aria-labelledby="pill-reflection-tab">
+                  <!-- Keyword trends panel -->
+                  <div class="card border-0 bg-light p-3 mb-4 rounded-4" id="reflectionTrendsPanel" style="display: none;">
+                    <h6 class="fw-bold text-dark mb-2"><i class="bi bi-graph-up-arrow text-info"></i> 📊 หัวข้อสำคัญในบทสะท้อนคิด (Reflection Keywords)</h6>
+                    <div class="row g-2" id="reflectionTrendsContainer"></div>
+                  </div>
+                  <div class="row g-3" id="gridReflection">
+                    <div class="text-center py-5 text-muted">กำลังโหลดรายงานสะท้อนคิดการเรียนรู้...</div>
                   </div>
                 </div>
               </div>
@@ -530,7 +508,7 @@ $role = $sessionUser['role'];
                 <!-- 4. สะท้อนการเรียนรู้ -->
                 <div class="col-12">
                   <div class="card border-0 shadow-sm rounded-3 p-3 bg-white">
-                    <h6 class="fw-bold text-dark border-bottom pb-2"><i class="bi bi-lightbulb text-info"></i> 4. แบบสะท้อนการเรียนรู้รายไตรมาส (Learning Reflection)</h6>
+                    <h6 class="fw-bold text-dark border-bottom pb-2"><i class="bi bi-lightbulb text-info"></i> 4. แบบสะท้อนการเรียนรู้ (Learning Reflection)</h6>
                     <div class="row g-3 mt-2">
                       <div class="col-md-6 col-sm-12">
                         <div class="p-3 bg-light rounded-3 h-100">
@@ -579,6 +557,7 @@ $role = $sessionUser['role'];
   // ตรวจสอบบทบาทจาก Session ฝั่ง PHP
   const userRole = "<?php echo $role; ?>";
   const currentUserId = "<?php echo $sessionUser['id']; ?>";
+  let loadTeacherDashboardSummary = function() {}; // Global placeholder to prevent ReferenceError
 
   // โหลดรายชื่อนักเรียน
   async function loadStudents() {
@@ -621,6 +600,53 @@ $role = $sessionUser['role'];
         teacherSelect.appendChild(opt);
       }
     });
+  }
+
+  // ฟังก์ชันวิเคราะห์คีย์เวิร์ด/แนวโน้มคำสำคัญในบทสะท้อนและอุปสรรคการเขียน
+  function analyzeKeywords(texts) {
+    // กำหนดคำสำคัญเป้าหมายที่เกี่ยวข้องกับการเขียนและเกณฑ์ประเมิน
+    const targetKeywords = [
+      'คำเชื่อม', 'คำสะกด', 'สะกดผิด', 'ประโยค', 'คำศัพท์', 'ระดับภาษา', 'โครงเรื่อง', 
+      'เนื้อหา', 'เวลา', 'การลำดับ', 'ขยายความ', 'เหตุผล', 'ย่อหน้า', 'เว้นวรรค', 
+      'เรียงความ', 'แก้ไข', 'วรรคตอน', 'คำซ้ำ', 'กังวล', 'ร่างแรก', 'ปรับปรุง'
+    ];
+    
+    const counts = {};
+    targetKeywords.forEach(kw => counts[kw] = 0);
+    
+    // คำทั่วไปที่จะคัดออก (Stop words)
+    const stopWords = ['และ', 'หรือ', 'แต่', 'ที่', 'ซึ่ง', 'อัน', 'ใน', 'การ', 'ความ', 'ให้', 'ได้', 'มี', 'เป็น', 'จะ', 'ของ', 'กับ', 'เพื่อ', 'ไป', 'มา', 'นี้', 'นั้น', 'แล้ว', 'ก็', 'เลย', 'คือ', 'ได้แก่', 'เช่น', 'มาก', 'มาก ๆ', 'เพราะ', 'คน'];
+    
+    texts.forEach(text => {
+      if (!text) return;
+      const lowerText = text.toLowerCase();
+      
+      // 1. นับคำเฉพาะที่เรากำหนด
+      targetKeywords.forEach(kw => {
+        const regex = new RegExp(kw, 'g');
+        const matches = lowerText.match(regex);
+        if (matches) {
+          counts[kw] += matches.length;
+        }
+      });
+      
+      // 2. ตัดและแยกคำทั่วไปด้วยช่องว่างหรือเครื่องหมายวรรคตอนเพิ่มเติม
+      const words = lowerText.split(/[\s,\.\?\!\(\)\[\]\{\}\-\+\*\/\\_:;]+/);
+      words.forEach(w => {
+        const trimmed = w.trim();
+        if (['__proto__', 'constructor', 'toString', 'valueOf', 'toLocaleString'].includes(trimmed)) return;
+        if (trimmed.length > 2 && !stopWords.includes(trimmed) && !targetKeywords.includes(trimmed)) {
+          counts[trimmed] = (counts[trimmed] || 0) + 1;
+        }
+      });
+    });
+    
+    // เรียงลำดับคำที่ถูกกล่าวถึงมากที่สุดและเลือกเฉพาะคำที่มีการกล่าวถึงจริงๆ
+    return Object.keys(counts)
+      .map(key => ({ keyword: key, count: counts[key] }))
+      .filter(item => item.count > 0)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
   }
 
   // ==========================================
@@ -852,7 +878,7 @@ $role = $sessionUser['role'];
   
   if (userRole === 'teacher') {
     // 1. ดึงภาพรวมสถิติชั้นเรียน
-    async function loadTeacherDashboardSummary() {
+    loadTeacherDashboardSummary = async function() {
       try {
         const response = await fetch(`api.php?action=get_reflection_summary&_t=${new Date().getTime()}`);
         const res = await response.json();
@@ -865,55 +891,260 @@ $role = $sessionUser['role'];
           document.getElementById('statPeerReviews').textContent = `${stats.peer_reviews_completed} / ${total} คน`;
           document.getElementById('statReflections').textContent = `${stats.reflections_completed} / ${total} คน`;
           
-          // แสดงรายการปัญหาล่าสุด
-          const probsContainer = document.getElementById('recentProblemsContainer');
-          if (res.recent_problems && res.recent_problems.length > 0) {
-            let html = '<div class="list-group list-group-flush">';
-            res.recent_problems.forEach(row => {
-              html += `
-                <div class="list-group-item py-3">
-                  <div class="d-flex justify-content-between mb-1">
-                    <strong class="text-dark">${row.student_id} - ${row.student_name}</strong>
-                    <span class="small text-muted">${new Date(row.created_at).toLocaleDateString('th-TH')}</span>
+          // แสดงรายชื่อการ์ดแยกตามหัวข้อการประเมิน (Topics) และกรองเฉพาะคนที่มีข้อมูล
+          const gridObstacles = document.getElementById('gridObstacles');
+          const gridChecklist = document.getElementById('gridChecklist');
+          const gridReflection = document.getElementById('gridReflection');
+
+          const criteriaLabelMap = {
+            '1_1': '1.1 ความตรงประเด็น',
+            '1_2': '1.2 แก่นเรื่องชัดเจน',
+            '1_3': '1.3 การขยายความและเหตุผล',
+            '2_1': '2.1 องค์ประกอบครบ',
+            '2_2': '2.2 ลำดับประเด็นเป็นระบบ',
+            '3_1': '3.1 ประโยคถูกต้อง',
+            '3_2': '3.2 เลือกใช้คำ',
+            '3_3': '3.3 ระดับภาษาเหมาะสม',
+            '4_1': '4.1 การสะกดคำถูกต้อง',
+            '4_2': '4.2 การเว้นวรรค',
+            '4_3': '4.3 ความเรียบร้อย'
+          };
+
+          let obstaclesHtml = '';
+          let checklistHtml = '';
+          let reflectionHtml = '';
+
+          let countObstaclesStudentsSet = new Set();
+          let countChecklistStudentsSet = new Set();
+          let countReflectionStudentsSet = new Set();
+
+          const allObstaclesTexts = [];
+          const allReflectionTexts = [];
+
+          if (res.students_details && res.students_details.length > 0) {
+            // 1. หมวดอุปสรรคการเขียน (จัดกลุ่มตาม 11 เกณฑ์)
+            Object.keys(criteriaLabelMap).forEach(key => {
+              let topicStudentsHtml = '';
+              let topicStudentCount = 0;
+
+              res.students_details.forEach(student => {
+                const rawProb = student[`prob_${key}`] ? student[`prob_${key}`].trim() : '';
+                const rawSol = student[`sol_${key}`] ? student[`sol_${key}`].trim() : '';
+
+                if (rawProb !== '' || rawSol !== '') {
+                  topicStudentCount++;
+                  countObstaclesStudentsSet.add(student.student_id);
+                  if (rawProb !== '') allObstaclesTexts.push(rawProb);
+                  if (rawSol !== '') allObstaclesTexts.push(rawSol);
+
+                  topicStudentsHtml += `
+                    <div class="border-bottom pb-2 mb-2">
+                      <div class="d-flex justify-content-between align-items-center mb-1">
+                        <a href="javascript:void(0)" onclick="viewStudentDetails('${student.student_id}')" class="fw-bold text-primary small text-decoration-none"><i class="bi bi-person-circle"></i> ${student.student_id} - ${student.student_name}</a>
+                      </div>
+                      <div class="text-danger ps-2 small" style="font-size: 0.75rem;"><strong>อุปสรรค:</strong> ${rawProb || '-'}</div>
+                      <div class="text-success ps-2 small" style="font-size: 0.75rem;"><strong>แผนแก้ปัญหา:</strong> ${rawSol || '-'}</div>
+                    </div>
+                  `;
+                }
+              });
+
+              if (topicStudentCount > 0) {
+                obstaclesHtml += `
+                  <div class="col-lg-6 col-md-12 mb-3">
+                    <div class="card h-100 border border-light shadow-sm rounded-4">
+                      <div class="card-header bg-danger-subtle border-0 pt-3 pb-2 d-flex justify-content-between align-items-center">
+                        <h6 class="fw-bold text-danger-emphasis mb-0"><i class="bi bi-exclamation-triangle-fill me-1"></i> ${criteriaLabelMap[key]}</h6>
+                        <span class="badge bg-danger rounded-pill">${topicStudentCount} คน</span>
+                      </div>
+                      <div class="card-body py-2">
+                        <div class="monitoring-text-area" style="max-height: 250px;">
+                          ${topicStudentsHtml}
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div class="text-danger small mb-1"><strong>ปัญหาหลัก (1.1 ตรงประเด็น):</strong> ${row.prob_1_1 || '-'}</div>
-                  <div class="text-success small"><strong>แนวทางแก้ไข:</strong> ${row.sol_1_1 || '-'}</div>
-                </div>
-              `;
+                `;
+              }
             });
-            html += '</div>';
-            probsContainer.innerHTML = html;
-          } else {
-            probsContainer.innerHTML = '<div class="text-center py-4">ไม่มีข้อมูลการบันทึกปัญหา</div>';
+
+            // 2. หมวดตรวจสอบตนเอง (จัดกลุ่มตาม 11 เกณฑ์)
+            Object.keys(criteriaLabelMap).forEach(key => {
+              let completeList = [];
+              let partialList = [];
+              let improveList = [];
+
+              res.students_details.forEach(student => {
+                const val = student[`check_${key}`];
+                if (val && val.trim() !== '') {
+                  countChecklistStudentsSet.add(student.student_id);
+                  const studentLink = `<a href="javascript:void(0)" onclick="viewStudentDetails('${student.student_id}')" class="badge bg-light text-dark border me-1 mb-1 text-decoration-none fw-normal" style="font-size: 0.7rem;"><i class="bi bi-person"></i> ${student.student_name}</a>`;
+                  if (val === 'ครบถ้วน') completeList.push(studentLink);
+                  else if (val === 'บางส่วน') partialList.push(studentLink);
+                  else if (val === 'ต้องปรับปรุง') improveList.push(studentLink);
+                }
+              });
+
+              const totalTopicChecklists = completeList.length + partialList.length + improveList.length;
+              if (totalTopicChecklists > 0) {
+                checklistHtml += `
+                  <div class="col-lg-6 col-md-12 mb-3">
+                    <div class="card h-100 border border-light shadow-sm rounded-4">
+                      <div class="card-header bg-success-subtle border-0 pt-3 pb-2 d-flex justify-content-between align-items-center">
+                        <h6 class="fw-bold text-success-emphasis mb-0"><i class="bi bi-check2-circle me-1"></i> ${criteriaLabelMap[key]}</h6>
+                        <span class="badge bg-success rounded-pill">${totalTopicChecklists} คน</span>
+                      </div>
+                      <div class="card-body py-2">
+                        <div class="monitoring-text-area" style="max-height: 250px;">
+                          <div class="mb-2">
+                            <strong class="text-success small d-block mb-1">✅ ปฏิบัติครบถ้วน (${completeList.length} คน):</strong>
+                            <div>${completeList.length > 0 ? completeList.join('') : '<span class="text-muted small font-light">- ไม่มี -</span>'}</div>
+                          </div>
+                          <div class="mb-2">
+                            <strong class="text-warning-emphasis small d-block mb-1">⚠️ ปฏิบัติบางส่วน (${partialList.length} คน):</strong>
+                            <div>${partialList.length > 0 ? partialList.join('') : '<span class="text-muted small font-light">- ไม่มี -</span>'}</div>
+                          </div>
+                          <div class="mb-1">
+                            <strong class="text-danger small d-block mb-1">❌ ต้องปรับปรุง (${improveList.length} คน):</strong>
+                            <div>${improveList.length > 0 ? improveList.join('') : '<span class="text-muted small font-light">- ไม่มี -</span>'}</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                `;
+              }
+            });
+
+            // 3. หมวดบันทึกสะท้อนคิด (จัดกลุ่มตาม 4 ด้านของคำถาม)
+            const reflectionFields = [
+              { key: 'content_structure', label: '1. ด้านโครงสร้างและเนื้อหา', color: 'info' },
+              { key: 'language_mechanics', label: '2. ด้านภาษาและอักขรวิธี', color: 'primary' },
+              { key: 'feedback_applied', label: '3. การปรับแก้ตามคำติชม', color: 'success' },
+              { key: 'future_goals', label: '4. การประยุกต์ใช้และเป้าหมายในอนาคต', color: 'warning' }
+            ];
+
+            reflectionFields.forEach(f => {
+              let topicStudentsHtml = '';
+              let topicStudentCount = 0;
+
+              res.students_details.forEach(student => {
+                const val = student[f.key] ? student[f.key].trim() : '';
+                if (val !== '') {
+                  topicStudentCount++;
+                  countReflectionStudentsSet.add(student.student_id);
+                  allReflectionTexts.push(val);
+
+                  topicStudentsHtml += `
+                    <div class="border-bottom pb-2 mb-2">
+                      <div class="d-flex justify-content-between align-items-center mb-1">
+                        <a href="javascript:void(0)" onclick="viewStudentDetails('${student.student_id}')" class="fw-bold text-${f.color}-emphasis small text-decoration-none"><i class="bi bi-person-circle"></i> ${student.student_id} - ${student.student_name}</a>
+                      </div>
+                      <div class="text-secondary ps-2 small font-italic">"${val}"</div>
+                    </div>
+                  `;
+                }
+              });
+
+              if (topicStudentCount > 0) {
+                reflectionHtml += `
+                  <div class="col-lg-6 col-md-12 mb-3">
+                    <div class="card h-100 border border-light shadow-sm rounded-4">
+                      <div class="card-header bg-${f.color}-subtle border-0 pt-3 pb-2 d-flex justify-content-between align-items-center">
+                        <h6 class="fw-bold text-${f.color}-emphasis mb-0"><i class="bi bi-lightbulb-fill me-1"></i> ${f.label}</h6>
+                        <span class="badge bg-${f.color} rounded-pill">${topicStudentCount} คน</span>
+                      </div>
+                      <div class="card-body py-2">
+                        <div class="monitoring-text-area" style="max-height: 250px;">
+                          ${topicStudentsHtml}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                `;
+              }
+            });
           }
 
-          // แสดงรายการคอมเมนต์เพื่อนล่าสุด
-          const peersContainer = document.getElementById('recentCommentsContainer');
-          if (res.recent_peers && res.recent_peers.length > 0) {
-            let html = '<div class="list-group list-group-flush">';
-            res.recent_peers.forEach(row => {
-              html += `
-                <div class="list-group-item py-3">
-                  <div class="d-flex justify-content-between mb-1">
-                    <strong class="text-dark">${row.reviewer_name} ประเมิน ${row.student_name}</strong>
-                    <span class="small text-muted">${new Date(row.created_at).toLocaleDateString('th-TH')}</span>
+          // 4. วิเคราะห์คำสำคัญยอดนิยมเชิงคุณภาพ (Keyword Analytics)
+          const obstacleKeywords = analyzeKeywords(allObstaclesTexts);
+          const reflectionKeywords = analyzeKeywords(allReflectionTexts);
+
+          // อัปเดตการแสดงผลเทรนด์อุปสรรคการเขียน
+          const obstaclesTrendsPanel = document.getElementById('obstaclesTrendsPanel');
+          const obstaclesTrendsContainer = document.getElementById('obstaclesTrendsContainer');
+          if (obstacleKeywords.length > 0) {
+            obstaclesTrendsPanel.style.display = 'block';
+            let trendHtml = '';
+            obstacleKeywords.forEach(item => {
+              trendHtml += `
+                <div class="col-md-3 col-sm-6 col-12">
+                  <div class="p-2 border rounded bg-white text-center shadow-sm h-100 d-flex flex-column justify-content-center align-items-center">
+                    <span class="badge bg-danger-subtle text-danger mb-1 fw-bold fs-6">${item.keyword}</span>
+                    <div class="small text-muted" style="font-size: 0.75rem;">พบประเด็นนี้ <strong class="text-danger">${item.count}</strong> ครั้ง</div>
                   </div>
-                  <div class="small text-secondary mb-1"><strong>จุดแข็ง:</strong> ${row.strength || '-'}</div>
-                  <div class="small text-secondary mb-1"><strong>จุดปรับปรุง:</strong> ${row.improvement || '-'}</div>
-                  <div class="small text-muted font-italic"><strong>ส่งเสริมกำลังใจ:</strong> "${row.encouragement || '-'}"</div>
                 </div>
               `;
             });
-            html += '</div>';
-            peersContainer.innerHTML = html;
+            obstaclesTrendsContainer.innerHTML = trendHtml;
           } else {
-            peersContainer.innerHTML = '<div class="text-center py-4">ไม่มีข้อมูลคำประเมินจากเพื่อน</div>';
+            obstaclesTrendsPanel.style.display = 'none';
           }
+
+          // อัปเดตการแสดงผลเทรนด์บันทึกสะท้อนคิด
+          const reflectionTrendsPanel = document.getElementById('reflectionTrendsPanel');
+          const reflectionTrendsContainer = document.getElementById('reflectionTrendsContainer');
+          if (reflectionKeywords.length > 0) {
+            reflectionTrendsPanel.style.display = 'block';
+            let trendHtml = '';
+            reflectionKeywords.forEach(item => {
+              trendHtml += `
+                <div class="col-md-3 col-sm-6 col-12">
+                  <div class="p-2 border rounded bg-white text-center shadow-sm h-100 d-flex flex-column justify-content-center align-items-center">
+                    <span class="badge bg-info-subtle text-info mb-1 fw-bold fs-6">${item.keyword}</span>
+                    <div class="small text-muted" style="font-size: 0.75rem;">กล่าวถึงในห้องเรียน <strong class="text-info">${item.count}</strong> ครั้ง</div>
+                  </div>
+                </div>
+              `;
+            });
+            reflectionTrendsContainer.innerHTML = trendHtml;
+          } else {
+            reflectionTrendsPanel.style.display = 'none';
+          }
+
+          // อัปเดตจำนวนนักเรียนในแต่ละกิจกรรมมอนิเตอร์ย่อย (ปุ่มแท็บ)
+          document.getElementById('countObstacles').textContent = countObstaclesStudentsSet.size;
+          document.getElementById('countChecklist').textContent = countChecklistStudentsSet.size;
+          document.getElementById('countReflection').textContent = countReflectionStudentsSet.size;
+
+          // แสดงข้อความตกหล่นหรือสถานะว่าง
+          gridObstacles.innerHTML = obstaclesHtml || '<div class="text-center py-5 text-muted">ยังไม่มีข้อมูลอุปสรรคการเขียนในกิจกรรมนี้</div>';
+          gridChecklist.innerHTML = checklistHtml || '<div class="text-center py-5 text-muted">ยังไม่มีข้อมูลการตรวจสอบตนเองในกิจกรรมนี้</div>';
+          gridReflection.innerHTML = reflectionHtml || '<div class="text-center py-5 text-muted">ยังไม่มีข้อมูลการสะท้อนคิดการเรียนรู้ในกิจกรรมนี้</div>';
+          if (!res.success) {
+            console.error("API error:", res.error || "Unknown error");
+            alert("เกิดข้อผิดพลาดในการโหลดข้อมูลห้องเรียน: " + (res.error || "Unknown API error"));
+          }
+        } else {
+          alert("ไม่สามารถดึงข้อมูลได้สำเร็จ (res.success !== true)");
         }
       } catch (err) {
-        console.error(err);
+        console.error("JS Catch error:", err);
+        alert("เกิดข้อผิดพลาดทางเทคนิค: " + err.message);
       }
-    }
+    };
+
+    window.viewStudentDetails = function(studentId) {
+      const triggerEl = document.getElementById('inspector-tab');
+      if (triggerEl) {
+        triggerEl.click();
+      }
+      const select = document.getElementById('inspectorStudentSelect');
+      if (select) {
+        select.value = studentId;
+        select.dispatchEvent(new Event('change'));
+      }
+    };
 
     // 2. โหลดข้อมูลรายบุคคลของนักเรียนที่ครูเลือกส่อง
     async function loadIndividualReflectionReport(studentId) {
@@ -995,7 +1226,7 @@ $role = $sessionUser['role'];
           const chkLabelMap = {
             '1_1': '1.1 ความตรงประเด็น',
             '1_2': '1.2 แก่นเรื่องที่ชัดเจน',
-            '1_3': '1.3 การขยายความและให้เหตุผล',
+            '1_3': '1.3 การขยายความและเหตุผล',
             '2_1': '2.1 ความครบถ้วนองค์ประกอบ',
             '2_2': '2.2 ลำดับประเด็นเป็นระบบ',
             '3_1': '3.1 ประโยคถูกต้องตามหลักภาษา',
@@ -1102,492 +1333,7 @@ $role = $sessionUser['role'];
     });
   }
 
-  // ==========================================
-  // ระบบดาวน์โหลดเทมเพลตและนำเข้าด้วย Excel (.csv) สำหรับคุณครู (ระดับชั้นเรียน)
-  // ==========================================
 
-  // ฟังก์ชันแยกแถว CSV รองรับเครื่องหมายคำพูดครอบข้อความที่มีจุลภาค
-  function parseCSVRow(rowText) {
-    let fields = [];
-    let currentField = '';
-    let inQuotes = false;
-    for (let i = 0; i < rowText.length; i++) {
-      let char = rowText[i];
-      if (char === '"') {
-        inQuotes = !inQuotes;
-      } else if (char === ',' && !inQuotes) {
-        fields.push(currentField.trim());
-        currentField = '';
-      } else {
-        currentField += char;
-      }
-    }
-    fields.push(currentField.trim());
-    return fields;
-  }
-
-  // ตัวช่วยสร้างไฟล์ CSV พร้อม UTF-8 BOM
-  function triggerCSVDownload(filename, headers, rows) {
-    const escapeCSV = (str) => {
-      if (str === null || str === undefined) return '';
-      let stringified = String(str);
-      if (stringified.includes(',') || stringified.includes('\n') || stringified.includes('"')) {
-        stringified = stringified.replace(/"/g, '""');
-        return `"${stringified}"`;
-      }
-      return stringified;
-    };
-    
-    let csvContent = "\uFEFF"; // UTF-8 BOM ให้ Excel เปิดแล้วภาษาไทยไม่เพี้ยน
-    csvContent += headers.map(escapeCSV).join(",") + "\n";
-    csvContent += rows.map(row => row.map(escapeCSV).join(",")).join("\n");
-    
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", filename);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }
-
-  // 1. เทมเพลตปัญหาการเขียน (ทั้งห้องเรียน)
-  function downloadClassObstaclesTemplate() {
-    const headers = ["รหัสนักเรียน (Primary Key)", "ชื่อนักเรียน", "prob_1_1", "sol_1_1", "prob_1_2", "sol_1_2", "prob_1_3", "sol_1_3", "prob_2_1", "sol_2_1", "prob_2_2", "sol_2_2", "prob_3_1", "sol_3_1", "prob_3_2", "sol_3_2", "prob_3_3", "sol_3_3", "prob_4_1", "sol_4_1", "prob_4_2", "sol_4_2", "prob_4_3", "sol_4_3"];
-    const rows = [];
-    const sortedKeys = Object.keys(studentDB).sort();
-    sortedKeys.forEach(id => {
-      rows.push([id, studentDB[id], "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]);
-    });
-    triggerCSVDownload("class_writing_obstacles_template.csv", headers, rows);
-  }
-
-  // ==========================================
-  // ระบบดาวน์โหลดเทมเพลตและนำเข้าด้วย Excel (.csv) สำหรับคุณครู (ระดับชั้นเรียน)
-  // ==========================================
-
-  // ฟังก์ชันแยกแถว CSV รองรับเครื่องหมายคำพูดครอบข้อความที่มีจุลภาค
-  function parseCSVRow(rowText) {
-    let fields = [];
-    let currentField = '';
-    let inQuotes = false;
-    for (let i = 0; i < rowText.length; i++) {
-      let char = rowText[i];
-      if (char === '"') {
-        inQuotes = !inQuotes;
-      } else if (char === ',' && !inQuotes) {
-        fields.push(currentField.trim());
-        currentField = '';
-      } else {
-        currentField += char;
-      }
-    }
-    fields.push(currentField.trim());
-    return fields;
-  }
-
-  // ตัวช่วยสร้างไฟล์ CSV พร้อม UTF-8 BOM
-  function triggerCSVDownload(filename, headers, rows) {
-    const escapeCSV = (str) => {
-      if (str === null || str === undefined) return '';
-      let stringified = String(str);
-      if (stringified.includes(',') || stringified.includes('\n') || stringified.includes('"')) {
-        stringified = stringified.replace(/"/g, '""');
-        return `"${stringified}"`;
-      }
-      return stringified;
-    };
-    
-    let csvContent = "\uFEFF"; // UTF-8 BOM ให้ Excel เปิดแล้วภาษาไทยไม่เพี้ยน
-    csvContent += headers.map(escapeCSV).join(",") + "\n";
-    csvContent += rows.map(row => row.map(escapeCSV).join(",")).join("\n");
-    
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", filename);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }
-
-  // ตัวช่วยอ่านและตรวจจับรหัสอักขระไฟล์ CSV (UTF-8 หรือ Windows-874 ของ Excel)
-  function readCSVFile(file, callback) {
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      const arrayBuffer = e.target.result;
-      const uint8Array = new Uint8Array(arrayBuffer);
-      
-      // ตรวจหา UTF-8 BOM (0xEF, 0xBB, 0xBF)
-      let encoding = 'windows-874'; // ใช้เป็นค่าเริ่มต้นสำหรับ Excel ภาษาไทยบน Windows
-      if (uint8Array[0] === 0xEF && uint8Array[1] === 0xBB && uint8Array[2] === 0xBF) {
-        encoding = 'utf-8';
-      } else {
-        try {
-          // ทดลองถอดรหัสเป็น UTF-8 แบบเคร่งครัด
-          const utf8Decoder = new TextDecoder('utf-8', { fatal: true });
-          utf8Decoder.decode(uint8Array);
-          encoding = 'utf-8';
-        } catch (err) {
-          encoding = 'windows-874';
-        }
-      }
-      
-      const decoder = new TextDecoder(encoding);
-      const decodedText = decoder.decode(uint8Array);
-      callback(decodedText);
-    };
-    reader.readAsArrayBuffer(file);
-  }
-
-  // 1. เทมเพลตปัญหาการเขียน (ทั้งห้องเรียน)
-  function downloadClassObstaclesTemplate() {
-    const headers = ["รหัสนักเรียน (Primary Key)", "ชื่อนักเรียน", "prob_1_1", "sol_1_1", "prob_1_2", "sol_1_2", "prob_1_3", "sol_1_3", "prob_2_1", "sol_2_1", "prob_2_2", "sol_2_2", "prob_3_1", "sol_3_1", "prob_3_2", "sol_3_2", "prob_3_3", "sol_3_3", "prob_4_1", "sol_4_1", "prob_4_2", "sol_4_2", "prob_4_3", "sol_4_3"];
-    const rows = [];
-    const sortedKeys = Object.keys(studentDB).sort();
-    sortedKeys.forEach(id => {
-      rows.push([id, studentDB[id], "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]);
-    });
-    triggerCSVDownload("class_writing_obstacles_template.csv", headers, rows);
-  }
-
-  async function importClassObstaclesCSV(input) {
-    const file = input.files[0];
-    if (!file) return;
-    
-    readCSVFile(file, async function(text) {
-      const lines = text.split(/\r?\n/);
-      const list = [];
-      
-      for (let i = 1; i < lines.length; i++) {
-        if (!lines[i].trim()) continue;
-        const cols = parseCSVRow(lines[i]);
-        if (cols.length < 2) continue;
-        
-        const studentId = cols[0].trim();
-        if (!studentId || studentId.includes('[') || !studentDB[studentId]) continue;
-        
-        const problems = {
-          prob_1_1: cols[2] || '', sol_1_1: cols[3] || '',
-          prob_1_2: cols[4] || '', sol_1_2: cols[5] || '',
-          prob_1_3: cols[6] || '', sol_1_3: cols[7] || '',
-          prob_2_1: cols[8] || '', sol_2_1: cols[9] || '',
-          prob_2_2: cols[10] || '', sol_2_2: cols[11] || '',
-          prob_3_1: cols[12] || '', sol_3_1: cols[13] || '',
-          prob_3_2: cols[14] || '', sol_3_2: cols[15] || '',
-          prob_3_3: cols[16] || '', sol_3_3: cols[17] || '',
-          prob_4_1: cols[18] || '', sol_4_1: cols[19] || '',
-          prob_4_2: cols[20] || '', sol_4_2: cols[21] || '',
-          prob_4_3: cols[22] || '', sol_4_3: cols[23] || ''
-        };
-        
-        list.push({ studentId, problems });
-      }
-      
-      if (list.length === 0) {
-        alert('ไม่พบข้อมูลนักเรียนที่ถูกต้องสำหรับการนำเข้าในไฟล์ CSV');
-        input.value = '';
-        return;
-      }
-      
-      if (!confirm(`ยืนยันการนำเข้าข้อมูล ปัญหาการเขียน ของนักเรียนทั้งหมด ${list.length} คน ใช่หรือไม่?`)) {
-        input.value = '';
-        return;
-      }
-      
-      try {
-        const response = await fetch('api.php', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'bulk_save_writing_problems',
-            list: list
-          })
-        });
-        
-        const responseText = await response.text();
-        let res;
-        try {
-          res = JSON.parse(responseText);
-        } catch (e) {
-          throw new Error('การตอบกลับจากเซิร์ฟเวอร์ไม่ใช่ JSON: ' + responseText.substring(0, 300));
-        }
-        
-        if (res.success) {
-          alert(`นำเข้าบันทึกปัญหาการเขียนจำนวน ${list.length} คนสำเร็จ!`);
-          loadTeacherDashboardSummary();
-        } else {
-          alert('ไม่สามารถนำเข้าข้อมูล: ' + res.error);
-        }
-      } catch (err) {
-        console.error(err);
-        alert('เกิดข้อผิดพลาด: ' + err.message);
-      }
-      input.value = '';
-    });
-  }
-
-  // 2. เทมเพลตตรวจสอบตนเอง (ทั้งห้องเรียน)
-  function downloadClassChecklistTemplate() {
-    const headers = ["รหัสนักเรียน (Primary Key)", "ชื่อนักเรียน", "check_1_1", "check_1_2", "check_1_3", "check_2_1", "check_2_2", "check_3_1", "check_3_2", "check_3_3", "check_4_1", "check_4_2", "check_4_3", "notes"];
-    const rows = [];
-    const sortedKeys = Object.keys(studentDB).sort();
-    sortedKeys.forEach(id => {
-      rows.push([id, studentDB[id], "ครบถ้วน", "ครบถ้วน", "ครบถ้วน", "ครบถ้วน", "ครบถ้วน", "ครบถ้วน", "ครบถ้วน", "ครบถ้วน", "ครบถ้วน", "ครบถ้วน", "ครบถ้วน", ""]);
-    });
-    triggerCSVDownload("class_self_checklist_template.csv", headers, rows);
-  }
-
-  async function importClassChecklistCSV(input) {
-    const file = input.files[0];
-    if (!file) return;
-    
-    readCSVFile(file, async function(text) {
-      const lines = text.split(/\r?\n/);
-      const list = [];
-      
-      for (let i = 1; i < lines.length; i++) {
-        if (!lines[i].trim()) continue;
-        const cols = parseCSVRow(lines[i]);
-        if (cols.length < 3) continue;
-        
-        const studentId = cols[0].trim();
-        if (!studentId || studentId.includes('[') || !studentDB[studentId]) continue;
-        
-        const checklist = {
-          '1.1': cols[2] || 'ต้องปรับปรุง',
-          '1.2': cols[3] || 'ต้องปรับปรุง',
-          '1.3': cols[4] || 'ต้องปรับปรุง',
-          '2.1': cols[5] || 'ต้องปรับปรุง',
-          '2.2': cols[6] || 'ต้องปรับปรุง',
-          '3.1': cols[7] || 'ต้องปรับปรุง',
-          '3.2': cols[8] || 'ต้องปรับปรุง',
-          '3.3': cols[9] || 'ต้องปรับปรุง',
-          '4.1': cols[10] || 'ต้องปรับปรุง',
-          '4.2': cols[11] || 'ต้องปรับปรุง',
-          '4.3': cols[12] || 'ต้องปรับปรุง'
-        };
-        const notes = cols[13] || '';
-        
-        list.push({ studentId, checklist, notes });
-      }
-      
-      if (list.length === 0) {
-        alert('ไม่พบข้อมูลนักเรียนที่ถูกต้องสำหรับการนำเข้าในไฟล์ CSV');
-        input.value = '';
-        return;
-      }
-      
-      if (!confirm(`ยืนยันการนำเข้าข้อมูล รายการตรวจสอบตนเอง ของนักเรียนทั้งหมด ${list.length} คน ใช่หรือไม่?`)) {
-        input.value = '';
-        return;
-      }
-      
-      try {
-        const response = await fetch('api.php', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'bulk_save_self_checklists',
-            list: list
-          })
-        });
-        
-        const responseText = await response.text();
-        let res;
-        try {
-          res = JSON.parse(responseText);
-        } catch (e) {
-          throw new Error('การตอบกลับจากเซิร์ฟเวอร์ไม่ใช่ JSON: ' + responseText.substring(0, 300));
-        }
-        
-        if (res.success) {
-          alert(`นำเข้าเช็คลิสต์ตรวจสอบตนเองของนักเรียนจำนวน ${list.length} คนสำเร็จ!`);
-          loadTeacherDashboardSummary();
-        } else {
-          alert('ไม่สามารถนำเข้าข้อมูล: ' + res.error);
-        }
-      } catch (err) {
-        console.error(err);
-        alert('เกิดข้อผิดพลาด: ' + err.message);
-      }
-      input.value = '';
-    });
-  }
-
-  // 3. เทมเพลตประเมินโดยเพื่อน (ทั้งห้องเรียน)
-  function downloadClassPeerReviewTemplate() {
-    const headers = ["รหัสนักเรียนผู้ถูกประเมิน (Primary Key)", "ชื่อนักเรียนผู้ถูกประเมิน", "รหัสนักเรียนผู้ประเมิน", "score_1_1", "score_1_2", "score_1_3", "score_1_4", "score_2_1", "score_2_2", "score_3_1", "score_3_2", "score_3_3", "score_3_4", "score_4_1", "score_4_2", "score_4_3", "strength", "improvement", "encouragement"];
-    const rows = [];
-    const sortedKeys = Object.keys(studentDB).sort();
-    sortedKeys.forEach(id => {
-      rows.push([id, studentDB[id], "[กรอกรหัสเพื่อนผู้ประเมิน]", "ดี", "ดี", "ดี", "ดี", "ดี", "ดี", "ดี", "ดี", "ดี", "ดี", "ดี", "ดี", "ดี", "", "", ""]);
-    });
-    triggerCSVDownload("class_peer_review_template.csv", headers, rows);
-  }
-
-  async function importClassPeerReviewCSV(input) {
-    const file = input.files[0];
-    if (!file) return;
-    
-    readCSVFile(file, async function(text) {
-      const lines = text.split(/\r?\n/);
-      const list = [];
-      
-      for (let i = 1; i < lines.length; i++) {
-        if (!lines[i].trim()) continue;
-        const cols = parseCSVRow(lines[i]);
-        if (cols.length < 4) continue;
-        
-        const studentId = cols[0].trim();
-        const reviewerId = cols[2].trim();
-        if (!studentId || studentId.includes('[') || !studentDB[studentId]) continue;
-        if (!reviewerId || reviewerId.includes('[') || !studentDB[reviewerId]) continue;
-        
-        const scores = {
-          '1.1': cols[3] || 'ปรับปรุง',
-          '1.2': cols[4] || 'ปรับปรุง',
-          '1.3': cols[5] || 'ปรับปรุง',
-          '1.4': cols[6] || 'ปรับปรุง',
-          '2.1': cols[7] || 'ปรับปรุง',
-          '2.2': cols[8] || 'ปรับปรุง',
-          '3.1': cols[9] || 'ปรับปรุง',
-          '3.2': cols[10] || 'ปรับปรุง',
-          '3.3': cols[11] || 'ปรับปรุง',
-          '3.4': cols[12] || 'ปรับปรุง',
-          '4.1': cols[13] || 'ปรับปรุง',
-          '4.2': cols[14] || 'ปรับปรุง',
-          '4.3': cols[15] || 'ปรับปรุง'
-        };
-        const strength = cols[16] || '';
-        const improvement = cols[17] || '';
-        const encouragement = cols[18] || '';
-        
-        list.push({ studentId, reviewerId, scores, strength, improvement, encouragement });
-      }
-      
-      if (list.length === 0) {
-        alert('ไม่พบข้อมูลประเมินโดยเพื่อนที่ถูกต้องในไฟล์ CSV');
-        input.value = '';
-        return;
-      }
-      
-      if (!confirm(`ยืนยันการนำเข้าข้อมูล แบบประเมินผลงานโดยเพื่อน ของนักเรียนทั้งหมด ${list.length} รายการ ใช่หรือไม่?`)) {
-        input.value = '';
-        return;
-      }
-      
-      try {
-        const response = await fetch('api.php', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'bulk_save_peer_reviews',
-            list: list
-          })
-        });
-        
-        const responseText = await response.text();
-        let res;
-        try {
-          res = JSON.parse(responseText);
-        } catch (e) {
-          throw new Error('การตอบกลับจากเซิร์ฟเวอร์ไม่ใช่ JSON: ' + responseText.substring(0, 300));
-        }
-        
-        if (res.success) {
-          alert(`นำเข้าแบบประเมินผลงานโดยเพื่อนจำนวน ${list.length} รายการสำเร็จ!`);
-          loadTeacherDashboardSummary();
-        } else {
-          alert('ไม่สามารถนำเข้าข้อมูล: ' + res.error);
-        }
-      } catch (err) {
-        console.error(err);
-        alert('เกิดข้อผิดพลาด: ' + err.message);
-      }
-      input.value = '';
-    });
-  }
-
-  // 4. เทมเพลตสะท้อนการเรียนรู้ (ทั้งห้องเรียน)
-  function downloadClassReflectionTemplate() {
-    const headers = ["รหัสนักเรียน (Primary Key)", "ชื่อนักเรียน", "content_structure", "language_mechanics", "feedback_applied", "future_goals"];
-    const rows = [];
-    const sortedKeys = Object.keys(studentDB).sort();
-    sortedKeys.forEach(id => {
-      rows.push([id, studentDB[id], "", "", "", ""]);
-    });
-    triggerCSVDownload("class_learning_reflection_template.csv", headers, rows);
-  }
-
-  async function importClassReflectionCSV(input) {
-    const file = input.files[0];
-    if (!file) return;
-    
-    readCSVFile(file, async function(text) {
-      const lines = text.split(/\r?\n/);
-      const list = [];
-      
-      for (let i = 1; i < lines.length; i++) {
-        if (!lines[i].trim()) continue;
-        const cols = parseCSVRow(lines[i]);
-        if (cols.length < 3) continue;
-        
-        const studentId = cols[0].trim();
-        if (!studentId || studentId.includes('[') || !studentDB[studentId]) continue;
-        
-        const content_structure = cols[2] || '';
-        const language_mechanics = cols[3] || '';
-        const feedback_applied = cols[4] || '';
-        const future_goals = cols[5] || '';
-        
-        list.push({ studentId, content_structure, language_mechanics, feedback_applied, future_goals });
-      }
-      
-      if (list.length === 0) {
-        alert('ไม่พบข้อมูลบันทึกการสะท้อนคิดที่ถูกต้องในไฟล์ CSV');
-        input.value = '';
-        return;
-      }
-      
-      if (!confirm(`ยืนยันการนำเข้าข้อมูล บันทึกการสะท้อนคิด ของนักเรียนทั้งหมด ${list.length} คน ใช่หรือไม่?`)) {
-        input.value = '';
-        return;
-      }
-      
-      try {
-        const response = await fetch('api.php', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'bulk_save_learning_reflections',
-            list: list
-          })
-        });
-        
-        const responseText = await response.text();
-        let res;
-        try {
-          res = JSON.parse(responseText);
-        } catch (e) {
-          throw new Error('การตอบกลับจากเซิร์ฟเวอร์ไม่ใช่ JSON: ' + responseText.substring(0, 300));
-        }
-        
-        if (res.success) {
-          alert(`นำเข้าบันทึกการสะท้อนคิดของนักเรียนจำนวน ${list.length} คนสำเร็จ!`);
-          loadTeacherDashboardSummary();
-        } else {
-          alert('ไม่สามารถนำเข้าข้อมูล: ' + res.error);
-        }
-      } catch (err) {
-        console.error(err);
-        alert('เกิดข้อผิดพลาด: ' + err.message);
-      }
-      input.value = '';
-    });
-  }
 </script>
 
 <?php

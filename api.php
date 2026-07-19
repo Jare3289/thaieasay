@@ -44,6 +44,24 @@ try {
                 } else {
                     echo json_encode(['success' => false, 'error' => 'รหัสผ่านคุณครูไม่ถูกต้อง']);
                 }
+            } else if ($role === 'expert') {
+                if ($loginId === 'admin1' || $loginId === 'admin2') {
+                    $expertNum = ($loginId === 'admin1') ? '1' : '2';
+                    $_SESSION['user'] = [
+                        'id' => $loginId,
+                        'name' => 'ผู้เชี่ยวชาญ ' . $expertNum,
+                        'role' => 'expert'
+                    ];
+                    
+                    if ($remember) {
+                        $cookie_val = json_encode(['role' => $role, 'loginId' => $loginId]);
+                        setcookie('remember_user', $cookie_val, time() + 30 * 24 * 60 * 60, '/', '', isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on', true);
+                    }
+                    
+                    echo json_encode(['success' => true, 'user' => $_SESSION['user']]);
+                } else {
+                    echo json_encode(['success' => false, 'error' => 'รหัสประจำตัวผู้เชี่ยวชาญไม่ถูกต้อง']);
+                }
             } else if ($role === 'student') {
                 // ค้นหารหัสนักเรียนในตาราง SQL
                 $stmt = $pdo->prepare('SELECT * FROM students WHERE student_id = ?');
@@ -117,6 +135,7 @@ try {
             $studentName = $data['studentName'];
             $evaluatorType = $data['evaluatorType'];
             $evaluatorName = $data['evaluatorName'];
+            $testPhase = isset($data['testPhase']) ? $data['testPhase'] : 'posttest';
             $scores = $data['scores'];
             $totalScore = $data['totalScore'];
             $qualityLevel = $data['qualityLevel'];
@@ -127,7 +146,7 @@ try {
             
             // เตรียมคิวรีและทำการ Upsert
             $sql = 'INSERT INTO evaluations (
-                        student_id, evaluator_type, evaluator_name,
+                        student_id, evaluator_type, evaluator_name, test_phase,
                         score_1_1, score_1_2, score_1_3,
                         score_2_1, score_2_2,
                         score_3_1, score_3_2, score_3_3,
@@ -135,7 +154,7 @@ try {
                         total_score, quality_level,
                         peer_strength, peer_improvement, peer_encouragement
                     ) VALUES (
-                        :student_id, :evaluator_type, :evaluator_name,
+                        :student_id, :evaluator_type, :evaluator_name, :test_phase,
                         :s1_1, :s1_2, :s1_3,
                         :s2_1, :s2_2,
                         :s3_1, :s3_2, :s3_3,
@@ -161,12 +180,13 @@ try {
                         peer_improvement = VALUES(peer_improvement),
                         peer_encouragement = VALUES(peer_encouragement),
                         timestamp = CURRENT_TIMESTAMP';
-            
+             
             $stmt = $pdo->prepare($sql);
             $stmt->execute([
                 ':student_id'          => $studentId,
                 ':evaluator_type'      => $evaluatorType,
                 ':evaluator_name'      => $evaluatorName,
+                ':test_phase'          => $testPhase,
                 ':s1_1'                => $scores['1.1'],
                 ':s1_2'                => $scores['1.2'],
                 ':s1_3'                => $scores['1.3'],
@@ -191,6 +211,7 @@ try {
         // 6. ดึงข้อมูลคะแนนสะสม 3 ทิศทางของนักเรียน 1 คน
         case 'get_student_scores':
             $studentId = isset($_GET['studentId']) ? $_GET['studentId'] : '';
+            $testPhase = isset($_GET['testPhase']) ? $_GET['testPhase'] : 'posttest';
             if (empty($studentId)) {
                 echo json_encode(['success' => false, 'error' => 'Student ID required']);
                 exit;
@@ -201,9 +222,9 @@ try {
                 SELECT e.*, s.student_name 
                 FROM evaluations e
                 JOIN students s ON e.student_id = s.student_id
-                WHERE e.student_id = ?
+                WHERE e.student_id = ? AND e.test_phase = ?
             ');
-            $stmt->execute([$studentId]);
+            $stmt->execute([$studentId, $testPhase]);
             $rows = $stmt->fetchAll();
             
             $results = [];
@@ -239,6 +260,7 @@ try {
             $studentId = isset($request_data['studentId']) ? $request_data['studentId'] : '';
             $evaluatorType = isset($request_data['evaluatorType']) ? $request_data['evaluatorType'] : '';
             $evaluatorName = isset($request_data['evaluatorName']) ? $request_data['evaluatorName'] : '';
+            $testPhase = isset($request_data['testPhase']) ? $request_data['testPhase'] : 'posttest';
             
             if (empty($studentId) || empty($evaluatorType) || empty($evaluatorName)) {
                 echo json_encode(['success' => false, 'error' => 'Missing parameters']);
@@ -247,9 +269,9 @@ try {
             
             $stmt = $pdo->prepare('
                 SELECT * FROM evaluations 
-                WHERE student_id = ? AND evaluator_type = ? AND evaluator_name = ?
+                WHERE student_id = ? AND evaluator_type = ? AND evaluator_name = ? AND test_phase = ?
             ');
-            $stmt->execute([$studentId, $evaluatorType, $evaluatorName]);
+            $stmt->execute([$studentId, $evaluatorType, $evaluatorName, $testPhase]);
             $row = $stmt->fetch();
             
             if ($row) {
@@ -825,6 +847,29 @@ try {
                 ORDER BY pr.created_at DESC LIMIT 5
             ');
             $recent_peers = $stmt_peers->fetchAll();
+
+            // ข้อมูลของนักเรียนทุกคนสำหรับภาพรวมชั้นเรียน
+            $stmt_all = $pdo->query('
+                SELECT 
+                    s.student_id, 
+                    s.student_name,
+                    wp.prob_1_1, wp.sol_1_1, wp.prob_1_2, wp.sol_1_2, wp.prob_1_3, wp.sol_1_3,
+                    wp.prob_2_1, wp.sol_2_1, wp.prob_2_2, wp.sol_2_2,
+                    wp.prob_3_1, wp.sol_3_1, wp.prob_3_2, wp.sol_3_2, wp.prob_3_3, wp.sol_3_3,
+                    wp.prob_4_1, wp.sol_4_1, wp.prob_4_2, wp.sol_4_2, wp.prob_4_3, wp.sol_4_3,
+                    chk.check_1_1, chk.check_1_2, chk.check_1_3,
+                    chk.check_2_1, chk.check_2_2,
+                    chk.check_3_1, chk.check_3_2, chk.check_3_3,
+                    chk.check_4_1, chk.check_4_2, chk.check_4_3,
+                    chk.notes AS checklist_notes,
+                    ref.content_structure, ref.language_mechanics, ref.feedback_applied, ref.future_goals
+                FROM students s
+                LEFT JOIN writing_problems wp ON s.student_id = wp.student_id
+                LEFT JOIN self_checklists chk ON s.student_id = chk.student_id
+                LEFT JOIN learning_reflections ref ON s.student_id = ref.student_id
+                ORDER BY s.student_id ASC
+            ');
+            $students_details = $stmt_all->fetchAll();
             
             echo json_encode([
                 'success' => true,
@@ -836,7 +881,8 @@ try {
                     'reflections_completed' => (int)$ref_count
                 ],
                 'recent_problems' => $recent_problems,
-                'recent_peers' => $recent_peers
+                'recent_peers' => $recent_peers,
+                'students_details' => $students_details
             ]);
             break;
 
@@ -864,6 +910,48 @@ try {
             } else {
                 echo json_encode(['success' => true, 'found' => false, 'data' => null]);
             }
+            break;
+
+        // ดึงข้อมูลภาพรวมวิจัยเชิงลึก (การประเมินสถิติและเชิงคุณภาพ)
+        case 'get_classroom_research_data':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'ต้องเป็นคุณครูเพื่อเข้าถึงข้อมูลนี้']);
+                exit;
+            }
+            
+            // 1. ดึงรายชื่อนักเรียนทั้งหมด
+            $stmt_std = $pdo->query('SELECT student_id, student_name FROM students ORDER BY student_id ASC');
+            $students = $stmt_std->fetchAll();
+            
+            // 2. ดึงข้อมูลการประเมินทั้งหมด
+            $stmt_eval = $pdo->query('SELECT * FROM evaluations ORDER BY student_id ASC, timestamp DESC');
+            $evaluations = $stmt_eval->fetchAll();
+            
+            // 3. ดึงข้อมูล writing_problems
+            $stmt_prob = $pdo->query('SELECT * FROM writing_problems');
+            $problems = $stmt_prob->fetchAll();
+            
+            // 4. ดึงข้อมูล self_checklists
+            $stmt_chk = $pdo->query('SELECT * FROM self_checklists');
+            $checklists = $stmt_chk->fetchAll();
+            
+            // 5. ดึงข้อมูล peer_reviews
+            $stmt_peer = $pdo->query('SELECT * FROM peer_reviews');
+            $peer_reviews = $stmt_peer->fetchAll();
+            
+            // 6. ดึงข้อมูล learning_reflections
+            $stmt_ref = $pdo->query('SELECT * FROM learning_reflections');
+            $reflections = $stmt_ref->fetchAll();
+            
+            echo json_encode([
+                'success' => true,
+                'students' => $students,
+                'evaluations' => $evaluations,
+                'problems' => $problems,
+                'checklists' => $checklists,
+                'peer_reviews' => $peer_reviews,
+                'reflections' => $reflections
+            ]);
             break;
 
         default:

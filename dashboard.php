@@ -113,13 +113,13 @@ require_once 'header.php';
       <!-- ตัวกรองและกล่องค้นหา -->
       <div class="card-body bg-light border-bottom p-3">
         <div class="row g-2">
-          <div class="col-md-6 col-sm-12">
+          <div class="col-md-4 col-sm-12">
             <div class="input-group">
               <span class="input-group-text bg-white text-secondary border-end-0"><i class="bi bi-search"></i></span>
               <input type="text" id="teacherSearchInput" onkeyup="filterTeacherTable()" class="form-control bg-white border-start-0" placeholder="พิมพ์ชื่อนักเรียนหรือรหัส 5 หลักเพื่อค้นหา...">
             </div>
           </div>
-          <div class="col-md-6 col-sm-12">
+          <div class="col-md-4 col-sm-12">
             <div class="input-group">
               <span class="input-group-text bg-white text-secondary border-end-0"><i class="bi bi-funnel"></i> ตัวกรองสถานะ</span>
               <select id="teacherStatusFilter" onchange="filterTeacherTable()" class="form-select bg-white border-start-0 font-semibold">
@@ -131,27 +131,241 @@ require_once 'header.php';
               </select>
             </div>
           </div>
+          <div class="col-md-4 col-sm-12">
+            <div class="input-group">
+              <span class="input-group-text bg-white text-secondary border-end-0"><i class="bi bi-grid-3x3-gap"></i> มุมมองรายงาน</span>
+              <select id="dashboardViewMode" onchange="switchDashboardViewMode()" class="form-select bg-white border-start-0 font-semibold text-primary">
+                <option value="task" selected>ภารงานในหน่วยเรียน (360° & Expert)</option>
+                <option value="prepost">เปรียบเทียบผลสัมฤทธิ์ (ก่อนเรียน vs หลังเรียน)</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
 
       <!-- ตารางรายชื่อ -->
       <div class="table-responsive">
         <table class="table table-hover align-middle mb-0 text-start table-classroom">
-          <thead class="table-light text-secondary small fw-bold text-uppercase">
+          <thead id="overviewTableHead" class="table-light text-secondary small fw-bold text-uppercase">
             <tr>
-              <th class="px-4 py-3" style="width: 15%">รหัสนักเรียน</th>
-              <th class="px-4 py-3" style="width: 30%">ชื่อ-สกุลผู้เรียน</th>
-              <th class="px-4 py-3 text-center" style="width: 12%">ตนเองประเมิน</th>
-              <th class="px-4 py-3 text-center" style="width: 12%">เพื่อนช่วยประเมิน</th>
-              <th class="px-4 py-3 text-center" style="width: 12%">ครูประเมิน</th>
-              <th class="px-4 py-3 text-center" style="width: 10%">เฉลี่ยสะสม</th>
-              <th class="px-4 py-3 text-end" style="width: 14%">การจัดการ</th>
+              <th class="px-3 py-3" style="width: 10%">รหัสนักเรียน</th>
+              <th class="px-3 py-3" style="width: 20%">ชื่อ-สกุลผู้เรียน</th>
+              <th class="px-3 py-3 text-center" style="width: 10%">ตนเองประเมิน</th>
+              <th class="px-3 py-3 text-center" style="width: 10%">เพื่อนประเมิน</th>
+              <th class="px-3 py-3 text-center" style="width: 10%">ครูประเมิน</th>
+              <th class="px-3 py-3 text-center text-warning-emphasis" style="width: 12%">ผู้เชี่ยวชาญ 1</th>
+              <th class="px-3 py-3 text-center text-warning-emphasis" style="width: 12%">ผู้เชี่ยวชาญ 2</th>
+              <th class="px-3 py-3 text-center" style="width: 8%">เฉลี่ยสะสม</th>
+              <th class="px-3 py-3 text-end" style="width: 8%">การจัดการ</th>
             </tr>
           </thead>
           <tbody id="overviewTableBody" class="small">
-            <tr><td colspan="7" class="text-center text-muted py-5 fw-bold">กำลังประมวลผลสรุปคะแนนนักเรียนรายบุคคล...</td></tr>
+            <tr><td colspan="9" class="text-center text-muted py-5 fw-bold">กำลังประมวลผลสรุปคะแนนนักเรียนรายบุคคล...</td></tr>
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- 🔬 สถิติตรวจสอบคุณภาพเกณฑ์และการวิจัย (Research Statistics & Inter-Rater Reliability Dashboard) -->
+    <div class="card border-0 shadow-sm rounded-4 bg-white mb-4 overflow-hidden" id="researchStatsCard">
+      <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-3">
+        <h6 class="fw-bold mb-0 text-white"><i class="bi bi-gear-wide-connected text-warning"></i> ระบบวิเคราะห์ทางสถิติเพื่อการทำวิจัยและตรวจสอบคุณภาพเกณฑ์ประเมิน (Inter-rater & Paired t-test)</h6>
+        <span class="badge bg-warning text-dark font-mono font-semibold">One-Group Pretest-Posttest Design</span>
+      </div>
+      <div class="card-body p-4 text-start">
+        
+        <!-- แท็บเลื่อนเลือกประเภทสถิติ -->
+        <ul class="nav nav-pills mb-4 gap-2 bg-light p-2 rounded-3 border" id="researchTab" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active fw-bold text-dark px-4 py-2.5 rounded-3 d-flex align-items-center gap-2" id="reliability-tab" data-bs-toggle="pill" data-bs-target="#tab-reliability" type="button" role="tab" aria-selected="true">
+              🤝 ค่าความสอดคล้องผู้ประเมินร่วม (Pearson r)
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link fw-bold text-dark px-4 py-2.5 rounded-3 d-flex align-items-center gap-2" id="ttest-tab" data-bs-toggle="pill" data-bs-target="#tab-ttest" type="button" role="tab" aria-selected="false">
+              📈 ประสิทธิภาพการพัฒนาการเขียน (Paired t-test)
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link fw-bold text-dark px-4 py-2.5 rounded-3 d-flex align-items-center gap-2" id="qualitative-tab" data-bs-toggle="pill" data-bs-target="#tab-qualitative" type="button" role="tab" aria-selected="false">
+              🔬 ศูนย์วิเคราะห์เชิงคุณภาพ (Content Analysis Hub)
+            </button>
+          </li>
+        </ul>
+
+        <div class="tab-content" id="researchTabContent">
+          
+          <!-- 1. Pearson Correlation Reliability Tab -->
+          <div class="tab-pane fade show active" id="tab-reliability" role="tabpanel" aria-labelledby="reliability-tab">
+            <div class="row g-4">
+              <div class="col-md-5 col-sm-12">
+                <div class="card border-0 rounded-3 p-3 bg-white shadow-sm border-start border-3 border-primary h-100">
+                  <h6 class="fw-bold text-dark mb-3"><i class="bi bi-info-circle-fill text-primary"></i> การตีความความน่าเชื่อถือเกณฑ์ประเมิน (Hopkins & Stanley, 1981)</h6>
+                  <p class="small text-muted mb-3" style="line-height: 1.6;">
+                    เป็นการคำนวณค่าสัมประสิทธิ์สหสัมพันธ์แบบเพียร์สัน (Pearson correlation coefficient - r) ของคะแนนที่ให้โดยผู้เชี่ยวชาญคนที่ 1 (admin1) และคนที่ 2 (admin2) เพื่อพิสูจน์ความสม่ำเสมอของเกณฑ์ประเมิน (Inter-rater Reliability)
+                  </p>
+                  <div class="d-flex flex-column gap-2 small">
+                    <div class="d-flex justify-content-between p-2 rounded bg-success bg-opacity-10 text-success fw-semibold">
+                      <span>r &ge; 0.90</span><span>ระดับสูงมาก (Very High)</span>
+                    </div>
+                    <div class="d-flex justify-content-between p-2 rounded bg-info bg-opacity-10 text-info fw-semibold">
+                      <span>0.70 &le; r &lt; 0.90</span><span>ระดับสูง (High)</span>
+                    </div>
+                    <div class="d-flex justify-content-between p-2 rounded bg-warning bg-opacity-10 text-warning-emphasis fw-semibold">
+                      <span>0.50 &le; r &lt; 0.70</span><span>ระดับปานกลาง (Moderate)</span>
+                    </div>
+                    <div class="d-flex justify-content-between p-2 rounded bg-danger bg-opacity-10 text-danger fw-semibold">
+                      <span>0.30 &le; r &lt; 0.50</span><span>ระดับต่ำ (Low)</span>
+                    </div>
+                    <div class="d-flex justify-content-between p-2 rounded bg-secondary bg-opacity-10 text-muted fw-semibold">
+                      <span>r &lt; 0.30</span><span>น้อยมาก (Little if any)</span>
+                    </div>
+                  </div>
+                  <div class="border-top pt-3 mt-3">
+                    <div class="text-secondary small fw-bold">สัมประสิทธิ์ภาพรวม (Overall Pearson r)</div>
+                    <h2 class="fw-bold text-primary font-outfit mt-1" id="overallPearsonResult">-</h2>
+                    <span id="overallPearsonInterpretation" class="badge bg-secondary">ไม่มีข้อมูล</span>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-7 col-sm-12">
+                <div class="card border-0 rounded-3 p-3 bg-white shadow-sm border-start border-3 border-warning h-100">
+                  <h6 class="fw-bold text-dark mb-3"><i class="bi bi-bar-chart-steps text-warning"></i> ความเที่ยงรายด้านย่อย 11 เกณฑ์ (Sub-criteria Reliability)</h6>
+                  <div class="table-responsive" style="max-height: 380px; overflow-y: auto;">
+                    <table class="table table-sm table-hover align-middle mb-0 small">
+                      <thead class="table-light text-secondary">
+                        <tr>
+                          <th>เกณฑ์ประเมิน</th>
+                          <th class="text-center">จำนวนคู่</th>
+                          <th class="text-center">ค่าสหสัมพันธ์ (r)</th>
+                          <th class="text-end">ผลประเมิน</th>
+                        </tr>
+                      </thead>
+                      <tbody id="reliabilityTableBody">
+                        <tr><td colspan="4" class="text-center py-4 text-muted">กรุณารอประมวลผลข้อมูล...</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+            </div>
+            
+            <!-- Pearson interpretation paragraph -->
+            <div class="row mt-3">
+              <div class="col-12">
+                <div id="pearsonReportParagraph" class="card border-0 rounded-3 p-3 text-secondary small bg-light border-start border-3 border-secondary" style="line-height: 1.6;">
+                  <em>กำลังรอผลสัมประสิทธิ์ความสอดคล้อง...</em>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 2. Paired t-test Tab -->
+          <div class="tab-pane fade" id="tab-ttest" role="tabpanel" aria-labelledby="ttest-tab">
+            <div class="row g-4">
+              <div class="col-md-4 col-sm-12">
+                <div class="card border-0 rounded-3 p-3 bg-white shadow-sm border-start border-3 border-success h-100">
+                  <h6 class="fw-bold text-dark mb-3"><i class="bi bi-sliders text-success"></i> ตัวแปรวิจัยเชิงสถิติ</h6>
+                  <div class="mb-3">
+                    <label class="form-label small fw-bold text-secondary">แหล่งที่มาของคะแนนดิบที่จับคู่:</label>
+                    <div class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-20 px-3 py-2.5 fs-7 w-100 text-start fw-bold rounded-3">
+                      <i class="bi bi-person-workspace me-1"></i> คุณครูผู้สอน (ประเมิน T1 & T2 ครบถ้วน)
+                    </div>
+                    <select id="ttestReviewerSelector" class="d-none">
+                      <option value="teacher" selected>คะแนนจากคุณครูผู้สอน</option>
+                    </select>
+                  </div>
+                  <p class="small text-muted" style="line-height: 1.6;">
+                    เปรียบเทียบคะแนนเขียนเรียงความของนักเรียนคนเดียวกันระหว่างก่อนเรียน (Pretest - T1) กับหลังเรียน (Posttest - T2) ด้วยสถิติ **Paired t-test (Dependent t-test)** เพื่อทดสอบประสิทธิภาพของแนวทางการจัดการเรียนการสอนแบบ POA
+                  </p>
+                  <div class="alert alert-info border-0 rounded-3 p-3 small mb-0">
+                    <strong>สมมติฐานหลัก (H0):</strong> คะแนนสอบเฉลี่ยก่อนเรียนและหลังเรียนเท่ากัน<br>
+                    <strong>สมมติฐานทางเลือก (H1):</strong> คะแนนหลังเรียนสูงกว่าก่อนเรียนอย่างมีนัยสำคัญ
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-8 col-sm-12">
+                <div class="card border-0 rounded-3 p-3 bg-white shadow-sm border-start border-3 border-danger h-100">
+                  <h6 class="fw-bold text-dark mb-3"><i class="bi bi-journal-check text-danger"></i> ตารางสถิติเปรียบเทียบผลสัมฤทธิ์ทางการเขียน (Paired t-test Table)</h6>
+                  <div class="table-responsive mb-3">
+                    <table class="table table-bordered align-middle text-center small mb-0">
+                      <thead class="table-light text-secondary">
+                        <tr>
+                          <th>ตัวแปรการทดสอบ</th>
+                          <th>N</th>
+                          <th>Mean ก่อนเรียน (T1)</th>
+                          <th>Mean หลังเรียน (T2)</th>
+                          <th>ผลต่างเฉลี่ย (D)</th>
+                          <th>SD ของผลต่าง (SD_D)</th>
+                          <th>ค่าสถิติ t</th>
+                          <th>องศาอิสระ (df)</th>
+                          <th>ค่าความนัยสำคัญ (p-value)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr id="ttestStatsRow">
+                          <td colspan="9" class="py-4 text-muted">ไม่มีข้อมูลประมวลผล...</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div class="card border-0 rounded bg-light p-3 small text-secondary" id="ttestInterpretationText">
+                    รอคำนวณสรุปผลทางสถิติ...
+                  </div>
+                  <div id="ttestReportParagraph" class="mt-3 p-3 rounded-3 border bg-light small text-secondary" style="line-height: 1.6;">
+                    <em>กำลังประมวลผลข้อเขียนรายงานสถิติเชิงปริมาณ...</em>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Qualitative Content Analysis Hub Tab -->
+          <div class="tab-pane fade" id="tab-qualitative" role="tabpanel" aria-labelledby="qualitative-tab">
+            <div class="card border-0 rounded-3 p-3 bg-light shadow-sm mb-4">
+              <div class="row g-2 align-items-center">
+                <div class="col-md-4 col-sm-12">
+                  <div class="input-group">
+                    <span class="input-group-text bg-white small border-end-0"><i class="bi bi-grid-fill"></i> เกณฑ์ด้าน</span>
+                    <select id="qualitativeCriteriaFilter" class="form-select bg-white border-start-0 small" onchange="filterQualitativeHub()">
+                      <option value="all" selected>แสดงทุกเกณฑ์ประเมิน</option>
+                      <option value="1.1">1.1 ความตรงประเด็น</option>
+                      <option value="1.2">1.2 แก่นเรื่องชัดเจน</option>
+                      <option value="1.3">1.3 การขยายความและเหตุผล</option>
+                      <option value="2.1">2.1 ความครบถ้วนขององค์ประกอบ</option>
+                      <option value="2.2">2.2 การลำดับประเด็นเป็นระบบ</option>
+                      <option value="3.1">3.1 การใช้ประโยคถูกต้อง</option>
+                      <option value="3.2">3.2 การเลือกใช้คำ</option>
+                      <option value="3.3">3.3 ระดับภาษาเหมาะสม</option>
+                      <option value="4.1">4.1 การสะกดคำถูกต้อง</option>
+                      <option value="4.2">4.2 การเว้นวรรค</option>
+                      <option value="4.3">4.3 ความเรียบร้อย</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="col-md-5 col-sm-12">
+                  <div class="input-group">
+                    <span class="input-group-text bg-white small border-end-0"><i class="bi bi-search"></i> ค้นหา</span>
+                    <input type="text" id="qualitativeSearchInput" onkeyup="filterQualitativeHub()" class="form-control bg-white border-start-0 small text-start" placeholder="ค้นหาคำศัพท์ อุปสรรค ความคิดเห็น...">
+                  </div>
+                </div>
+                <div class="col-md-3 col-sm-12 text-md-end text-center mt-2 mt-md-0">
+                  <button class="btn btn-primary btn-sm fw-bold px-4 py-2.5 rounded-pill" onclick="exportQualitativeToCSV()"><i class="bi bi-download"></i> ส่งออกข้อมูลดิบ (CSV)</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Qualitative Content Analysis paragraph -->
+            <div id="qualitativeReportParagraph" class="card border-0 rounded-3 p-3 text-secondary small bg-light border-start border-3 border-success mb-3" style="line-height: 1.6;">
+              <em>กำลังประมวลผลข้อเขียนวิเคราะห์ข้อมูลเชิงคุณภาพ...</em>
+            </div>
+
+            <!-- กล่องแสดงข้อความสำหรับการทำวิเคราะห์เนื้อหา (Content Analysis Cards) -->
+            <div class="row g-3" id="qualitativeHubContainer" style="max-height: 480px; overflow-y: auto;">
+              <!-- Cards created by JS dynamically -->
+              <div class="col-12 text-center py-5 text-muted">กำลังโหลดข้อความเชิงคุณภาพเพื่อใช้วิเคราะห์เนื้อหา...</div>
+            </div>
+          </div>
+
+        </div>
       </div>
     </div>
   </div>
@@ -163,11 +377,18 @@ require_once 'header.php';
       <h4 class="fw-bold mb-1">บทวิเคราะห์คะแนนและการประเมินสะสมรอบด้าน (360° Assessment)</h4>
       <p class="mb-0 text-white-50 small">นักเรียนเป้าหมาย: <span id="dashStudentName" class="fw-bold text-white fs-6">...</span> <span class="opacity-75">(รหัส: <span id="dashStudentId" class="font-mono">...</span>)</span></p>
     </div>
-    <?php if ($sessionUser['role'] === 'teacher'): ?>
-    <button id="backToOverviewBtn" onclick="showTeacherOverviewOnly()" class="btn btn-outline-light fw-bold px-4 rounded-pill">
-      &uarr; กลับไปที่แดชบอร์ดชั้นเรียน
-    </button>
-    <?php endif; ?>
+    <div class="d-flex align-items-center gap-2">
+      <label for="studentPhaseSelector" class="small text-white-50 text-nowrap mb-0">รอบประเมิน:</label>
+      <select id="studentPhaseSelector" class="form-select form-select-sm bg-white text-dark font-semibold border-0" style="width:140px;" onchange="switchStudentPhase()">
+        <option value="posttest" selected>หลังเรียน (T2)</option>
+        <option value="pretest">ก่อนเรียน (T1)</option>
+      </select>
+      <?php if ($sessionUser['role'] === 'teacher'): ?>
+      <button id="backToOverviewBtn" onclick="showTeacherOverviewOnly()" class="btn btn-light fw-bold px-3 btn-sm rounded-pill shadow-sm">
+        &uarr; กลับไปภาพรวม
+      </button>
+      <?php endif; ?>
+    </div>
   </div>
 
   <!-- สถานะดาวน์โหลดข้อมูล -->
@@ -322,11 +543,14 @@ require_once 'header.php';
   let classQualityChartInstance = null;
   let classDimensionChartInstance = null;
   let classDimensionLinesChartInstance = null;
+  let classroomResearchData = null;
+  let currentResearchPhase = 'posttest';
+  let currentDashboardViewMode = 'task';
 
   const criteriaMap = {
     '1.1': { name: '1.1 ความตรงประเด็น (คะแนนเต็ม 12)', mult: 3 },
-    '1.2': { name: '1.2 แก่นเรื่องที่ชัดเจน (คะแนนเต็ม 6)', mult: 1.5 },
-    '1.3': { name: '1.3 การขยายความและให้เหตุผล (คะแนนเต็ม 9)', mult: 2.25 },
+    '1.2': { name: '1.2 แก่นเรื่องชัดเจน (คะแนนเต็ม 6)', mult: 1.5 },
+    '1.3': { name: '1.3 การขยายความและเหตุผล (คะแนนเต็ม 9)', mult: 2.25 },
     '2.1': { name: '2.1 ความครบถ้วนขององค์ประกอบ (คะแนนเต็ม 8)', mult: 2 },
     '2.2': { name: '2.2 การลำดับประเด็นเป็นระบบ (คะแนนเต็ม 4)', mult: 1 },
     '3.1': { name: '3.1 การใช้ประโยคถูกต้อง (คะแนนเต็ม 4)', mult: 1 },
@@ -344,56 +568,56 @@ require_once 'header.php';
         {
           id: "1.1", name: "1.1 ความตรงประเด็น (คะแนนเต็ม 12)", multiplier: 3,
           levels: [
-            { score: 4, label: "ดีมาก", desc: "เนื้อหาสัมพันธ์กับหัวข้อและโจทย์อย่างสมบูรณ์ทุกส่วน ไม่ปรากฏประเด็นที่อยู่นอกขอบเขตของหัวข้อ" },
-            { score: 3, label: "ดี", desc: "เนื้อหาสัมพันธ์กับโจทย์เป็นส่วนใหญ่ ปรากฏประเด็นนอกขอบเขต 1 ประเด็น ซึ่งไม่กระทบสาระหลักของเรื่อง" },
-            { score: 2, label: "ปานกลาง", desc: "เนื้อหาสัมพันธ์กับโจทย์ระดับปานกลาง ปรากฏประเด็นนอกขอบเขต 2 ประเด็น" },
-            { score: 1, label: "พอใช้", desc: "เนื้อหาเบี่ยงเบนออกนอกกรอบที่กำหนดหลายส่วน สัมพันธ์กับโจทย์น้อยมาก ปรากฏประเด็นนอกขอบเขตตั้งแต่ 3 ประเด็นขึ้นไป แต่ยังคงมีประเด็นที่สัมพันธ์กับหัวข้ออย่างน้อย 1 ประเด็น" },
-            { score: 0, label: "ปรับปรุง", desc: "เนื้อหาไม่สัมพันธ์กับหัวข้อหรือภาระงานที่กำหนดเลย" }
+            { score: 4, label: "ดีมาก", desc: "เนื้อหาสัมพันธ์กับหัวข้อทุกส่วน ไม่ปรากฏประเด็นที่อยู่นอกขอบเขตของหัวข้อ" },
+            { score: 3, label: "ดี", desc: "เนื้อหาสัมพันธ์กับหัวข้อเกือบทุกส่วน ปรากฏประเด็นนอกขอบเขต 1 ประเด็น" },
+            { score: 2, label: "ปานกลาง", desc: "เนื้อหาสัมพันธ์กับหัวข้อบางส่วนปรากฏประเด็นนอกขอบเขต 2 ประเด็น" },
+            { score: 1, label: "พอใช้", desc: "เนื้อหาสัมพันธ์กับหัวข้อหลายส่วน ปรากฏประเด็นนอกขอบเขต 3 ประเด็นขึ้นไป" },
+            { score: 0, label: "ปรับปรุง", desc: "เนื้อหาไม่สัมพันธ์กับหัวข้อที่กำหนด" }
           ]
         },
         {
-          id: "1.2", name: "1.2 แก่นเรื่องที่ชัดเจน (คะแนนเต็ม 6)", multiplier: 1.5,
+          id: "1.2", name: "1.2 แก่นเรื่องชัดเจน (คะแนนเต็ม 6)", multiplier: 1.5,
           levels: [
-            { score: 4, label: "ดีมาก", desc: "แก่นเรื่องโดดเด่น ชัดเจน เป็นรากฐานของเรื่องทั้งหมด โดยระบุประเด็นหลักไว้ในส่วนนำ ย้ำประเด็นเดิมในส่วนสรุป และทุกย่อหน้าในเนื้อเรื่องยึดโยงกับประเด็นหลัก" },
-            { score: 3, label: "ดี", desc: "แก่นเรื่องชัดเจนและสอดคล้องเหมาะสมกับหัวข้อที่กำหนด ปรากฏการระบุประเด็นหลัก 2 ใน 3 ตำแหน่งข้างต้น" },
-            { score: 2, label: "ปานกลาง", desc: "มีแก่นเรื่องแต่ไม่โดดเด่น หรือไม่ปรากฏชัดเจนในบางส่วนของเรื่อง ปรากฏการระบุประเด็นหลักเพียง 1 ตำแหน่ง" },
-            { score: 1, label: "พอใช้", desc: "แก่นเรื่องเริ่มคลุมเครือ สื่อเป้าหมายหลักได้เพียงบางส่วน ไม่ปรากฏการระบุประเด็นหลักทั้งในส่วนนำและส่วนสรุป แต่ผู้ประเมินยังสรุปประเด็นได้จากเนื้อเรื่อง" },
-            { score: 0, label: "ปรับปรุง", desc: "ขาดแก่นเรื่องที่ชัดเจน ไม่มีแกนกลางยึดโยงเนื้อหาเข้าด้วยกัน ไม่สามารถระบุประเด็นหลักได้" }
+            { score: 4, label: "ดีมาก", desc: "แก่นเรื่องโดดเด่น ชัดเจน โดยระบุประเด็นหลักไว้ในส่วนคำนำ ย้ำประเด็นเดิมในส่วนสรุป และทุกย่อหน้าสัมพันธ์กับประเด็นหลัก" },
+            { score: 3, label: "ดี", desc: "แก่นเรื่องชัดเจนและสอดคล้องกับหัวข้อที่กำหนด ระบุประเด็นหลัก 2 ใน 3 ย่อหน้า ในส่วนคำนำ ส่วนเนื้อเรื่อง หรือส่วนสรุป" },
+            { score: 2, label: "ปานกลาง", desc: "แก่นเรื่องไม่ชัดเจนหรือไม่ปรากฏชัดเจนส่วนเนื้อเรื่อง ระบุประเด็นหลักเพียง 1 ย่อหน้า" },
+            { score: 1, label: "พอใช้", desc: "แก่นเรื่องไม่ชัดเจน ไม่ระบุประเด็นหลักทั้งในส่วนคำนำและส่วนสรุป แต่ยังสรุปประเด็นไม่ได้จากเนื้อเรื่อง" },
+            { score: 0, label: "ปรับปรุง", desc: "แก่นเรื่องไม่ชัดเจน ไม่สามารถระบุประเด็นหลักได้" }
           ]
         },
         {
-          id: "1.3", name: "1.3 การขยายความและให้เหตุผล (คะแนนเต็ม 9)", multiplier: 2.25,
+          id: "1.3", name: "1.3 การขยายความและเหตุผล (คะแนนเต็ม 9)", multiplier: 2.25,
           levels: [
-            { score: 4, label: "ดีมาก", desc: "ขยายความอย่างลึกซึ้ง มีเหตุผลและตัวอย่างประกอบที่น่าเชื่อถือ ทุกประเด็นหลักมีเหตุผลหรือตัวอย่างสนับสนุนที่สอดคล้องสัมพันธ์กันตั้งแต่ 2 รายการขึ้นไป" },
-            { score: 3, label: "ดี", desc: "ขยายความได้ดี มีเหตุผลสนับสนุนสอดคล้องกับประเด็นหลัก โดยประเด็นส่วนใหญ่มีเหตุผลสนับสนุน 2 รายการ และมี 1 ประเด็นที่มีเพียง 1 รายการ" },
-            { score: 2, label: "ปานกลาง", desc: "ขยายความพอสังเขป แต่ขาดความลึกในบางประเด็น แต่ละประเด็นมีเหตุผลสนับสนุนเพียง 1 รายการ และไม่ปรากฏตัวอย่างประกอบ" },
-            { score: 1, label: "พอใช้", desc: "ขยายความน้อย เหตุผลสนับสนุนไม่หนักแน่นเพียงพอ ปรากฏเหตุผลสนับสนุนไม่เกิน 1 รายการตลอดทั้งเรื่อง" },
-            { score: 0, label: "ปรับปรุง", desc: "ไม่มีการขยายความหรือให้รายละเอียดสนับสนุนแก่นเรื่อง" }
+            { score: 4, label: "ดีมาก", desc: "ขยายความครบทุกประเด็นหลัก โดยแต่ละประเด็นมีเหตุผลหรือตัวอย่างสนับสนุนที่สอดคล้อง ตั้งแต่ 2 รายการขึ้นไป" },
+            { score: 3, label: "ดี", desc: "ขยายความครบทุกประเด็นหลัก โดยแต่ละประเด็นมีเหตุผลหรือตัวอย่างสนับสนุนที่สอดคล้อง จำนวน 1 รายการ" },
+            { score: 2, label: "ปานกลาง", desc: "ขยายความครบทุกประเด็นหลัก แต่ปรากฏประเด็นที่ขาดเหตุผลหรือตัวอย่างสนับสนุน จำนวน 1 ถึง 2 ประเด็น" },
+            { score: 1, label: "พอใช้", desc: "ขยายความเพียงบางประเด็น หรือปรากฏประเด็นที่ขาดเหตุผลหรือตัวอย่างสนับสนุน ตั้งแต่ 3 ประเด็นขึ้นไป" },
+            { score: 0, label: "ปรับปรุง", desc: "ไม่มีการขยายความ  ไม่มีเหตุผลหรือตัวอย่างสนับสนุน" }
           ]
         }
       ]
     },
     {
-      section: "2) ด้านองค์ประกอบและการลำดับเรื่อง",
+      section: "2) ด้านองค์ประกอบและการลำดับ",
       items: [
         {
           id: "2.1", name: "2.1 ความครบถ้วนขององค์ประกอบ (คะแนนเต็ม 8)", multiplier: 2,
           levels: [
-            { score: 4, label: "ดีมาก", desc: "องค์ประกอบครบทั้ง 3 ส่วน ได้แก่ คำนำ เนื้อเรื่อง และสรุป แยกย่อหน้าแต่ละส่วนชัดเจน และส่วนเนื้อเรื่องมีความยาวมากกว่าคำนำและมากกว่าสรุป" },
-            { score: 3, label: "ดี", desc: "องค์ประกอบครบทั้ง 3 ส่วน แยกย่อหน้าแต่ละส่วนชัดเจน แต่สัดส่วนความยาวไม่เป็นไปตามเกณฑ์ข้างต้น" },
-            { score: 2, label: "ปานกลาง", desc: "องค์ประกอบครบถ้วน แต่สัดส่วนในแต่ละส่วนไม่สมดุล หรือไม่แยกย่อหน้าให้เห็นขอบเขตของแต่ละส่วนอย่างชัดเจน" },
-            { score: 1, label: "พอใช้", desc: "องค์ประกอบไม่ครบถ้วน ขาดส่วนสำคัญไป 1 ส่วน เช่น คำนำหรือสรุป" },
+            { score: 4, label: "ดีมาก", desc: "องค์ประกอบครบทั้ง 3 ส่วน ได้แก่ คำนำ เนื้อเรื่อง และสรุป แยกย่อหน้าแต่ละส่วนชัดเจน" },
+            { score: 3, label: "ดี", desc: "องค์ประกอบครบทั้ง 3 ส่วน แยกย่อหน้าแต่ละส่วนชัดเจน แต่สัดส่วนความยาวไม่เท่ากันทุกย่อหน้า" },
+            { score: 2, label: "ปานกลาง", desc: "องค์ประกอบครบถ้วน แต่สัดส่วนไม่สมดุล หรือไม่แยกย่อหน้าให้เห็นขอบเขตอย่างชัดเจน" },
+            { score: 1, label: "พอใช้", desc: "องค์ประกอบไม่ครบถ้วน ขาดส่วนสำคัญไป 1 ส่วน เช่น คำนำ หรือสรุป" },
             { score: 0, label: "ปรับปรุง", desc: "องค์ประกอบไม่ครบถ้วน ขาดตั้งแต่ 2 ส่วนขึ้นไป และไม่สามารถแยกแต่ละส่วนได้อย่างชัดเจน" }
           ]
         },
         {
           id: "2.2", name: "2.2 การลำดับประเด็นเป็นระบบ (คะแนนเต็ม 4)", multiplier: 1,
           levels: [
-            { score: 4, label: "ดีมาก", desc: "วางตำแหน่งย่อหน้าเรียงตามลำดับเหตุผลได้ถูกต้อง มีทิศทางชัดเจน ไม่มีการสลับประเด็น" },
-            { score: 3, label: "ดี", desc: "ลำดับย่อหน้าต่อเนื่อง มีทิศทางชัดเจนเป็นส่วนใหญ่ ปรากฏย่อหน้าที่วางผิดตำแหน่ง 1 ย่อหน้า ซึ่งไม่กระทบความเข้าใจ" },
-            { score: 2, label: "ปานกลาง", desc: "ลำดับย่อหน้าไม่สม่ำเสมอ ปรากฏย่อหน้าที่วางผิดตำแหน่ง 2 ย่อหน้า ทำให้ต้องอ่านย้อนกลับ" },
-            { score: 1, label: "พอใช้", desc: "ลำดับประเด็นสับสน วางข้อมูลผิดที่อย่างเห็นได้ชัด กระทบต่อความเข้าใจ ปรากฏย่อหน้าที่วางผิดตำแหน่ง 3 ย่อหน้า" },
-            { score: 0, label: "ปรับปรุง", desc: "ลำดับประเด็นไม่เป็นระบบ วกวน จนเสียความหมายและความสัมพันธ์ของเนื้อความ" }
+            { score: 4, label: "ดีมาก", desc: "ลำดับย่อหน้าเรียงตามลำดับเหตุผลได้ถูกต้อง มีทิศทางชัดเจน ไม่มีการสลับประเด็น" },
+            { score: 3, label: "ดี", desc: "ลำดับย่อหน้าต่อเนื่อง มีทิศทางชัดเจนเป็นส่วนใหญ่ ปรากฏย่อหน้าที่วางผิด 1 ย่อหน้า" },
+            { score: 2, label: "ปานกลาง", desc: "ลำดับย่อหน้าไม่สม่ำเสมอ ปรากฏย่อหน้าที่วางผิด 2 ย่อหน้า" },
+            { score: 1, label: "พอใช้", desc: "ลำดับประเด็นสับสน กระทบต่อความเข้าใจ ปรากฏย่อหน้าที่วางผิด 3 ย่อหน้า" },
+            { score: 0, label: "ปรับปรุง", desc: "ลำดับประเด็นไม่เป็นระบบ" }
           ]
         }
       ]
@@ -404,31 +628,31 @@ require_once 'header.php';
         {
           id: "3.1", name: "3.1 การใช้ประโยคถูกต้อง (คะแนนเต็ม 4)", multiplier: 1,
           levels: [
-            { score: 4, label: "ดีมาก", desc: "ประโยคถูกต้องตามหลักไวยากรณ์ทั้งหมด และใช้โครงสร้างประโยคหลากหลาย" },
-            { score: 3, label: "ดี", desc: "ประโยคถูกต้องเป็นส่วนใหญ่ ปรากฏประโยคผิดหลักไวยากรณ์ไม่เกิน 2 ประโยค แต่บริบทโดยรวมยังสื่อความหมายได้" },
-            { score: 2, label: "ปานกลาง", desc: "ประโยคถูกต้องระดับปานกลาง ปรากฏประโยคผิดหลักไวยากรณ์ 3 ถึง 5 ประโยค และขาดความหลากหลายของรูปแบบประโยค" },
-            { score: 1, label: "พอใช้", desc: "ประโยคมีข้อผิดพลาดหลายแห่ง ตั้งแต่ 6 ถึง 8 ประโยค หรือวางส่วนขยายกำกวม" },
-            { score: 0, label: "ปรับปรุง", desc: "ประโยคมีข้อผิดพลาดร้ายแรง ตั้งแต่ 9 ประโยคขึ้นไป ใช้โครงสร้างประโยคไม่สมบูรณ์จนไม่สื่อความหมาย" }
+            { score: 4, label: "ดีมาก", desc: "ใช้ประโยคถูกต้องตามหลักภาษาทั้งหมด และใช้โครงสร้างประโยคหลากหลาย" },
+            { score: 3, label: "ดี", desc: "ใช้ประโยคถูกต้องเป็นส่วนใหญ่ ปรากฏประโยคผิดหลักภาษาไม่เกิน 2 ประโยค แต่ใช้โครงสร้างประโยคหลากหลาย" },
+            { score: 2, label: "ปานกลาง", desc: "ใช้ประโยคค่อนข้างถูกต้องแต่ปรากฏประโยคผิดหลักภาษา 3 ถึง 5 ประโยค และขาดความหลากหลาย" },
+            { score: 1, label: "พอใช้", desc: "ใช้ประโยคผิดพลาดหลายแห่ง ตั้งแต่ 6 ถึง 8 ประโยค และขาดความหลากหลายของรูปแบบประโยค" },
+            { score: 0, label: "ปรับปรุง", desc: "ใช้ประโยคผิดพลาด ตั้งแต่ 9 ประโยคขึ้นไป" }
           ]
         },
         {
           id: "3.2", name: "3.2 การเลือกใช้คำ (คะแนนเต็ม 6)", multiplier: 1.5,
           levels: [
-            { score: 4, label: "ดีมาก", desc: "เลือกใช้คำและคำเชื่อมได้แม่นยำ สื่อความหมายชัดเจนและสละสลวย โดยใช้คำ คำเชื่อม และสำนวนถูกต้องทั้งหมด" },
+            { score: 4, label: "ดีมาก", desc: "เลือกใช้คำและคำเชื่อมได้ถูกต้อง สื่อความหมายชัดเจน กระชับ และสละสลวย โดยใช้คำ คำเชื่อม และสำนวนถูกต้องทั้งหมด" },
             { score: 3, label: "ดี", desc: "เลือกใช้คำถูกต้องตามความหมายและสอดคล้องกับบริบท แต่ปรากฏการใช้คำเชื่อมคลาดเคลื่อนไม่เกิน 2 แห่ง" },
-            { score: 2, label: "ปานกลาง", desc: "เลือกใช้คำถูกต้องปานกลาง มีคำที่กำกวมบางแห่ง ปรากฏการใช้คำเชื่อมคลาดเคลื่อนหรือใช้คำซ้ำ รวม 3 ถึง 5 แห่ง" },
-            { score: 1, label: "พอใช้", desc: "ใช้คำผิดความหมายหลายแห่ง จนสาระสำคัญสับสน รวม 6 ถึง 8 แห่ง และปรากฏการใช้สำนวนไม่เหมาะสม" },
-            { score: 0, label: "ปรับปรุง", desc: "ใช้คำผิดความหมายและใช้สำนวนคลาดเคลื่อนเป็นส่วนใหญ่ ตั้งแต่ 9 แห่งขึ้นไป จนไม่สามารถสื่อสารได้" }
+            { score: 2, label: "ปานกลาง", desc: "เลือกใช้คำถูกต้องแต่มีคำที่กำกวมบางแห่ง ปรากฏการใช้คำเชื่อมคลาดเคลื่อนรวม 3 ถึง 5 แห่ง" },
+            { score: 1, label: "พอใช้", desc: "ใช้คำผิดความหมาย 6 ถึง 8 แห่ง และปรากฏการใช้สำนวนไม่เหมาะสม" },
+            { score: 0, label: "ปรับปรุง", desc: "ใช้คำผิดความหมายและใช้สำนวนคลาดเคลื่อนเป็นส่วนใหญ่ ตั้งแต่ 9 แห่งขึ้นไป" }
           ]
         },
         {
           id: "3.3", name: "3.3 ระดับภาษาเหมาะสม (คะแนนเต็ม 5)", multiplier: 1.25,
           levels: [
-            { score: 4, label: "ดีมาก", desc: "ใช้ภาษาเขียนระดับทางการได้ถูกต้องและสม่ำเสมอ โดยไม่ปรากฏภาษาพูดปะปน" },
-            { score: 3, label: "ดี", desc: "ใช้ภาษาระดับทางการได้ถูกต้องสม่ำเสมอ ปรากฏคำภาษาพูดปะปนไม่เกิน 2 คำ" },
-            { score: 2, label: "ปานกลาง", desc: "ใช้ภาษาระดับทางการเป็นส่วนใหญ่ ปรากฏคำภาษาพูดหรือคำสแลงปะปน 3 ถึง 5 คำ" },
-            { score: 1, label: "พอใช้", desc: "ใช้ภาษาทางการและกึ่งทางการสลับกัน ทำให้ระดับภาษาในงานเขียนไม่คงที่ ปรากฏคำภาษาพูดปะปน 6 ถึง 8 คำ" },
-            { score: 0, label: "ปรับปรุง", desc: "ใช้ภาษาพูดหรือภาษาปากตลอดทั้งงานเขียน หรือปรากฏคำภาษาพูดตั้งแต่ 9 คำขึ้นไป" }
+            { score: 4, label: "ดีมาก", desc: "ใช้ภาษาระดับกึ่งทางการขึ้นไปได้ถูกต้องและสม่ำเสมอ โดยไม่ปรากฏภาษาพูดปะปน" },
+            { score: 3, label: "ดี", desc: "ใช้ภาษาระดับกึ่งทางการขึ้นไปได้ถูกต้องสม่ำเสมอ ปรากฏคำภาษาพูดปะปนไม่เกิน 2 ตำแหน่ง" },
+            { score: 2, label: "ปานกลาง", desc: "ใช้ภาษาระดับกึ่งทางการขึ้นไปเป็นส่วนใหญ่ ปรากฏคำภาษาพูดปะปน 3 ถึง 5 ตำแหน่ง" },
+            { score: 1, label: "พอใช้", desc: "ใช้ภาษาระดับกึ่งทางการสลับไม่คงที่ ปรากฏคำภาษาพูดปะปน 6 ถึง 8 ตำแหน่ง" },
+            { score: 0, label: "ปรับปรุง", desc: "ใช้ภาษาพูดหรือภาษาปากตลอดทั้งงานเขียน หรือปรากฏคำภาษาพูดตั้งแต่ 9 ตำแหน่งขึ้นไป" }
           ]
         }
       ]
@@ -439,7 +663,7 @@ require_once 'header.php';
         {
           id: "4.1", name: "4.1 การสะกดคำถูกต้อง (คะแนนเต็ม 2)", multiplier: 0.5,
           levels: [
-            { score: 4, label: "ดีมาก", desc: "สะกดคำและใช้อักษรย่อได้ถูกต้องตามพจนานุกรมทุกคำ" },
+            { score: 4, label: "ดีมาก", desc: "สะกดคำได้ถูกต้องตามพจนานุกรมทุกคำ" },
             { score: 3, label: "ดี", desc: "สะกดคำผิด 1 ถึง 2 แห่ง" },
             { score: 2, label: "ปานกลาง", desc: "สะกดคำผิด 3 ถึง 5 แห่ง" },
             { score: 1, label: "พอใช้", desc: "สะกดคำผิด 6 ถึง 8 แห่ง" },
@@ -449,7 +673,7 @@ require_once 'header.php';
         {
           id: "4.2", name: "4.2 การเว้นวรรค (คะแนนเต็ม 2)", multiplier: 0.5,
           levels: [
-            { score: 4, label: "ดีมาก", desc: "เว้นวรรคตอนถูกต้องตามหลักเกณฑ์การใช้ภาษาไทยทั้งหมด" },
+            { score: 4, label: "ดีมาก", desc: "เว้นวรรคตอนถูกต้องตามหลักเกณฑ์ทั้งหมด" },
             { score: 3, label: "ดี", desc: "เว้นวรรคผิด 1 ถึง 2 จุด" },
             { score: 2, label: "ปานกลาง", desc: "เว้นวรรคผิด 3 ถึง 5 จุด" },
             { score: 1, label: "พอใช้", desc: "เว้นวรรคผิด 6 ถึง 8 จุด" },
@@ -459,11 +683,11 @@ require_once 'header.php';
         {
           id: "4.3", name: "4.3 ความเรียบร้อย (คะแนนเต็ม 2)", multiplier: 0.5,
           levels: [
-            { score: 4, label: "ดีมาก", desc: "ผลงานสะอาด เป็นระเบียบ ลายมืออ่านง่าย ไม่ปรากฏรอยขูดลบขีดฆ่า และไม่มีการเขียนฉีกคำ" },
-            { score: 3, label: "ดี", desc: "ผลงานสะอาดเรียบร้อย ปรากฏรอยขูดลบขีดฆ่า 1 ถึง 2 จุด" },
-            { score: 2, label: "ปานกลาง", desc: "ปรากฏรอยขูดลบขีดฆ่า 3 ถึง 5 จุด หรือมีการเขียนฉีกคำ 1 ถึง 2 แห่ง" },
-            { score: 1, label: "พอใช้", desc: "ปรากฏรอยขูดลบขีดฆ่า 6 ถึง 8 จุด หรือมีการเขียนฉีกคำตั้งแต่ 3 แห่งขึ้นไป" },
-            { score: 0, label: "ปรับปรุง", desc: "ปรากฏรอยขูดลบขีดฆ่าตั้งแต่ 9 จุดขึ้นไป หรือลายมืออ่านยาก" }
+            { score: 4, label: "ดีมาก", desc: "ผลงานสะอาด เป็นระเบียบ ลายมืออ่านง่าย ไม่ปรากฏรอยขูดลบขีดฆ่า" },
+            { score: 3, label: "ดี", desc: "ผลงานสะอาดเรียบร้อย ลายมืออ่านง่ายปรากฏรอยขูดลบขีดฆ่า 1 ถึง 2 จุด" },
+            { score: 2, label: "ปานกลาง", desc: "ผลงานค่อนข้างเรียบร้อย ลายมืออ่านง่าย ปรากฏรอยขูดลบขีดฆ่า 3 ถึง 5 จุด" },
+            { score: 1, label: "พอใช้", desc: "ผลงานไม่เรียบร้อย ปรากฏรอยขูดลบขีดฆ่า 6 ถึง 8 จุด" },
+            { score: 0, label: "ปรับปรุง", desc: "ผลงานไม่เรียบร้อย ปรากฏรอยขูดลบขีดฆ่าตั้งแต่ 9 จุดขึ้นไป หรือลายมืออ่านยาก" }
           ]
         }
       ]
@@ -487,43 +711,224 @@ require_once 'header.php';
   async function loadTeacherOverview() {
     const tbody = document.getElementById('overviewTableBody');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-5 fw-bold"><div class="spinner-border spinner-border-sm mb-2 d-block mx-auto"></div>กำลังประมวลคำนวณและดึงข้อมูลสถิติ...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-5 fw-bold"><div class="spinner-border spinner-border-sm mb-2 d-block mx-auto"></div>กำลังประมวลคำนวณและดึงข้อมูลสถิติสำหรับการวิจัย...</td></tr>';
     
     try {
-      const response = await fetch(`api.php?action=get_all_students_summary&_t=${new Date().getTime()}`);
+      const response = await fetch(`api.php?action=get_classroom_research_data&_t=${new Date().getTime()}`);
       const text = await response.text();
       let res;
       try {
         res = JSON.parse(text);
       } catch (parseErr) {
         console.error("JSON parse error:", parseErr, "Response text:", text);
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger py-5 fw-bold">เกิดข้อผิดพลาดในการคำนวณคะแนนผ่านเครือข่าย<br><small class="fw-normal text-muted" style="font-family: monospace; display: block; max-height: 150px; overflow-y: auto; text-align: left; padding: 10px; background: #f8d7da; border-radius: 6px; border: 1px solid #f5c6cb; margin-top: 10px;">' + text.substring(0, 500).replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</small></td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-danger py-5 fw-bold">เกิดข้อผิดพลาดในการโหลดข้อมูลวิจัยชั้นเรียน<br><small class="fw-normal text-muted" style="font-family: monospace; display: block; max-height: 150px; overflow-y: auto; text-align: left; padding: 10px; background: #f8d7da; border-radius: 6px; border: 1px solid #f5c6cb; margin-top: 10px;">' + text.substring(0, 500).replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</small></td></tr>';
         return;
       }
-      renderTeacherOverview(res);
+      
+      if (res.success) {
+        classroomResearchData = res;
+        processDashboardData();
+      } else {
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-danger py-5 fw-bold">เกิดข้อผิดพลาดจาก API: ' + res.error + '</td></tr>';
+      }
     } catch (err) {
-      tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger py-5 fw-bold">เกิดข้อผิดพลาดในการคำนวณคะแนนผ่านเครือข่าย: ' + err.message + '</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" class="text-center text-danger py-5 fw-bold">เกิดข้อผิดพลาดในการเชื่อมต่อเครือข่าย: ' + err.message + '</td></tr>';
     }
   }
 
-  function renderTeacherOverview(res) {
-    const tbody = document.getElementById('overviewTableBody');
-    if(!tbody) return;
-    tbody.innerHTML = '';
-    
-    if(!res.success) {
-      tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger py-5 fw-bold">เกิดปัญหาจากฝั่ง API: ' + res.error + '</td></tr>';
-      return;
+  function processDashboardData() {
+    if (!classroomResearchData) return;
+
+    const studentsList = classroomResearchData.students;
+    const evaluations = classroomResearchData.evaluations;
+
+    // จัดกลุ่มประเมินตามรหัสนักเรียนและรอบการประเมิน
+    const studentEvals = {};
+    studentsList.forEach(s => {
+      studentEvals[s.student_id] = {
+        pretest: [],
+        task: [],
+        posttest: []
+      };
+    });
+
+    evaluations.forEach(ev => {
+      const phase = ev.test_phase;
+      if (studentEvals[ev.student_id] && studentEvals[ev.student_id][phase]) {
+        studentEvals[ev.student_id][phase].push(ev);
+      }
+    });
+
+    const summaryData = {};
+    const expertPairs = [];
+
+    // ดึงผู้ประเมินร่วม (Expert 1 & 2) เฉพาะภารงานในหน่วยการเรียน (task) เพื่อคำนวณ Pearson r
+    studentsList.forEach(s => {
+      const id = s.student_id;
+      const taskEvs = studentEvals[id]['task'] || [];
+      const expert1Eval = taskEvs.find(e => e.evaluator_type === 'expert' && (e.evaluator_name === 'ผู้เชี่ยวชาญ 1' || e.evaluator_name === 'admin1'));
+      const expert2Eval = taskEvs.find(e => e.evaluator_type === 'expert' && (e.evaluator_name === 'ผู้เชี่ยวชาญ 2' || e.evaluator_name === 'admin2'));
+
+      if (expert1Eval && expert2Eval) {
+        expertPairs.push({
+          e1: expert1Eval,
+          e2: expert2Eval
+        });
+      }
+    });
+
+    if (currentDashboardViewMode === 'task') {
+      // --- 1. โหมดรายงานภารงานในหน่วยเรียน (Task) ---
+      studentsList.forEach(s => {
+        const id = s.student_id;
+        const evs = studentEvals[id]['task'] || [];
+
+        const selfEval = evs.find(e => e.evaluator_type === 'self');
+        const peerEval = evs.find(e => e.evaluator_type === 'peer');
+        const teacherEval = evs.find(e => e.evaluator_type === 'teacher');
+        const expert1Eval = evs.find(e => e.evaluator_type === 'expert' && (e.evaluator_name === 'ผู้เชี่ยวชาญ 1' || e.evaluator_name === 'admin1'));
+        const expert2Eval = evs.find(e => e.evaluator_type === 'expert' && (e.evaluator_name === 'ผู้เชี่ยวชาญ 2' || e.evaluator_name === 'admin2'));
+
+        let sum_1_1 = 0, sum_1_2 = 0, sum_1_3 = 0;
+        let sum_2_1 = 0, sum_2_2 = 0;
+        let sum_3_1 = 0, sum_3_2 = 0, sum_3_3 = 0;
+        let sum_4_1 = 0, sum_4_2 = 0, sum_4_3 = 0;
+        let sum_total = 0;
+
+        evs.forEach(e => {
+          sum_1_1 += Number(e.score_1_1);
+          sum_1_2 += Number(e.score_1_2);
+          sum_1_3 += Number(e.score_1_3);
+          sum_2_1 += Number(e.score_2_1);
+          sum_2_2 += Number(e.score_2_2);
+          sum_3_1 += Number(e.score_3_1);
+          sum_3_2 += Number(e.score_3_2);
+          sum_3_3 += Number(e.score_3_3);
+          sum_4_1 += Number(e.score_4_1);
+          sum_4_2 += Number(e.score_4_2);
+          sum_4_3 += Number(e.score_4_3);
+          sum_total += Number(e.total_score);
+        });
+
+        const count = evs.length;
+        const avgScore = count > 0 ? (sum_total / count) : 0;
+
+        summaryData[id] = {
+          self: !!selfEval,
+          peer: !!peerEval,
+          teacher: !!teacherEval,
+          expert1: !!expert1Eval,
+          expert2: !!expert2Eval,
+          expert1_score: expert1Eval ? Number(expert1Eval.total_score) : null,
+          expert2_score: expert2Eval ? Number(expert2Eval.total_score) : null,
+          avgScore: avgScore,
+          count: count,
+          avg_c: count > 0 ? (sum_1_1 + sum_1_2 + sum_1_3) / count : 0,
+          avg_s: count > 0 ? (sum_2_1 + sum_2_2) / count : 0,
+          avg_l: count > 0 ? (sum_3_1 + sum_3_2 + sum_3_3) / count : 0,
+          avg_m: count > 0 ? (sum_4_1 + sum_4_2 + sum_4_3) / count : 0,
+          avg_1_1: count > 0 ? sum_1_1 / count : 0,
+          avg_1_2: count > 0 ? sum_1_2 / count : 0,
+          avg_1_3: count > 0 ? sum_1_3 / count : 0,
+          avg_2_1: count > 0 ? sum_2_1 / count : 0,
+          avg_2_2: count > 0 ? sum_2_2 / count : 0,
+          avg_3_1: count > 0 ? sum_3_1 / count : 0,
+          avg_3_2: count > 0 ? sum_3_2 / count : 0,
+          avg_3_3: count > 0 ? sum_3_3 / count : 0,
+          avg_4_1: count > 0 ? sum_4_1 / count : 0,
+          avg_4_2: count > 0 ? sum_4_2 / count : 0,
+          avg_4_3: count > 0 ? sum_4_3 / count : 0
+        };
+      });
+    } else {
+      // --- 2. โหมดเปรียบเทียบผลสัมฤทธิ์ก่อน-หลังเรียน (Pre vs Post) ---
+      studentsList.forEach(s => {
+        const id = s.student_id;
+        const preEvs = studentEvals[id]['pretest'] || [];
+        const postEvs = studentEvals[id]['posttest'] || [];
+
+        // ใช้การประเมินของครูในการประเมินความสามารถวิชาการก่อน-หลังเรียน
+        const preTeacher = preEvs.find(e => e.evaluator_type === 'teacher');
+        const postTeacher = postEvs.find(e => e.evaluator_type === 'teacher');
+
+        const preScore = preTeacher ? Number(preTeacher.total_score) : null;
+        const postScore = postTeacher ? Number(postTeacher.total_score) : null;
+        const gain = (preScore !== null && postScore !== null) ? (postScore - preScore) : null;
+
+        const activeEval = postTeacher || preTeacher;
+
+        summaryData[id] = {
+          preScore: preScore,
+          postScore: postScore,
+          gain: gain,
+          avgScore: postScore !== null ? postScore : (preScore !== null ? preScore : 0),
+          count: (preTeacher ? 1 : 0) + (postTeacher ? 1 : 0),
+          avg_c: activeEval ? Number(activeEval.score_1_1) + Number(activeEval.score_1_2) + Number(activeEval.score_1_3) : 0,
+          avg_s: activeEval ? Number(activeEval.score_2_1) + Number(activeEval.score_2_2) : 0,
+          avg_l: activeEval ? Number(activeEval.score_3_1) + Number(activeEval.score_3_2) + Number(activeEval.score_3_3) : 0,
+          avg_m: activeEval ? Number(activeEval.score_4_1) + Number(activeEval.score_4_2) + Number(activeEval.score_4_3) : 0,
+          avg_1_1: activeEval ? Number(activeEval.score_1_1) : 0,
+          avg_1_2: activeEval ? Number(activeEval.score_1_2) : 0,
+          avg_1_3: activeEval ? Number(activeEval.score_1_3) : 0,
+          avg_2_1: activeEval ? Number(activeEval.score_2_1) : 0,
+          avg_2_2: activeEval ? Number(activeEval.score_2_2) : 0,
+          avg_3_1: activeEval ? Number(activeEval.score_3_1) : 0,
+          avg_3_2: activeEval ? Number(activeEval.score_3_2) : 0,
+          avg_3_3: activeEval ? Number(activeEval.score_3_3) : 0,
+          avg_4_1: activeEval ? Number(activeEval.score_4_1) : 0,
+          avg_4_2: activeEval ? Number(activeEval.score_4_2) : 0,
+          avg_4_3: activeEval ? Number(activeEval.score_4_3) : 0
+        };
+      });
     }
 
-    let html = '';
-    const sortedKeys = Object.keys(studentDB).sort();
+    renderCustomTeacherOverview(summaryData);
+    calculatePearsonReliability(expertPairs);
+    calculateResearchTTest();
+    renderQualitativeHub();
+  }
+
+  function renderCustomTeacherOverview(data) {
+    const tbody = document.getElementById('overviewTableBody');
+    const thead = document.getElementById('overviewTableHead');
+    if (!tbody || !thead) return;
     
+    // แสดงผลส่วนหัวตารางแบบไดนามิก
+    if (currentDashboardViewMode === 'task') {
+      thead.innerHTML = `
+        <tr>
+          <th class="px-3 py-3" style="width: 10%">รหัสนักเรียน</th>
+          <th class="px-3 py-3" style="width: 20%">ชื่อ-สกุลผู้เรียน</th>
+          <th class="px-3 py-3 text-center" style="width: 10%">ตนเองประเมิน</th>
+          <th class="px-3 py-3 text-center" style="width: 10%">เพื่อนประเมิน</th>
+          <th class="px-3 py-3 text-center" style="width: 10%">ครูประเมิน</th>
+          <th class="px-3 py-3 text-center text-warning-emphasis" style="width: 12%">ผู้เชี่ยวชาญ 1</th>
+          <th class="px-3 py-3 text-center text-warning-emphasis" style="width: 12%">ผู้เชี่ยวชาญ 2</th>
+          <th class="px-3 py-3 text-center" style="width: 8%">เฉลี่ยภารงาน</th>
+          <th class="px-3 py-3 text-end" style="width: 8%">การจัดการ</th>
+        </tr>
+      `;
+    } else {
+      thead.innerHTML = `
+        <tr>
+          <th class="px-3 py-3" style="width: 15%">รหัสนักเรียน</th>
+          <th class="px-3 py-3" style="width: 30%">ชื่อ-สกุลผู้เรียน</th>
+          <th class="px-3 py-3 text-center text-danger-emphasis" style="width: 15%">ก่อนเรียน (Pretest)</th>
+          <th class="px-3 py-3 text-center text-success-emphasis" style="width: 15%">หลังเรียน (Posttest)</th>
+          <th class="px-3 py-3 text-center text-primary" style="width: 15%">คะแนนพัฒนาการ</th>
+          <th class="px-3 py-3 text-end" style="width: 10%">การจัดการ</th>
+        </tr>
+      `;
+    }
+
+    tbody.innerHTML = '';
+
+    const sortedKeys = Object.keys(studentDB).sort();
     let totalRegistered = sortedKeys.length;
     let totalScoredCount = 0;
     let totalSumScores = 0;
     let activeEvaluationSetCount = 0;
-    
+
     let qualityCounts = { veryGood: 0, good: 0, fair: 0, pass: 0, poor: 0 };
     let dimensionSums = { content: 0, structure: 0, language: 0, mechanics: 0 };
     let evaluatedStdsCount = 0;
@@ -534,71 +939,702 @@ require_once 'header.php';
       '4.1': 0, '4.2': 0, '4.3': 0
     };
 
+    let html = '';
     sortedKeys.forEach(id => {
-      const data = res.data && res.data[id] ? res.data[id] : { self: false, peer: false, teacher: false, avgScore: 0, count: 0 };
-      
-      const checkIcon = '<span class="badge badge-teal"><i class="bi bi-check-circle-fill"></i> ส่งแล้ว</span>';
-      const crossIcon = '<span class="badge bg-light text-muted border px-2.5 py-1 rounded-pill">-</span>';
-      
-      if(data.avgScore > 0) {
-        const avg = Number(data.avgScore);
-        totalSumScores += avg;
-        totalScoredCount++;
-        
-        if (avg >= 49) qualityCounts.veryGood++;
-        else if (avg >= 37) qualityCounts.good++;
-        else if (avg >= 25) qualityCounts.fair++;
-        else if (avg >= 13) qualityCounts.pass++;
-        else qualityCounts.poor++;
-        
-        dimensionSums.content += Number(data.avg_c || 0);
-        dimensionSums.structure += Number(data.avg_s || 0);
-        dimensionSums.language += Number(data.avg_l || 0);
-        dimensionSums.mechanics += Number(data.avg_m || 0);
-        
-        subCriteriaSums['1.1'] += Number(data.avg_1_1 || 0);
-        subCriteriaSums['1.2'] += Number(data.avg_1_2 || 0);
-        subCriteriaSums['1.3'] += Number(data.avg_1_3 || 0);
-        subCriteriaSums['2.1'] += Number(data.avg_2_1 || 0);
-        subCriteriaSums['2.2'] += Number(data.avg_2_2 || 0);
-        subCriteriaSums['3.1'] += Number(data.avg_3_1 || 0);
-        subCriteriaSums['3.2'] += Number(data.avg_3_2 || 0);
-        subCriteriaSums['3.3'] += Number(data.avg_3_3 || 0);
-        subCriteriaSums['4.1'] += Number(data.avg_4_1 || 0);
-        subCriteriaSums['4.2'] += Number(data.avg_4_2 || 0);
-        subCriteriaSums['4.3'] += Number(data.avg_4_3 || 0);
-        evaluatedStdsCount++;
+      const sData = data[id] || {};
+
+      if (currentDashboardViewMode === 'task') {
+        const checkIcon = '<span class="badge badge-teal"><i class="bi bi-check-circle-fill"></i> ส่งแล้ว</span>';
+        const crossIcon = '<span class="badge bg-light text-muted border px-2.5 py-1 rounded-pill">-</span>';
+
+        if (sData.avgScore > 0) {
+          const avg = Number(sData.avgScore);
+          totalSumScores += avg;
+          totalScoredCount++;
+
+          if (avg >= 49) qualityCounts.veryGood++;
+          else if (avg >= 37) qualityCounts.good++;
+          else if (avg >= 25) qualityCounts.fair++;
+          else if (avg >= 13) qualityCounts.pass++;
+          else qualityCounts.poor++;
+
+          dimensionSums.content += Number(sData.avg_c || 0);
+          dimensionSums.structure += Number(sData.avg_s || 0);
+          dimensionSums.language += Number(sData.avg_l || 0);
+          dimensionSums.mechanics += Number(sData.avg_m || 0);
+
+          subCriteriaSums['1.1'] += Number(sData.avg_1_1 || 0);
+          subCriteriaSums['1.2'] += Number(sData.avg_1_2 || 0);
+          subCriteriaSums['1.3'] += Number(sData.avg_1_3 || 0);
+          subCriteriaSums['2.1'] += Number(sData.avg_2_1 || 0);
+          subCriteriaSums['2.2'] += Number(sData.avg_2_2 || 0);
+          subCriteriaSums['3.1'] += Number(sData.avg_3_1 || 0);
+          subCriteriaSums['3.2'] += Number(sData.avg_3_2 || 0);
+          subCriteriaSums['3.3'] += Number(sData.avg_3_3 || 0);
+          subCriteriaSums['4.1'] += Number(sData.avg_4_1 || 0);
+          subCriteriaSums['4.2'] += Number(sData.avg_4_2 || 0);
+          subCriteriaSums['4.3'] += Number(sData.avg_4_3 || 0);
+          evaluatedStdsCount++;
+        }
+
+        if (sData.self && sData.peer && sData.teacher) {
+          activeEvaluationSetCount++;
+        }
+
+        html += `
+          <tr class="hover-row cursor-pointer" onclick="viewStudentDetail('${id}')">
+            <td class="px-3 py-3 font-mono fw-bold text-secondary">${id}</td>
+            <td class="px-3 py-3 fw-bold text-dark text-start">${studentDB[id]}</td>
+            <td class="px-3 py-3 text-center">${sData.self ? checkIcon : crossIcon}</td>
+            <td class="px-3 py-3 text-center">${sData.peer ? checkIcon : crossIcon}</td>
+            <td class="px-3 py-3 text-center">${sData.teacher ? checkIcon : crossIcon}</td>
+            <td class="px-3 py-3 text-center">${sData.expert1 ? checkIcon : crossIcon}</td>
+            <td class="px-3 py-3 text-center">${sData.expert2 ? checkIcon : crossIcon}</td>
+            <td class="px-3 py-3 text-center fw-extrabold ${sData.avgScore > 0 ? 'text-primary bg-light-blue' : 'text-muted'}">${sData.avgScore > 0 ? sData.avgScore.toFixed(2) : '-'}</td>
+            <td class="px-3 py-3 text-end">
+               <button class="btn btn-outline-primary btn-sm fw-bold rounded-pill px-3">วิเคราะห์</button>
+            </td>
+          </tr>
+        `;
+      } else {
+        // prepost mode row rendering
+        const preDisp = sData.preScore !== null ? sData.preScore.toFixed(2) : '-';
+        const postDisp = sData.postScore !== null ? sData.postScore.toFixed(2) : '-';
+        let gainDisp = '-';
+        let gainClass = 'text-muted';
+        if (sData.gain !== null) {
+          if (sData.gain > 0) {
+            gainDisp = `+${sData.gain.toFixed(2)}`;
+            gainClass = 'text-success fw-bold';
+          } else if (sData.gain < 0) {
+            gainDisp = `${sData.gain.toFixed(2)}`;
+            gainClass = 'text-danger fw-bold';
+          } else {
+            gainDisp = '0.00';
+            gainClass = 'text-secondary';
+          }
+        }
+
+        if (sData.postScore !== null) {
+          const postVal = Number(sData.postScore);
+          totalSumScores += postVal;
+          totalScoredCount++;
+
+          if (postVal >= 49) qualityCounts.veryGood++;
+          else if (postVal >= 37) qualityCounts.good++;
+          else if (postVal >= 25) qualityCounts.fair++;
+          else if (postVal >= 13) qualityCounts.pass++;
+          else qualityCounts.poor++;
+
+          dimensionSums.content += Number(sData.avg_c || 0);
+          dimensionSums.structure += Number(sData.avg_s || 0);
+          dimensionSums.language += Number(sData.avg_l || 0);
+          dimensionSums.mechanics += Number(sData.avg_m || 0);
+
+          subCriteriaSums['1.1'] += Number(sData.avg_1_1 || 0);
+          subCriteriaSums['1.2'] += Number(sData.avg_1_2 || 0);
+          subCriteriaSums['1.3'] += Number(sData.avg_1_3 || 0);
+          subCriteriaSums['2.1'] += Number(sData.avg_2_1 || 0);
+          subCriteriaSums['2.2'] += Number(sData.avg_2_2 || 0);
+          subCriteriaSums['3.1'] += Number(sData.avg_3_1 || 0);
+          subCriteriaSums['3.2'] += Number(sData.avg_3_2 || 0);
+          subCriteriaSums['3.3'] += Number(sData.avg_3_3 || 0);
+          subCriteriaSums['4.1'] += Number(sData.avg_4_1 || 0);
+          subCriteriaSums['4.2'] += Number(sData.avg_4_2 || 0);
+          subCriteriaSums['4.3'] += Number(sData.avg_4_3 || 0);
+          evaluatedStdsCount++;
+        }
+
+        html += `
+          <tr class="hover-row cursor-pointer" onclick="viewStudentDetail('${id}')">
+            <td class="px-3 py-3 font-mono fw-bold text-secondary">${id}</td>
+            <td class="px-3 py-3 fw-bold text-dark text-start">${studentDB[id]}</td>
+            <td class="px-3 py-3 text-center font-mono fw-semibold">${preDisp}</td>
+            <td class="px-3 py-3 text-center font-mono fw-semibold">${postDisp}</td>
+            <td class="px-3 py-3 text-center font-mono ${gainClass}">${gainDisp}</td>
+            <td class="px-3 py-3 text-end">
+               <button class="btn btn-outline-primary btn-sm fw-bold rounded-pill px-3">วิเคราะห์</button>
+            </td>
+          </tr>
+        `;
       }
-      
-      if(data.self && data.peer && data.teacher) {
-        activeEvaluationSetCount++;
-      }
-      
-      html += `
-        <tr class="hover-row cursor-pointer" onclick="viewStudentDetail('${id}')">
-          <td class="px-4 py-3 font-mono fw-bold text-secondary">${id}</td>
-          <td class="px-4 py-3 fw-bold text-dark text-start">${studentDB[id]}</td>
-          <td class="px-4 py-3 text-center">${data.self ? checkIcon : crossIcon}</td>
-          <td class="px-4 py-3 text-center">${data.peer ? checkIcon : crossIcon}</td>
-          <td class="px-4 py-3 text-center">${data.teacher ? checkIcon : crossIcon}</td>
-          <td class="px-4 py-3 text-center fw-extrabold ${data.avgScore > 0 ? 'text-primary bg-light-blue' : 'text-muted'}">${data.avgScore > 0 ? data.avgScore.toFixed(2) : '-'}</td>
-          <td class="px-4 py-3 text-end">
-             <button class="btn btn-outline-primary btn-sm fw-bold rounded-pill px-3">วิเคราะห์</button>
-          </td>
-        </tr>
-      `;
     });
+
     tbody.innerHTML = html;
 
     document.getElementById('statTotalStudents').textContent = totalRegistered + " คน";
     document.getElementById('statClassAvg').textContent = totalScoredCount > 0 ? (totalSumScores / totalScoredCount).toFixed(2) + " / 60" : "0 / 60";
-    document.getElementById('statCompletion').textContent = Math.round((activeEvaluationSetCount / totalRegistered) * 100) + "%";
     
+    // In prepost mode, completion means having both pre and post evaluations from the teacher
+    let completionPercentage = 0;
+    if (currentDashboardViewMode === 'task') {
+      completionPercentage = Math.round((activeEvaluationSetCount / totalRegistered) * 100);
+    } else {
+      let bothTeacherCount = Object.values(data).filter(x => x.preScore !== null && x.postScore !== null).length;
+      completionPercentage = Math.round((bothTeacherCount / totalRegistered) * 100);
+    }
+    document.getElementById('statCompletion').textContent = completionPercentage + "%";
+
     drawClassQualityDistribution(qualityCounts);
     drawClassDimensionAverages(dimensionSums, evaluatedStdsCount);
-    drawClassroomDimensionLines(res);
-    filterTeacherTable();
+    drawClassroomDimensionLines({ success: true, data: data });
     generateResearchInsights(subCriteriaSums, evaluatedStdsCount, totalRegistered, totalSumScores, totalScoredCount, activeEvaluationSetCount);
+  }
+
+  function pearsonCorrelation(pairs, keyFn) {
+    const N = pairs.length;
+    if (N < 2) return null;
+
+    let sumX = 0, sumY = 0;
+    let sumXSq = 0, sumYSq = 0;
+    let sumXY = 0;
+
+    for (let i = 0; i < N; i++) {
+      const valX = keyFn(pairs[i].e1);
+      const valY = keyFn(pairs[i].e2);
+      sumX += valX;
+      sumY += valY;
+      sumXSq += valX * valX;
+      sumYSq += valY * valY;
+      sumXY += valX * valY;
+    }
+
+    const num = N * sumXY - sumX * sumY;
+    const den = Math.sqrt((N * sumXSq - sumX * sumX) * (N * sumYSq - sumY * sumY));
+    if (den === 0) return 0;
+    return num / den;
+  }
+
+  function getPearsonInterpretation(r) {
+    if (r === null) return { text: 'ข้อมูลน้อยเกินไป', css: 'bg-secondary' };
+    const absR = Math.abs(r);
+    if (absR >= 0.90) return { text: 'ระดับสูงมาก (Very High Reliability)', css: 'bg-success' };
+    if (absR >= 0.70) return { text: 'ระดับสูง (High Reliability)', css: 'bg-info text-dark' };
+    if (absR >= 0.50) return { text: 'ระดับปานกลาง (Moderate Reliability)', css: 'bg-warning text-dark' };
+    if (absR >= 0.30) return { text: 'ระดับต่ำ (Low Reliability)', css: 'bg-danger' };
+    return { text: 'น้อยมากหรือไม่มีความเที่ยง (Little if any)', css: 'bg-danger bg-opacity-75' };
+  }
+
+  function calculatePearsonReliability(pairs) {
+    const overallEl = document.getElementById('overallPearsonResult');
+    const interpEl = document.getElementById('overallPearsonInterpretation');
+    const tableBody = document.getElementById('reliabilityTableBody');
+    if (!overallEl || !tableBody) return;
+
+    if (pairs.length < 2) {
+      overallEl.textContent = "N/A";
+      interpEl.textContent = "ต้องมีผู้เรียนถูกประเมินโดยทั้ง 2 ผู้เชี่ยวชาญอย่างน้อย 2 คน";
+      interpEl.className = "badge bg-secondary";
+      tableBody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-muted">ต้องการข้อมูลประเมินครบทั้งสองผู้เชี่ยวชาญอย่างน้อย 2 คนในการประมวลผล</td></tr>`;
+      
+      const pearsonParagraphEl = document.getElementById('pearsonReportParagraph');
+      if (pearsonParagraphEl) {
+        pearsonParagraphEl.innerHTML = `
+          <h6 class="fw-bold text-dark mb-2"><i class="bi bi-file-earmark-text text-primary"></i> บทวิเคราะห์ความสอดคล้องผู้ประเมินเชิงปริมาณ</h6>
+          <p class="mb-0 text-muted">ต้องการข้อมูลประเมินจับคู่ครบทั้งสองผู้เชี่ยวชาญอย่างน้อย 2 คนในการประมวลผลบทรายงาน</p>
+        `;
+      }
+      return;
+    }
+
+    const overallR = pearsonCorrelation(pairs, e => Number(e.total_score));
+    overallEl.textContent = overallR !== null ? overallR.toFixed(4) : "N/A";
+    const overallInterp = getPearsonInterpretation(overallR);
+    interpEl.textContent = overallInterp.text;
+    interpEl.className = "badge " + overallInterp.css;
+
+    const subCriteria = [
+      { id: '1.1', name: '1.1 ความตรงประเด็น' },
+      { id: '1.2', name: '1.2 แก่นเรื่องชัดเจน' },
+      { id: '1.3', name: '1.3 การขยายความและเหตุผล' },
+      { id: '2.1', name: '2.1 ความครบถ้วนขององค์ประกอบ' },
+      { id: '2.2', name: '2.2 การลำดับประเด็นเป็นระบบ' },
+      { id: '3.1', name: '3.1 การใช้ประโยคถูกต้อง' },
+      { id: '3.2', name: '3.2 การเลือกใช้คำ' },
+      { id: '3.3', name: '3.3 ระดับภาษาเหมาะสม' },
+      { id: '4.1', name: '4.1 การสะกดคำถูกต้อง' },
+      { id: '4.2', name: '4.2 การเว้นวรรค' },
+      { id: '4.3', name: '4.3 ความเรียบร้อย' }
+    ];
+
+    let html = '';
+    let subRs = [];
+    subCriteria.forEach(sc => {
+      const scoreKey = 'score_' + sc.id.replace('.', '_');
+      const rVal = pearsonCorrelation(pairs, e => Number(e[scoreKey]));
+      if (rVal !== null) subRs.push(rVal);
+      const interp = getPearsonInterpretation(rVal);
+      const displayR = rVal !== null ? rVal.toFixed(4) : "N/A";
+
+      html += `
+        <tr>
+          <td class="fw-semibold">${sc.name}</td>
+          <td class="text-center font-mono">${pairs.length}</td>
+          <td class="text-center font-mono fw-bold text-primary">${displayR}</td>
+          <td class="text-end"><span class="badge ${interp.css} small">${interp.text.split(' (')[0]}</span></td>
+        </tr>
+      `;
+    });
+    tableBody.innerHTML = html;
+
+    const pearsonParagraphEl = document.getElementById('pearsonReportParagraph');
+    if (pearsonParagraphEl) {
+      const minSubR = subRs.length > 0 ? Math.min(...subRs).toFixed(4) : "N/A";
+      const maxSubR = subRs.length > 0 ? Math.max(...subRs).toFixed(4) : "N/A";
+      const overallInterpText = overallInterp.text.split(' (')[0];
+
+      pearsonParagraphEl.innerHTML = `
+        <h6 class="fw-bold text-dark mb-2"><i class="bi bi-file-earmark-text text-primary"></i> บทวิเคราะห์ความสอดคล้องผู้ประเมินเชิงปริมาณ (Inter-rater Reliability Narrative)</h6>
+        <p class="mb-0 text-slate-700" style="line-height: 1.6;">
+          จากการศึกษาความสอดคล้องของการให้คะแนนความสามารถการเขียนเรียงความเชิงปริมาณ ระหว่างผู้เชี่ยวชาญคนที่ 1 (Expert 1) และผู้เชี่ยวชาญคนที่ 2 (Expert 2) ประเมินในรอบภารงานในหน่วยเรียนร่วมกันของนักเรียนกลุ่มเป้าหมาย (N = ${pairs.length} คน) 
+          พบว่า <strong>ค่าสัมประสิทธิ์สหสัมพันธ์ความสอดคล้องของคะแนนรวม (Overall Pearson r) มีค่าเท่ากับ ${overallR !== null ? overallR.toFixed(4) : "N/A"}</strong> ซึ่งเมื่อแปลความตามเกณฑ์ของ Hopkins & Stanley (1981) พบว่ามีความสอดคล้องความเที่ยงของเกณฑ์ประเมินร่วมอยู่ใน<strong>ระดับ${overallInterpText}</strong> 
+          และเมื่อพิจารณาแยกรายเกณฑ์ย่อย 11 เกณฑ์ พบว่าค่าสหสัมพันธ์ของเกณฑ์ย่อยมีค่าอยู่ระหว่าง <strong>r = ${minSubR}</strong> ถึง <strong>r = ${maxSubR}</strong> ซึ่งสะท้อนถึงระดับความเที่ยงตรงสม่ำเสมอของรูบริกประเมินและทิศทางเกณฑ์ประเมินที่มีความเชื่อถือได้ในระดับสูงเชิงสถิติวิจัย
+        </p>
+      `;
+    }
+  }
+
+  function normalCDF(z) {
+    const t = 1 / (1 + 0.2316419 * Math.abs(z));
+    const d = 0.39894228 * Math.exp(-z * z / 2);
+    const prob = d * t * (0.31938153 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + 1.330274429 * t))));
+    if (z >= 0) return 1 - prob;
+    return prob;
+  }
+
+  function calculateOneTailedPValue(t, df) {
+    if (df <= 0) return 1;
+    const x = t;
+    const n = df;
+    if (n === 1) {
+      return 0.5 - Math.atan(x) / Math.PI;
+    }
+    const d1 = 1 / (4 * n);
+    const d2 = 5 / (96 * n * n);
+    const z = x * Math.sqrt(1 - d1 + d2) / Math.sqrt(1 + x * x / (2 * n));
+    return 1 - normalCDF(z);
+  }
+
+  function recalculateTTest() {
+    calculateResearchTTest();
+  }
+
+  function calculateResearchTTest() {
+    const rowEl = document.getElementById('ttestStatsRow');
+    const interpEl = document.getElementById('ttestInterpretationText');
+    const reviewerSource = document.getElementById('ttestReviewerSelector').value;
+    if (!rowEl || !interpEl) return;
+
+    if (!classroomResearchData) return;
+
+    const students = classroomResearchData.students;
+    const evaluations = classroomResearchData.evaluations;
+
+    const pretestEvals = evaluations.filter(e => e.test_phase === 'pretest');
+    const posttestEvals = evaluations.filter(e => e.test_phase === 'posttest');
+
+    const pairedData = [];
+
+    students.forEach(s => {
+      const id = s.student_id;
+
+      let preScore = null;
+      let postScore = null;
+
+      const preStudentEvals = pretestEvals.filter(e => e.student_id === id);
+      const postStudentEvals = posttestEvals.filter(e => e.student_id === id);
+
+      if (reviewerSource === 'expert_avg') {
+        const preExperts = preStudentEvals.filter(e => e.evaluator_type === 'expert');
+        const postExperts = postStudentEvals.filter(e => e.evaluator_type === 'expert');
+        if (preExperts.length > 0 && postExperts.length > 0) {
+          preScore = preExperts.reduce((sum, e) => sum + Number(e.total_score), 0) / preExperts.length;
+          postScore = postExperts.reduce((sum, e) => sum + Number(e.total_score), 0) / postExperts.length;
+        }
+      } else if (reviewerSource === 'expert1') {
+        const preE1 = preStudentEvals.find(e => e.evaluator_type === 'expert' && (e.evaluator_name === 'ผู้เชี่ยวชาญ 1' || e.evaluator_name === 'admin1'));
+        const postE1 = postStudentEvals.find(e => e.evaluator_type === 'expert' && (e.evaluator_name === 'ผู้เชี่ยวชาญ 1' || e.evaluator_name === 'admin1'));
+        if (preE1 && postE1) {
+          preScore = Number(preE1.total_score);
+          postScore = Number(postE1.total_score);
+        }
+      } else if (reviewerSource === 'expert2') {
+        const preE2 = preStudentEvals.find(e => e.evaluator_type === 'expert' && (e.evaluator_name === 'ผู้เชี่ยวชาญ 2' || e.evaluator_name === 'admin2'));
+        const postE2 = postStudentEvals.find(e => e.evaluator_type === 'expert' && (e.evaluator_name === 'ผู้เชี่ยวชาญ 2' || e.evaluator_name === 'admin2'));
+        if (preE2 && postE2) {
+          preScore = Number(preE2.total_score);
+          postScore = Number(postE2.total_score);
+        }
+      } else if (reviewerSource === 'teacher') {
+        const preT = preStudentEvals.find(e => e.evaluator_type === 'teacher');
+        const postT = postStudentEvals.find(e => e.evaluator_type === 'teacher');
+        if (preT && postT) {
+          preScore = Number(preT.total_score);
+          postScore = Number(postT.total_score);
+        }
+      }
+
+      if (preScore !== null && postScore !== null) {
+        pairedData.push({
+          id: id,
+          pre: preScore,
+          post: postScore,
+          diff: postScore - preScore
+        });
+      }
+    });
+
+    const N = pairedData.length;
+    if (N < 2) {
+      rowEl.innerHTML = `<td colspan="9" class="text-center py-4 text-muted">ต้องการข้อมูลผลคะแนนที่ตรงคู่กันระหว่าง Pretest และ Posttest อย่างน้อย 2 คน</td>`;
+      interpEl.innerHTML = `<i class="bi bi-exclamation-triangle-fill text-warning"></i> ไม่สามารถคำนวณสถิติ Paired t-test ได้ เนื่องจากจำนวนตัวอย่างที่จับคู่มีไม่เพียงพอ (N = ${N})`;
+      return;
+    }
+
+    let sumPre = 0, sumPost = 0, sumDiff = 0;
+    pairedData.forEach(d => {
+      sumPre += d.pre;
+      sumPost += d.post;
+      sumDiff += d.diff;
+    });
+
+    const meanPre = sumPre / N;
+    const meanPost = sumPost / N;
+    const meanDiff = sumDiff / N;
+
+    let sumSqDiff = 0;
+    pairedData.forEach(d => {
+      sumSqDiff += Math.pow(d.diff - meanDiff, 2);
+    });
+    const sdDiff = Math.sqrt(sumSqDiff / (N - 1));
+    const seDiff = sdDiff / Math.sqrt(N);
+    const tStat = seDiff > 0 ? meanDiff / seDiff : 0;
+    const df = N - 1;
+    const pValue = calculateOneTailedPValue(tStat, df);
+
+    rowEl.innerHTML = `
+      <td class="fw-bold">ก่อนเรียน (T1) vs หลังเรียน (T2)</td>
+      <td class="font-mono">${N}</td>
+      <td class="font-mono fw-bold">${meanPre.toFixed(2)}</td>
+      <td class="font-mono fw-bold">${meanPost.toFixed(2)}</td>
+      <td class="font-mono text-primary fw-bold">+${meanDiff.toFixed(2)}</td>
+      <td class="font-mono">${sdDiff.toFixed(2)}</td>
+      <td class="font-mono text-danger fw-bold">${tStat.toFixed(4)}</td>
+      <td class="font-mono">${df}</td>
+      <td class="font-mono text-success fw-bold">${pValue < 0.001 ? '&lt; 0.001' : pValue.toFixed(4)}</td>
+    `;
+
+    const isSignificant = pValue < 0.05;
+    let signStr = isSignificant 
+      ? `<span class="text-success fw-bold"><i class="bi bi-check-circle-fill"></i> มีนัยสำคัญทางสถิติที่ระดับ .05 (p = ${pValue < 0.001 ? '< .001' : pValue.toFixed(4)})</span>`
+      : `<span class="text-danger fw-bold"><i class="bi bi-x-circle-fill"></i> ไม่มีนัยสำคัญทางสถิติที่ระดับ .05 (p = ${pValue.toFixed(4)})</span>`;
+
+    interpEl.innerHTML = `
+      <div class="mb-2"><strong>วิเคราะห์ผลต่างเฉลี่ยสัมฤทธิ์:</strong></div>
+      <p class="mb-2 text-dark">
+        จากนักเรียนกลุ่มตัวอย่างที่นำมาวิเคราะห์ N = ${N} คน พบว่า คะแนนเฉลี่ยก่อนเรียน (Pretest) อยู่ที่ <strong>${meanPre.toFixed(2)} คะแนน</strong> และคะแนนเฉลี่ยหลังเรียน (Posttest) อยู่ที่ <strong>${meanPost.toFixed(2)} คะแนน</strong> เพิ่มขึ้นโดยเฉลี่ย <strong>+${meanDiff.toFixed(2)} คะแนน</strong>
+      </p>
+      <div class="p-2.5 rounded bg-white border">
+        <strong>สรุปผลสมมติฐานทางวิจัย:</strong> ${signStr} <br>
+        <span class="text-muted small mt-1 d-block">${isSignificant ? 'สมมติฐานหลัก H0 ถูกปฏิเสธ: แสดงว่าการจัดการเรียนการสอนเขียนเรียงความภาษาไทยส่งผลให้ความสามารถในการเขียนของนักเรียนเพิ่มสูงขึ้นจริงอย่างเด่นชัด' : 'ยอมรับสมมติฐานหลัก H0: คะแนนเฉลี่ยหลังเรียนไม่แตกต่างจากก่อนเรียนอย่างเพียงพอในทางสถิติ'}</span>
+      </div>
+    `;
+
+    // ค้นหาค่าความเบี่ยงเบนมาตรฐาน (SD) ของ Pretest และ Posttest
+    let sumSqPre = 0, sumSqPost = 0;
+    pairedData.forEach(d => {
+      sumSqPre += Math.pow(d.pre - meanPre, 2);
+      sumSqPost += Math.pow(d.post - meanPost, 2);
+    });
+    const sdPre = N > 1 ? Math.sqrt(sumSqPre / (N - 1)) : 0;
+    const sdPost = N > 1 ? Math.sqrt(sumSqPost / (N - 1)) : 0;
+
+    const ttestParagraphEl = document.getElementById('ttestReportParagraph');
+    if (ttestParagraphEl) {
+      const sigText = pValue < 0.05 
+        ? `สูงกว่าก่อนเรียนอย่างมีนัยสำคัญทางสถิติที่ระดับ .05 (t(${df}) = ${tStat.toFixed(4)}, p = ${pValue < 0.001 ? '&lt; 0.001' : pValue.toFixed(4)}) ซึ่งเป็นไปตามสมมติฐานการวิจัย` 
+        : `ไม่สูงกว่าก่อนเรียนอย่างมีนัยสำคัญทางสถิติที่ระดับ .05 (t(${df}) = ${tStat.toFixed(4)}, p = ${pValue.toFixed(4)})`;
+
+      ttestParagraphEl.innerHTML = `
+        <h6 class="fw-bold text-dark mb-2"><i class="bi bi-file-earmark-text text-success"></i> บทเขียนสรุปผลสัมฤทธิ์วิจัยเชิงปริมาณ (Paired t-test Narrative)</h6>
+        <p class="mb-0 text-slate-700" style="line-height: 1.6;">
+          การศึกษาเปรียบเทียบผลสัมฤทธิ์ความสามารถในการเขียนเรียงความภาษาไทยของนักเรียนกลุ่มเป้าหมาย (N = ${N} คน) ก่อนเรียน (Pretest - T1) และหลังเรียน (Posttest - T2) จากคะแนนดิบประเมินของคุณครูผู้สอน 
+          พบว่า <strong>คะแนนเฉลี่ยก่อนเรียนเท่ากับ ${meanPre.toFixed(2)} คะแนน (SD = ${sdPre.toFixed(2)})</strong> และ <strong>คะแนนเฉลี่ยหลังเรียนเท่ากับ ${meanPost.toFixed(2)} คะแนน (SD = ${sdPost.toFixed(2)})</strong> 
+          เมื่อวิเคราะห์ทางสถิติเปรียบเทียบด้วย Paired t-test พบว่า คะแนนเฉลี่ยความสามารถงานเขียนหลังเรียนของนักเรียนสูงขึ้นเพิ่มขึ้นเฉลี่ย <strong>+${meanDiff.toFixed(2)} คะแนน</strong> และแตกต่างกันอย่างมีนัยสำคัญทางสถิติ โดยผลการทดสอบแสดงว่า คะแนนความสามารถงานเขียนของนักเรียน<strong>${sigText}</strong> แสดงให้เห็นว่านวัตกรรมการสอนเขียนเรียงความมีประสิทธิผลในการพัฒนาทักษะวิชาการผู้เรียนอย่างแท้จริง
+        </p>
+      `;
+    }
+  }
+
+  function renderQualitativeHub() {
+    const container = document.getElementById('qualitativeHubContainer');
+    if (!container) return;
+
+    if (!classroomResearchData) {
+      container.innerHTML = '<div class="col-12 text-center text-muted">ไม่มีข้อมูลประมวลผล</div>';
+      return;
+    }
+
+    const filterCriteria = document.getElementById('qualitativeCriteriaFilter').value;
+    const query = document.getElementById('qualitativeSearchInput').value.toLowerCase().trim();
+
+    const problems = classroomResearchData.problems;
+    const peerReviews = classroomResearchData.peer_reviews;
+    const reflections = classroomResearchData.reflections;
+
+    // ประมวลผลบทวิเคราะห์เชิงคุณภาพ
+    const qualParagraphEl = document.getElementById('qualitativeReportParagraph');
+    if (qualParagraphEl) {
+      const criteriaCounts = {};
+      const subCriteriaList = ['1.1', '1.2', '1.3', '2.1', '2.2', '3.1', '3.2', '3.3', '4.1', '4.2', '4.3'];
+      subCriteriaList.forEach(sc => { criteriaCounts[sc] = 0; });
+
+      problems.forEach(p => {
+        subCriteriaList.forEach(sc => {
+          const key = sc.replace('.', '_');
+          if (p['prob_' + key]) {
+            criteriaCounts[sc]++;
+          }
+        });
+      });
+
+      const sortedCrit = Object.entries(criteriaCounts).sort((a,b) => b[1] - a[1]);
+      const top1 = sortedCrit[0];
+      const top2 = sortedCrit[1];
+
+      const top1Name = top1 && top1[1] > 0 ? criteriaMap[top1[0]].name.split(' (')[0] : "ไม่มีข้อมูลหลัก";
+      const top2Name = top2 && top2[1] > 0 ? criteriaMap[top2[0]].name.split(' (')[0] : "ไม่มีข้อมูลรอง";
+      const top1Count = top1 ? top1[1] : 0;
+      const top2Count = top2 ? top2[1] : 0;
+
+      const totalPeer = peerReviews.length;
+      const totalReflect = reflections.length;
+
+      qualParagraphEl.innerHTML = `
+        <h6 class="fw-bold text-dark mb-2"><i class="bi bi-file-earmark-text text-success"></i> บทวิเคราะห์และอภิปรายเชิงคุณภาพ (Qualitative Content Analysis Summary)</h6>
+        <p class="mb-0 text-slate-700" style="line-height: 1.6;">
+          จากการวิเคราะห์เนื้อหาเชิงคุณภาพ (Content Analysis) จากบันทึกข้อมูลอุปสรรคและแนวทางแก้ไข (POA) การสะท้อนคิด และข้อเสนอแนะระหว่างการจัดการเรียนการสอนคลาสรูม พบประเด็นเชิงคุณภาพที่เด่นชัดดังนี้:
+        </p>
+        <ul class="mt-2 mb-0 ps-3 text-slate-700 small" style="line-height: 1.6;">
+          <li class="mb-1"><strong>อุปสรรคการเขียนที่พบบ่อยที่สุด:</strong> อันดับแรกคือด้าน <strong>${top1Name}</strong> (พบปัญหาจากผู้เรียนจำนวน ${top1Count} คน) และอันดับรองลงมาคือด้าน <strong>${top2Name}</strong> (พบปัญหาจากผู้เรียนจำนวน ${top2Count} คน) ซึ่งสะท้อนถึงประเด็นอุปสรรคในการเขียนที่นักเรียนกลุ่มเป้าหมายส่วนใหญ่เผชิญและต้องให้ความสำคัญเพิ่มเติม</li>
+          <li class="mb-1"><strong>การสะท้อนคิดและการมีส่วนร่วมของกลุ่มเพื่อน:</strong> มีการบันทึกการให้ข้อคิดเห็นเชิงคุณภาพและข้อเสนอแนะร่วมกันระหว่างเพื่อน (Peer Reviews) สะสมจำนวน <strong>${totalPeer} ครั้ง</strong> และแบบสะท้อนคิดการเรียนรู้เรียงความของตนเอง (Self Reflections) จำนวน <strong>${totalReflect} ครั้ง</strong></li>
+          <li class="mb-1"><strong>แนวทางการลงข้อเสนอแนะและเป้าหมาย:</strong> จากคำแนะนำในการเขียนเรียงความ นักเรียนส่วนใหญ่วางกรอบแนวทางแก้ไขปัญหาโดยนำคำวิจารณ์ของเพื่อนและคำแนะแนวของครูผู้สอนมาปรับปรุงเรียงความ และตั้งเป้าหมายเชิงพัฒนาเพื่อเลือกใช้คำเชื่อมที่สละสลวยขึ้นในอนาคต</li>
+        </ul>
+      `;
+    }
+
+    let html = '';
+    let cardCount = 0;
+
+    problems.forEach(p => {
+      const studentName = studentDB[p.student_id] || p.student_id;
+      const subCriteria = ['1.1', '1.2', '1.3', '2.1', '2.2', '3.1', '3.2', '3.3', '4.1', '4.2', '4.3'];
+      subCriteria.forEach(sc => {
+        if (filterCriteria !== 'all' && filterCriteria !== sc) return;
+
+        const key = sc.replace('.', '_');
+        const probText = p['prob_' + key] || '';
+        const solText = p['sol_' + key] || '';
+
+        if (!probText && !solText) return;
+
+        const matchSearch = !query || 
+                            studentName.toLowerCase().includes(query) || 
+                            p.student_id.toLowerCase().includes(query) || 
+                            probText.toLowerCase().includes(query) || 
+                            solText.toLowerCase().includes(query);
+
+        if (!matchSearch) return;
+
+        cardCount++;
+        html += `
+          <div class="col-md-6 col-sm-12 qualitative-card" data-criteria="${sc}">
+            <div class="card border-0 shadow-sm rounded-3 p-3 bg-white border-start border-3 border-danger h-100 text-start">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="badge bg-danger bg-opacity-10 text-danger fw-bold small">อุปสรรค & แนวคิดแก้ไข (POA)</span>
+                <span class="badge bg-secondary font-mono small">${sc}</span>
+              </div>
+              <h6 class="fw-bold text-dark mb-1">${studentName} <span class="text-muted small">(${p.student_id})</span></h6>
+              <div class="small text-secondary mb-2"><strong>เกณฑ์:</strong> ${criteriaMap[sc].name}</div>
+              <div class="small mb-2" style="line-height: 1.5;">
+                <span class="text-danger-emphasis fw-bold">อุปสรรคการเขียน:</span> ${probText}
+              </div>
+              <div class="small text-success-emphasis border-top pt-2" style="line-height: 1.5;">
+                <strong>แนวทางแก้ไขที่ตั้งใจ:</strong> ${solText}
+              </div>
+            </div>
+          </div>
+        `;
+      });
+    });
+
+    peerReviews.forEach(pr => {
+      const studentName = studentDB[pr.student_id] || pr.student_id;
+      const reviewerName = studentDB[pr.reviewer_id] || pr.reviewer_id;
+
+      if (filterCriteria !== 'all') return;
+
+      const strength = pr.strength || '';
+      const improvement = pr.improvement || '';
+      const encouragement = pr.encouragement || '';
+
+      if (!strength && !improvement && !encouragement) return;
+
+      const matchSearch = !query || 
+                          studentName.toLowerCase().includes(query) || 
+                          pr.student_id.toLowerCase().includes(query) || 
+                          reviewerName.toLowerCase().includes(query) || 
+                          strength.toLowerCase().includes(query) || 
+                          improvement.toLowerCase().includes(query) || 
+                          encouragement.toLowerCase().includes(query);
+
+      if (!matchSearch) return;
+
+      cardCount++;
+      html += `
+        <div class="col-md-6 col-sm-12 qualitative-card" data-criteria="peer_review">
+          <div class="card border-0 shadow-sm rounded-3 p-3 bg-white border-start border-3 border-primary h-100 text-start">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="badge bg-primary bg-opacity-10 text-primary fw-bold small">คำแนะนำเชิงคุณภาพจากเพื่อน</span>
+              <span class="text-muted small font-semibold">ผู้รีวิว: ${reviewerName}</span>
+            </div>
+            <h6 class="fw-bold text-dark mb-1">ถึง: ${studentName} <span class="text-muted small">(${pr.student_id})</span></h6>
+            <div class="small mb-2" style="line-height: 1.5;">
+              <span class="text-primary fw-bold">จุดเด่นที่ชื่นชอบ:</span> ${strength || '-'}
+            </div>
+            <div class="small mb-2 border-top pt-2" style="line-height: 1.5;">
+              <span class="text-warning-emphasis fw-bold">จุดควรพัฒนาเพิ่มเติม:</span> ${improvement || '-'}
+            </div>
+            <div class="small text-success border-top pt-2" style="line-height: 1.5;">
+              <strong>ข้อความให้กำลังใจ:</strong> ${encouragement || '-'}
+            </div>
+          </div>
+        </div>
+      `;
+    });
+
+    reflections.forEach(rf => {
+      const studentName = studentDB[rf.student_id] || rf.student_id;
+
+      if (filterCriteria !== 'all') return;
+
+      const cs = rf.content_structure || '';
+      const lm = rf.language_mechanics || '';
+      const fa = rf.feedback_applied || '';
+      const fg = rf.future_goals || '';
+
+      if (!cs && !lm && !fa && !fg) return;
+
+      const matchSearch = !query || 
+                          studentName.toLowerCase().includes(query) || 
+                          rf.student_id.toLowerCase().includes(query) || 
+                          cs.toLowerCase().includes(query) || 
+                          lm.toLowerCase().includes(query) || 
+                          fa.toLowerCase().includes(query) || 
+                          fg.toLowerCase().includes(query);
+
+      if (!matchSearch) return;
+
+      cardCount++;
+      html += `
+        <div class="col-md-6 col-sm-12 qualitative-card" data-criteria="reflection">
+          <div class="card border-0 shadow-sm rounded-3 p-3 bg-white border-start border-3 border-success h-100 text-start">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="badge bg-success bg-opacity-10 text-success fw-bold small">แบบสะท้อนคิดหลังเรียนรู้นักเรียน</span>
+              <span class="text-muted small font-mono">${rf.student_id}</span>
+            </div>
+            <h6 class="fw-bold text-dark mb-3">${studentName}</h6>
+            <div class="small mb-2" style="line-height: 1.5;">
+              <strong>1. โครงสร้างและเนื้อหาที่พัฒนา:</strong> ${cs || '-'}
+            </div>
+            <div class="small mb-2 border-top pt-2" style="line-height: 1.5;">
+              <strong>2. การเลือกใช้ภาษาและอักขรวิธี:</strong> ${lm || '-'}
+            </div>
+            <div class="small mb-2 border-top pt-2" style="line-height: 1.5;">
+              <strong>3. การนำข้อเสนอแนะเพื่อน/ครูไปปรับปรุง:</strong> ${fa || '-'}
+            </div>
+            <div class="small text-success border-top pt-2" style="line-height: 1.5;">
+              <strong>4. เป้าหมายการเขียนเรียงความถัดไป:</strong> ${fg || '-'}
+            </div>
+          </div>
+        </div>
+      `;
+    });
+
+    if (cardCount === 0) {
+      container.innerHTML = '<div class="col-12 text-center text-muted py-5">ไม่พบข้อมูลที่ตรงกับตัวกรองหรือคำค้นหานี้</div>';
+    } else {
+      container.innerHTML = html;
+    }
+  }
+
+  function filterQualitativeHub() {
+    renderQualitativeHub();
+  }
+
+  function exportQualitativeToCSV() {
+    if (!classroomResearchData) return;
+
+    let csvContent = "\uFEFF"; // UTF-8 BOM
+    csvContent += "Student ID,Student Name,Data Type,Sub-criteria,Content / Problem / Strength,Solution / Improvement / Feedback,Encouragement / Goals\n";
+
+    const problems = classroomResearchData.problems;
+    const peerReviews = classroomResearchData.peer_reviews;
+    const reflections = classroomResearchData.reflections;
+
+    const escapeCSV = (str) => {
+      if (!str) return '';
+      return '"' + str.replace(/"/g, '""').replace(/\n/g, ' ') + '"';
+    };
+
+    problems.forEach(p => {
+      const name = studentDB[p.student_id] || p.student_id;
+      const subCriteria = ['1.1', '1.2', '1.3', '2.1', '2.2', '3.1', '3.2', '3.3', '4.1', '4.2', '4.3'];
+      subCriteria.forEach(sc => {
+        const key = sc.replace('.', '_');
+        const prob = p['prob_' + key] || '';
+        const sol = p['sol_' + key] || '';
+        if (prob || sol) {
+          csvContent += `${escapeCSV(p.student_id)},${escapeCSV(name)},Writing Problem,${sc},${escapeCSV(prob)},${escapeCSV(sol)},\n`;
+        }
+      });
+    });
+
+    peerReviews.forEach(pr => {
+      const name = studentDB[pr.student_id] || pr.student_id;
+      csvContent += `${escapeCSV(pr.student_id)},${escapeCSV(name)},Peer Review,,${escapeCSV(pr.strength)},${escapeCSV(pr.improvement)},${escapeCSV(pr.encouragement)}\n`;
+    });
+
+    reflections.forEach(rf => {
+      const name = studentDB[rf.student_id] || rf.student_id;
+      csvContent += `${escapeCSV(rf.student_id)},${escapeCSV(name)},Self Reflection,,${escapeCSV(rf.content_structure + " | " + rf.language_mechanics)},${escapeCSV(rf.feedback_applied)},${escapeCSV(rf.future_goals)}\n`;
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", "qualitative_content_analysis_data.csv");
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  function switchDashboardViewMode() {
+    const selector = document.getElementById('dashboardViewMode');
+    if (!selector) return;
+    currentDashboardViewMode = selector.value;
+    processDashboardData();
+  }
+
+  function switchStudentPhase() {
+    const studentId = document.getElementById('dashStudentId').textContent;
+    if (!studentId) return;
+    
+    // Fetch individual student scores for selected phase
+    fetchScores(studentId, studentDB[studentId]);
+    fetchReflectionData(studentId);
   }
 
   function generateResearchInsights(subCriteriaSums, evaluatedStdsCount, totalRegistered, totalSumScores, totalScoredCount, activeEvaluationSetCount) {
@@ -609,8 +1645,8 @@ require_once 'header.php';
     if (evaluatedStdsCount > 0) {
       const subCriteriaMeta = {
         '1.1': { name: '1.1 ความตรงประเด็น', max: 12 },
-        '1.2': { name: '1.2 แก่นเรื่องที่ชัดเจน', max: 6 },
-        '1.3': { name: '1.3 การขยายความและให้เหตุผล', max: 9 },
+        '1.2': { name: '1.2 แก่นเรื่องชัดเจน', max: 6 },
+        '1.3': { name: '1.3 การขยายความและเหตุผล', max: 9 },
         '2.1': { name: '2.1 ความครบถ้วนขององค์ประกอบ', max: 8 },
         '2.2': { name: '2.2 การลำดับประเด็นเป็นระบบ', max: 4 },
         '3.1': { name: '3.1 การใช้ประโยคถูกต้อง', max: 4 },
@@ -899,32 +1935,61 @@ require_once 'header.php';
     const rows = document.querySelectorAll('#overviewTableBody tr');
     
     rows.forEach(row => {
-      if(row.cells.length < 7) return;
+      if (currentDashboardViewMode === 'task') {
+        if(row.cells.length < 9) return;
 
-      const studentId = row.cells[0].textContent.toLowerCase();
-      const name = row.cells[1].textContent.toLowerCase();
-      
-      const hasSelf = row.cells[2].innerHTML.includes('ส่งแล้ว');
-      const hasPeer = row.cells[3].innerHTML.includes('ส่งแล้ว');
-      const hasTeacher = row.cells[4].innerHTML.includes('ส่งแล้ว');
-      
-      const matchesSearch = studentId.includes(query) || name.includes(query);
-      
-      let matchesFilter = true;
-      if (filterVal === 'complete') {
-        matchesFilter = (hasSelf && hasPeer && hasTeacher);
-      } else if (filterVal === 'incomplete') {
-        matchesFilter = !(hasSelf && hasPeer && hasTeacher);
-      } else if (filterVal === 'no_eval') {
-        matchesFilter = (!hasSelf && !hasPeer && !hasTeacher);
-      } else if (filterVal === 'missing_teacher') {
-        matchesFilter = !hasTeacher;
-      }
-      
-      if (matchesSearch && matchesFilter) {
-        row.classList.remove('d-none');
+        const studentId = row.cells[0].textContent.toLowerCase();
+        const name = row.cells[1].textContent.toLowerCase();
+        
+        const hasSelf = row.cells[2].innerHTML.includes('ส่งแล้ว');
+        const hasPeer = row.cells[3].innerHTML.includes('ส่งแล้ว');
+        const hasTeacher = row.cells[4].innerHTML.includes('ส่งแล้ว');
+        
+        const matchesSearch = studentId.includes(query) || name.includes(query);
+        
+        let matchesFilter = true;
+        if (filterVal === 'complete') {
+          matchesFilter = (hasSelf && hasPeer && hasTeacher);
+        } else if (filterVal === 'incomplete') {
+          matchesFilter = !(hasSelf && hasPeer && hasTeacher);
+        } else if (filterVal === 'no_eval') {
+          matchesFilter = (!hasSelf && !hasPeer && !hasTeacher);
+        } else if (filterVal === 'missing_teacher') {
+          matchesFilter = !hasTeacher;
+        }
+        
+        if (matchesSearch && matchesFilter) {
+          row.classList.remove('d-none');
+        } else {
+          row.classList.add('d-none');
+        }
       } else {
-        row.classList.add('d-none');
+        if(row.cells.length < 6) return;
+
+        const studentId = row.cells[0].textContent.toLowerCase();
+        const name = row.cells[1].textContent.toLowerCase();
+        
+        const hasPre = row.cells[2].textContent.trim() !== '-';
+        const hasPost = row.cells[3].textContent.trim() !== '-';
+        
+        const matchesSearch = studentId.includes(query) || name.includes(query);
+        
+        let matchesFilter = true;
+        if (filterVal === 'complete') {
+          matchesFilter = (hasPre && hasPost);
+        } else if (filterVal === 'incomplete') {
+          matchesFilter = !(hasPre && hasPost);
+        } else if (filterVal === 'no_eval') {
+          matchesFilter = (!hasPre && !hasPost);
+        } else if (filterVal === 'missing_teacher') {
+          matchesFilter = !hasPost;
+        }
+        
+        if (matchesSearch && matchesFilter) {
+          row.classList.remove('d-none');
+        } else {
+          row.classList.add('d-none');
+        }
       }
     });
   }
@@ -951,8 +2016,11 @@ require_once 'header.php';
     document.getElementById('dashStudentId').textContent = studentId;
     document.getElementById('dashStudentName').textContent = "กำลังวิเคราะห์...";
 
+    const selector = document.getElementById('studentPhaseSelector');
+    const phase = selector ? selector.value : currentResearchPhase;
+
     try {
-      const response = await fetch(`api.php?action=get_student_scores&studentId=${studentId}&_t=${new Date().getTime()}`);
+      const response = await fetch(`api.php?action=get_student_scores&studentId=${studentId}&testPhase=${phase}&_t=${new Date().getTime()}`);
       const res = await response.json();
       renderSearchResults(res);
     } catch (err) {
