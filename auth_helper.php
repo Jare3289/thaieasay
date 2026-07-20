@@ -81,5 +81,6 @@ function require_login($required_role = null) {
 // 4. Format name prefixes (remove space after นาย, นาง, นางสาว, ด.ช., ด.ญ., ครู, อาจารย์, ผู้เชี่ยวชาญ)
 function formatNamePrefix($name) {
     if (empty($name)) return '';
-    return preg_replace('/(นาย|นางสาว|นาง|ด\.ช\.|ด\.ญ\.|ครู|อาจารย์|ผู้เชี่ยวชาญ)\s+/u', '$1', $name);
+    // ตัดคำนำหน้าชื่อ (นาย/นางสาว/นาง ฯลฯ) ออก ให้เหลือแต่ชื่อ-นามสกุล
+    return trim(preg_replace('/^(นาย|นางสาว|นาง|ด\.ช\.|ด\.ญ\.|เด็กชาย|เด็กหญิง|ครู|อาจารย์|ผู้เชี่ยวชาญ)\s*/u', '', $name));
 }

@@ -2419,18 +2419,17 @@ require_once 'header.php';
     consolDisplay.className = `fw-bold py-2 rounded text-center shadow-inner ${finalColorClass}`;
     consolDisplay.textContent = `คุณภาพรวม: ${finalLevelText}`;
 
-    drawScoresChart(selfRecord, peerRecord, teacherRecord);
-    drawRadarChart(selfRecord, peerRecord, teacherRecord);
-    runConsistencyAnalysis(selfRecord, peerRecord, teacherRecord);
-    renderConsistencyTable(selfRecord, peerRecord, teacherRecord);
-    
-    document.getElementById('feedbackContainer').innerHTML = generateQualitativeFeedback(res.data);
-    
-    // โหลดข้อมูลสะท้อนคิด (reflection data)
-    const studentId = document.getElementById('dashStudentId').textContent;
-    fetchReflectionData(studentId);
-    
+    // เปิดหน้าผลรายบุคคลให้เห็นก่อน เพื่อไม่ให้กราฟที่ error ตัวใดตัวหนึ่งบังทั้งหน้า (ข้อมูลหาย)
     document.getElementById('searchResults').classList.remove('d-none');
+
+    try { drawScoresChart(selfRecord, peerRecord, teacherRecord); } catch (e) { console.error('drawScoresChart', e); }
+    try { drawRadarChart(selfRecord, peerRecord, teacherRecord); } catch (e) { console.error('drawRadarChart', e); }
+    try { runConsistencyAnalysis(selfRecord, peerRecord, teacherRecord); } catch (e) { console.error('runConsistencyAnalysis', e); }
+    try { renderConsistencyTable(selfRecord, peerRecord, teacherRecord); } catch (e) { console.error('renderConsistencyTable', e); }
+    try { document.getElementById('feedbackContainer').innerHTML = generateQualitativeFeedback(res.data); } catch (e) { console.error('generateQualitativeFeedback', e); }
+
+    // โหลดข้อมูลสะท้อนคิด (reflection data)
+    try { fetchReflectionData(document.getElementById('dashStudentId').textContent); } catch (e) { console.error('fetchReflectionData', e); }
   }
 
   function drawScoresChart(selfData, peerData, teacherData) {
