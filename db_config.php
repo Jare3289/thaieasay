@@ -6,6 +6,36 @@ $db_name = 'if0_42376188_thaieasay';
 $db_user = 'if0_42376188';
 $db_pass = 'wEBv1Ea42V';
 
+/**
+ * แจ้งข้อผิดพลาดฐานข้อมูลแบบเหมาะกับชนิดของ Request
+ * - ถ้าเป็นการเรียกผ่าน API/AJAX ให้ตอบเป็น JSON
+ * - ถ้าเป็นการเปิดหน้าเว็บปกติ ให้แสดงข้อความภาษาไทยที่อ่านง่าย (ไม่ปล่อยให้เป็น 500 ดิบ ๆ)
+ */
+function db_fail_response($message) {
+    $script = isset($_SERVER['SCRIPT_NAME']) ? $_SERVER['SCRIPT_NAME'] : '';
+    $isAjax = (strpos($script, 'api.php') !== false)
+        || (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
+        || (isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false);
+
+    if (!headers_sent()) {
+        header('Content-Type: ' . ($isAjax ? 'application/json' : 'text/html') . '; charset=utf-8');
+    }
+
+    if ($isAjax) {
+        echo json_encode(['success' => false, 'error' => $message]);
+    } else {
+        echo '<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8">'
+            . '<meta name="viewport" content="width=device-width, initial-scale=1.0">'
+            . '<title>ระบบขัดข้องชั่วคราว</title></head>'
+            . '<body style="font-family:sans-serif;text-align:center;padding:60px 20px;color:#333;">'
+            . '<div style="font-size:48px;margin-bottom:16px;">🛠️</div>'
+            . '<h2>ขออภัย ระบบเชื่อมต่อฐานข้อมูลไม่ได้ชั่วคราว</h2>'
+            . '<p style="color:#666;">กรุณารีเฟรชหน้านี้อีกครั้งในอีกสักครู่ หากยังพบปัญหาโปรดแจ้งผู้ดูแลระบบ</p>'
+            . '</body></html>';
+    }
+    exit;
+}
+
 try {
     $dsn = "mysql:host=$db_host;dbname=$db_name;charset=utf8mb4";
     $options = [
@@ -13,11 +43,72 @@ try {
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_EMULATE_PREPARES   => false,
     ];
-    
+
     $pdo = new PDO($dsn, $db_user, $db_pass, $options);
-    
-    // ย้ายโครงสร้างข้อมูลแบบอัตโนมัติ (Auto Migration) สำหรับเครื่องมือการประเมินและการสะท้อนคิดเพิ่มเติม
-    $pdo->exec("
+} catch (PDOException $e) {
+    // ต่อฐานข้อมูลไม่ได้ → ตอบกลับให้เหมาะกับชนิด Request แล้วหยุด (ไม่ปล่อยเป็น 500)
+    db_fail_response('Database connection failed: ' . $e->getMessage());
+}
+
+/**
+ * รันคำสั่ง DDL แบบปลอดภัย (ไม่ให้ล้มทั้งหน้าเมื่อคำสั่งใดคำสั่งหนึ่งผิดพลาด)
+ */
+function safe_ddl(PDO $pdo, $sql) {
+    try {
+        $pdo->exec($sql);
+    } catch (PDOException $e) {
+        // เงียบไว้ — โครงสร้างที่มีอยู่แล้ว/สิทธิ์บางอย่างบนโฮสต์ฟรีไม่ควรทำให้ทั้งเว็บพัง
+    }
+}
+
+// ตรวจสอบแบบเบา ๆ ว่าโครงสร้างตารางถูกติดตั้งครบแล้วหรือยัง
+// ถ้าครบแล้วให้ข้ามขั้นตอน migration ทั้งหมด เพื่อลดภาระฐานข้อมูลในทุก request (สำคัญมากบนโฮสต์ฟรี)
+$needs_migration = true;
+try {
+    $check = $pdo->query("SHOW TABLES LIKE 'learning_reflections'");
+    if ($check && $check->fetch()) {
+        $needs_migration = false;
+    }
+} catch (PDOException $e) {
+    $needs_migration = true;
+}
+
+if ($needs_migration) {
+    // 0) ตารางพื้นฐานที่ตารางอื่นอ้างอิงถึงด้วย FOREIGN KEY ต้องมีก่อนเสมอ
+    safe_ddl($pdo, "
+        CREATE TABLE IF NOT EXISTS students (
+            student_id VARCHAR(10) PRIMARY KEY,
+            student_name VARCHAR(150) NOT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    ");
+
+    safe_ddl($pdo, "
+        CREATE TABLE IF NOT EXISTS evaluations (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            student_id VARCHAR(10) NOT NULL,
+            evaluator_type VARCHAR(50) NOT NULL,
+            evaluator_name VARCHAR(150) NOT NULL,
+            score_1_1 DECIMAL(5,2) NOT NULL,
+            score_1_2 DECIMAL(5,2) NOT NULL,
+            score_1_3 DECIMAL(5,2) NOT NULL,
+            score_2_1 DECIMAL(5,2) NOT NULL,
+            score_2_2 DECIMAL(5,2) NOT NULL,
+            score_3_1 DECIMAL(5,2) NOT NULL,
+            score_3_2 DECIMAL(5,2) NOT NULL,
+            score_3_3 DECIMAL(5,2) NOT NULL,
+            score_4_1 DECIMAL(5,2) NOT NULL,
+            score_4_2 DECIMAL(5,2) NOT NULL,
+            score_4_3 DECIMAL(5,2) NOT NULL,
+            total_score DECIMAL(5,2) NOT NULL,
+            quality_level VARCHAR(50) NOT NULL,
+            FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE,
+            UNIQUE KEY unique_eval (student_id, evaluator_type, evaluator_name)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    ");
+
+    // 1) ตารางเครื่องมือการประเมินและการสะท้อนคิดเพิ่มเติม (แยกรันทีละคำสั่งให้ปลอดภัย)
+    safe_ddl($pdo, "
         CREATE TABLE IF NOT EXISTS writing_problems (
             student_id VARCHAR(10) PRIMARY KEY,
             prob_1_1 TEXT, sol_1_1 TEXT,
@@ -34,7 +125,9 @@ try {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    ");
 
+    safe_ddl($pdo, "
         CREATE TABLE IF NOT EXISTS self_checklists (
             student_id VARCHAR(10) PRIMARY KEY,
             check_1_1 VARCHAR(50) NOT NULL,
@@ -52,7 +145,9 @@ try {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    ");
 
+    safe_ddl($pdo, "
         CREATE TABLE IF NOT EXISTS peer_reviews (
             id INT AUTO_INCREMENT PRIMARY KEY,
             student_id VARCHAR(10) NOT NULL,
@@ -78,7 +173,9 @@ try {
             FOREIGN KEY (reviewer_id) REFERENCES students(student_id) ON DELETE CASCADE,
             UNIQUE KEY unique_peer_review (student_id, reviewer_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    ");
 
+    safe_ddl($pdo, "
         CREATE TABLE IF NOT EXISTS learning_reflections (
             student_id VARCHAR(10) PRIMARY KEY,
             content_structure TEXT,
@@ -90,27 +187,19 @@ try {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     ");
 
-    // เพิ่มคอลัมน์คำแนะนำเชิงคุณภาพจากเพื่อน (ถ้ายังไม่มี)
-    try { $pdo->exec("ALTER TABLE evaluations ADD COLUMN peer_strength TEXT NULL AFTER quality_level"); } catch (PDOException $e) {}
-    try { $pdo->exec("ALTER TABLE evaluations ADD COLUMN peer_improvement TEXT NULL AFTER peer_strength"); } catch (PDOException $e) {}
-    try { $pdo->exec("ALTER TABLE evaluations ADD COLUMN peer_encouragement TEXT NULL AFTER peer_improvement"); } catch (PDOException $e) {}
+    // 2) เพิ่มคอลัมน์คำแนะนำเชิงคุณภาพจากเพื่อน (ถ้ายังไม่มี)
+    safe_ddl($pdo, "ALTER TABLE evaluations ADD COLUMN peer_strength TEXT NULL AFTER quality_level");
+    safe_ddl($pdo, "ALTER TABLE evaluations ADD COLUMN peer_improvement TEXT NULL AFTER peer_strength");
+    safe_ddl($pdo, "ALTER TABLE evaluations ADD COLUMN peer_encouragement TEXT NULL AFTER peer_improvement");
 
-    // Add test_phase column and modify unique index unique_eval
-    try { $pdo->exec("ALTER TABLE evaluations ADD COLUMN test_phase VARCHAR(20) DEFAULT 'posttest' AFTER evaluator_name"); } catch (PDOException $e) {}
-    try { $pdo->exec("ALTER TABLE evaluations DROP INDEX unique_eval"); } catch (PDOException $e) {}
-    try { $pdo->exec("ALTER TABLE evaluations ADD UNIQUE KEY unique_eval (student_id, evaluator_type, evaluator_name, test_phase)"); } catch (PDOException $e) {}
+    // 3) เพิ่มคอลัมน์ test_phase และปรับ unique index unique_eval
+    safe_ddl($pdo, "ALTER TABLE evaluations ADD COLUMN test_phase VARCHAR(20) DEFAULT 'posttest' AFTER evaluator_name");
+    safe_ddl($pdo, "ALTER TABLE evaluations DROP INDEX unique_eval");
+    safe_ddl($pdo, "ALTER TABLE evaluations ADD UNIQUE KEY unique_eval (student_id, evaluator_type, evaluator_name, test_phase)");
 
-    // เพิ่มคอลัมน์ created_at ในกรณีที่ตารางถูกสร้างในเวอร์ชันเก่าที่ยังไม่มีคอลัมน์นี้
-    try { $pdo->exec("ALTER TABLE writing_problems ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"); } catch (PDOException $e) {}
-    try { $pdo->exec("ALTER TABLE self_checklists ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"); } catch (PDOException $e) {}
-    try { $pdo->exec("ALTER TABLE peer_reviews ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"); } catch (PDOException $e) {}
-    try { $pdo->exec("ALTER TABLE learning_reflections ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"); } catch (PDOException $e) {}
-} catch (PDOException $e) {
-    // ส่งข้อมูลข้อผิดพลาดกลับเป็น JSON กรณีเรียกใช้ผ่าน AJAX
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode([
-        'success' => false,
-        'error' => 'Database connection failed: ' . $e->getMessage()
-    ]);
-    exit;
+    // 4) เพิ่มคอลัมน์ created_at สำหรับตารางเวอร์ชันเก่าที่ยังไม่มีคอลัมน์นี้
+    safe_ddl($pdo, "ALTER TABLE writing_problems ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
+    safe_ddl($pdo, "ALTER TABLE self_checklists ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
+    safe_ddl($pdo, "ALTER TABLE peer_reviews ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
+    safe_ddl($pdo, "ALTER TABLE learning_reflections ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
 }
