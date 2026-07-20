@@ -65,7 +65,8 @@ function safe_ddl(PDO $pdo, $sql) {
 // ถ้าครบแล้วให้ข้ามขั้นตอน migration ทั้งหมด เพื่อลดภาระฐานข้อมูลในทุก request (สำคัญมากบนโฮสต์ฟรี)
 $needs_migration = true;
 try {
-    $check = $pdo->query("SHOW TABLES LIKE 'learning_reflections'");
+    // ใช้ตารางล่าสุด (student_essays) เป็นตัวชี้วัด — ถ้ายังไม่มี แปลว่าต้องรัน migration เพื่อสร้างตารางที่ขาด
+    $check = $pdo->query("SHOW TABLES LIKE 'student_essays'");
     if ($check && $check->fetch()) {
         // ตารางครบแล้ว ตรวจต่อว่ามีรายชื่อนักเรียนหรือยัง (กันกรณีติดตั้งค้างไว้ครึ่งทาง)
         $cnt = $pdo->query("SELECT COUNT(*) AS c FROM students")->fetch();
@@ -233,6 +234,22 @@ if ($needs_migration) {
             future_goals TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    ");
+
+    // ตารางบันทึกเรียงความของนักเรียน (Essay Writer) — ใช้โดย essay_writer.php และ api.php (save_essay/get_essay)
+    safe_ddl($pdo, "
+        CREATE TABLE IF NOT EXISTS student_essays (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            student_id VARCHAR(10) NOT NULL,
+            essay_phase VARCHAR(20) NOT NULL DEFAULT 'task1',
+            essay_title VARCHAR(255) DEFAULT NULL,
+            essay_content LONGTEXT,
+            word_count INT DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE,
+            UNIQUE KEY unique_student_essay (student_id, essay_phase)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     ");
 
