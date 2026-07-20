@@ -21,6 +21,7 @@ require_once 'header.php';
     </div>
   </div>
 
+  <?php if ($sessionUser['role'] === 'student'): ?>
   <!-- แผงสำหรับนักเรียน (Student Menu) -->
   <div id="menuStudent">
     
