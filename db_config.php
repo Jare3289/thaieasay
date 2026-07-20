@@ -65,12 +65,13 @@ function safe_ddl(PDO $pdo, $sql) {
 // ถ้าครบแล้วให้ข้ามขั้นตอน migration ทั้งหมด เพื่อลดภาระฐานข้อมูลในทุก request (สำคัญมากบนโฮสต์ฟรี)
 $needs_migration = true;
 try {
-    // ใช้ตารางล่าสุด (student_essays) เป็นตัวชี้วัด — ถ้ายังไม่มี แปลว่าต้องรัน migration เพื่อสร้างตารางที่ขาด
+    // ใช้คอลัมน์ classroom (เวอร์ชันล่าสุด) เป็นตัวชี้วัด — ถ้ายังไม่มี แปลว่าต้องรัน migration เพื่อสร้าง/เพิ่มส่วนที่ขาด
     $check = $pdo->query("SHOW TABLES LIKE 'student_essays'");
     if ($check && $check->fetch()) {
-        // ตารางครบแล้ว ตรวจต่อว่ามีรายชื่อนักเรียนหรือยัง (กันกรณีติดตั้งค้างไว้ครึ่งทาง)
+        $col = $pdo->query("SHOW COLUMNS FROM students LIKE 'classroom'");
+        $hasClassroom = $col && $col->fetch();
         $cnt = $pdo->query("SELECT COUNT(*) AS c FROM students")->fetch();
-        if ($cnt && (int)$cnt['c'] > 0) {
+        if ($hasClassroom && $cnt && (int)$cnt['c'] > 0) {
             $needs_migration = false;
         }
     }
@@ -262,6 +263,10 @@ if ($needs_migration) {
     safe_ddl($pdo, "ALTER TABLE evaluations ADD COLUMN test_phase VARCHAR(20) DEFAULT 'posttest' AFTER evaluator_name");
     safe_ddl($pdo, "ALTER TABLE evaluations DROP INDEX unique_eval");
     safe_ddl($pdo, "ALTER TABLE evaluations ADD UNIQUE KEY unique_eval (student_id, evaluator_type, evaluator_name, test_phase)");
+
+    // 3.5) เพิ่มคอลัมน์ห้องเรียน + กลุ่ม (ทดลอง/ตัวอย่าง) ในตารางนักเรียน
+    safe_ddl($pdo, "ALTER TABLE students ADD COLUMN classroom VARCHAR(20) DEFAULT NULL");
+    safe_ddl($pdo, "ALTER TABLE students ADD COLUMN student_group VARCHAR(30) DEFAULT NULL");
 
     // 4) เพิ่มคอลัมน์ created_at สำหรับตารางเวอร์ชันเก่าที่ยังไม่มีคอลัมน์นี้
     safe_ddl($pdo, "ALTER TABLE writing_problems ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");

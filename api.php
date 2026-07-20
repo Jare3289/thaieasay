@@ -117,6 +117,82 @@ try {
             echo json_encode(['success' => true, 'students' => $students]);
             break;
 
+        // 4.1 ดึงรายชื่อนักเรียนแบบเต็ม (รหัส/ชื่อ/ห้อง/กลุ่ม) สำหรับหน้าจัดการนักเรียน (ครูเท่านั้น)
+        case 'get_students_full':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'ต้องเป็นคุณครู']);
+                exit;
+            }
+            $rows = $pdo->query('SELECT student_id, student_name, classroom, student_group FROM students ORDER BY classroom ASC, student_id ASC')->fetchAll();
+            echo json_encode(['success' => true, 'students' => $rows]);
+            break;
+
+        // 4.2 เพิ่ม/แก้ไขนักเรียนทีละคน (ครูเท่านั้น)
+        case 'save_student':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'ต้องเป็นคุณครู']);
+                exit;
+            }
+            $sid   = isset($request_data['student_id'])   ? trim($request_data['student_id'])   : '';
+            $sname = isset($request_data['student_name']) ? trim($request_data['student_name']) : '';
+            $sroom = isset($request_data['classroom'])    ? trim($request_data['classroom'])    : '';
+            $sgrp  = isset($request_data['student_group'])? trim($request_data['student_group']): '';
+            if ($sid === '' || $sname === '') {
+                echo json_encode(['success' => false, 'error' => 'ต้องระบุรหัสและชื่อนักเรียน']);
+                exit;
+            }
+            $stmt = $pdo->prepare('INSERT INTO students (student_id, student_name, classroom, student_group)
+                VALUES (?,?,?,?)
+                ON DUPLICATE KEY UPDATE student_name=VALUES(student_name), classroom=VALUES(classroom), student_group=VALUES(student_group)');
+            $stmt->execute([$sid, $sname, ($sroom !== '' ? $sroom : null), ($sgrp !== '' ? $sgrp : null)]);
+            echo json_encode(['success' => true]);
+            break;
+
+        // 4.3 นำเข้ารายชื่อนักเรียนจากไฟล์ CSV (ครูเท่านั้น) — คอลัมน์: รหัส, ชื่อ, ห้อง, กลุ่ม
+        case 'import_students_csv':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'ต้องเป็นคุณครู']);
+                exit;
+            }
+            $b64 = isset($request_data['csv_base64']) ? $request_data['csv_base64'] : '';
+            $raw = base64_decode($b64, true);
+            if ($raw === false || $raw === '') {
+                echo json_encode(['success' => false, 'error' => 'ไม่พบข้อมูลไฟล์ CSV']);
+                exit;
+            }
+            // ตัด BOM และแปลงเป็น UTF-8 (รองรับไฟล์ Excel ที่เป็น Windows-874/TIS-620)
+            $raw = preg_replace('/^\xEF\xBB\xBF/', '', $raw);
+            if (!mb_check_encoding($raw, 'UTF-8')) {
+                $raw = mb_convert_encoding($raw, 'UTF-8', 'Windows-874,TIS-620,UTF-8');
+            }
+            $lines = preg_split('/\r\n|\r|\n/', trim($raw));
+
+            $stmt = $pdo->prepare('INSERT INTO students (student_id, student_name, classroom, student_group)
+                VALUES (?,?,?,?)
+                ON DUPLICATE KEY UPDATE student_name=VALUES(student_name), classroom=VALUES(classroom), student_group=VALUES(student_group)');
+
+            $imported = 0; $skipped = 0; $errors = [];
+            foreach ($lines as $i => $line) {
+                if (trim($line) === '') continue;
+                $cols = str_getcsv($line);
+                $sid  = isset($cols[0]) ? trim($cols[0]) : '';
+                $name = isset($cols[1]) ? trim($cols[1]) : '';
+                $room = isset($cols[2]) ? trim($cols[2]) : '';
+                $grp  = isset($cols[3]) ? trim($cols[3]) : '';
+                // ข้ามแถวหัวตาราง (รหัสไม่ใช่ตัวเลข หรือเป็นคำว่า 'รหัส'/'student_id')
+                if ($sid === '' || $name === '') { $skipped++; continue; }
+                if (!preg_match('/^\d+$/', $sid)) { $skipped++; continue; }
+                try {
+                    $stmt->execute([$sid, $name, ($room !== '' ? $room : null), ($grp !== '' ? $grp : null)]);
+                    $imported++;
+                } catch (PDOException $e) {
+                    $skipped++;
+                    if (count($errors) < 5) $errors[] = "แถว " . ($i + 1) . ": " . $e->getMessage();
+                }
+            }
+            echo json_encode(['success' => true, 'imported' => $imported, 'skipped' => $skipped, 'errors' => $errors]);
+            break;
+
         // 5. บันทึกผลการประเมิน (Insert / Update)
         case 'save_evaluation':
             // ป้องกันการแอบบันทึกโดยไม่ล็อกอิน
@@ -919,8 +995,8 @@ try {
                 exit;
             }
             
-            // 1. ดึงรายชื่อนักเรียนทั้งหมด
-            $stmt_std = $pdo->query('SELECT student_id, student_name FROM students ORDER BY student_id ASC');
+            // 1. ดึงรายชื่อนักเรียนทั้งหมด (พร้อมห้อง + กลุ่ม)
+            $stmt_std = $pdo->query('SELECT student_id, student_name, classroom, student_group FROM students ORDER BY student_id ASC');
             $students = $stmt_std->fetchAll();
             
             // 2. ดึงข้อมูลการประเมินทั้งหมด
