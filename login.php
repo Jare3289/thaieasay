@@ -24,15 +24,16 @@ require_once 'header.php';
         <div class="mb-3">
           <label class="form-label fw-bold text-secondary">บทบาทผู้เข้าใช้งาน</label>
           <div class="row g-2">
-            <div class="col-4">
+            <div class="col-6">
               <input type="radio" name="loginRole" value="student" id="roleStudent" class="btn-check" checked onchange="toggleLoginType()">
               <label class="btn btn-outline-primary w-100 py-2.5 rounded-3 fw-bold small" for="roleStudent" style="font-size: 0.85rem; padding: 10px 2px;">👨‍🎓 นักเรียน</label>
             </div>
-            <div class="col-4">
+            <div class="col-6">
               <input type="radio" name="loginRole" value="teacher" id="roleTeacher" class="btn-check" onchange="toggleLoginType()">
               <label class="btn btn-outline-success w-100 py-2.5 rounded-3 fw-bold small" for="roleTeacher" style="font-size: 0.85rem; padding: 10px 2px;">👩‍🏫 ครูผู้สอน</label>
             </div>
-            <div class="col-4">
+            <!-- ซ่อนตัวเลือกผู้เชี่ยวชาญไว้ (ยังใช้งานได้ผ่านหลังบ้าน) เพื่อไม่ให้นักเรียนเผลอเข้าถึง -->
+            <div class="col-12 d-none">
               <input type="radio" name="loginRole" value="expert" id="roleExpert" class="btn-check" onchange="toggleLoginType()">
               <label class="btn btn-outline-warning w-100 py-2.5 rounded-3 fw-bold small" for="roleExpert" style="font-size: 0.85rem; padding: 10px 2px;">🎓 ผู้เชี่ยวชาญ</label>
             </div>
