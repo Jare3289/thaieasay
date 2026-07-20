@@ -443,8 +443,10 @@ require_once 'header.php';
     </div>
     <div class="d-flex align-items-center gap-2">
       <label for="studentPhaseSelector" class="small text-white-50 text-nowrap mb-0">รอบประเมิน:</label>
-      <select id="studentPhaseSelector" class="form-select form-select-sm bg-white text-dark font-semibold border-0" style="width:140px;" onchange="switchStudentPhase()">
-        <option value="posttest" selected>หลังเรียน (T2)</option>
+      <select id="studentPhaseSelector" class="form-select form-select-sm bg-white text-dark font-semibold border-0" style="width:160px;" onchange="switchStudentPhase()">
+        <option value="task1" selected>ภารงาน หน่วยที่ 1</option>
+        <option value="task2">ภารงาน หน่วยที่ 2</option>
+        <option value="posttest">หลังเรียน (T2)</option>
         <option value="pretest">ก่อนเรียน (T1)</option>
       </select>
       <?php if ($sessionUser['role'] === 'teacher'): ?>
@@ -608,7 +610,7 @@ require_once 'header.php';
   let classDimensionChartInstance = null;
   let classDimensionLinesChartInstance = null;
   let classroomResearchData = null;
-  let currentResearchPhase = 'posttest';
+  let currentResearchPhase = 'task1';
   let currentDashboardViewMode = 'task1';
 
   const criteriaMap = {
@@ -791,6 +793,13 @@ require_once 'header.php';
       
       if (res.success) {
         classroomResearchData = res;
+        // แปลง evaluator_type จากภาษาไทย → รหัสอังกฤษ ให้ตรงกับที่โค้ดแดชบอร์ดใช้เทียบ (self/peer/teacher/expert)
+        if (Array.isArray(classroomResearchData.evaluations)) {
+          const _typeMap = { 'ตนเองประเมิน': 'self', 'เพื่อนประเมิน': 'peer', 'ครูประเมิน': 'teacher', 'ผู้เชี่ยวชาญประเมิน': 'expert' };
+          classroomResearchData.evaluations.forEach(ev => {
+            if (_typeMap[ev.evaluator_type]) ev.evaluator_type = _typeMap[ev.evaluator_type];
+          });
+        }
         processDashboardData();
       } else {
         tbody.innerHTML = '<tr><td colspan="9" class="text-center text-danger py-5 fw-bold">เกิดข้อผิดพลาดจาก API: ' + res.error + '</td></tr>';
