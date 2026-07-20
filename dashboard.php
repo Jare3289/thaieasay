@@ -250,7 +250,32 @@ require_once 'header.php';
                   </div>
             </div>
             
-            <!-- Pearson interpretation paragraph -->
+            <!-- ตารางคะแนนผู้ตรวจ 3 คน รายบุคคล (กลุ่มตัวอย่าง) + ICC ท้ายตาราง -->
+            <div class="row mt-3">
+              <div class="col-12">
+                <div class="card border-0 rounded-3 p-3 bg-white shadow-sm border-start border-3 border-info">
+                  <h6 class="fw-bold text-dark mb-3"><i class="bi bi-people-fill text-info"></i> คะแนนผู้ตรวจ 3 คน รายบุคคล (เฉพาะกลุ่มตัวอย่าง)</h6>
+                  <div class="table-responsive" style="max-height: 360px; overflow-y: auto;">
+                    <table class="table table-sm table-hover align-middle mb-0 small">
+                      <thead class="table-light text-secondary">
+                        <tr>
+                          <th>รหัส</th>
+                          <th>ชื่อ-สกุล</th>
+                          <th class="text-center">ครูผู้สอน</th>
+                          <th class="text-center">ผู้เชี่ยวชาญ 1</th>
+                          <th class="text-center">ผู้เชี่ยวชาญ 2</th>
+                        </tr>
+                      </thead>
+                      <tbody id="iccStudentTableBody">
+                        <tr><td colspan="5" class="text-center py-4 text-muted">รอประมวลผลข้อมูล...</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- ICC interpretation paragraph -->
             <div class="row mt-3">
               <div class="col-12">
                 <div id="pearsonReportParagraph" class="card border-0 rounded-3 p-3 text-secondary small bg-light border-start border-3 border-secondary" style="line-height: 1.6;">
@@ -844,7 +869,7 @@ require_once 'header.php';
       const expert2Eval = taskEvs.find(e => e.evaluator_type === 'expert' && (e.evaluator_name === 'ผู้เชี่ยวชาญ 2' || e.evaluator_name === 'admin2'));
 
       if (teacherEval && expert1Eval && expert2Eval) {
-        raterTriples.push([teacherEval, expert1Eval, expert2Eval]);
+        raterTriples.push({ sid: id, name: (studentDB[id] || id), evals: [teacherEval, expert1Eval, expert2Eval] });
       }
     });
 
@@ -971,14 +996,12 @@ require_once 'header.php';
       thead.innerHTML = `
         <tr>
           <th class="px-3 py-3" style="width: 10%">รหัสนักเรียน</th>
-          <th class="px-3 py-3" style="width: 20%">ชื่อ-สกุลผู้เรียน</th>
-          <th class="px-3 py-3 text-center" style="width: 10%">ตนเองประเมิน</th>
-          <th class="px-3 py-3 text-center" style="width: 10%">เพื่อนประเมิน</th>
-          <th class="px-3 py-3 text-center" style="width: 10%">ครูประเมิน</th>
-          <th class="px-3 py-3 text-center text-warning-emphasis" style="width: 12%">ผู้เชี่ยวชาญ 1</th>
-          <th class="px-3 py-3 text-center text-warning-emphasis" style="width: 12%">ผู้เชี่ยวชาญ 2</th>
+          <th class="px-3 py-3" style="width: 28%">ชื่อ-สกุลผู้เรียน</th>
+          <th class="px-3 py-3 text-center" style="width: 14%">ตนเองประเมิน</th>
+          <th class="px-3 py-3 text-center" style="width: 14%">เพื่อนประเมิน</th>
+          <th class="px-3 py-3 text-center" style="width: 14%">ครูประเมิน</th>
           <th class="px-3 py-3 text-center" style="width: 8%">เฉลี่ย${unitLabel}</th>
-          <th class="px-3 py-3 text-end" style="width: 8%">การจัดการ</th>
+          <th class="px-3 py-3 text-end" style="width: 12%">การจัดการ</th>
         </tr>
       `;
     } else {
@@ -1061,8 +1084,6 @@ require_once 'header.php';
             <td class="px-3 py-3 text-center">${sData.self ? checkIcon : crossIcon}</td>
             <td class="px-3 py-3 text-center">${sData.peer ? checkIcon : crossIcon}</td>
             <td class="px-3 py-3 text-center">${sData.teacher ? checkIcon : crossIcon}</td>
-            <td class="px-3 py-3 text-center">${sData.expert1 ? checkIcon : crossIcon}</td>
-            <td class="px-3 py-3 text-center">${sData.expert2 ? checkIcon : crossIcon}</td>
             <td class="px-3 py-3 text-center fw-extrabold ${sData.avgScore > 0 ? 'text-primary bg-light-blue' : 'text-muted'}">${sData.avgScore > 0 ? sData.avgScore.toFixed(2) : '-'}</td>
             <td class="px-3 py-3 text-end">
                <button class="btn btn-outline-primary btn-sm fw-bold rounded-pill px-3">วิเคราะห์</button>
@@ -1248,7 +1269,7 @@ require_once 'header.php';
     ];
 
     // ภาพรวม = คะแนนรวม
-    const totalMatrix = triples.map(tr => tr.map(dims[0].get));
+    const totalMatrix = triples.map(tr => tr.evals.map(dims[0].get));
     const overallICC = computeICC(totalMatrix);
     overallEl.textContent = overallICC !== null ? overallICC.toFixed(4) : "N/A";
     const overallInterp = getICCInterpretation(overallICC);
@@ -1258,7 +1279,7 @@ require_once 'header.php';
     let html = '';
     const iccVals = [];
     dims.forEach(d => {
-      const m = triples.map(tr => tr.map(d.get));
+      const m = triples.map(tr => tr.evals.map(d.get));
       const icc = computeICC(m);
       if (icc !== null) iccVals.push(icc);
       const interp = getICCInterpretation(icc);
@@ -1272,6 +1293,25 @@ require_once 'header.php';
       `;
     });
     tableBody.innerHTML = html;
+
+    // ตารางคะแนนผู้ตรวจ 3 คน รายบุคคล + ICC ท้ายตาราง
+    const stBody = document.getElementById('iccStudentTableBody');
+    if (stBody) {
+      let sh = triples.map(tr => `
+        <tr>
+          <td class="font-mono">${tr.sid}</td>
+          <td>${tr.name}</td>
+          <td class="text-center fw-semibold">${Number(tr.evals[0].total_score).toFixed(1)}</td>
+          <td class="text-center fw-semibold">${Number(tr.evals[1].total_score).toFixed(1)}</td>
+          <td class="text-center fw-semibold">${Number(tr.evals[2].total_score).toFixed(1)}</td>
+        </tr>`).join('');
+      sh += `
+        <tr class="table-primary fw-bold">
+          <td colspan="2" class="text-end">ค่า ICC ภาพรวม (คะแนนรวม) →</td>
+          <td colspan="3" class="text-center">${overallICC !== null ? overallICC.toFixed(4) : 'N/A'} <span class="badge ${overallInterp.css} ms-1">${overallInterp.text.split(' (')[0]}</span></td>
+        </tr>`;
+      stBody.innerHTML = sh;
+    }
 
     const paragraphEl = document.getElementById('pearsonReportParagraph');
     if (paragraphEl) {
