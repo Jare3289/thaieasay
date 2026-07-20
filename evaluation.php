@@ -33,20 +33,76 @@ require_once 'header.php';
     </a>
   </div>
 
-  <div class="card border-0 shadow-lg rounded-4 overflow-hidden mb-5">
-    <div class="p-4 position-relative text-white" style="background: linear-gradient(135deg, var(--primary-navy) 0%, var(--secondary-blue) 100%);">
+  <!-- Phase Picker Overlay (แสดงก่อนเริ่มกรอกแบบประเมิน) -->
+  <div id="phasePicker" class="card border-0 shadow-lg rounded-4 overflow-hidden mb-5 <?php echo ($sessionUser['role'] === 'expert') ? 'd-none' : ''; ?>">
+    <div class="p-4 text-white" style="background: linear-gradient(135deg, var(--primary-navy) 0%, var(--secondary-blue) 100%);">
       <div class="d-flex align-items-center justify-content-between">
-        <h4 class="fw-bold mb-1">กรอกแบบประเมินความสามารถงานเขียน</h4>
-        <span id="roleBadge" class="badge bg-white text-dark px-3 py-2 fs-6 fw-bold"><?php echo $currentMode; ?></span>
+        <div>
+          <h4 class="fw-bold mb-1"><i class="bi bi-journal-check me-2"></i>เลือกรอบการประเมิน</h4>
+          <p class="text-white-50 mb-0 small">กรุณาเลือกรอบการประเมินก่อนเริ่มกรอกแบบประเมิน</p>
+        </div>
+        <span class="badge bg-white text-dark px-3 py-2 fs-6 fw-bold"><?php echo $currentMode; ?></span>
       </div>
-      <p class="text-white-50 mb-0 small font-light">โปรดรีวิวย่อหน้าผลงานแล้วทำเครื่องหมายเลือกเกณฑ์คุณภาพที่ตรงตามจริง (ซ่อนตัวเลขคะแนน/ตัวคูณลดอคติ)</p>
+    </div>
+    <div class="p-4 bg-white">
+      <div class="row g-3">
+        <div class="col-md-3 col-6">
+          <button type="button" class="phase-btn w-100 btn btn-outline-primary rounded-3 p-3 text-center fw-bold" data-phase="pretest" onclick="selectPhase('pretest')">
+            <div class="fs-2 mb-2">📝</div>
+            <div class="fw-bold">ก่อนเรียน</div>
+            <div class="text-muted small">Pretest (T1)</div>
+          </button>
+        </div>
+        <div class="col-md-3 col-6">
+          <button type="button" class="phase-btn w-100 btn btn-outline-success rounded-3 p-3 text-center fw-bold" data-phase="task1" onclick="selectPhase('task1')">
+            <div class="fs-2 mb-2">📚</div>
+            <div class="fw-bold">ภารงาน หน่วยที่ 1</div>
+            <div class="text-muted small">Task Unit 1</div>
+          </button>
+        </div>
+        <div class="col-md-3 col-6">
+          <button type="button" class="phase-btn w-100 btn btn-outline-warning rounded-3 p-3 text-center fw-bold" data-phase="task2" onclick="selectPhase('task2')">
+            <div class="fs-2 mb-2">📖</div>
+            <div class="fw-bold">ภารงาน หน่วยที่ 2</div>
+            <div class="text-muted small">Task Unit 2</div>
+          </button>
+        </div>
+        <div class="col-md-3 col-6">
+          <button type="button" class="phase-btn w-100 btn btn-outline-danger rounded-3 p-3 text-center fw-bold" data-phase="posttest" onclick="selectPhase('posttest')">
+            <div class="fs-2 mb-2">🎓</div>
+            <div class="fw-bold">หลังเรียน</div>
+            <div class="text-muted small">Posttest (T2)</div>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="evalSection" class="card border-0 shadow-lg rounded-4 overflow-hidden mb-5 <?php echo ($sessionUser['role'] === 'expert') ? '' : 'd-none'; ?>">
+    <div class="p-4 position-relative text-white" style="background: linear-gradient(135deg, var(--primary-navy) 0%, var(--secondary-blue) 100%);">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div>
+          <h4 class="fw-bold mb-1">กรอกแบบประเมินความสามารถงานเขียน</h4>
+          <p class="text-white-50 mb-0 small font-light">โปรดรีวิวย่อหน้าผลงานแล้วทำเครื่องหมายเลือกเกณฑ์คุณภาพที่ตรงตามจริง (ซ่อนตัวเลขคะแนน/ตัวคูณลดอคติ)</p>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <span id="selectedPhaseBadge" class="badge bg-white text-dark px-3 py-2 fs-7 fw-bold"></span>
+          <span id="roleBadge" class="badge bg-white bg-opacity-25 text-white px-3 py-2 fs-7"><?php echo $currentMode; ?></span>
+          <?php if ($sessionUser['role'] !== 'expert'): ?>
+          <button type="button" class="btn btn-sm btn-light rounded-pill px-3 fw-bold" onclick="resetPhase()">
+            <i class="bi bi-arrow-left-short"></i> เปลี่ยนรอบ
+          </button>
+          <?php endif; ?>
+        </div>
+      </div>
     </div>
 
     <form id="evalForm" class="p-4">
+      <input type="hidden" id="selectedTestPhase" value="<?php echo ($sessionUser['role'] === 'expert') ? 'task1' : ''; ?>">
       <!-- ข้อมูลนักเรียนเป้าหมายที่ได้รับการประเมิน -->
       <div class="card border-0 rounded-3 p-4 mb-4" style="background-color: var(--light-blue);">
         <div class="row align-items-end">
-          <div class="col-md-5 col-sm-12">
+          <div class="col-md-8 col-sm-12">
             <label for="targetStudentSelect" class="form-label fw-bold text-secondary small text-uppercase tracking-wider">เลือกนักเรียนที่เป็นเป้าหมายผู้ถูกประเมิน <span class="text-danger">*</span></label>
             <select id="targetStudentSelect" required class="form-select form-select-lg border-2 rounded-3 cursor-pointer fw-semibold text-dark">
               <option value="" disabled selected>-- เลือกรายชื่อนักเรียน --</option>
@@ -57,21 +113,35 @@ require_once 'header.php';
             </p>
             <?php endif; ?>
           </div>
-          <div class="col-md-4 col-sm-12 mt-3 mt-md-0 text-start">
-            <label for="testPhaseSelect" class="form-label fw-bold text-secondary small text-uppercase tracking-wider">รอบการประเมิน <span class="text-danger">*</span></label>
-            <select id="testPhaseSelect" required class="form-select form-select-lg border-2 rounded-3 cursor-pointer fw-semibold text-dark">
-              <?php if ($sessionUser['role'] === 'expert'): ?>
-              <option value="task" selected>ภารงานในหน่วยการเรียน (Task)</option>
-              <?php else: ?>
-              <option value="pretest">ก่อนเรียน (Pretest - T1)</option>
-              <option value="task">ภารงานในหน่วยการเรียน (Task)</option>
-              <option value="posttest" selected>หลังเรียน (Posttest - T2)</option>
-              <?php endif; ?>
-            </select>
+          <?php if ($sessionUser['role'] === 'expert'): ?>
+          <div class="col-md-4 col-sm-12 mt-3 mt-md-0">
+            <label class="form-label fw-bold text-secondary small text-uppercase tracking-wider">หน่วยการเรียน <span class="text-danger">*</span></label>
+            <div class="d-flex gap-2">
+              <button type="button" id="btnTask1" class="btn btn-success btn-sm fw-bold flex-fill rounded-3 py-2" onclick="selectPhase('task1')">
+                📚 หน่วยที่ 1
+              </button>
+              <button type="button" id="btnTask2" class="btn btn-outline-warning btn-sm fw-bold flex-fill rounded-3 py-2" onclick="selectPhase('task2')">
+                📖 หน่วยที่ 2
+              </button>
+            </div>
           </div>
-          <div class="col-md-3 col-sm-12 text-md-end mt-3 mt-md-0">
+          <?php endif; ?>
+          <div class="col-md-<?php echo ($sessionUser['role'] === 'expert') ? '12 mt-2' : '4'; ?> col-sm-12 text-md-end mt-3 mt-md-0">
             <span id="loadOldDataStatus" class="badge fs-7 p-2.5 rounded-pill d-none"></span>
           </div>
+        </div>
+      <!-- ส่วนแสดงผลเรียงความที่นักเรียนพิมพ์ส่งไว้ (ถ้ามี) -->
+      <div id="studentEssayPanel" class="card border-0 shadow-sm rounded-4 p-4 mb-4 d-none" style="background-color: #fffdf0; border: 1px solid #e7e5e4 !important;">
+        <div class="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2">
+          <h6 class="fw-bold text-dark mb-0"><i class="bi bi-file-earmark-text text-primary me-2"></i>เนื้อหาเรียงความที่นักเรียนบันทึกไว้ (Student Essay Content)</h6>
+          <span class="badge bg-primary-subtle text-primary rounded-pill px-3 py-1 font-mono small" id="essayPanelWordCount">0 คำ</span>
+        </div>
+        <div class="mb-2 small">
+          <span class="text-secondary fw-bold">ชื่อเรื่อง: </span>
+          <span id="essayPanelTitle" class="fw-bold text-dark">—</span>
+        </div>
+        <div class="p-3 bg-white rounded-3 border text-dark" id="essayPanelContent" style="white-space: pre-wrap; line-height: 1.8; font-family: 'Sarabun', sans-serif; font-size: 1rem; max-height: 250px; overflow-y: auto;">
+          <!-- เนื้อหาเรียงความ -->
         </div>
       </div>
 
@@ -167,6 +237,17 @@ require_once 'header.php';
     </form>
   </div>
 </div>
+<style>
+.phase-btn:hover, .phase-btn.active {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  transition: all 0.2s ease;
+}
+.phase-btn {
+  transition: all 0.2s ease;
+  min-height: 130px;
+}
+</style>
 
 <script>
   let currentMode = "<?php echo $currentMode; ?>";
@@ -433,7 +514,7 @@ require_once 'header.php';
     statusBadge.className = "badge bg-info text-white fs-8 px-3 py-2 rounded-pill";
     statusBadge.classList.remove('d-none');
 
-    const testPhase = document.getElementById('testPhaseSelect') ? document.getElementById('testPhaseSelect').value : 'posttest';
+    const testPhase = document.getElementById('selectedTestPhase') ? document.getElementById('selectedTestPhase').value : 'task1';
 
     try {
       const response = await fetch('api.php?action=get_single_evaluation', {
@@ -476,10 +557,80 @@ require_once 'header.php';
         if (impEl) impEl.value = f.improvement || '';
         if (encEl) encEl.value = f.encouragement || '';
       }
+      // โหลดเรียงความของนักเรียนมาแสดงประกอบการให้คะแนนด้วย
+      fetchStudentEssayForEvaluation(studentId, testPhase);
     } catch (err) {
       console.error(err);
       statusBadge.textContent = "⚠️ ไม่สามารถตรวจสอบประวัติได้";
       statusBadge.className = "badge bg-danger text-white fs-8 px-3 py-2 rounded-pill";
+    }
+  }
+
+  function formatEssayHTML(contentStr) {
+    if (!contentStr) return '<em class="text-muted">ไม่มีเนื้อหาเรียงความ</em>';
+    try {
+      const obj = JSON.parse(contentStr);
+      if (obj && typeof obj === 'object' && obj.introduction !== undefined) {
+        let html = '';
+        if (obj.introduction) {
+          html += `
+            <div class="mb-3">
+              <span class="badge bg-primary bg-opacity-10 text-primary fw-bold mb-1"><i class="bi bi-pencil-fill me-1"></i>ส่วนคำนำ (Introduction)</span>
+              <div class="p-2.5 bg-light rounded-3 text-dark style-sarabun" style="white-space:pre-wrap; line-height:1.7;">${obj.introduction.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+            </div>`;
+        }
+        if (obj.body && Array.isArray(obj.body)) {
+          obj.body.forEach((paraText, i) => {
+            if (paraText) {
+              html += `
+                <div class="mb-3">
+                  <span class="badge bg-success bg-opacity-10 text-success fw-bold mb-1"><i class="bi bi-book-fill me-1"></i>ส่วนเนื้อเรื่อง ย่อหน้าที่ ${i+1} (Body Paragraph)</span>
+                  <div class="p-2.5 bg-light rounded-3 text-dark style-sarabun" style="white-space:pre-wrap; line-height:1.7;">${paraText.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+                </div>`;
+            }
+          });
+        }
+        if (obj.conclusion) {
+          html += `
+            <div class="mb-0">
+              <span class="badge bg-danger bg-opacity-10 text-danger fw-bold mb-1"><i class="bi bi-award-fill me-1"></i>ส่วนสรุป (Conclusion)</span>
+              <div class="p-2.5 bg-light rounded-3 text-dark style-sarabun" style="white-space:pre-wrap; line-height:1.7;">${obj.conclusion.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+            </div>`;
+        }
+        return html;
+      }
+    } catch(e) {}
+    return `<div class="p-2.5 bg-light rounded-3 text-dark style-sarabun" style="white-space:pre-wrap; line-height:1.7;">${contentStr.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`;
+  }
+
+  async function fetchStudentEssayForEvaluation(studentId, testPhase) {
+    const panel = document.getElementById('studentEssayPanel');
+    const titleEl = document.getElementById('essayPanelTitle');
+    const contentEl = document.getElementById('essayPanelContent');
+    const countEl = document.getElementById('essayPanelWordCount');
+    
+    if (!panel) return;
+    
+    if (!studentId) {
+      panel.classList.add('d-none');
+      return;
+    }
+    
+    try {
+      const response = await fetch(`api.php?action=get_essay&studentId=${studentId}&essay_phase=${testPhase}`);
+      const data = await response.json();
+      
+      if (data.success && data.found) {
+        titleEl.textContent = data.data.essay_title || 'ไม่มีชื่อเรื่อง';
+        contentEl.innerHTML = formatEssayHTML(data.data.essay_content);
+        countEl.textContent = `${data.data.word_count || 0} คำ`;
+        panel.classList.remove('d-none');
+      } else {
+        panel.classList.add('d-none');
+      }
+    } catch (err) {
+      console.error("Error fetching student essay for evaluation:", err);
+      panel.classList.add('d-none');
     }
   }
 
@@ -501,7 +652,7 @@ require_once 'header.php';
     return { total, levelText };
   }
 
-  // การเปลี่ยนตัวเลือกผู้ถูกประเมิน หรือ รอบการประเมิน
+  // การเปลี่ยนตัวเลือกผู้ถูกประเมิน
   function handleTargetOrPhaseChange() {
     const studentSelect = document.getElementById('targetStudentSelect');
     const id = studentSelect.value;
@@ -510,8 +661,47 @@ require_once 'header.php';
     }
   }
   document.getElementById('targetStudentSelect').addEventListener('change', handleTargetOrPhaseChange);
-  if (document.getElementById('testPhaseSelect')) {
-    document.getElementById('testPhaseSelect').addEventListener('change', handleTargetOrPhaseChange);
+
+  // phase picker functions
+  const phaseLabels = {
+    pretest:  'ก่อนเรียน (Pretest - T1)',
+    task1:    'ภารงาน หน่วยที่ 1 (Task 1)',
+    task2:    'ภารงาน หน่วยที่ 2 (Task 2)',
+    posttest: 'หลังเรียน (Posttest - T2)'
+  };
+  function selectPhase(phase) {
+    document.getElementById('selectedTestPhase').value = phase;
+    const picker = document.getElementById('phasePicker');
+    const section = document.getElementById('evalSection');
+    if (picker && !picker.classList.contains('d-none')) {
+      picker.classList.add('d-none');
+      section.classList.remove('d-none');
+    }
+    const badge = document.getElementById('selectedPhaseBadge');
+    if (badge) badge.textContent = phaseLabels[phase] || phase;
+
+    // update expert unit toggle buttons
+    const btn1 = document.getElementById('btnTask1');
+    const btn2 = document.getElementById('btnTask2');
+    if (btn1 && btn2) {
+      if (phase === 'task1') {
+        btn1.className = 'btn btn-success btn-sm fw-bold flex-fill rounded-3 py-2';
+        btn2.className = 'btn btn-outline-warning btn-sm fw-bold flex-fill rounded-3 py-2';
+      } else if (phase === 'task2') {
+        btn1.className = 'btn btn-outline-success btn-sm fw-bold flex-fill rounded-3 py-2';
+        btn2.className = 'btn btn-warning btn-sm fw-bold flex-fill rounded-3 py-2';
+      }
+    }
+
+    // reload existing if student already selected
+    const id = document.getElementById('targetStudentSelect').value;
+    if (id) checkExistingEvaluation(id);
+  }
+  function resetPhase() {
+    document.getElementById('evalSection').classList.add('d-none');
+    document.getElementById('phasePicker').classList.remove('d-none');
+    // clear active state
+    document.querySelectorAll('.phase-btn').forEach(b => b.classList.remove('active', 'btn-primary','btn-success','btn-warning','btn-danger'));
   }
 
   // บันทึกฟอร์ม
@@ -539,7 +729,7 @@ require_once 'header.php';
     btn.disabled = true;
 
     const calcResult = calculateHiddenScore();
-    const testPhase = document.getElementById('testPhaseSelect') ? document.getElementById('testPhaseSelect').value : 'posttest';
+    const testPhase = document.getElementById('selectedTestPhase') ? document.getElementById('selectedTestPhase').value : 'task1';
     const payload = {
       studentId: studentId,
       studentName: studentName,

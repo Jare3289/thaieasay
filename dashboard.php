@@ -191,6 +191,11 @@ require_once 'header.php';
               🔬 ศูนย์วิเคราะห์เชิงคุณภาพ (Content Analysis Hub)
             </button>
           </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link fw-bold text-dark px-4 py-2.5 rounded-3 d-flex align-items-center gap-2" id="essays-tab" data-bs-toggle="pill" data-bs-target="#tab-essays" type="button" role="tab" aria-selected="false" onclick="loadEssayViewer()">
+              ✍️ เรียงความนักเรียน (Essay Viewer)
+            </button>
+          </li>
         </ul>
 
         <div class="tab-content" id="researchTabContent">
@@ -362,6 +367,65 @@ require_once 'header.php';
             <div class="row g-3" id="qualitativeHubContainer" style="max-height: 480px; overflow-y: auto;">
               <!-- Cards created by JS dynamically -->
               <div class="col-12 text-center py-5 text-muted">กำลังโหลดข้อความเชิงคุณภาพเพื่อใช้วิเคราะห์เนื้อหา...</div>
+            </div>
+          </div>
+
+          <!-- 4. Essay Viewer Tab -->
+          <div class="tab-pane fade" id="tab-essays" role="tabpanel" aria-labelledby="essays-tab">
+            <!-- Controls row -->
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
+              <div>
+                <h6 class="fw-bold text-dark mb-1"><i class="bi bi-pencil-square text-primary me-2"></i>เรียงความของนักเรียน (Essay Viewer)</h6>
+                <p class="text-muted small mb-0">ตรวจสอบเนื้อหาเรียงความที่นักเรียนพิมพ์ส่งเพื่อประกอบการวิเคราะห์เชิงคุณภาพ</p>
+              </div>
+              <div class="d-flex gap-2 flex-wrap align-items-center">
+                <select id="essayPhaseFilter" onchange="filterEssayViewer()" class="form-select form-select-sm border-2 rounded-pill" style="width:auto;">
+                  <option value="all">ทุกรอบ</option>
+                  <option value="pretest">ก่อนเรียน</option>
+                  <option value="task1">ภารงาน หน่วยที่ 1</option>
+                  <option value="task2">ภารงาน หน่วยที่ 2</option>
+                  <option value="posttest">หลังเรียน</option>
+                </select>
+                <input type="text" id="essaySearchInput" onkeyup="filterEssayViewer()" class="form-control form-control-sm border-2 rounded-pill" placeholder="🔍 ค้นหาชื่อหรือเนื้อหา..." style="width:220px;">
+                <button class="btn btn-outline-primary btn-sm rounded-pill px-3" onclick="exportEssaysCSV()">
+                  <i class="bi bi-download me-1"></i>ส่งออก CSV
+                </button>
+              </div>
+            </div>
+
+            <!-- Summary stats row -->
+            <div class="row g-3 mb-4" id="essaySummaryRow">
+              <div class="col-md-3 col-6">
+                <div class="card border-0 rounded-3 p-3 text-center bg-light">
+                  <div class="fs-4 fw-bold text-primary" id="essayStatTotal">-</div>
+                  <div class="text-muted small">ส่งเรียงความแล้ว</div>
+                </div>
+              </div>
+              <div class="col-md-3 col-6">
+                <div class="card border-0 rounded-3 p-3 text-center bg-light">
+                  <div class="fs-4 fw-bold text-success" id="essayStatAvgWords">-</div>
+                  <div class="text-muted small">เฉลี่ย คำ/ชิ้น</div>
+                </div>
+              </div>
+              <div class="col-md-3 col-6">
+                <div class="card border-0 rounded-3 p-3 text-center bg-light">
+                  <div class="fs-4 fw-bold text-warning" id="essayStatMaxWords">-</div>
+                  <div class="text-muted small">มากสุด (คำ)</div>
+                </div>
+              </div>
+              <div class="col-md-3 col-6">
+                <div class="card border-0 rounded-3 p-3 text-center bg-light">
+                  <div class="fs-4 fw-bold text-danger" id="essayStatMinWords">-</div>
+                  <div class="text-muted small">น้อยสุด (คำ)</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Essay cards -->
+            <div id="essayViewerContainer" style="max-height:560px; overflow-y:auto;">
+              <div class="text-center text-muted py-5">
+                <i class="bi bi-hourglass-split fs-3 d-block mb-2"></i>กดแท็บ "เรียงความนักเรียน" เพื่อโหลดข้อมูล
+              </div>
             </div>
           </div>
 
@@ -545,7 +609,7 @@ require_once 'header.php';
   let classDimensionLinesChartInstance = null;
   let classroomResearchData = null;
   let currentResearchPhase = 'posttest';
-  let currentDashboardViewMode = 'task';
+  let currentDashboardViewMode = 'task1';
 
   const criteriaMap = {
     '1.1': { name: '1.1 ความตรงประเด็น (คะแนนเต็ม 12)', mult: 3 },
@@ -747,14 +811,15 @@ require_once 'header.php';
     studentsList.forEach(s => {
       studentEvals[s.student_id] = {
         pretest: [],
-        task: [],
+        task1:   [],
+        task2:   [],
         posttest: []
       };
     });
 
     evaluations.forEach(ev => {
       const phase = ev.test_phase;
-      if (studentEvals[ev.student_id] && studentEvals[ev.student_id][phase]) {
+      if (studentEvals[ev.student_id] && studentEvals[ev.student_id][phase] !== undefined) {
         studentEvals[ev.student_id][phase].push(ev);
       }
     });
@@ -762,10 +827,11 @@ require_once 'header.php';
     const summaryData = {};
     const expertPairs = [];
 
-    // ดึงผู้ประเมินร่วม (Expert 1 & 2) เฉพาะภารงานในหน่วยการเรียน (task) เพื่อคำนวณ Pearson r
+    // ดึงผู้ประเมินร่วม (Expert 1 & 2) เฉพาะภารงานในหน่วยที่เลือก เพื่อคำนวณ Pearson r
+    const expertTaskPhase = (currentDashboardViewMode === 'task2') ? 'task2' : 'task1';
     studentsList.forEach(s => {
       const id = s.student_id;
-      const taskEvs = studentEvals[id]['task'] || [];
+      const taskEvs = studentEvals[id][expertTaskPhase] || [];
       const expert1Eval = taskEvs.find(e => e.evaluator_type === 'expert' && (e.evaluator_name === 'ผู้เชี่ยวชาญ 1' || e.evaluator_name === 'admin1'));
       const expert2Eval = taskEvs.find(e => e.evaluator_type === 'expert' && (e.evaluator_name === 'ผู้เชี่ยวชาญ 2' || e.evaluator_name === 'admin2'));
 
@@ -777,11 +843,12 @@ require_once 'header.php';
       }
     });
 
-    if (currentDashboardViewMode === 'task') {
-      // --- 1. โหมดรายงานภารงานในหน่วยเรียน (Task) ---
+    if (currentDashboardViewMode === 'task1' || currentDashboardViewMode === 'task2') {
+      // --- 1. โหมดรายงานภารงานในหน่วยเรียน (Task 1 หรือ Task 2) ---
+      const taskPhaseKey = currentDashboardViewMode; // 'task1' or 'task2'
       studentsList.forEach(s => {
         const id = s.student_id;
-        const evs = studentEvals[id]['task'] || [];
+        const evs = studentEvals[id][taskPhaseKey] || [];
 
         const selfEval = evs.find(e => e.evaluator_type === 'self');
         const peerEval = evs.find(e => e.evaluator_type === 'peer');
@@ -894,7 +961,8 @@ require_once 'header.php';
     if (!tbody || !thead) return;
     
     // แสดงผลส่วนหัวตารางแบบไดนามิก
-    if (currentDashboardViewMode === 'task') {
+    if (currentDashboardViewMode === 'task1' || currentDashboardViewMode === 'task2') {
+      const unitLabel = currentDashboardViewMode === 'task1' ? 'หน่วยที่ 1' : 'หน่วยที่ 2';
       thead.innerHTML = `
         <tr>
           <th class="px-3 py-3" style="width: 10%">รหัสนักเรียน</th>
@@ -904,7 +972,7 @@ require_once 'header.php';
           <th class="px-3 py-3 text-center" style="width: 10%">ครูประเมิน</th>
           <th class="px-3 py-3 text-center text-warning-emphasis" style="width: 12%">ผู้เชี่ยวชาญ 1</th>
           <th class="px-3 py-3 text-center text-warning-emphasis" style="width: 12%">ผู้เชี่ยวชาญ 2</th>
-          <th class="px-3 py-3 text-center" style="width: 8%">เฉลี่ยภารงาน</th>
+          <th class="px-3 py-3 text-center" style="width: 8%">เฉลี่ย${unitLabel}</th>
           <th class="px-3 py-3 text-end" style="width: 8%">การจัดการ</th>
         </tr>
       `;
@@ -943,7 +1011,7 @@ require_once 'header.php';
     sortedKeys.forEach(id => {
       const sData = data[id] || {};
 
-      if (currentDashboardViewMode === 'task') {
+      if (currentDashboardViewMode === 'task1' || currentDashboardViewMode === 'task2') {
         const checkIcon = '<span class="badge badge-teal"><i class="bi bi-check-circle-fill"></i> ส่งแล้ว</span>';
         const crossIcon = '<span class="badge bg-light text-muted border px-2.5 py-1 rounded-pill">-</span>';
 
@@ -1627,6 +1695,231 @@ require_once 'header.php';
     currentDashboardViewMode = selector.value;
     processDashboardData();
   }
+
+  // ========== Essay Viewer Functions ==========
+  let allEssaysCache = null;
+
+  const essayPhaseLabels = {
+    pretest:  'ก่อนเรียน (Pretest)',
+    task1:    'ภารงาน หน่วยที่ 1',
+    task2:    'ภารงาน หน่วยที่ 2',
+    posttest: 'หลังเรียน (Posttest)'
+  };
+  const essayPhaseBadgeClass = {
+    pretest: 'bg-primary',
+    task1: 'bg-success',
+    task2: 'bg-warning text-dark',
+    posttest: 'bg-danger'
+  };
+
+  async function loadEssayViewer() {
+    if (allEssaysCache) { renderEssayViewer(allEssaysCache); return; }
+    const container = document.getElementById('essayViewerContainer');
+    container.innerHTML = '<div class="text-center py-5 text-muted"><span class="spinner-border spinner-border-sm me-2"></span>กำลังโหลดเรียงความ...</div>';
+    try {
+      const res = await fetch('api.php?action=get_all_essays');
+      const data = await res.json();
+      if (data.success) {
+        allEssaysCache = data.essays;
+        renderEssayViewer(data.essays);
+      } else {
+        container.innerHTML = `<div class="text-center py-5 text-danger fw-bold">เกิดข้อผิดพลาด: ${data.error}</div>`;
+      }
+    } catch(err) {
+      container.innerHTML = '<div class="text-center py-5 text-danger fw-bold">ไม่สามารถโหลดข้อมูลได้</div>';
+    }
+  }
+
+  function filterEssayViewer() {
+    if (!allEssaysCache) return;
+    renderEssayViewer(allEssaysCache);
+  }
+
+  function formatEssayHTML(contentStr) {
+    if (!contentStr) return '<em class="text-muted">ไม่มีเนื้อหาเรียงความ</em>';
+    try {
+      const obj = JSON.parse(contentStr);
+      if (obj && typeof obj === 'object' && obj.introduction !== undefined) {
+        let html = '';
+        if (obj.introduction) {
+          html += `
+            <div class="mb-3">
+              <span class="badge bg-primary bg-opacity-10 text-primary fw-bold mb-1"><i class="bi bi-pencil-fill me-1"></i>ส่วนคำนำ (Introduction)</span>
+              <div class="p-3 bg-white rounded-3 border text-dark" style="white-space:pre-wrap; line-height:1.7;">${obj.introduction.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+            </div>`;
+        }
+        if (obj.body && Array.isArray(obj.body)) {
+          obj.body.forEach((paraText, i) => {
+            if (paraText) {
+              html += `
+                <div class="mb-3">
+                  <span class="badge bg-success bg-opacity-10 text-success fw-bold mb-1"><i class="bi bi-book-fill me-1"></i>ส่วนเนื้อเรื่อง ย่อหน้าที่ ${i+1} (Body Paragraph)</span>
+                  <div class="p-3 bg-white rounded-3 border text-dark" style="white-space:pre-wrap; line-height:1.7;">${paraText.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+                </div>`;
+            }
+          });
+        }
+        if (obj.conclusion) {
+          html += `
+            <div class="mb-0">
+              <span class="badge bg-danger bg-opacity-10 text-danger fw-bold mb-1"><i class="bi bi-award-fill me-1"></i>ส่วนสรุป (Conclusion)</span>
+              <div class="p-3 bg-white rounded-3 border text-dark" style="white-space:pre-wrap; line-height:1.7;">${obj.conclusion.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+            </div>`;
+        }
+        return html;
+      }
+    } catch(e) {}
+    return `<div class="p-3 bg-white rounded-3 border text-dark" style="white-space:pre-wrap; line-height:1.7;">${contentStr.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`;
+  }
+
+  function renderEssayViewer(essays) {
+    const phaseFilter = (document.getElementById('essayPhaseFilter') || {}).value || 'all';
+    const query       = ((document.getElementById('essaySearchInput') || {}).value || '').toLowerCase().trim();
+    const container   = document.getElementById('essayViewerContainer');
+
+    let filtered = essays.filter(e => {
+      if (phaseFilter !== 'all' && e.essay_phase !== phaseFilter) return false;
+      
+      let searchableText = e.essay_content || '';
+      try {
+        const obj = JSON.parse(e.essay_content);
+        if (obj && typeof obj === 'object' && obj.introduction !== undefined) {
+          searchableText = (obj.introduction || '') + ' ' + (obj.body ? obj.body.join(' ') : '') + ' ' + (obj.conclusion || '');
+        }
+      } catch(err) {}
+
+      if (query) {
+        const combined = ((e.student_name || '') + ' ' + (e.student_id || '') + ' ' + (e.essay_title || '') + ' ' + searchableText).toLowerCase();
+        if (!combined.includes(query)) return false;
+      }
+      return true;
+    });
+
+    // update summary stats
+    const total    = filtered.length;
+    const words    = filtered.map(e => parseInt(e.word_count || 0));
+    const avgWords = total > 0 ? Math.round(words.reduce((a,b)=>a+b,0)/total) : 0;
+    const maxWords = total > 0 ? Math.max(...words) : 0;
+    const minWords = total > 0 ? Math.min(...words) : 0;
+
+    const setEl = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val.toLocaleString('th-TH'); };
+    setEl('essayStatTotal', total);
+    setEl('essayStatAvgWords', avgWords);
+    setEl('essayStatMaxWords', maxWords);
+    setEl('essayStatMinWords', minWords);
+
+    if (filtered.length === 0) {
+      container.innerHTML = '<div class="text-center py-5 text-muted"><i class="bi bi-inbox fs-3 d-block mb-2"></i>ไม่พบเรียงความที่ตรงกับเงื่อนไข</div>';
+      return;
+    }
+
+    container.innerHTML = filtered.map(e => {
+      let previewText = '';
+      try {
+        const obj = JSON.parse(e.essay_content);
+        if (obj && typeof obj === 'object' && obj.introduction !== undefined) {
+          const firstBody = (obj.body && obj.body[0]) ? obj.body[0] : '';
+          previewText = `[คำนำ] ${obj.introduction || ''}\n[เนื้อเรื่อง] ${firstBody}...`;
+        } else {
+          previewText = e.essay_content || '';
+        }
+      } catch(err) {
+        previewText = e.essay_content || '';
+      }
+
+      const previewTrunc = previewText.substring(0, 300).trim();
+      const hasMore      = previewText.length > 300;
+      const dt           = new Date(e.updated_at || e.created_at);
+      const dateStr      = dt.toLocaleString('th-TH', { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+      const badgeClass   = essayPhaseBadgeClass[e.essay_phase] || 'bg-secondary';
+      const phaseLabel   = essayPhaseLabels[e.essay_phase] || e.essay_phase;
+      const wordCount    = parseInt(e.word_count || 0).toLocaleString('th-TH');
+      const essayId      = `essay_${e.student_id}_${e.essay_phase}`;
+      const formattedHTML = formatEssayHTML(e.essay_content);
+
+      return `
+        <div class="card border-0 rounded-3 mb-3 shadow-sm" style="border-left: 4px solid #0d7377 !important;">
+          <div class="card-body p-3">
+            <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-2">
+              <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span class="badge ${badgeClass} px-2 py-1 small">${phaseLabel}</span>
+                <span class="fw-bold text-dark">${e.student_name} <span class="text-muted fw-normal small">(${e.student_id})</span></span>
+                ${e.essay_title ? `<span class="text-secondary small fst-italic">— ${e.essay_title}</span>` : ''}
+              </div>
+              <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-primary-subtle text-primary rounded-pill px-2 py-1 small">
+                  <i class="bi bi-fonts me-1"></i>${wordCount} คำ
+                </span>
+                <button class="btn btn-outline-primary btn-sm rounded-pill px-3 py-1 small" style="font-size:0.75rem;"
+                  onclick="document.getElementById('${essayId}').classList.toggle('d-none')">
+                  <i class="bi bi-eye me-1"></i>เปิดดูเต็มยศ
+                </button>
+              </div>
+            </div>
+
+            <!-- Preview -->
+            <div class="text-secondary small mb-2 text-start" style="white-space:pre-wrap; line-height:1.6; background:#f8f9fa; padding:10px; border-radius:6px; max-height:100px; overflow:hidden;">
+              ${previewTrunc.replace(/</g,'&lt;').replace(/>/g,'&gt;')}${hasMore ? '...' : ''}
+            </div>
+
+            <!-- Full content (hidden by default) -->
+            <div id="${essayId}" class="d-none text-dark small mt-3 p-3 bg-light rounded-3" style="font-family:'Sarabun',sans-serif; background-color: #fffdf9 !important; border: 1px solid #f0e6c8 !important;">
+              ${formattedHTML}
+            </div>
+
+            <div class="text-muted text-start mt-2" style="font-size:0.72rem;">
+              <i class="bi bi-clock me-1"></i>บันทึกล่าสุด: ${dateStr}
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function exportEssaysCSV() {
+    if (!allEssaysCache) { showToast('กรุณาโหลดข้อมูลก่อน', 'error'); return; }
+    const phaseFilter = (document.getElementById('essayPhaseFilter') || {}).value || 'all';
+    const query       = ((document.getElementById('essaySearchInput') || {}).value || '').toLowerCase();
+
+    let filtered = allEssaysCache.filter(e => {
+      if (phaseFilter !== 'all' && e.essay_phase !== phaseFilter) return false;
+      if (query) {
+        const combined = ((e.student_name||'')+(e.essay_title||'')+(e.essay_content||'')).toLowerCase();
+        if (!combined.includes(query)) return false;
+      }
+      return true;
+    });
+
+    const esc = s => '"' + (s||'').replace(/"/g,'""').replace(/\n/g,' ') + '"';
+    let csv = '\uFEFF' + 'รหัสนักเรียน,ชื่อ-สกุล,รอบการประเมิน,ชื่อเรื่อง,จำนวนคำ,ส่วนคำนำ (Introduction),ส่วนเนื้อเรื่อง (Body),ส่วนสรุป (Conclusion),วันที่บันทึก\n';
+    filtered.forEach(e => {
+      const dt = new Date(e.updated_at||e.created_at).toLocaleString('th-TH');
+      let intro = '';
+      let bodyText = '';
+      let conc = '';
+      try {
+        const obj = JSON.parse(e.essay_content);
+        if (obj && typeof obj === 'object' && obj.introduction !== undefined) {
+          intro = obj.introduction || '';
+          bodyText = obj.body ? obj.body.join('\n\n') : '';
+          conc = obj.conclusion || '';
+        } else {
+          intro = e.essay_content || '';
+        }
+      } catch(err) {
+        intro = e.essay_content || '';
+      }
+      csv += [esc(e.student_id), esc(e.student_name), esc(essayPhaseLabels[e.essay_phase]||e.essay_phase),
+              esc(e.essay_title), e.word_count, esc(intro), esc(bodyText), esc(conc), esc(dt)].join(',') + '\n';
+    });
+
+    const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'student_essays.csv';
+    link.click();
+  }
+  // ============================================
 
   function switchStudentPhase() {
     const studentId = document.getElementById('dashStudentId').textContent;

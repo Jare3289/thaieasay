@@ -55,7 +55,7 @@ if (!isset($_SESSION['user']) && isset($_COOKIE['remember_user'])) {
                 if ($student) {
                     $_SESSION['user'] = [
                         'id' => $student['student_id'],
-                        'name' => $student['student_name'],
+                        'name' => formatNamePrefix($student['student_name']),
                         'role' => 'student'
                     ];
                 }
@@ -76,4 +76,10 @@ function require_login($required_role = null) {
         header('Location: index.php');
         exit;
     }
+}
+
+// 4. Format name prefixes (remove space after นาย, นาง, นางสาว, ด.ช., ด.ญ., ครู, อาจารย์, ผู้เชี่ยวชาญ)
+function formatNamePrefix($name) {
+    if (empty($name)) return '';
+    return preg_replace('/(นาย|นางสาว|นาง|ด\.ช\.|ด\.ญ\.|ครู|อาจารย์|ผู้เชี่ยวชาญ)\s+/u', '$1', $name);
 }

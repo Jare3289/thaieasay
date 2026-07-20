@@ -71,7 +71,7 @@ try {
                 if ($student) {
                     $_SESSION['user'] = [
                         'id' => $student['student_id'],
-                        'name' => $student['student_name'],
+                        'name' => formatNamePrefix($student['student_name']),
                         'role' => 'student'
                     ];
                     
@@ -112,7 +112,7 @@ try {
             $stmt = $pdo->query('SELECT student_id, student_name FROM students ORDER BY student_id ASC');
             $students = [];
             while ($row = $stmt->fetch()) {
-                $students[$row['student_id']] = $row['student_name'];
+                $students[$row['student_id']] = formatNamePrefix($row['student_name']);
             }
             echo json_encode(['success' => true, 'students' => $students]);
             break;
@@ -952,6 +952,67 @@ try {
                 'peer_reviews' => $peer_reviews,
                 'reflections' => $reflections
             ]);
+            break;
+
+        // Essay: บันทึกเรียงความของนักเรียน
+        case 'save_essay':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'student') {
+                echo json_encode(['success' => false, 'error' => 'ต้องเข้าสู่ระบบในฐานะนักเรียนก่อนบันทึกเรียงความ']);
+                exit;
+            }
+            $studentId    = $_SESSION['user']['id'];
+            $essayPhase   = isset($request_data['essay_phase'])   ? trim($request_data['essay_phase'])   : 'task1';
+            $essayTitle   = isset($request_data['essay_title'])   ? trim($request_data['essay_title'])   : '';
+            $essayContent = isset($request_data['essay_content']) ? trim($request_data['essay_content']) : '';
+            // นับจำนวนคำ (แยกด้วยช่องว่างและขึ้นบรรทัดใหม่)
+            $wordCount    = $essayContent ? count(preg_split('/[\s\n\r]+/u', $essayContent, -1, PREG_SPLIT_NO_EMPTY)) : 0;
+
+            $stmt = $pdo->prepare('
+                INSERT INTO student_essays (student_id, essay_phase, essay_title, essay_content, word_count)
+                VALUES (?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                    essay_title   = VALUES(essay_title),
+                    essay_content = VALUES(essay_content),
+                    word_count    = VALUES(word_count),
+                    updated_at    = CURRENT_TIMESTAMP
+            ');
+            $stmt->execute([$studentId, $essayPhase, $essayTitle, $essayContent, $wordCount]);
+            echo json_encode(['success' => true, 'word_count' => $wordCount]);
+            break;
+
+        // Essay: ดึงเรียงความของนักเรียนคนนั้น (นักเรียนดูของตัวเอง)
+        case 'get_essay':
+            if (!isset($_SESSION['user'])) {
+                echo json_encode(['success' => false, 'error' => 'Not logged in']);
+                exit;
+            }
+            $studentId  = isset($_GET['studentId'])  ? trim($_GET['studentId'])  : $_SESSION['user']['id'];
+            $essayPhase = isset($_GET['essay_phase']) ? trim($_GET['essay_phase']) : 'task1';
+            $stmt = $pdo->prepare('SELECT * FROM student_essays WHERE student_id = ? AND essay_phase = ?');
+            $stmt->execute([$studentId, $essayPhase]);
+            $row = $stmt->fetch();
+            echo json_encode(['success' => true, 'found' => (bool)$row, 'data' => $row ?: null]);
+            break;
+
+        // Essay: ดึงเรียงความทั้งชั้น (สำหรับครู/แดชบอร์ด)
+        case 'get_all_essays':
+            if (!isset($_SESSION['user']) || !in_array($_SESSION['user']['role'], ['teacher', 'expert'])) {
+                echo json_encode(['success' => false, 'error' => 'ต้องเป็นครูหรือผู้เชี่ยวชาญ']);
+                exit;
+            }
+            $stmt = $pdo->query('
+                SELECT se.*, s.student_name
+                FROM student_essays se
+                JOIN students s ON se.student_id = s.student_id
+                ORDER BY se.essay_phase ASC, s.student_id ASC
+            ');
+            $essays = $stmt->fetchAll();
+            // apply formatNamePrefix
+            foreach ($essays as &$e) {
+                $e['student_name'] = formatNamePrefix($e['student_name']);
+            }
+            unset($e);
+            echo json_encode(['success' => true, 'essays' => $essays]);
             break;
 
         default:
