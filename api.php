@@ -124,7 +124,19 @@ try {
                 exit;
             }
             $rows = $pdo->query('SELECT student_id, student_name, classroom, student_group FROM students ORDER BY classroom ASC, student_id ASC')->fetchAll();
+            foreach ($rows as &$r) { $r['student_name'] = formatNamePrefix($r['student_name']); }
+            unset($r);
             echo json_encode(['success' => true, 'students' => $rows]);
+            break;
+
+        // 4.4 ตั้งนักเรียนที่ยังไม่ระบุกลุ่ม ให้เป็น 'กลุ่มทดลอง' (ครูเท่านั้น)
+        case 'set_ungrouped_experimental':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'ต้องเป็นคุณครู']);
+                exit;
+            }
+            $stmt = $pdo->query("UPDATE students SET student_group = 'กลุ่มทดลอง' WHERE student_group IS NULL OR student_group = ''");
+            echo json_encode(['success' => true, 'updated' => $stmt->rowCount()]);
             break;
 
         // 4.2 เพิ่ม/แก้ไขนักเรียนทีละคน (ครูเท่านั้น)
@@ -998,6 +1010,8 @@ try {
             // 1. ดึงรายชื่อนักเรียนทั้งหมด (พร้อมห้อง + กลุ่ม)
             $stmt_std = $pdo->query('SELECT student_id, student_name, classroom, student_group FROM students ORDER BY student_id ASC');
             $students = $stmt_std->fetchAll();
+            foreach ($students as &$st) { $st['student_name'] = formatNamePrefix($st['student_name']); }
+            unset($st);
             
             // 2. ดึงข้อมูลการประเมินทั้งหมด
             $stmt_eval = $pdo->query('SELECT * FROM evaluations ORDER BY student_id ASC, timestamp DESC');

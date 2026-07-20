@@ -73,7 +73,10 @@ require_once 'header.php';
     <div class="card border-0 shadow-sm rounded-4">
       <div class="card-header bg-white fw-bold rounded-top-4 py-3 d-flex justify-content-between align-items-center">
         <span>📋 รายชื่อนักเรียนในระบบ (<span id="studentCount">-</span> คน)</span>
-        <div class="d-flex align-items-center gap-2">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <button type="button" class="btn btn-outline-primary btn-sm rounded-pill" onclick="setUngroupedExperimental()" title="ตั้งนักเรียนที่ยังไม่ระบุกลุ่มทั้งหมดให้เป็นกลุ่มทดลอง">
+            ตั้งคนที่ยังไม่มีกลุ่ม = กลุ่มทดลอง
+          </button>
           <select id="groupFilter" class="form-select form-select-sm" style="width:auto" onchange="renderStudentTable()">
             <option value="">ทุกกลุ่ม</option>
             <option value="กลุ่มทดลอง">กลุ่มทดลอง</option>
@@ -204,6 +207,17 @@ require_once 'header.php';
       } else { showToast(res.error || 'บันทึกไม่สำเร็จ', 'error'); }
     } catch (err) { showToast('เกิดข้อผิดพลาด: ' + err.message, 'error'); }
   });
+
+  async function setUngroupedExperimental() {
+    if (!confirm('ตั้งนักเรียนทุกคนที่ยังไม่ระบุกลุ่ม ให้เป็น "กลุ่มทดลอง" ใช่หรือไม่?')) return;
+    try {
+      const res = await (await fetch('api.php?action=set_ungrouped_experimental', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json();
+      if (res.success) {
+        showToast(`ตั้งกลุ่มทดลองให้ ${res.updated} คนแล้ว`, 'success');
+        loadStudents();
+      } else { showToast(res.error || 'ทำรายการไม่สำเร็จ', 'error'); }
+    } catch (err) { showToast('เกิดข้อผิดพลาด: ' + err.message, 'error'); }
+  }
 
   document.addEventListener('DOMContentLoaded', loadStudents);
 </script>
