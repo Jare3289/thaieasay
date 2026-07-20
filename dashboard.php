@@ -178,7 +178,7 @@ require_once 'header.php';
         <ul class="nav nav-pills mb-4 gap-2 bg-light p-2 rounded-3 border" id="researchTab" role="tablist">
           <li class="nav-item" role="presentation">
             <button class="nav-link active fw-bold text-dark px-4 py-2.5 rounded-3 d-flex align-items-center gap-2" id="reliability-tab" data-bs-toggle="pill" data-bs-target="#tab-reliability" type="button" role="tab" aria-selected="true">
-              🤝 ค่าความสอดคล้องผู้ประเมินร่วม (Pearson r)
+              🤝 ค่าความสอดคล้องผู้ตรวจ 3 คน (ICC)
             </button>
           </li>
           <li class="nav-item" role="presentation">
@@ -205,29 +205,26 @@ require_once 'header.php';
             <div class="row g-4">
               <div class="col-md-5 col-sm-12">
                 <div class="card border-0 rounded-3 p-3 bg-white shadow-sm border-start border-3 border-primary h-100">
-                  <h6 class="fw-bold text-dark mb-3"><i class="bi bi-info-circle-fill text-primary"></i> การตีความความน่าเชื่อถือเกณฑ์ประเมิน (Hopkins & Stanley, 1981)</h6>
+                  <h6 class="fw-bold text-dark mb-3"><i class="bi bi-info-circle-fill text-primary"></i> การตีความความสอดคล้องผู้ตรวจ (Koo & Li, 2016)</h6>
                   <p class="small text-muted mb-3" style="line-height: 1.6;">
-                    เป็นการคำนวณค่าสัมประสิทธิ์สหสัมพันธ์แบบเพียร์สัน (Pearson correlation coefficient - r) ของคะแนนที่ให้โดยผู้เชี่ยวชาญคนที่ 1 (admin1) และคนที่ 2 (admin2) เพื่อพิสูจน์ความสม่ำเสมอของเกณฑ์ประเมิน (Inter-rater Reliability)
+                    คำนวณค่าสัมประสิทธิ์สหสัมพันธ์ภายในชั้น (Intraclass Correlation Coefficient — ICC) ของคะแนนที่ให้โดยผู้ตรวจ 3 คน คือ <strong>ครูผู้สอน + ผู้เชี่ยวชาญ 2 ท่าน</strong> สำหรับงานของนักเรียน<strong>กลุ่มตัวอย่าง</strong> เพื่อตรวจสอบความสอดคล้องระหว่างผู้ตรวจ (Inter-rater Reliability) — ใช้โมเดล ICC(2,1) two-way random, absolute agreement
                   </p>
                   <div class="d-flex flex-column gap-2 small">
                     <div class="d-flex justify-content-between p-2 rounded bg-success bg-opacity-10 text-success fw-semibold">
-                      <span>r &ge; 0.90</span><span>ระดับสูงมาก (Very High)</span>
+                      <span>ICC &ge; 0.90</span><span>ดีเยี่ยม (Excellent)</span>
                     </div>
                     <div class="d-flex justify-content-between p-2 rounded bg-info bg-opacity-10 text-info fw-semibold">
-                      <span>0.70 &le; r &lt; 0.90</span><span>ระดับสูง (High)</span>
+                      <span>0.75 &le; ICC &lt; 0.90</span><span>ดี (Good)</span>
                     </div>
                     <div class="d-flex justify-content-between p-2 rounded bg-warning bg-opacity-10 text-warning-emphasis fw-semibold">
-                      <span>0.50 &le; r &lt; 0.70</span><span>ระดับปานกลาง (Moderate)</span>
+                      <span>0.50 &le; ICC &lt; 0.75</span><span>ปานกลาง (Moderate)</span>
                     </div>
                     <div class="d-flex justify-content-between p-2 rounded bg-danger bg-opacity-10 text-danger fw-semibold">
-                      <span>0.30 &le; r &lt; 0.50</span><span>ระดับต่ำ (Low)</span>
-                    </div>
-                    <div class="d-flex justify-content-between p-2 rounded bg-secondary bg-opacity-10 text-muted fw-semibold">
-                      <span>r &lt; 0.30</span><span>น้อยมาก (Little if any)</span>
+                      <span>ICC &lt; 0.50</span><span>ต่ำ (Poor)</span>
                     </div>
                   </div>
                   <div class="border-top pt-3 mt-3">
-                    <div class="text-secondary small fw-bold">สัมประสิทธิ์ภาพรวม (Overall Pearson r)</div>
+                    <div class="text-secondary small fw-bold">ICC ภาพรวม (คะแนนรวม)</div>
                     <h2 class="fw-bold text-primary font-outfit mt-1" id="overallPearsonResult">-</h2>
                     <span id="overallPearsonInterpretation" class="badge bg-secondary">ไม่มีข้อมูล</span>
                   </div>
@@ -235,14 +232,14 @@ require_once 'header.php';
               </div>
               <div class="col-md-7 col-sm-12">
                 <div class="card border-0 rounded-3 p-3 bg-white shadow-sm border-start border-3 border-warning h-100">
-                  <h6 class="fw-bold text-dark mb-3"><i class="bi bi-bar-chart-steps text-warning"></i> ความเที่ยงรายด้านย่อย 11 เกณฑ์ (Sub-criteria Reliability)</h6>
+                  <h6 class="fw-bold text-dark mb-3"><i class="bi bi-bar-chart-steps text-warning"></i> ค่า ICC รายด้าน (คะแนนรวม + 4 ด้าน)</h6>
                   <div class="table-responsive" style="max-height: 380px; overflow-y: auto;">
                     <table class="table table-sm table-hover align-middle mb-0 small">
                       <thead class="table-light text-secondary">
                         <tr>
-                          <th>เกณฑ์ประเมิน</th>
-                          <th class="text-center">จำนวนคู่</th>
-                          <th class="text-center">ค่าสหสัมพันธ์ (r)</th>
+                          <th>มิติคะแนน</th>
+                          <th class="text-center">จำนวน (N)</th>
+                          <th class="text-center">ค่า ICC</th>
                           <th class="text-end">ผลประเมิน</th>
                         </tr>
                       </thead>
@@ -834,21 +831,20 @@ require_once 'header.php';
     });
 
     const summaryData = {};
-    const expertPairs = [];
+    const raterTriples = [];  // แต่ละแถว = [ครูผู้สอน, ผู้เชี่ยวชาญ1, ผู้เชี่ยวชาญ2] ของนักเรียน 1 คน
 
-    // ดึงผู้ประเมินร่วม (Expert 1 & 2) เฉพาะภารงานในหน่วยที่เลือก เพื่อคำนวณ Pearson r
-    const expertTaskPhase = (currentDashboardViewMode === 'task2') ? 'task2' : 'task1';
+    // เก็บคะแนนของผู้ตรวจ 3 คน (ครู + ผู้เชี่ยวชาญ 2 คน) เฉพาะนักเรียนกลุ่มตัวอย่าง เพื่อคำนวณ ICC
+    const iccTaskPhase = (currentDashboardViewMode === 'task2') ? 'task2' : 'task1';
     studentsList.forEach(s => {
+      if (s.student_group !== 'กลุ่มตัวอย่าง') return;
       const id = s.student_id;
-      const taskEvs = studentEvals[id][expertTaskPhase] || [];
+      const taskEvs = studentEvals[id][iccTaskPhase] || [];
+      const teacherEval = taskEvs.find(e => e.evaluator_type === 'teacher');
       const expert1Eval = taskEvs.find(e => e.evaluator_type === 'expert' && (e.evaluator_name === 'ผู้เชี่ยวชาญ 1' || e.evaluator_name === 'admin1'));
       const expert2Eval = taskEvs.find(e => e.evaluator_type === 'expert' && (e.evaluator_name === 'ผู้เชี่ยวชาญ 2' || e.evaluator_name === 'admin2'));
 
-      if (expert1Eval && expert2Eval) {
-        expertPairs.push({
-          e1: expert1Eval,
-          e2: expert2Eval
-        });
+      if (teacherEval && expert1Eval && expert2Eval) {
+        raterTriples.push([teacherEval, expert1Eval, expert2Eval]);
       }
     });
 
@@ -959,7 +955,7 @@ require_once 'header.php';
     }
 
     renderCustomTeacherOverview(summaryData);
-    calculatePearsonReliability(expertPairs);
+    calculateICCReliability(raterTriples);
     calculateResearchTTest();
     renderQualitativeHub();
   }
@@ -1192,80 +1188,103 @@ require_once 'header.php';
     return { text: 'น้อยมากหรือไม่มีความเที่ยง (Little if any)', css: 'bg-danger bg-opacity-75' };
   }
 
-  function calculatePearsonReliability(pairs) {
+  // แปลผล ICC ตามเกณฑ์ Koo & Li (2016)
+  function getICCInterpretation(icc) {
+    if (icc === null || isNaN(icc)) return { text: 'ข้อมูลน้อยเกินไป', css: 'bg-secondary' };
+    if (icc >= 0.90) return { text: 'ดีเยี่ยม (Excellent)', css: 'bg-success' };
+    if (icc >= 0.75) return { text: 'ดี (Good)', css: 'bg-info text-dark' };
+    if (icc >= 0.50) return { text: 'ปานกลาง (Moderate)', css: 'bg-warning text-dark' };
+    return { text: 'ต่ำ (Poor)', css: 'bg-danger' };
+  }
+
+  // คำนวณ ICC(2,1): two-way random-effects, absolute agreement, single rater
+  // matrix = อาเรย์ของแถว (subject) แต่ละแถว = [คะแนนผู้ตรวจ 1, ผู้ตรวจ 2, ...]
+  function computeICC(matrix) {
+    const n = matrix.length;
+    if (n < 2) return null;
+    const k = matrix[0].length;
+    if (k < 2) return null;
+    let grand = 0;
+    for (const row of matrix) for (const v of row) grand += v;
+    grand /= (n * k);
+    const rowMeans = matrix.map(r => r.reduce((a, b) => a + b, 0) / k);
+    const colMeans = [];
+    for (let j = 0; j < k; j++) { let s = 0; for (let i = 0; i < n; i++) s += matrix[i][j]; colMeans.push(s / n); }
+    let SSR = 0; for (const rm of rowMeans) SSR += (rm - grand) ** 2; SSR *= k;
+    let SSC = 0; for (const cm of colMeans) SSC += (cm - grand) ** 2; SSC *= n;
+    let SST = 0; for (const row of matrix) for (const v of row) SST += (v - grand) ** 2;
+    const SSE = SST - SSR - SSC;
+    const MSR = SSR / (n - 1);
+    const MSC = SSC / (k - 1);
+    const MSE = SSE / ((n - 1) * (k - 1));
+    const denom = MSR + (k - 1) * MSE + (k / n) * (MSC - MSE);
+    if (denom === 0) return null;
+    return (MSR - MSE) / denom;
+  }
+
+  function calculateICCReliability(triples) {
     const overallEl = document.getElementById('overallPearsonResult');
     const interpEl = document.getElementById('overallPearsonInterpretation');
     const tableBody = document.getElementById('reliabilityTableBody');
     if (!overallEl || !tableBody) return;
 
-    if (pairs.length < 2) {
+    if (triples.length < 2) {
       overallEl.textContent = "N/A";
-      interpEl.textContent = "ต้องมีผู้เรียนถูกประเมินโดยทั้ง 2 ผู้เชี่ยวชาญอย่างน้อย 2 คน";
+      interpEl.textContent = "ต้องมีนักเรียนกลุ่มตัวอย่างที่ถูกตรวจครบทั้ง 3 คน อย่างน้อย 2 คน";
       interpEl.className = "badge bg-secondary";
-      tableBody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-muted">ต้องการข้อมูลประเมินครบทั้งสองผู้เชี่ยวชาญอย่างน้อย 2 คนในการประมวลผล</td></tr>`;
-      
-      const pearsonParagraphEl = document.getElementById('pearsonReportParagraph');
-      if (pearsonParagraphEl) {
-        pearsonParagraphEl.innerHTML = `
-          <h6 class="fw-bold text-dark mb-2"><i class="bi bi-file-earmark-text text-primary"></i> บทวิเคราะห์ความสอดคล้องผู้ประเมินเชิงปริมาณ</h6>
-          <p class="mb-0 text-muted">ต้องการข้อมูลประเมินจับคู่ครบทั้งสองผู้เชี่ยวชาญอย่างน้อย 2 คนในการประมวลผลบทรายงาน</p>
-        `;
-      }
+      tableBody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-muted">ต้องการข้อมูลนักเรียน<strong>กลุ่มตัวอย่าง</strong>ที่ครูผู้สอน + ผู้เชี่ยวชาญ 2 คน ตรวจครบ อย่างน้อย 2 คน</td></tr>`;
+      const p = document.getElementById('pearsonReportParagraph');
+      if (p) p.innerHTML = `<h6 class="fw-bold text-dark mb-2"><i class="bi bi-file-earmark-text text-primary"></i> บทวิเคราะห์ค่าความสอดคล้องผู้ตรวจ (ICC)</h6><p class="mb-0 text-muted">ยังมีข้อมูลไม่พอสำหรับคำนวณ ICC — ต้องมีนักเรียนกลุ่มตัวอย่างที่ผู้ตรวจครบ 3 คนอย่างน้อย 2 คน</p>`;
       return;
     }
 
-    const overallR = pearsonCorrelation(pairs, e => Number(e.total_score));
-    overallEl.textContent = overallR !== null ? overallR.toFixed(4) : "N/A";
-    const overallInterp = getPearsonInterpretation(overallR);
+    // มิติคะแนน: รวม + 4 ด้าน
+    const dims = [
+      { name: 'คะแนนรวม (Total 60)', get: e => Number(e.total_score) },
+      { name: 'ด้านเนื้อหา (Content)', get: e => Number(e.score_1_1) + Number(e.score_1_2) + Number(e.score_1_3) },
+      { name: 'ด้านโครงสร้าง (Structure)', get: e => Number(e.score_2_1) + Number(e.score_2_2) },
+      { name: 'ด้านการใช้ภาษา (Language)', get: e => Number(e.score_3_1) + Number(e.score_3_2) + Number(e.score_3_3) },
+      { name: 'ด้านอักขรวิธี (Mechanics)', get: e => Number(e.score_4_1) + Number(e.score_4_2) + Number(e.score_4_3) }
+    ];
+
+    // ภาพรวม = คะแนนรวม
+    const totalMatrix = triples.map(tr => tr.map(dims[0].get));
+    const overallICC = computeICC(totalMatrix);
+    overallEl.textContent = overallICC !== null ? overallICC.toFixed(4) : "N/A";
+    const overallInterp = getICCInterpretation(overallICC);
     interpEl.textContent = overallInterp.text;
     interpEl.className = "badge " + overallInterp.css;
 
-    const subCriteria = [
-      { id: '1.1', name: '1.1 ความตรงประเด็น' },
-      { id: '1.2', name: '1.2 แก่นเรื่องชัดเจน' },
-      { id: '1.3', name: '1.3 การขยายความและเหตุผล' },
-      { id: '2.1', name: '2.1 ความครบถ้วนขององค์ประกอบ' },
-      { id: '2.2', name: '2.2 การลำดับประเด็นเป็นระบบ' },
-      { id: '3.1', name: '3.1 การใช้ประโยคถูกต้อง' },
-      { id: '3.2', name: '3.2 การเลือกใช้คำ' },
-      { id: '3.3', name: '3.3 ระดับภาษาเหมาะสม' },
-      { id: '4.1', name: '4.1 การสะกดคำถูกต้อง' },
-      { id: '4.2', name: '4.2 การเว้นวรรค' },
-      { id: '4.3', name: '4.3 ความเรียบร้อย' }
-    ];
-
     let html = '';
-    let subRs = [];
-    subCriteria.forEach(sc => {
-      const scoreKey = 'score_' + sc.id.replace('.', '_');
-      const rVal = pearsonCorrelation(pairs, e => Number(e[scoreKey]));
-      if (rVal !== null) subRs.push(rVal);
-      const interp = getPearsonInterpretation(rVal);
-      const displayR = rVal !== null ? rVal.toFixed(4) : "N/A";
-
+    const iccVals = [];
+    dims.forEach(d => {
+      const m = triples.map(tr => tr.map(d.get));
+      const icc = computeICC(m);
+      if (icc !== null) iccVals.push(icc);
+      const interp = getICCInterpretation(icc);
       html += `
         <tr>
-          <td class="fw-semibold">${sc.name}</td>
-          <td class="text-center font-mono">${pairs.length}</td>
-          <td class="text-center font-mono fw-bold text-primary">${displayR}</td>
+          <td class="fw-semibold">${d.name}</td>
+          <td class="text-center font-mono">${triples.length}</td>
+          <td class="text-center font-mono fw-bold text-primary">${icc !== null ? icc.toFixed(4) : "N/A"}</td>
           <td class="text-end"><span class="badge ${interp.css} small">${interp.text.split(' (')[0]}</span></td>
         </tr>
       `;
     });
     tableBody.innerHTML = html;
 
-    const pearsonParagraphEl = document.getElementById('pearsonReportParagraph');
-    if (pearsonParagraphEl) {
-      const minSubR = subRs.length > 0 ? Math.min(...subRs).toFixed(4) : "N/A";
-      const maxSubR = subRs.length > 0 ? Math.max(...subRs).toFixed(4) : "N/A";
+    const paragraphEl = document.getElementById('pearsonReportParagraph');
+    if (paragraphEl) {
+      const minICC = iccVals.length > 0 ? Math.min(...iccVals).toFixed(4) : "N/A";
+      const maxICC = iccVals.length > 0 ? Math.max(...iccVals).toFixed(4) : "N/A";
       const overallInterpText = overallInterp.text.split(' (')[0];
-
-      pearsonParagraphEl.innerHTML = `
-        <h6 class="fw-bold text-dark mb-2"><i class="bi bi-file-earmark-text text-primary"></i> บทวิเคราะห์ความสอดคล้องผู้ประเมินเชิงปริมาณ (Inter-rater Reliability Narrative)</h6>
+      paragraphEl.innerHTML = `
+        <h6 class="fw-bold text-dark mb-2"><i class="bi bi-file-earmark-text text-primary"></i> บทวิเคราะห์ค่าความสอดคล้องระหว่างผู้ตรวจ (Inter-rater Reliability — ICC)</h6>
         <p class="mb-0 text-slate-700" style="line-height: 1.6;">
-          จากการศึกษาความสอดคล้องของการให้คะแนนความสามารถการเขียนเรียงความเชิงปริมาณ ระหว่างผู้เชี่ยวชาญคนที่ 1 (Expert 1) และผู้เชี่ยวชาญคนที่ 2 (Expert 2) ประเมินในรอบภารงานในหน่วยเรียนร่วมกันของนักเรียนกลุ่มเป้าหมาย (N = ${pairs.length} คน) 
-          พบว่า <strong>ค่าสัมประสิทธิ์สหสัมพันธ์ความสอดคล้องของคะแนนรวม (Overall Pearson r) มีค่าเท่ากับ ${overallR !== null ? overallR.toFixed(4) : "N/A"}</strong> ซึ่งเมื่อแปลความตามเกณฑ์ของ Hopkins & Stanley (1981) พบว่ามีความสอดคล้องความเที่ยงของเกณฑ์ประเมินร่วมอยู่ใน<strong>ระดับ${overallInterpText}</strong> 
-          และเมื่อพิจารณาแยกรายเกณฑ์ย่อย 11 เกณฑ์ พบว่าค่าสหสัมพันธ์ของเกณฑ์ย่อยมีค่าอยู่ระหว่าง <strong>r = ${minSubR}</strong> ถึง <strong>r = ${maxSubR}</strong> ซึ่งสะท้อนถึงระดับความเที่ยงตรงสม่ำเสมอของรูบริกประเมินและทิศทางเกณฑ์ประเมินที่มีความเชื่อถือได้ในระดับสูงเชิงสถิติวิจัย
+          การตรวจสอบความสอดคล้องของการให้คะแนนโดยผู้ตรวจ 3 คน (ครูผู้สอน และผู้เชี่ยวชาญ 2 ท่าน) สำหรับงานเขียนของนักเรียน<strong>กลุ่มตัวอย่าง</strong> (N = ${triples.length} คน)
+          ด้วยค่าสัมประสิทธิ์สหสัมพันธ์ภายในชั้น <strong>ICC(2,1) — two-way random-effects, absolute agreement, single rater</strong>
+          พบว่า <strong>ค่า ICC ของคะแนนรวมเท่ากับ ${overallICC !== null ? overallICC.toFixed(4) : "N/A"}</strong> ซึ่งเมื่อแปลผลตามเกณฑ์ของ Koo &amp; Li (2016) จัดอยู่ใน<strong>ระดับ${overallInterpText}</strong>
+          และเมื่อพิจารณาแยกราย 4 ด้าน พบว่าค่า ICC อยู่ระหว่าง <strong>${minICC}</strong> ถึง <strong>${maxICC}</strong> สะท้อนถึงความสอดคล้องของเกณฑ์ประเมินระหว่างผู้ตรวจในระดับที่เชื่อถือได้เชิงสถิติวิจัย
         </p>
       `;
     }
