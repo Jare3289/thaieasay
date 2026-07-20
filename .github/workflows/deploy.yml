@@ -1,0 +1,38 @@
+name: Deploy to InfinityFree (FTP)
+
+# อัปโหลดไฟล์ขึ้นโฮสต์ InfinityFree อัตโนมัติทุกครั้งที่โค้ดเข้า branch main
+# ต้องตั้งค่า Secrets 3 ตัวใน GitHub ก่อน (Settings > Secrets and variables > Actions):
+#   FTP_SERVER   = ftpupload.net           (ดูค่าจริงในหน้า InfinityFree > FTP Details)
+#   FTP_USERNAME = if0_42376188            (FTP username จากหน้า InfinityFree)
+#   FTP_PASSWORD = ******                  (FTP password จากหน้า InfinityFree)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # กดรันเองได้จากแท็บ Actions
+
+jobs:
+  ftp-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy files via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          # โฟลเดอร์ปลายทางบน InfinityFree คือ htdocs (public web root)
+          server-dir: /htdocs/
+          # ไม่อัปโหลดไฟล์ที่ไม่เกี่ยวกับการรันเว็บ
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.github/**
+            schema.sql
+            test_db.php
+            clean_temp.php
+            verify_calculations.js
