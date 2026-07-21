@@ -112,6 +112,14 @@ require_once 'header.php';
               <i class="bi bi-info-circle-fill"></i> ระบบจำกัดการเลือกเฉพาะข้อมูลของคุณเนื่องจากกำลังทำโหมด "ตนเองประเมิน"
             </p>
             <?php endif; ?>
+            <?php if ($mode_param === 'peer'): ?>
+            <p id="peerLockNotice" class="mt-2 text-success small fw-bold mb-0 d-none">
+              <i class="bi bi-lock-fill"></i> ระบบได้จับคู่ผู้ถูกประเมินให้คุณโดยคุณครูแล้ว (ล็อกอัตโนมัติ) ไม่ต้องเลือกเอง
+            </p>
+            <p id="peerFallbackNotice" class="mt-2 text-danger small fw-bold mb-0 d-none">
+              <i class="bi bi-exclamation-triangle-fill"></i> ยังไม่มีการจับคู่สำหรับรอบนี้ กรุณาเลือกรายชื่อเพื่อนที่ต้องการประเมินจากรายการด้านบนด้วยตนเอง
+            </p>
+            <?php endif; ?>
           </div>
           <?php if ($sessionUser['role'] === 'expert'): ?>
           <div class="col-md-4 col-sm-12 mt-3 mt-md-0">
@@ -693,9 +701,50 @@ require_once 'header.php';
       }
     }
 
+    // โหมดเพื่อนประเมิน: ดึงคู่ที่ครูจับไว้มาล็อกให้อัตโนมัติเมื่อเลือกรอบแล้ว
+    if (modeParam === 'peer') {
+      applyPeerPairing(phase);
+      return;
+    }
+
     // reload existing if student already selected
     const id = document.getElementById('targetStudentSelect').value;
     if (id) checkExistingEvaluation(id);
+  }
+
+  // ดึงคู่ประเมินเพื่อนที่ครูจับไว้ตามรอบ แล้วตั้งเป็นค่า default ที่ล็อกไว้
+  // ถ้าไม่มีคู่สำหรับรอบนั้น → fallback กลับไปใช้ dropdown เดิมพร้อมข้อความเตือน
+  async function applyPeerPairing(phase) {
+    const tSelect = document.getElementById('targetStudentSelect');
+    const lockNotice = document.getElementById('peerLockNotice');
+    const fallbackNotice = document.getElementById('peerFallbackNotice');
+    if (lockNotice) lockNotice.classList.add('d-none');
+    if (fallbackNotice) fallbackNotice.classList.add('d-none');
+
+    try {
+      const res = await (await fetch(`api.php?action=get_my_peer_partner&round=${phase}&_t=${Date.now()}`)).json();
+      if (res.success && res.partner && studentDB[res.partner]) {
+        // มีคู่ → ตั้งค่าและล็อกช่องเลือก
+        tSelect.value = res.partner;
+        tSelect.disabled = true;
+        if (lockNotice) lockNotice.classList.remove('d-none');
+        checkExistingEvaluation(res.partner);
+      } else {
+        // ไม่มีคู่ → เปิด dropdown ให้เลือกเองพร้อมข้อความเตือน (fallback)
+        tSelect.disabled = false;
+        tSelect.value = "";
+        if (fallbackNotice) fallbackNotice.classList.remove('d-none');
+        const rubricCont = document.getElementById('rubricContainer');
+        const progressCont = document.getElementById('progressContainer');
+        if (rubricCont) rubricCont.classList.add('opacity-60', 'pointer-events-none');
+        if (progressCont) progressCont.classList.add('d-none');
+      }
+    } catch (err) {
+      console.error('ไม่สามารถโหลดคู่ประเมินเพื่อนได้:', err);
+      // เผื่อ error ให้ fallback เป็น dropdown เดิม
+      tSelect.disabled = false;
+      if (fallbackNotice) fallbackNotice.classList.remove('d-none');
+    }
   }
   function resetPhase() {
     document.getElementById('evalSection').classList.add('d-none');
