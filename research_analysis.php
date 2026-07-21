@@ -28,28 +28,28 @@ require_once 'header.php';
       <div class="row g-3 mb-4" id="researchKpiRow">
         <div class="col-md-3 col-6">
           <div class="card border-0 rounded-3 p-3 text-center bg-light h-100">
-            <div class="text-muted small fw-semibold mb-1 text-truncate"><i class="bi bi-people-fill me-1 text-primary"></i>ICC ภาพรวม</div>
+            <div class="text-muted small fw-semibold mb-1 lh-sm"><i class="bi bi-people-fill me-1 text-primary"></i>ICC ภาพรวม</div>
             <div class="fs-4 fw-bold text-primary mb-1" id="kpiIccOverall">-</div>
             <span class="badge bg-secondary" id="kpiIccBadge">รอข้อมูล</span>
           </div>
         </div>
         <div class="col-md-3 col-6">
           <div class="card border-0 rounded-3 p-3 text-center bg-light h-100">
-            <div class="text-muted small fw-semibold mb-1 text-truncate"><i class="bi bi-graph-up-arrow me-1 text-success"></i>Paired t-test</div>
+            <div class="text-muted small fw-semibold mb-1 lh-sm"><i class="bi bi-graph-up-arrow me-1 text-success"></i>Paired t-test</div>
             <div class="fs-4 fw-bold text-success mb-1" id="kpiTtestValue">-</div>
             <span class="badge bg-secondary" id="kpiTtestBadge">รอข้อมูล</span>
           </div>
         </div>
         <div class="col-md-3 col-6">
           <div class="card border-0 rounded-3 p-3 text-center bg-light h-100">
-            <div class="text-muted small fw-semibold mb-1 text-truncate"><i class="bi bi-chat-square-text-fill me-1 text-warning-emphasis"></i>ข้อมูลเชิงคุณภาพ</div>
+            <div class="text-muted small fw-semibold mb-1 lh-sm"><i class="bi bi-chat-square-text-fill me-1 text-warning-emphasis"></i>ข้อมูลเชิงคุณภาพ</div>
             <div class="fs-4 fw-bold text-warning-emphasis mb-1" id="kpiQualCount">-</div>
             <span class="text-muted small">รายการที่บันทึกไว้</span>
           </div>
         </div>
         <div class="col-md-3 col-6">
           <div class="card border-0 rounded-3 p-3 text-center bg-light h-100">
-            <div class="text-muted small fw-semibold mb-1 text-truncate"><i class="bi bi-pencil-square me-1 text-danger"></i>เรียงความ</div>
+            <div class="text-muted small fw-semibold mb-1 lh-sm"><i class="bi bi-pencil-square me-1 text-danger"></i>เรียงความ</div>
             <div class="fs-4 fw-bold text-danger mb-1" id="kpiEssayCount">-</div>
             <span class="text-muted small">ฉบับที่ส่งแล้ว</span>
           </div>
@@ -57,26 +57,26 @@ require_once 'header.php';
       </div>
 
       <!-- แท็บกลุ่มหลัก: แยกเชิงปริมาณ / เชิงคุณภาพให้ชัดเจน -->
-      <ul class="nav nav-tabs nav-fill mb-0" id="analysisGroupTab" role="tablist">
+      <ul class="nav nav-pills nav-fill gap-2 mb-3 p-2 bg-light rounded-3 border flex-column flex-sm-row" id="analysisGroupTab" role="tablist">
         <li class="nav-item" role="presentation">
           <button class="nav-link active fw-bold d-flex align-items-center justify-content-center gap-2 py-3" id="group-quant-tab" data-bs-toggle="tab" data-bs-target="#group-quant" type="button" role="tab" aria-selected="true">
-            <i class="bi bi-bar-chart-line-fill"></i> การวิเคราะห์เชิงปริมาณ (Quantitative)
+            <i class="bi bi-bar-chart-line-fill"></i> <span>การวิเคราะห์เชิงปริมาณ <span class="d-none d-sm-inline">(Quantitative)</span></span>
           </button>
         </li>
         <li class="nav-item" role="presentation">
           <button class="nav-link fw-bold d-flex align-items-center justify-content-center gap-2 py-3" id="group-qual-tab" data-bs-toggle="tab" data-bs-target="#group-qual" type="button" role="tab" aria-selected="false">
-            <i class="bi bi-chat-square-quote-fill"></i> การวิเคราะห์เชิงคุณภาพ (Qualitative)
+            <i class="bi bi-chat-square-quote-fill"></i> <span>การวิเคราะห์เชิงคุณภาพ <span class="d-none d-sm-inline">(Qualitative)</span></span>
           </button>
         </li>
       </ul>
 
-      <div class="tab-content border border-top-0 rounded-bottom-4 p-4 bg-white shadow-sm" id="analysisGroupContent">
+      <div class="tab-content rounded-4 p-4 bg-white shadow-sm border" id="analysisGroupContent">
 
         <!-- กลุ่ม 1: เชิงปริมาณ -->
         <div class="tab-pane fade show active" id="group-quant" role="tabpanel" aria-labelledby="group-quant-tab">
 
           <!-- แท็บเลื่อนเลือกประเภทสถิติเชิงปริมาณ -->
-          <ul class="nav nav-pills mb-4 gap-2 bg-light p-2 rounded-3 border" id="researchTab" role="tablist">
+          <ul class="nav nav-pills mb-4 gap-2 bg-light p-2 rounded-3 border flex-wrap" id="researchTab" role="tablist">
             <li class="nav-item" role="presentation">
               <button class="nav-link active fw-bold text-dark px-4 py-2.5 rounded-3 d-flex align-items-center gap-2" id="reliability-tab" data-bs-toggle="pill" data-bs-target="#tab-reliability" type="button" role="tab" aria-selected="true">
                 <i class="bi bi-people-fill"></i> ค่าความสอดคล้องผู้ตรวจ 3 คน (ICC)
@@ -84,7 +84,7 @@ require_once 'header.php';
             </li>
             <li class="nav-item" role="presentation">
               <button class="nav-link fw-bold text-dark px-4 py-2.5 rounded-3 d-flex align-items-center gap-2" id="ttest-tab" data-bs-toggle="pill" data-bs-target="#tab-ttest" type="button" role="tab" aria-selected="false">
-                <i class="bi bi-graph-up-arrow"></i> ประสิทธิภาพการพัฒนาการเขียน (Paired t-test)
+                <i class="bi bi-graph-up-arrow"></i> <span>ประสิทธิภาพการพัฒนาการเขียน <span class="d-none d-sm-inline">(Paired t-test)</span></span>
               </button>
             </li>
           </ul>
@@ -93,9 +93,9 @@ require_once 'header.php';
 
         <!-- 1. ICC Reliability Tab -->
         <div class="tab-pane fade show active" id="tab-reliability" role="tabpanel" aria-labelledby="reliability-tab">
-          <div class="d-flex justify-content-end mb-3">
+          <div class="d-flex flex-wrap justify-content-end mb-3">
             <div class="input-group" style="width: auto;">
-              <span class="input-group-text bg-white small border-end-0"><i class="bi bi-calendar-check"></i> ภารงานที่ใช้คำนวณ ICC</span>
+              <span class="input-group-text bg-white small border-end-0 text-nowrap"><i class="bi bi-calendar-check"></i> ภารงานที่ใช้คำนวณ ICC</span>
               <select id="iccTaskPhaseSelector" class="form-select form-select-sm bg-white border-start-0 small" onchange="switchICCTaskPhase()">
                 <option value="task1" selected>หน่วยที่ 1</option>
                 <option value="task2">หน่วยที่ 2</option>
@@ -137,10 +137,10 @@ require_once 'header.php';
                   <table class="table table-sm table-hover align-middle mb-0 small">
                     <thead class="table-light text-secondary">
                       <tr>
-                        <th>มิติคะแนน</th>
-                        <th class="text-center">จำนวน (N)</th>
-                        <th class="text-center">ค่า ICC</th>
-                        <th class="text-end">ผลประเมิน</th>
+                        <th class="text-nowrap">มิติคะแนน</th>
+                        <th class="text-center text-nowrap">จำนวน (N)</th>
+                        <th class="text-center text-nowrap">ค่า ICC</th>
+                        <th class="text-end text-nowrap">ผลประเมิน</th>
                       </tr>
                     </thead>
                     <tbody id="reliabilityTableBody">
@@ -161,11 +161,11 @@ require_once 'header.php';
                   <table class="table table-sm table-hover align-middle mb-0 small">
                     <thead class="table-light text-secondary">
                       <tr>
-                        <th>รหัส</th>
-                        <th>ชื่อ-สกุล</th>
-                        <th class="text-center">ครูผู้สอน</th>
-                        <th class="text-center">ผู้เชี่ยวชาญ 1</th>
-                        <th class="text-center">ผู้เชี่ยวชาญ 2</th>
+                        <th class="text-nowrap">รหัส</th>
+                        <th class="text-nowrap">ชื่อ-สกุล</th>
+                        <th class="text-center text-nowrap">ครูผู้สอน</th>
+                        <th class="text-center text-nowrap">ผู้เชี่ยวชาญ 1</th>
+                        <th class="text-center text-nowrap">ผู้เชี่ยวชาญ 2</th>
                       </tr>
                     </thead>
                     <tbody id="iccStudentTableBody">
@@ -218,15 +218,15 @@ require_once 'header.php';
                   <table class="table table-bordered align-middle text-center small mb-0">
                     <thead class="table-light text-secondary">
                       <tr>
-                        <th>ตัวแปรการทดสอบ</th>
-                        <th>N</th>
-                        <th>Mean ก่อนเรียน (T1)</th>
-                        <th>Mean หลังเรียน (T2)</th>
-                        <th>ผลต่างเฉลี่ย (D)</th>
-                        <th>SD ของผลต่าง (SD_D)</th>
-                        <th>ค่าสถิติ t</th>
-                        <th>องศาอิสระ (df)</th>
-                        <th>ค่าความนัยสำคัญ (p-value)</th>
+                        <th class="text-nowrap">ตัวแปรการทดสอบ</th>
+                        <th class="text-nowrap">N</th>
+                        <th class="text-nowrap">Mean ก่อนเรียน (T1)</th>
+                        <th class="text-nowrap">Mean หลังเรียน (T2)</th>
+                        <th class="text-nowrap">ผลต่างเฉลี่ย (D)</th>
+                        <th class="text-nowrap">SD ของผลต่าง (SD_D)</th>
+                        <th class="text-nowrap">ค่าสถิติ t</th>
+                        <th class="text-nowrap">องศาอิสระ (df)</th>
+                        <th class="text-nowrap">ค่าความนัยสำคัญ (p-value)</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -254,15 +254,15 @@ require_once 'header.php';
         <div class="tab-pane fade" id="group-qual" role="tabpanel" aria-labelledby="group-qual-tab">
 
           <!-- แท็บเลื่อนเลือกประเภทข้อมูลเชิงคุณภาพ -->
-          <ul class="nav nav-pills mb-4 gap-2 bg-light p-2 rounded-3 border" id="qualGroupTab" role="tablist">
+          <ul class="nav nav-pills mb-4 gap-2 bg-light p-2 rounded-3 border flex-wrap" id="qualGroupTab" role="tablist">
             <li class="nav-item" role="presentation">
               <button class="nav-link active fw-bold text-dark px-4 py-2.5 rounded-3 d-flex align-items-center gap-2" id="qualitative-tab" data-bs-toggle="pill" data-bs-target="#tab-qualitative" type="button" role="tab" aria-selected="true">
-                <i class="bi bi-chat-square-text-fill"></i> ศูนย์วิเคราะห์เชิงคุณภาพ (Content Analysis Hub)
+                <i class="bi bi-chat-square-text-fill"></i> <span>ศูนย์วิเคราะห์เชิงคุณภาพ <span class="d-none d-sm-inline">(Content Analysis Hub)</span></span>
               </button>
             </li>
             <li class="nav-item" role="presentation">
               <button class="nav-link fw-bold text-dark px-4 py-2.5 rounded-3 d-flex align-items-center gap-2" id="essays-tab" data-bs-toggle="pill" data-bs-target="#tab-essays" type="button" role="tab" aria-selected="false" onclick="loadEssayViewer()">
-                <i class="bi bi-pencil-square"></i> เรียงความนักเรียน (Essay Viewer)
+                <i class="bi bi-pencil-square"></i> <span>เรียงความนักเรียน <span class="d-none d-sm-inline">(Essay Viewer)</span></span>
               </button>
             </li>
           </ul>
