@@ -5,6 +5,11 @@ require_login('teacher'); // ครูเท่านั้น
 require_once 'header.php';
 ?>
 
+<style>
+  html { scroll-behavior: smooth; }
+  #section-icc, #section-ttest, #section-qual, #section-essay { scroll-margin-top: 84px; }
+</style>
+
 <div class="text-start">
   <div class="mb-3">
     <a href="dashboard.php" class="btn btn-link text-decoration-none text-secondary fw-bold p-0">
@@ -56,43 +61,28 @@ require_once 'header.php';
         </div>
       </div>
 
-      <!-- แท็บกลุ่มหลัก: แยกเชิงปริมาณ / เชิงคุณภาพให้ชัดเจน -->
-      <ul class="nav nav-pills nav-fill gap-2 mb-3 p-2 bg-light rounded-3 border flex-column flex-sm-row" id="analysisGroupTab" role="tablist">
-        <li class="nav-item" role="presentation">
-          <button class="nav-link active fw-bold d-flex align-items-center justify-content-center gap-2 py-3" id="group-quant-tab" data-bs-toggle="tab" data-bs-target="#group-quant" type="button" role="tab" aria-selected="true">
-            <i class="bi bi-bar-chart-line-fill"></i> <span>การวิเคราะห์เชิงปริมาณ <span class="d-none d-sm-inline">(Quantitative)</span></span>
-          </button>
-        </li>
-        <li class="nav-item" role="presentation">
-          <button class="nav-link fw-bold d-flex align-items-center justify-content-center gap-2 py-3" id="group-qual-tab" data-bs-toggle="tab" data-bs-target="#group-qual" type="button" role="tab" aria-selected="false">
-            <i class="bi bi-chat-square-quote-fill"></i> <span>การวิเคราะห์เชิงคุณภาพ <span class="d-none d-sm-inline">(Qualitative)</span></span>
-          </button>
-        </li>
-      </ul>
+      <!-- ปุ่มลัดไปยังแต่ละส่วน -->
+      <div class="d-flex flex-wrap gap-2 mb-4" id="sectionQuickNav">
+        <a href="#section-icc" class="btn btn-outline-primary btn-sm fw-bold rounded-pill px-3">
+          <i class="bi bi-people-fill"></i> ICC
+        </a>
+        <a href="#section-ttest" class="btn btn-outline-success btn-sm fw-bold rounded-pill px-3">
+          <i class="bi bi-graph-up-arrow"></i> Paired t-test
+        </a>
+        <a href="#section-qual" class="btn btn-outline-warning btn-sm fw-bold rounded-pill px-3">
+          <i class="bi bi-chat-square-text-fill"></i> Content Analysis Hub
+        </a>
+        <a href="#section-essay" class="btn btn-outline-danger btn-sm fw-bold rounded-pill px-3">
+          <i class="bi bi-pencil-square"></i> Essay Viewer
+        </a>
+      </div>
 
-      <div class="tab-content rounded-4 p-4 bg-white shadow-sm border" id="analysisGroupContent">
-
-        <!-- กลุ่ม 1: เชิงปริมาณ -->
-        <div class="tab-pane fade show active" id="group-quant" role="tabpanel" aria-labelledby="group-quant-tab">
-
-          <!-- แท็บเลื่อนเลือกประเภทสถิติเชิงปริมาณ -->
-          <ul class="nav nav-pills mb-4 gap-2 bg-light p-2 rounded-3 border flex-wrap" id="researchTab" role="tablist">
-            <li class="nav-item" role="presentation">
-              <button class="nav-link active fw-bold text-dark px-4 py-2.5 rounded-3 d-flex align-items-center gap-2" id="reliability-tab" data-bs-toggle="pill" data-bs-target="#tab-reliability" type="button" role="tab" aria-selected="true">
-                <i class="bi bi-people-fill"></i> ค่าความสอดคล้องผู้ตรวจ 3 คน (ICC)
-              </button>
-            </li>
-            <li class="nav-item" role="presentation">
-              <button class="nav-link fw-bold text-dark px-4 py-2.5 rounded-3 d-flex align-items-center gap-2" id="ttest-tab" data-bs-toggle="pill" data-bs-target="#tab-ttest" type="button" role="tab" aria-selected="false">
-                <i class="bi bi-graph-up-arrow"></i> <span>ประสิทธิภาพการพัฒนาการเขียน <span class="d-none d-sm-inline">(Paired t-test)</span></span>
-              </button>
-            </li>
-          </ul>
-
-          <div class="tab-content" id="researchTabContent">
-
-        <!-- 1. ICC Reliability Tab -->
-        <div class="tab-pane fade show active" id="tab-reliability" role="tabpanel" aria-labelledby="reliability-tab">
+        <!-- ส่วนที่ 1: ICC -->
+        <section id="section-icc" class="mb-5">
+          <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom border-primary border-2">
+            <span class="badge bg-primary fs-6">1</span>
+            <h5 class="fw-bold text-dark mb-0"><i class="bi bi-people-fill text-primary"></i> ค่าความสอดคล้องผู้ตรวจ 3 คน (ICC)</h5>
+          </div>
           <div class="d-flex flex-wrap justify-content-end mb-3">
             <div class="input-group" style="width: auto;">
               <span class="input-group-text bg-white small border-end-0 text-nowrap"><i class="bi bi-calendar-check"></i> ภารงานที่ใช้คำนวณ ICC</span>
@@ -185,10 +175,14 @@ require_once 'header.php';
               </div>
             </div>
           </div>
-        </div>
+        </section>
 
-        <!-- 2. Paired t-test Tab -->
-        <div class="tab-pane fade" id="tab-ttest" role="tabpanel" aria-labelledby="ttest-tab">
+        <!-- ส่วนที่ 2: Paired t-test -->
+        <section id="section-ttest" class="mb-5">
+          <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom border-success border-2">
+            <span class="badge bg-success fs-6">2</span>
+            <h5 class="fw-bold text-dark mb-0"><i class="bi bi-graph-up-arrow text-success"></i> ประสิทธิภาพการพัฒนาการเขียน (Paired t-test)</h5>
+          </div>
           <div class="row g-4">
             <div class="col-md-4 col-sm-12">
               <div class="card border-0 rounded-3 p-3 bg-white shadow-sm border-start border-3 border-success h-100">
@@ -245,32 +239,14 @@ require_once 'header.php';
               </div>
             </div>
           </div>
-        </div>
+        </section>
 
+        <!-- ส่วนที่ 3: Qualitative Content Analysis Hub -->
+        <section id="section-qual" class="mb-5">
+          <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom border-warning border-2">
+            <span class="badge bg-warning text-dark fs-6">3</span>
+            <h5 class="fw-bold text-dark mb-0"><i class="bi bi-chat-square-text-fill text-warning-emphasis"></i> ศูนย์วิเคราะห์เชิงคุณภาพ (Content Analysis Hub)</h5>
           </div>
-        </div>
-
-        <!-- กลุ่ม 2: เชิงคุณภาพ -->
-        <div class="tab-pane fade" id="group-qual" role="tabpanel" aria-labelledby="group-qual-tab">
-
-          <!-- แท็บเลื่อนเลือกประเภทข้อมูลเชิงคุณภาพ -->
-          <ul class="nav nav-pills mb-4 gap-2 bg-light p-2 rounded-3 border flex-wrap" id="qualGroupTab" role="tablist">
-            <li class="nav-item" role="presentation">
-              <button class="nav-link active fw-bold text-dark px-4 py-2.5 rounded-3 d-flex align-items-center gap-2" id="qualitative-tab" data-bs-toggle="pill" data-bs-target="#tab-qualitative" type="button" role="tab" aria-selected="true">
-                <i class="bi bi-chat-square-text-fill"></i> <span>ศูนย์วิเคราะห์เชิงคุณภาพ <span class="d-none d-sm-inline">(Content Analysis Hub)</span></span>
-              </button>
-            </li>
-            <li class="nav-item" role="presentation">
-              <button class="nav-link fw-bold text-dark px-4 py-2.5 rounded-3 d-flex align-items-center gap-2" id="essays-tab" data-bs-toggle="pill" data-bs-target="#tab-essays" type="button" role="tab" aria-selected="false" onclick="loadEssayViewer()">
-                <i class="bi bi-pencil-square"></i> <span>เรียงความนักเรียน <span class="d-none d-sm-inline">(Essay Viewer)</span></span>
-              </button>
-            </li>
-          </ul>
-
-          <div class="tab-content" id="qualGroupContent">
-
-        <!-- 3. Qualitative Content Analysis Hub Tab -->
-        <div class="tab-pane fade show active" id="tab-qualitative" role="tabpanel" aria-labelledby="qualitative-tab">
           <div class="card border-0 rounded-3 p-3 bg-light shadow-sm mb-4">
             <div class="row g-2 align-items-center">
               <div class="col-md-4 col-sm-12">
@@ -314,14 +290,17 @@ require_once 'header.php';
             <!-- Cards created by JS dynamically -->
             <div class="col-12 text-center py-5 text-muted">กำลังโหลดข้อความเชิงคุณภาพเพื่อใช้วิเคราะห์เนื้อหา...</div>
           </div>
-        </div>
+        </section>
 
-        <!-- 4. Essay Viewer Tab -->
-        <div class="tab-pane fade" id="tab-essays" role="tabpanel" aria-labelledby="essays-tab">
+        <!-- ส่วนที่ 4: Essay Viewer -->
+        <section id="section-essay">
+          <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom border-danger border-2">
+            <span class="badge bg-danger fs-6">4</span>
+            <h5 class="fw-bold text-dark mb-0"><i class="bi bi-pencil-square text-danger"></i> เรียงความนักเรียน (Essay Viewer)</h5>
+          </div>
           <!-- Controls row -->
           <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
             <div>
-              <h6 class="fw-bold text-dark mb-1"><i class="bi bi-pencil-square text-primary me-2"></i>เรียงความของนักเรียน (Essay Viewer)</h6>
               <p class="text-muted small mb-0">ตรวจสอบเนื้อหาเรียงความที่นักเรียนพิมพ์ส่งเพื่อประกอบการวิเคราะห์เชิงคุณภาพ</p>
             </div>
             <div class="d-flex gap-2 flex-wrap align-items-center">
@@ -370,15 +349,11 @@ require_once 'header.php';
           <!-- Essay cards -->
           <div id="essayViewerContainer" style="max-height:560px; overflow-y:auto;">
             <div class="text-center text-muted py-5">
-              <i class="bi bi-hourglass-split fs-3 d-block mb-2"></i>กดแท็บ "เรียงความนักเรียน" เพื่อโหลดข้อมูล
+              <i class="bi bi-hourglass-split fs-3 d-block mb-2"></i>กำลังโหลดเรียงความ...
             </div>
           </div>
-        </div>
+        </section>
 
-          </div>
-        </div>
-
-      </div>
     </div>
   </div>
 </div>
