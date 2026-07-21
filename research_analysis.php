@@ -247,48 +247,90 @@ require_once 'header.php';
             <span class="badge bg-warning text-dark fs-6">3</span>
             <h5 class="fw-bold text-dark mb-0"><i class="bi bi-chat-square-text-fill text-warning-emphasis"></i> ศูนย์วิเคราะห์เชิงคุณภาพ (Content Analysis Hub)</h5>
           </div>
-          <div class="card border-0 rounded-3 p-3 bg-light shadow-sm mb-4">
-            <div class="row g-2 align-items-center">
-              <div class="col-md-4 col-sm-12">
-                <div class="input-group">
-                  <span class="input-group-text bg-white small border-end-0"><i class="bi bi-grid-fill"></i> เกณฑ์ด้าน</span>
-                  <select id="qualitativeCriteriaFilter" class="form-select bg-white border-start-0 small" onchange="filterQualitativeHub()">
-                    <option value="all" selected>แสดงทุกเกณฑ์ประเมิน</option>
-                    <option value="1.1">1.1 ความตรงประเด็น</option>
-                    <option value="1.2">1.2 แก่นเรื่องชัดเจน</option>
-                    <option value="1.3">1.3 การขยายความและเหตุผล</option>
-                    <option value="2.1">2.1 ความครบถ้วนขององค์ประกอบ</option>
-                    <option value="2.2">2.2 การลำดับประเด็นเป็นระบบ</option>
-                    <option value="3.1">3.1 การใช้ประโยคถูกต้อง</option>
-                    <option value="3.2">3.2 การเลือกใช้คำ</option>
-                    <option value="3.3">3.3 ระดับภาษาเหมาะสม</option>
-                    <option value="4.1">4.1 การสะกดคำถูกต้อง</option>
-                    <option value="4.2">4.2 การเว้นวรรค</option>
-                    <option value="4.3">4.3 ความเรียบร้อย</option>
-                  </select>
-                </div>
+
+          <ul class="nav nav-pills mb-4 gap-2 bg-light p-2 rounded-3 border flex-wrap" id="qualViewTab" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active fw-bold text-dark px-4 py-2.5 rounded-3 d-flex align-items-center gap-2" id="qual-overview-tab" data-bs-toggle="pill" data-bs-target="#qual-overview-pane" type="button" role="tab" aria-selected="true">
+                <i class="bi bi-bar-chart-steps"></i> ภาพรวม
+              </button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link fw-bold text-dark px-4 py-2.5 rounded-3 d-flex align-items-center gap-2" id="qual-individual-tab" data-bs-toggle="pill" data-bs-target="#qual-individual-pane" type="button" role="tab" aria-selected="false">
+                <i class="bi bi-person-lines-fill"></i> รายบุคคล <span class="badge bg-secondary ms-1" id="qualIndividualCountBadge">0</span>
+              </button>
+            </li>
+          </ul>
+
+          <div class="tab-content">
+
+            <!-- ภาพรวม: อุปสรรค/จุดแข็งรายด้าน เพื่อวางแผนขั้น Enabling (POA) -->
+            <div class="tab-pane fade show active" id="qual-overview-pane" role="tabpanel" aria-labelledby="qual-overview-tab">
+              <div id="qualitativeReportParagraph" class="card border-0 rounded-3 p-3 text-secondary small bg-light border-start border-3 border-success mb-4" style="line-height: 1.6;">
+                <em>กำลังประมวลผลข้อเขียนวิเคราะห์ข้อมูลเชิงคุณภาพ...</em>
               </div>
-              <div class="col-md-5 col-sm-12">
-                <div class="input-group">
-                  <span class="input-group-text bg-white small border-end-0"><i class="bi bi-search"></i> ค้นหา</span>
-                  <input type="text" id="qualitativeSearchInput" onkeyup="filterQualitativeHub()" class="form-control bg-white border-start-0 small text-start" placeholder="ค้นหาคำศัพท์ อุปสรรค ความคิดเห็น...">
+
+              <div class="row g-4">
+                <div class="col-lg-6">
+                  <div class="card border-0 rounded-3 p-3 bg-white shadow-sm border-start border-3 border-danger h-100">
+                    <h6 class="fw-bold text-dark mb-3"><i class="bi bi-exclamation-triangle-fill text-danger"></i> ความถี่ของอุปสรรคการเขียน รายด้าน (11 ด้าน)</h6>
+                    <div style="position: relative; height: 420px;" class="w-100">
+                      <canvas id="qualProblemFreqChart"></canvas>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div class="col-md-3 col-sm-12 text-md-end text-center mt-2 mt-md-0">
-                <button class="btn btn-primary btn-sm fw-bold px-4 py-2.5 rounded-pill" onclick="exportQualitativeToCSV()"><i class="bi bi-download"></i> ส่งออกข้อมูลดิบ (CSV)</button>
+                <div class="col-lg-6">
+                  <div class="card border-0 rounded-3 p-3 bg-white shadow-sm border-start border-3 border-primary h-100">
+                    <h6 class="fw-bold text-dark mb-3"><i class="bi bi-people-fill text-primary"></i> คะแนนประเมินจากเพื่อนเฉลี่ย รายด้าน (เต็ม 4)</h6>
+                    <div style="position: relative; height: 420px;" class="w-100">
+                      <canvas id="qualPeerScoreChart"></canvas>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
 
-          <!-- Qualitative Content Analysis paragraph -->
-          <div id="qualitativeReportParagraph" class="card border-0 rounded-3 p-3 text-secondary small bg-light border-start border-3 border-success mb-3" style="line-height: 1.6;">
-            <em>กำลังประมวลผลข้อเขียนวิเคราะห์ข้อมูลเชิงคุณภาพ...</em>
-          </div>
+            <!-- รายบุคคล: การ์ดข้อมูลดิบรายคน -->
+            <div class="tab-pane fade" id="qual-individual-pane" role="tabpanel" aria-labelledby="qual-individual-tab">
+              <div class="card border-0 rounded-3 p-3 bg-light shadow-sm mb-4">
+                <div class="row g-2 align-items-center">
+                  <div class="col-md-4 col-sm-12">
+                    <div class="input-group">
+                      <span class="input-group-text bg-white small border-end-0"><i class="bi bi-grid-fill"></i> เกณฑ์ด้าน</span>
+                      <select id="qualitativeCriteriaFilter" class="form-select bg-white border-start-0 small" onchange="filterQualitativeHub()">
+                        <option value="all" selected>แสดงทุกเกณฑ์ประเมิน</option>
+                        <option value="1.1">1.1 ความตรงประเด็น</option>
+                        <option value="1.2">1.2 แก่นเรื่องชัดเจน</option>
+                        <option value="1.3">1.3 การขยายความและเหตุผล</option>
+                        <option value="2.1">2.1 ความครบถ้วนขององค์ประกอบ</option>
+                        <option value="2.2">2.2 การลำดับประเด็นเป็นระบบ</option>
+                        <option value="3.1">3.1 การใช้ประโยคถูกต้อง</option>
+                        <option value="3.2">3.2 การเลือกใช้คำ</option>
+                        <option value="3.3">3.3 ระดับภาษาเหมาะสม</option>
+                        <option value="4.1">4.1 การสะกดคำถูกต้อง</option>
+                        <option value="4.2">4.2 การเว้นวรรค</option>
+                        <option value="4.3">4.3 ความเรียบร้อย</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="col-md-5 col-sm-12">
+                    <div class="input-group">
+                      <span class="input-group-text bg-white small border-end-0"><i class="bi bi-search"></i> ค้นหา</span>
+                      <input type="text" id="qualitativeSearchInput" onkeyup="filterQualitativeHub()" class="form-control bg-white border-start-0 small text-start" placeholder="ค้นหาคำศัพท์ อุปสรรค ความคิดเห็น...">
+                    </div>
+                  </div>
+                  <div class="col-md-3 col-sm-12 text-md-end text-center mt-2 mt-md-0">
+                    <button class="btn btn-primary btn-sm fw-bold px-4 py-2.5 rounded-pill" onclick="exportQualitativeToCSV()"><i class="bi bi-download"></i> ส่งออกข้อมูลดิบ (CSV)</button>
+                  </div>
+                </div>
+              </div>
 
-          <!-- กล่องแสดงข้อความสำหรับการทำวิเคราะห์เนื้อหา (Content Analysis Cards) -->
-          <div class="row g-3" id="qualitativeHubContainer" style="max-height: 480px; overflow-y: auto;">
-            <!-- Cards created by JS dynamically -->
-            <div class="col-12 text-center py-5 text-muted">กำลังโหลดข้อความเชิงคุณภาพเพื่อใช้วิเคราะห์เนื้อหา...</div>
+              <!-- กล่องแสดงข้อความสำหรับการทำวิเคราะห์เนื้อหา (Content Analysis Cards) -->
+              <div class="row g-3" id="qualitativeHubContainer" style="max-height: 480px; overflow-y: auto;">
+                <!-- Cards created by JS dynamically -->
+                <div class="col-12 text-center py-5 text-muted">กำลังโหลดข้อความเชิงคุณภาพเพื่อใช้วิเคราะห์เนื้อหา...</div>
+              </div>
+            </div>
+
           </div>
         </section>
 
@@ -782,7 +824,162 @@ require_once 'header.php';
     }
   }
 
+  // แปลงระดับคุณภาพที่เพื่อนให้ (ดีมาก/ดี/ปานกลาง/พอใช้/ปรับปรุง) เป็นตัวเลข 0-4 เพื่อหาค่าเฉลี่ยรายด้าน
+  const PEER_LEVEL_SCORE = { 'ดีมาก': 4, 'ดี': 3, 'ปานกลาง': 2, 'พอใช้': 1, 'ปรับปรุง': 0 };
+  const QUAL_SUB_CRITERIA = ['1.1', '1.2', '1.3', '2.1', '2.2', '3.1', '3.2', '3.3', '4.1', '4.2', '4.3'];
+
+  let qualProblemChartInstance = null;
+  let qualPeerScoreChartInstance = null;
+
   function renderQualitativeHub() {
+    renderQualitativeOverview();
+    renderQualitativeCards();
+  }
+
+  // ภาพรวม: ความถี่ของอุปสรรครายด้าน + คะแนนประเมินจากเพื่อนเฉลี่ยรายด้าน เพื่อดูว่าประเด็นความสามารถใดสูง/ต่ำ
+  // สำหรับใช้วางแผนการจัดการเรียนรู้ขั้น Enabling (POA)
+  function renderQualitativeOverview() {
+    if (!classroomResearchData) return;
+
+    const experimentalIds = getExperimentalStudentIds();
+    const problems = classroomResearchData.problems.filter(p => experimentalIds.has(p.student_id));
+    const peerReviews = classroomResearchData.peer_reviews.filter(pr => experimentalIds.has(pr.student_id));
+    const reflections = classroomResearchData.reflections.filter(rf => experimentalIds.has(rf.student_id));
+
+    setKpiValue('kpiQualCount', (problems.length + peerReviews.length + reflections.length).toLocaleString('th-TH'));
+
+    // 1) ความถี่ของอุปสรรคการเขียนรายด้าน (จาก writing_problems)
+    const criteriaCounts = {};
+    QUAL_SUB_CRITERIA.forEach(sc => { criteriaCounts[sc] = 0; });
+    problems.forEach(p => {
+      QUAL_SUB_CRITERIA.forEach(sc => {
+        const key = sc.replace('.', '_');
+        if (p['prob_' + key]) criteriaCounts[sc]++;
+      });
+    });
+
+    // 2) คะแนนประเมินจากเพื่อนเฉลี่ยรายด้าน (จาก peer_reviews)
+    const peerSums = {}, peerCounts = {};
+    QUAL_SUB_CRITERIA.forEach(sc => { peerSums[sc] = 0; peerCounts[sc] = 0; });
+    peerReviews.forEach(pr => {
+      QUAL_SUB_CRITERIA.forEach(sc => {
+        const key = 'score_' + sc.replace('.', '_');
+        const level = pr[key];
+        if (level && PEER_LEVEL_SCORE[level] !== undefined) {
+          peerSums[sc] += PEER_LEVEL_SCORE[level];
+          peerCounts[sc]++;
+        }
+      });
+    });
+    const peerAverages = {};
+    QUAL_SUB_CRITERIA.forEach(sc => { peerAverages[sc] = peerCounts[sc] > 0 ? peerSums[sc] / peerCounts[sc] : null; });
+
+    renderQualProblemChart(criteriaCounts);
+    renderQualPeerScoreChart(peerAverages);
+
+    // ประมวลผลบทวิเคราะห์เชิงคุณภาพ
+    const qualParagraphEl = document.getElementById('qualitativeReportParagraph');
+    if (qualParagraphEl) {
+      const sortedCrit = Object.entries(criteriaCounts).sort((a,b) => b[1] - a[1]);
+      const top1 = sortedCrit[0];
+      const top2 = sortedCrit[1];
+      const top1Name = top1 && top1[1] > 0 ? criteriaMap[top1[0]].name.split(' (')[0] : "ไม่มีข้อมูลหลัก";
+      const top2Name = top2 && top2[1] > 0 ? criteriaMap[top2[0]].name.split(' (')[0] : "ไม่มีข้อมูลรอง";
+      const top1Count = top1 ? top1[1] : 0;
+      const top2Count = top2 ? top2[1] : 0;
+
+      const peerRanked = Object.entries(peerAverages).filter(([, v]) => v !== null).sort((a, b) => a[1] - b[1]);
+      const weakest = peerRanked[0];
+      const strongest = peerRanked[peerRanked.length - 1];
+      const weakestName = weakest ? criteriaMap[weakest[0]].name.split(' (')[0] : null;
+      const strongestName = strongest ? criteriaMap[strongest[0]].name.split(' (')[0] : null;
+
+      const totalPeer = peerReviews.length;
+      const totalReflect = reflections.length;
+
+      qualParagraphEl.innerHTML = `
+        <h6 class="fw-bold text-dark mb-2"><i class="bi bi-file-earmark-text text-success"></i> บทวิเคราะห์และอภิปรายเชิงคุณภาพ (Qualitative Content Analysis Summary)</h6>
+        <p class="mb-0 text-slate-700" style="line-height: 1.6;">
+          จากการวิเคราะห์เนื้อหาเชิงคุณภาพ (Content Analysis) จากบันทึกข้อมูลอุปสรรคและแนวทางแก้ไข (POA) คะแนนประเมินจากเพื่อน และการสะท้อนคิด พบประเด็นเชิงคุณภาพที่เด่นชัดดังนี้:
+        </p>
+        <ul class="mt-2 mb-0 ps-3 text-slate-700 small" style="line-height: 1.6;">
+          ${weakestName ? `<li class="mb-1"><strong>ประเด็นความสามารถที่ควรพัฒนาเร่งด่วน (จัดการเรียนรู้ขั้น Enabling):</strong> ด้าน <strong class="text-danger">${weakestName}</strong> ได้คะแนนประเมินจากเพื่อนเฉลี่ยต่ำสุดที่ <strong>${weakest[1].toFixed(2)}/4</strong> ${strongestName ? `ในขณะที่ด้าน <strong class="text-success">${strongestName}</strong> เป็นจุดแข็งของชั้นเรียนด้วยคะแนนเฉลี่ยสูงสุดที่ <strong>${strongest[1].toFixed(2)}/4</strong>` : ''}</li>` : ''}
+          <li class="mb-1"><strong>อุปสรรคการเขียนที่พบบ่อยที่สุด:</strong> อันดับแรกคือด้าน <strong>${top1Name}</strong> (พบปัญหาจากผู้เรียนจำนวน ${top1Count} คน) และอันดับรองลงมาคือด้าน <strong>${top2Name}</strong> (พบปัญหาจากผู้เรียนจำนวน ${top2Count} คน)</li>
+          <li class="mb-1"><strong>การสะท้อนคิดและการมีส่วนร่วมของกลุ่มเพื่อน:</strong> มีการบันทึกการให้ข้อคิดเห็นเชิงคุณภาพและข้อเสนอแนะร่วมกันระหว่างเพื่อน (Peer Reviews) สะสมจำนวน <strong>${totalPeer} ครั้ง</strong> และแบบสะท้อนคิดการเรียนรู้เรียงความของตนเอง (Self Reflections) จำนวน <strong>${totalReflect} ครั้ง</strong></li>
+        </ul>
+      `;
+    }
+  }
+
+  function renderQualProblemChart(criteriaCounts) {
+    const canvas = document.getElementById('qualProblemFreqChart');
+    if (!canvas) return;
+    const rows = QUAL_SUB_CRITERIA.map(sc => ({ sc, count: criteriaCounts[sc] || 0, name: criteriaMap[sc].name.split(' (')[0] }))
+      .sort((a, b) => b.count - a.count);
+
+    if (qualProblemChartInstance) qualProblemChartInstance.destroy();
+    qualProblemChartInstance = new Chart(canvas.getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: rows.map(x => `${x.sc} ${x.name}`),
+        datasets: [{
+          label: 'จำนวนนักเรียนที่พบอุปสรรค (คน)',
+          data: rows.map(x => x.count),
+          backgroundColor: 'rgba(239, 68, 68, 0.75)',
+          borderColor: '#ef4444',
+          borderWidth: 1.5,
+          borderRadius: 4
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { x: { beginAtZero: true, ticks: { precision: 0 } } }
+      }
+    });
+  }
+
+  function renderQualPeerScoreChart(peerAverages) {
+    const canvas = document.getElementById('qualPeerScoreChart');
+    if (!canvas) return;
+    const rows = QUAL_SUB_CRITERIA.map(sc => ({ sc, avg: peerAverages[sc], name: criteriaMap[sc].name.split(' (')[0] }))
+      .sort((a, b) => (a.avg === null ? 99 : a.avg) - (b.avg === null ? 99 : b.avg));
+
+    const colorFor = (avg) => {
+      if (avg === null) return '#adb5bd';
+      if (avg >= 3.5) return '#059669';
+      if (avg >= 2.5) return '#2563eb';
+      if (avg >= 1.5) return '#f59e0b';
+      return '#ef4444';
+    };
+
+    if (qualPeerScoreChartInstance) qualPeerScoreChartInstance.destroy();
+    qualPeerScoreChartInstance = new Chart(canvas.getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: rows.map(x => `${x.sc} ${x.name}`),
+        datasets: [{
+          label: 'คะแนนเฉลี่ยจากเพื่อน (เต็ม 4)',
+          data: rows.map(x => x.avg !== null ? x.avg : 0),
+          backgroundColor: rows.map(x => colorFor(x.avg)),
+          borderWidth: 0,
+          borderRadius: 4
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { x: { beginAtZero: true, max: 4 } }
+      }
+    });
+  }
+
+  // รายบุคคล: การ์ดข้อมูลดิบของอุปสรรค/คำแนะนำเพื่อน/การสะท้อนคิด พร้อมตัวกรองและค้นหา
+  function renderQualitativeCards() {
     const container = document.getElementById('qualitativeHubContainer');
     if (!container) return;
 
@@ -798,49 +995,6 @@ require_once 'header.php';
     const problems = classroomResearchData.problems.filter(p => experimentalIds.has(p.student_id));
     const peerReviews = classroomResearchData.peer_reviews.filter(pr => experimentalIds.has(pr.student_id));
     const reflections = classroomResearchData.reflections.filter(rf => experimentalIds.has(rf.student_id));
-
-    setKpiValue('kpiQualCount', (problems.length + peerReviews.length + reflections.length).toLocaleString('th-TH'));
-
-    // ประมวลผลบทวิเคราะห์เชิงคุณภาพ
-    const qualParagraphEl = document.getElementById('qualitativeReportParagraph');
-    if (qualParagraphEl) {
-      const criteriaCounts = {};
-      const subCriteriaList = ['1.1', '1.2', '1.3', '2.1', '2.2', '3.1', '3.2', '3.3', '4.1', '4.2', '4.3'];
-      subCriteriaList.forEach(sc => { criteriaCounts[sc] = 0; });
-
-      problems.forEach(p => {
-        subCriteriaList.forEach(sc => {
-          const key = sc.replace('.', '_');
-          if (p['prob_' + key]) {
-            criteriaCounts[sc]++;
-          }
-        });
-      });
-
-      const sortedCrit = Object.entries(criteriaCounts).sort((a,b) => b[1] - a[1]);
-      const top1 = sortedCrit[0];
-      const top2 = sortedCrit[1];
-
-      const top1Name = top1 && top1[1] > 0 ? criteriaMap[top1[0]].name.split(' (')[0] : "ไม่มีข้อมูลหลัก";
-      const top2Name = top2 && top2[1] > 0 ? criteriaMap[top2[0]].name.split(' (')[0] : "ไม่มีข้อมูลรอง";
-      const top1Count = top1 ? top1[1] : 0;
-      const top2Count = top2 ? top2[1] : 0;
-
-      const totalPeer = peerReviews.length;
-      const totalReflect = reflections.length;
-
-      qualParagraphEl.innerHTML = `
-        <h6 class="fw-bold text-dark mb-2"><i class="bi bi-file-earmark-text text-success"></i> บทวิเคราะห์และอภิปรายเชิงคุณภาพ (Qualitative Content Analysis Summary)</h6>
-        <p class="mb-0 text-slate-700" style="line-height: 1.6;">
-          จากการวิเคราะห์เนื้อหาเชิงคุณภาพ (Content Analysis) จากบันทึกข้อมูลอุปสรรคและแนวทางแก้ไข (POA) การสะท้อนคิด และข้อเสนอแนะระหว่างการจัดการเรียนการสอนคลาสรูม พบประเด็นเชิงคุณภาพที่เด่นชัดดังนี้:
-        </p>
-        <ul class="mt-2 mb-0 ps-3 text-slate-700 small" style="line-height: 1.6;">
-          <li class="mb-1"><strong>อุปสรรคการเขียนที่พบบ่อยที่สุด:</strong> อันดับแรกคือด้าน <strong>${top1Name}</strong> (พบปัญหาจากผู้เรียนจำนวน ${top1Count} คน) และอันดับรองลงมาคือด้าน <strong>${top2Name}</strong> (พบปัญหาจากผู้เรียนจำนวน ${top2Count} คน) ซึ่งสะท้อนถึงประเด็นอุปสรรคในการเขียนที่นักเรียนกลุ่มเป้าหมายส่วนใหญ่เผชิญและต้องให้ความสำคัญเพิ่มเติม</li>
-          <li class="mb-1"><strong>การสะท้อนคิดและการมีส่วนร่วมของกลุ่มเพื่อน:</strong> มีการบันทึกการให้ข้อคิดเห็นเชิงคุณภาพและข้อเสนอแนะร่วมกันระหว่างเพื่อน (Peer Reviews) สะสมจำนวน <strong>${totalPeer} ครั้ง</strong> และแบบสะท้อนคิดการเรียนรู้เรียงความของตนเอง (Self Reflections) จำนวน <strong>${totalReflect} ครั้ง</strong></li>
-          <li class="mb-1"><strong>แนวทางการลงข้อเสนอแนะและเป้าหมาย:</strong> จากคำแนะนำในการเขียนเรียงความ นักเรียนส่วนใหญ่วางกรอบแนวทางแก้ไขปัญหาโดยนำคำวิจารณ์ของเพื่อนและคำแนะแนวของครูผู้สอนมาปรับปรุงเรียงความ และตั้งเป้าหมายเชิงพัฒนาเพื่อเลือกใช้คำเชื่อมที่สละสลวยขึ้นในอนาคต</li>
-        </ul>
-      `;
-    }
 
     let html = '';
     let cardCount = 0;
@@ -985,10 +1139,12 @@ require_once 'header.php';
     } else {
       container.innerHTML = html;
     }
+
+    setKpiValue('qualIndividualCountBadge', cardCount.toLocaleString('th-TH'));
   }
 
   function filterQualitativeHub() {
-    renderQualitativeHub();
+    renderQualitativeCards();
   }
 
   function exportQualitativeToCSV() {
