@@ -109,8 +109,16 @@ try {
 
         // 4. ดึงรายชื่อนักเรียนทั้งหมด
         case 'get_students_list':
-            // ถ้าส่ง classmates=1 และผู้ใช้เป็นนักเรียน → คืนเฉพาะเพื่อนห้องเดียวกัน
-            // (ใช้ในหน้าประเมินเพื่อน/ตนเอง เพื่อจำกัดรายชื่อเป้าหมายให้อยู่ในห้องของตนเอง)
+            $conds = [];
+            $params = [];
+
+            // ผู้เชี่ยวชาญเห็นเฉพาะ "กลุ่มทดลอง" เสมอ (บังคับฝั่งเซิร์ฟเวอร์ ไม่ให้ client ข้าม)
+            $forceGroup = null;
+            if (isset($_SESSION['user']) && $_SESSION['user']['role'] === 'expert') {
+                $forceGroup = 'กลุ่มทดลอง';
+            }
+
+            // classmates=1 สำหรับนักเรียน → คืนเฉพาะเพื่อนห้องเดียวกัน
             $onlyClassmates = isset($_GET['classmates']) && $_GET['classmates'] == '1'
                 && isset($_SESSION['user']) && $_SESSION['user']['role'] === 'student';
             if ($onlyClassmates) {
@@ -118,15 +126,23 @@ try {
                 $meStmt->execute([$_SESSION['user']['id']]);
                 $myRoom = $meStmt->fetchColumn();
                 if ($myRoom !== false && $myRoom !== null && trim($myRoom) !== '') {
-                    $stmt = $pdo->prepare('SELECT student_id, student_name FROM students WHERE classroom = ? ORDER BY student_id ASC');
-                    $stmt->execute([$myRoom]);
-                } else {
-                    // ยังไม่ได้กำหนดห้องให้นักเรียนคนนี้ → คืนทั้งหมดเพื่อไม่ให้รายชื่อว่างเปล่า
-                    $stmt = $pdo->query('SELECT student_id, student_name FROM students ORDER BY student_id ASC');
+                    $conds[] = 'classroom = ?';
+                    $params[] = $myRoom;
                 }
-            } else {
-                $stmt = $pdo->query('SELECT student_id, student_name FROM students ORDER BY student_id ASC');
             }
+
+            // กรองตามกลุ่ม (ทดลอง/ตัวอย่าง) — ผู้เชี่ยวชาญถูกบังคับเป็นกลุ่มทดลอง
+            $groupParam = $forceGroup !== null ? $forceGroup : (isset($_GET['group']) ? trim($_GET['group']) : '');
+            if ($groupParam !== '') {
+                $conds[] = 'student_group = ?';
+                $params[] = $groupParam;
+            }
+
+            $sql = 'SELECT student_id, student_name FROM students';
+            if (!empty($conds)) $sql .= ' WHERE ' . implode(' AND ', $conds);
+            $sql .= ' ORDER BY student_id ASC';
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
             $students = [];
             while ($row = $stmt->fetch()) {
                 $students[$row['student_id']] = formatNamePrefix($row['student_name']);
@@ -984,28 +1000,47 @@ try {
                 echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
                 exit;
             }
-            // จำกัดเฉพาะกลุ่มที่ต้องการได้ (ถ้าส่ง group มา) มิฉะนั้นใช้ทุกคน
+            // จำกัดเฉพาะกลุ่มที่ต้องการได้ (ถ้าส่ง group มา) มิฉะนั้นใช้ทุกคน — ดึงห้องมาด้วยเพื่อจับคู่ภายในห้อง
             $group = isset($request_data['group']) ? trim($request_data['group']) : '';
             if ($group !== '') {
-                $stmt = $pdo->prepare('SELECT student_id FROM students WHERE student_group = ? ORDER BY student_id ASC');
+                $stmt = $pdo->prepare('SELECT student_id, classroom FROM students WHERE student_group = ? ORDER BY classroom ASC, student_id ASC');
                 $stmt->execute([$group]);
-                $ids = $stmt->fetchAll(PDO::FETCH_COLUMN);
+                $rows = $stmt->fetchAll();
             } else {
-                $ids = $pdo->query('SELECT student_id FROM students ORDER BY student_id ASC')->fetchAll(PDO::FETCH_COLUMN);
+                $rows = $pdo->query('SELECT student_id, classroom FROM students ORDER BY classroom ASC, student_id ASC')->fetchAll();
             }
 
-            if (count($ids) < 2) {
-                echo json_encode(['success' => false, 'error' => 'มีนักเรียนไม่พอสำหรับการจับคู่ (ต้องมีอย่างน้อย 2 คน)']);
+            // จัดกลุ่มนักเรียนตามห้อง (เฉพาะคนที่มีห้อง) เพื่อจับคู่ภายในห้องเดียวกัน
+            $byRoom = [];
+            foreach ($rows as $r) {
+                $room = ($r['classroom'] === null) ? '' : trim($r['classroom']);
+                if ($room === '') continue; // ข้ามนักเรียนที่ยังไม่ได้กำหนดห้อง
+                $byRoom[$room][] = $r['student_id'];
+            }
+
+            // จับคู่แบบไป-กลับ (A↔B) ภายในแต่ละห้อง ถ้าจำนวนคนเป็นเลขคี่ ให้ 3 คนสุดท้ายเป็นวง (A→B→C→A)
+            $result = []; // [student_code => partner_code]
+            foreach ($byRoom as $room => $ids) {
+                $n = count($ids);
+                if ($n < 2) continue; // ห้องมีคนเดียว จับคู่ไม่ได้
+                shuffle($ids);
+                $limit = ($n % 2 === 0) ? $n : $n - 3;
+                for ($i = 0; $i < $limit; $i += 2) {
+                    $result[$ids[$i]]     = $ids[$i + 1];
+                    $result[$ids[$i + 1]] = $ids[$i];
+                }
+                if ($n % 2 === 1) {
+                    // สามคนสุดท้ายจับเป็นวง เพื่อไม่ให้มีใครถูกทิ้ง
+                    $a = $ids[$n - 3]; $b = $ids[$n - 2]; $c = $ids[$n - 1];
+                    $result[$a] = $b;
+                    $result[$b] = $c;
+                    $result[$c] = $a;
+                }
+            }
+
+            if (empty($result)) {
+                echo json_encode(['success' => false, 'error' => 'ไม่พบห้องที่มีนักเรียนตั้งแต่ 2 คนขึ้นไปสำหรับการจับคู่ (โปรดกำหนดห้องเรียนให้นักเรียนก่อน)']);
                 exit;
-            }
-
-            // สุ่มลำดับแล้วจับคู่แบบผู้ประเมิน→ถูกประเมิน เป็นวงกลม (A→B, B→C, ..., last→A)
-            // วิธีนี้รับประกันว่าทุกคนได้เป็นทั้งผู้ประเมินและถูกประเมิน และไม่มีใครประเมินตนเอง
-            shuffle($ids);
-            $n = count($ids);
-            $result = [];
-            for ($i = 0; $i < $n; $i++) {
-                $result[] = ['student_code' => $ids[$i], 'partner_code' => $ids[($i + 1) % $n]];
             }
 
             $pdo->beginTransaction();
@@ -1013,8 +1048,8 @@ try {
                 $del = $pdo->prepare('DELETE FROM peer_pairs WHERE round = ?');
                 $del->execute([$round]);
                 $ins = $pdo->prepare('INSERT INTO peer_pairs (round, student_code, partner_code) VALUES (?, ?, ?)');
-                foreach ($result as $r) {
-                    $ins->execute([$round, $r['student_code'], $r['partner_code']]);
+                foreach ($result as $sc => $pc) {
+                    $ins->execute([$round, $sc, $pc]);
                 }
                 $pdo->commit();
             } catch (Exception $e) {
@@ -1024,9 +1059,7 @@ try {
             }
 
             // ส่งกลับเป็น map student_code → partner_code เพื่อให้หน้าเว็บอัปเดตทันที
-            $pairsMap = [];
-            foreach ($result as $r) { $pairsMap[$r['student_code']] = $r['partner_code']; }
-            echo json_encode(['success' => true, 'pairs' => $pairsMap, 'count' => $n]);
+            echo json_encode(['success' => true, 'pairs' => $result, 'count' => count($result)]);
             break;
 
         case 'save_learning_reflection':

@@ -130,6 +130,21 @@ require_once 'header.php';
               <i class="bi bi-exclamation-triangle-fill"></i> ยังไม่มีการจับคู่สำหรับรอบนี้ กรุณาเลือกรายชื่อเพื่อนที่ต้องการประเมินจากรายการด้านบนด้วยตนเอง
             </p>
             <?php endif; ?>
+            <?php if ($mode_param === 'teacher' || $mode_param === 'peer'): ?>
+            <div class="mt-2">
+              <label for="groupFilterSelect" class="form-label small fw-bold text-secondary mb-1">กรองตามกลุ่ม (กันสับสนระหว่างกลุ่มทดลอง/กลุ่มตัวอย่าง)</label>
+              <select id="groupFilterSelect" class="form-select form-select-sm" style="max-width: 320px;">
+                <option value="">ทุกกลุ่ม</option>
+                <option value="กลุ่มทดลอง">กลุ่มทดลอง</option>
+                <option value="กลุ่มตัวอย่าง">กลุ่มตัวอย่าง</option>
+              </select>
+            </div>
+            <?php endif; ?>
+            <?php if ($mode_param === 'expert'): ?>
+            <p class="mt-2 text-primary small fw-bold mb-0">
+              <i class="bi bi-lock-fill"></i> ระบบจำกัดเฉพาะนักเรียน "กลุ่มทดลอง" หน่วยที่ 1 เท่านั้น
+            </p>
+            <?php endif; ?>
           </div>
           <?php if ($sessionUser['role'] === 'expert'): ?>
           <!-- ผู้เชี่ยวชาญตรวจเฉพาะ หน่วยที่ 1 เท่านั้น (ล็อกไว้ ไม่มีหน่วยที่ 2 และ Pretest/Posttest) -->
@@ -406,9 +421,14 @@ require_once 'header.php';
   // โหลดรายชื่อนักเรียนจาก API
   async function loadStudents() {
     try {
+      const params = [];
       // นักเรียน (โหมดประเมินตนเอง/ประเมินเพื่อน) เห็นเฉพาะรายชื่อเพื่อนห้องเดียวกัน
-      const scope = (modeParam === 'peer' || modeParam === 'self') ? '&classmates=1' : '';
-      const response = await fetch(`api.php?action=get_students_list${scope}&_t=${new Date().getTime()}`);
+      if (modeParam === 'peer' || modeParam === 'self') params.push('classmates=1');
+      // ตัวกรองกลุ่ม (ทดลอง/ตัวอย่าง) สำหรับครูและนักเรียนโหมดเพื่อน (ผู้เชี่ยวชาญถูกบังคับกลุ่มทดลองที่ฝั่งเซิร์ฟเวอร์)
+      const gf = document.getElementById('groupFilterSelect');
+      if (gf && gf.value) params.push('group=' + encodeURIComponent(gf.value));
+      const qs = params.length ? '&' + params.join('&') : '';
+      const response = await fetch(`api.php?action=get_students_list${qs}&_t=${new Date().getTime()}`);
       const res = await response.json();
       if (res.success) {
         studentDB = res.students;
@@ -679,6 +699,30 @@ require_once 'header.php';
     }
   }
   document.getElementById('targetStudentSelect').addEventListener('change', handleTargetOrPhaseChange);
+
+  // เปลี่ยนตัวกรองกลุ่ม → โหลดรายชื่อใหม่แล้วรีเซ็ตการเลือกเป้าหมาย
+  (function bindGroupFilter() {
+    const gf = document.getElementById('groupFilterSelect');
+    if (!gf) return;
+    gf.addEventListener('change', async () => {
+      await loadStudents();
+      populateStudentSelect();
+      const tSelect = document.getElementById('targetStudentSelect');
+      const phase = document.getElementById('selectedTestPhase') ? document.getElementById('selectedTestPhase').value : '';
+      // โหมดเพื่อน: ถ้าเลือกรอบแล้ว ให้ดึงคู่ที่ล็อกไว้ใหม่ตามรายชื่อที่กรอง
+      if (modeParam === 'peer' && phase) {
+        applyPeerPairing(phase);
+        return;
+      }
+      // โหมดอื่น: รีเซ็ตการเลือกเป้าหมาย
+      tSelect.value = "";
+      tSelect.disabled = false;
+      const rubricCont = document.getElementById('rubricContainer');
+      const progressCont = document.getElementById('progressContainer');
+      if (rubricCont) rubricCont.classList.add('opacity-60', 'pointer-events-none');
+      if (progressCont) progressCont.classList.add('d-none');
+    });
+  })();
 
   // phase picker functions
   const phaseLabels = {
