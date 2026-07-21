@@ -872,6 +872,146 @@ try {
             echo json_encode(['success' => true, 'data' => $rows]);
             break;
 
+        // ============================================================
+        //  ระบบจับคู่ประเมินเพื่อน (Peer Pairing)  รอบ: pretest/task1/task2/posttest
+        // ============================================================
+
+        // ดึงคู่ของนักเรียนที่ล็อกอินอยู่ ตามรอบที่เลือก (ใช้ในหน้า evaluation.php?mode=peer)
+        case 'get_my_peer_partner':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'student') {
+                echo json_encode(['success' => false, 'error' => 'ต้องเป็นนักเรียน']);
+                exit;
+            }
+            $round = isset($_GET['round']) ? trim($_GET['round']) : '';
+            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
+                echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
+                exit;
+            }
+            $myId = $_SESSION['user']['id'];
+            $stmt = $pdo->prepare('SELECT partner_code FROM peer_pairs WHERE round = ? AND student_code = ?');
+            $stmt->execute([$round, $myId]);
+            $prow = $stmt->fetch();
+            if ($prow && !empty($prow['partner_code'])) {
+                echo json_encode(['success' => true, 'partner' => $prow['partner_code']]);
+            } else {
+                // ยังไม่มีการจับคู่ในรอบนี้ → ให้หน้าเว็บ fallback ไปใช้ dropdown เดิม
+                echo json_encode(['success' => true, 'partner' => null]);
+            }
+            break;
+
+        // ดึงคู่ทั้งหมดของรอบที่เลือก (ครูเท่านั้น) สำหรับหน้าจัดการ peer_pairing.php
+        case 'get_peer_pairs':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'ต้องเป็นคุณครู']);
+                exit;
+            }
+            $round = isset($_GET['round']) ? trim($_GET['round']) : '';
+            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
+                echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
+                exit;
+            }
+            $stmt = $pdo->prepare('SELECT student_code, partner_code FROM peer_pairs WHERE round = ?');
+            $stmt->execute([$round]);
+            $pairs = [];
+            while ($row = $stmt->fetch()) {
+                $pairs[$row['student_code']] = $row['partner_code'];
+            }
+            echo json_encode(['success' => true, 'pairs' => $pairs]);
+            break;
+
+        // บันทึกคู่ทั้งชุดของรอบที่เลือก (ครูเท่านั้น) — แทนที่ข้อมูลเดิมของรอบนั้นทั้งหมด
+        case 'save_peer_pairs':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'ต้องเป็นคุณครู']);
+                exit;
+            }
+            $round = isset($request_data['round']) ? trim($request_data['round']) : '';
+            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
+                echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
+                exit;
+            }
+            $pairs = isset($request_data['pairs']) && is_array($request_data['pairs']) ? $request_data['pairs'] : [];
+
+            $pdo->beginTransaction();
+            try {
+                // ลบคู่เดิมของรอบนี้ก่อน แล้วบันทึกใหม่ทั้งชุด
+                $del = $pdo->prepare('DELETE FROM peer_pairs WHERE round = ?');
+                $del->execute([$round]);
+
+                $ins = $pdo->prepare('INSERT INTO peer_pairs (round, student_code, partner_code) VALUES (?, ?, ?)');
+                $saved = 0;
+                foreach ($pairs as $p) {
+                    $sc = isset($p['student_code']) ? trim($p['student_code']) : '';
+                    $pc = isset($p['partner_code']) ? trim($p['partner_code']) : '';
+                    // ข้ามคู่ที่ยังไม่ได้กำหนด หรือจับคู่กับตนเอง
+                    if ($sc === '' || $pc === '' || $sc === $pc) continue;
+                    $ins->execute([$round, $sc, $pc]);
+                    $saved++;
+                }
+                $pdo->commit();
+                echo json_encode(['success' => true, 'saved' => $saved]);
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+            break;
+
+        // จับคู่แบบสุ่มอัตโนมัติสำหรับรอบที่เลือก (ครูเท่านั้น) — บันทึกแล้วส่งผลคู่กลับไป
+        case 'auto_pair_students':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'ต้องเป็นคุณครู']);
+                exit;
+            }
+            $round = isset($request_data['round']) ? trim($request_data['round']) : '';
+            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
+                echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
+                exit;
+            }
+            // จำกัดเฉพาะกลุ่มที่ต้องการได้ (ถ้าส่ง group มา) มิฉะนั้นใช้ทุกคน
+            $group = isset($request_data['group']) ? trim($request_data['group']) : '';
+            if ($group !== '') {
+                $stmt = $pdo->prepare('SELECT student_id FROM students WHERE student_group = ? ORDER BY student_id ASC');
+                $stmt->execute([$group]);
+                $ids = $stmt->fetchAll(PDO::FETCH_COLUMN);
+            } else {
+                $ids = $pdo->query('SELECT student_id FROM students ORDER BY student_id ASC')->fetchAll(PDO::FETCH_COLUMN);
+            }
+
+            if (count($ids) < 2) {
+                echo json_encode(['success' => false, 'error' => 'มีนักเรียนไม่พอสำหรับการจับคู่ (ต้องมีอย่างน้อย 2 คน)']);
+                exit;
+            }
+
+            // สุ่มลำดับแล้วจับคู่แบบผู้ประเมิน→ถูกประเมิน เป็นวงกลม (A→B, B→C, ..., last→A)
+            // วิธีนี้รับประกันว่าทุกคนได้เป็นทั้งผู้ประเมินและถูกประเมิน และไม่มีใครประเมินตนเอง
+            shuffle($ids);
+            $n = count($ids);
+            $result = [];
+            for ($i = 0; $i < $n; $i++) {
+                $result[] = ['student_code' => $ids[$i], 'partner_code' => $ids[($i + 1) % $n]];
+            }
+
+            $pdo->beginTransaction();
+            try {
+                $del = $pdo->prepare('DELETE FROM peer_pairs WHERE round = ?');
+                $del->execute([$round]);
+                $ins = $pdo->prepare('INSERT INTO peer_pairs (round, student_code, partner_code) VALUES (?, ?, ?)');
+                foreach ($result as $r) {
+                    $ins->execute([$round, $r['student_code'], $r['partner_code']]);
+                }
+                $pdo->commit();
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                exit;
+            }
+
+            // ส่งกลับเป็น map student_code → partner_code เพื่อให้หน้าเว็บอัปเดตทันที
+            $pairsMap = [];
+            foreach ($result as $r) { $pairsMap[$r['student_code']] = $r['partner_code']; }
+            echo json_encode(['success' => true, 'pairs' => $pairsMap, 'count' => $n]);
+            break;
+
         case 'save_learning_reflection':
             $studentId = isset($request_data['studentId']) ? $request_data['studentId'] : '';
             if (empty($studentId)) {

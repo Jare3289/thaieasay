@@ -274,3 +274,25 @@ if ($needs_migration) {
     safe_ddl($pdo, "ALTER TABLE peer_reviews ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
     safe_ddl($pdo, "ALTER TABLE learning_reflections ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
 }
+
+// ตารางจับคู่ประเมินเพื่อน (peer_pairs) — ตรวจแยกจาก migration หลัก
+// เพราะเป็นฟีเจอร์ที่เพิ่มภายหลัง ต้องสร้างให้ระบบที่ migration หลักผ่านไปแล้วด้วย
+try {
+    $has_pairs = $pdo->query("SHOW TABLES LIKE 'peer_pairs'");
+    if (!$has_pairs || $has_pairs->rowCount() === 0) {
+        safe_ddl($pdo, "
+            CREATE TABLE IF NOT EXISTS peer_pairs (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                round VARCHAR(20) NOT NULL,
+                student_code VARCHAR(10) NOT NULL,
+                partner_code VARCHAR(10) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (student_code) REFERENCES students(student_id) ON DELETE CASCADE,
+                FOREIGN KEY (partner_code) REFERENCES students(student_id) ON DELETE CASCADE,
+                UNIQUE KEY unique_peer_pair (round, student_code)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+    }
+} catch (Exception $e) {
+    // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
+}

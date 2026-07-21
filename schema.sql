@@ -152,3 +152,18 @@ CREATE TABLE IF NOT EXISTS learning_reflections (
     FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 8. ตารางจับคู่นักเรียนสำหรับการประเมินเพื่อน (Peer Pairing per round)
+-- round: รอบการประเมิน เช่น 'pretest', 'task1', 'task2', 'posttest'
+-- student_code: รหัสนักเรียนผู้ประเมิน (ผู้ให้คะแนน)
+-- partner_code: รหัสนักเรียนคู่ที่ถูกประเมิน (เจ้าของผลงาน)
+CREATE TABLE IF NOT EXISTS peer_pairs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    round VARCHAR(20) NOT NULL,
+    student_code VARCHAR(10) NOT NULL,
+    partner_code VARCHAR(10) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (student_code) REFERENCES students(student_id) ON DELETE CASCADE,
+    FOREIGN KEY (partner_code) REFERENCES students(student_id) ON DELETE CASCADE,
+    UNIQUE KEY unique_peer_pair (round, student_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
