@@ -45,35 +45,45 @@ require_once 'header.php';
       </div>
     </div>
     <div class="p-4 bg-white">
+      <?php
+        // นักเรียนประเมินเฉพาะ หน่วยที่ 1 และ หน่วยที่ 2 เท่านั้น (ไม่มี Pretest/Posttest)
+        // ครูยังคงเห็นครบทั้ง 4 รอบเพื่อใช้วัดผลก่อน-หลังเรียนในงานวิจัย
+        $isStudentEval = ($sessionUser['role'] === 'student');
+        $phaseColClass = $isStudentEval ? 'col-md-6 col-12' : 'col-md-3 col-6';
+      ?>
       <div class="row g-3">
-        <div class="col-md-3 col-6">
+        <?php if (!$isStudentEval): ?>
+        <div class="<?php echo $phaseColClass; ?>">
           <button type="button" class="phase-btn w-100 btn btn-outline-primary rounded-3 p-3 text-center fw-bold" data-phase="pretest" onclick="selectPhase('pretest')">
             <div class="fs-2 mb-2">📝</div>
             <div class="fw-bold">ก่อนเรียน</div>
             <div class="text-muted small">Pretest (T1)</div>
           </button>
         </div>
-        <div class="col-md-3 col-6">
+        <?php endif; ?>
+        <div class="<?php echo $phaseColClass; ?>">
           <button type="button" class="phase-btn w-100 btn btn-outline-success rounded-3 p-3 text-center fw-bold" data-phase="task1" onclick="selectPhase('task1')">
             <div class="fs-2 mb-2">📚</div>
             <div class="fw-bold">ภารงาน หน่วยที่ 1</div>
             <div class="text-muted small">Task Unit 1</div>
           </button>
         </div>
-        <div class="col-md-3 col-6">
+        <div class="<?php echo $phaseColClass; ?>">
           <button type="button" class="phase-btn w-100 btn btn-outline-warning rounded-3 p-3 text-center fw-bold" data-phase="task2" onclick="selectPhase('task2')">
             <div class="fs-2 mb-2">📖</div>
             <div class="fw-bold">ภารงาน หน่วยที่ 2</div>
             <div class="text-muted small">Task Unit 2</div>
           </button>
         </div>
-        <div class="col-md-3 col-6">
+        <?php if (!$isStudentEval): ?>
+        <div class="<?php echo $phaseColClass; ?>">
           <button type="button" class="phase-btn w-100 btn btn-outline-danger rounded-3 p-3 text-center fw-bold" data-phase="posttest" onclick="selectPhase('posttest')">
             <div class="fs-2 mb-2">🎓</div>
             <div class="fw-bold">หลังเรียน</div>
             <div class="text-muted small">Posttest (T2)</div>
           </button>
         </div>
+        <?php endif; ?>
       </div>
     </div>
   </div>
@@ -120,17 +130,36 @@ require_once 'header.php';
               <i class="bi bi-exclamation-triangle-fill"></i> ยังไม่มีการจับคู่สำหรับรอบนี้ กรุณาเลือกรายชื่อเพื่อนที่ต้องการประเมินจากรายการด้านบนด้วยตนเอง
             </p>
             <?php endif; ?>
+            <?php if ($mode_param === 'teacher' || $mode_param === 'peer'): ?>
+            <div class="mt-2">
+              <label for="groupFilterSelect" class="form-label small fw-bold text-secondary mb-1">
+                เลือกกลุ่ม (รายชื่อจะแสดงเฉพาะกลุ่มที่เลือก) <?php if ($mode_param === 'teacher'): ?><span class="text-danger">*</span><?php endif; ?>
+              </label>
+              <select id="groupFilterSelect" class="form-select form-select-sm" style="max-width: 320px;">
+                <?php if ($mode_param === 'teacher'): ?>
+                <option value="" selected>-- กรุณาเลือกกลุ่มก่อน --</option>
+                <?php else: ?>
+                <option value="">ทุกกลุ่ม</option>
+                <?php endif; ?>
+                <option value="กลุ่มทดลอง">กลุ่มทดลอง</option>
+                <option value="กลุ่มตัวอย่าง">กลุ่มตัวอย่าง</option>
+              </select>
+            </div>
+            <?php endif; ?>
+            <?php if ($mode_param === 'expert'): ?>
+            <p class="mt-2 text-primary small fw-bold mb-0">
+              <i class="bi bi-lock-fill"></i> ระบบจำกัดเฉพาะนักเรียน "กลุ่มทดลอง" หน่วยที่ 1 เท่านั้น
+            </p>
+            <?php endif; ?>
           </div>
           <?php if ($sessionUser['role'] === 'expert'): ?>
+          <!-- ผู้เชี่ยวชาญตรวจเฉพาะ หน่วยที่ 1 เท่านั้น (ล็อกไว้ ไม่มีหน่วยที่ 2 และ Pretest/Posttest) -->
           <div class="col-md-4 col-sm-12 mt-3 mt-md-0">
             <label class="form-label fw-bold text-secondary small text-uppercase tracking-wider">หน่วยการเรียน <span class="text-danger">*</span></label>
             <div class="d-flex gap-2">
-              <button type="button" id="btnTask1" class="btn btn-success btn-sm fw-bold flex-fill rounded-3 py-2" onclick="selectPhase('task1')">
+              <span class="btn btn-success btn-sm fw-bold flex-fill rounded-3 py-2 disabled" aria-disabled="true">
                 📚 หน่วยที่ 1
-              </button>
-              <button type="button" id="btnTask2" class="btn btn-outline-warning btn-sm fw-bold flex-fill rounded-3 py-2" onclick="selectPhase('task2')">
-                📖 หน่วยที่ 2
-              </button>
+              </span>
             </div>
           </div>
           <?php endif; ?>
@@ -395,10 +424,24 @@ require_once 'header.php';
     }
   ];
 
+  // โหมดครูต้องเลือกกลุ่มก่อนเสมอ รายชื่อจึงจะแสดง (แยกกลุ่มไม่ให้ปนกัน)
+  function groupRequired() { return modeParam === 'teacher'; }
+
   // โหลดรายชื่อนักเรียนจาก API
   async function loadStudents() {
     try {
-      const response = await fetch(`api.php?action=get_students_list&_t=${new Date().getTime()}`);
+      const gf = document.getElementById('groupFilterSelect');
+      const gval = gf ? gf.value : '';
+      // ครูยังไม่เลือกกลุ่ม → ยังไม่โหลดรายชื่อ (บังคับเลือกกลุ่มก่อน)
+      if (groupRequired() && !gval) { studentDB = {}; return; }
+
+      const params = [];
+      // นักเรียน (โหมดประเมินตนเอง/ประเมินเพื่อน) เห็นเฉพาะรายชื่อเพื่อนห้องเดียวกัน
+      if (modeParam === 'peer' || modeParam === 'self') params.push('classmates=1');
+      // ตัวกรองกลุ่ม (ทดลอง/ตัวอย่าง) — ผู้เชี่ยวชาญถูกบังคับกลุ่มทดลองที่ฝั่งเซิร์ฟเวอร์
+      if (gval) params.push('group=' + encodeURIComponent(gval));
+      const qs = params.length ? '&' + params.join('&') : '';
+      const response = await fetch(`api.php?action=get_students_list${qs}&_t=${new Date().getTime()}`);
       const res = await response.json();
       if (res.success) {
         studentDB = res.students;
@@ -413,8 +456,15 @@ require_once 'header.php';
   // เติมรายชื่อนักเรียนลงใน Dropdown
   function populateStudentSelect() {
     const select = document.getElementById('targetStudentSelect');
+    const gf = document.getElementById('groupFilterSelect');
+
+    // ครูยังไม่เลือกกลุ่ม → แจ้งให้เลือกกลุ่มก่อน ยังไม่แสดงรายชื่อ
+    if (groupRequired() && (!gf || !gf.value)) {
+      select.innerHTML = '<option value="" disabled selected>-- กรุณาเลือกกลุ่มก่อน --</option>';
+      return;
+    }
+
     select.innerHTML = '<option value="" disabled selected>-- เลือกรายชื่อนักเรียน --</option>';
-    
     const sortedKeys = Object.keys(studentDB).sort();
     sortedKeys.forEach(id => {
       const option = document.createElement('option');
@@ -669,6 +719,30 @@ require_once 'header.php';
     }
   }
   document.getElementById('targetStudentSelect').addEventListener('change', handleTargetOrPhaseChange);
+
+  // เปลี่ยนตัวกรองกลุ่ม → โหลดรายชื่อใหม่แล้วรีเซ็ตการเลือกเป้าหมาย
+  (function bindGroupFilter() {
+    const gf = document.getElementById('groupFilterSelect');
+    if (!gf) return;
+    gf.addEventListener('change', async () => {
+      await loadStudents();
+      populateStudentSelect();
+      const tSelect = document.getElementById('targetStudentSelect');
+      const phase = document.getElementById('selectedTestPhase') ? document.getElementById('selectedTestPhase').value : '';
+      // โหมดเพื่อน: ถ้าเลือกรอบแล้ว ให้ดึงคู่ที่ล็อกไว้ใหม่ตามรายชื่อที่กรอง
+      if (modeParam === 'peer' && phase) {
+        applyPeerPairing(phase);
+        return;
+      }
+      // โหมดอื่น: รีเซ็ตการเลือกเป้าหมาย
+      tSelect.value = "";
+      tSelect.disabled = false;
+      const rubricCont = document.getElementById('rubricContainer');
+      const progressCont = document.getElementById('progressContainer');
+      if (rubricCont) rubricCont.classList.add('opacity-60', 'pointer-events-none');
+      if (progressCont) progressCont.classList.add('d-none');
+    });
+  })();
 
   // phase picker functions
   const phaseLabels = {
