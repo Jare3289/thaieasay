@@ -132,9 +132,15 @@ require_once 'header.php';
             <?php endif; ?>
             <?php if ($mode_param === 'teacher' || $mode_param === 'peer'): ?>
             <div class="mt-2">
-              <label for="groupFilterSelect" class="form-label small fw-bold text-secondary mb-1">กรองตามกลุ่ม (กันสับสนระหว่างกลุ่มทดลอง/กลุ่มตัวอย่าง)</label>
+              <label for="groupFilterSelect" class="form-label small fw-bold text-secondary mb-1">
+                เลือกกลุ่ม (รายชื่อจะแสดงเฉพาะกลุ่มที่เลือก) <?php if ($mode_param === 'teacher'): ?><span class="text-danger">*</span><?php endif; ?>
+              </label>
               <select id="groupFilterSelect" class="form-select form-select-sm" style="max-width: 320px;">
+                <?php if ($mode_param === 'teacher'): ?>
+                <option value="" selected>-- กรุณาเลือกกลุ่มก่อน --</option>
+                <?php else: ?>
                 <option value="">ทุกกลุ่ม</option>
+                <?php endif; ?>
                 <option value="กลุ่มทดลอง">กลุ่มทดลอง</option>
                 <option value="กลุ่มตัวอย่าง">กลุ่มตัวอย่าง</option>
               </select>
@@ -418,15 +424,22 @@ require_once 'header.php';
     }
   ];
 
+  // โหมดครูต้องเลือกกลุ่มก่อนเสมอ รายชื่อจึงจะแสดง (แยกกลุ่มไม่ให้ปนกัน)
+  function groupRequired() { return modeParam === 'teacher'; }
+
   // โหลดรายชื่อนักเรียนจาก API
   async function loadStudents() {
     try {
+      const gf = document.getElementById('groupFilterSelect');
+      const gval = gf ? gf.value : '';
+      // ครูยังไม่เลือกกลุ่ม → ยังไม่โหลดรายชื่อ (บังคับเลือกกลุ่มก่อน)
+      if (groupRequired() && !gval) { studentDB = {}; return; }
+
       const params = [];
       // นักเรียน (โหมดประเมินตนเอง/ประเมินเพื่อน) เห็นเฉพาะรายชื่อเพื่อนห้องเดียวกัน
       if (modeParam === 'peer' || modeParam === 'self') params.push('classmates=1');
-      // ตัวกรองกลุ่ม (ทดลอง/ตัวอย่าง) สำหรับครูและนักเรียนโหมดเพื่อน (ผู้เชี่ยวชาญถูกบังคับกลุ่มทดลองที่ฝั่งเซิร์ฟเวอร์)
-      const gf = document.getElementById('groupFilterSelect');
-      if (gf && gf.value) params.push('group=' + encodeURIComponent(gf.value));
+      // ตัวกรองกลุ่ม (ทดลอง/ตัวอย่าง) — ผู้เชี่ยวชาญถูกบังคับกลุ่มทดลองที่ฝั่งเซิร์ฟเวอร์
+      if (gval) params.push('group=' + encodeURIComponent(gval));
       const qs = params.length ? '&' + params.join('&') : '';
       const response = await fetch(`api.php?action=get_students_list${qs}&_t=${new Date().getTime()}`);
       const res = await response.json();
@@ -443,8 +456,15 @@ require_once 'header.php';
   // เติมรายชื่อนักเรียนลงใน Dropdown
   function populateStudentSelect() {
     const select = document.getElementById('targetStudentSelect');
+    const gf = document.getElementById('groupFilterSelect');
+
+    // ครูยังไม่เลือกกลุ่ม → แจ้งให้เลือกกลุ่มก่อน ยังไม่แสดงรายชื่อ
+    if (groupRequired() && (!gf || !gf.value)) {
+      select.innerHTML = '<option value="" disabled selected>-- กรุณาเลือกกลุ่มก่อน --</option>';
+      return;
+    }
+
     select.innerHTML = '<option value="" disabled selected>-- เลือกรายชื่อนักเรียน --</option>';
-    
     const sortedKeys = Object.keys(studentDB).sort();
     sortedKeys.forEach(id => {
       const option = document.createElement('option');
