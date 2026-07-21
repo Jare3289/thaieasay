@@ -109,7 +109,24 @@ try {
 
         // 4. ดึงรายชื่อนักเรียนทั้งหมด
         case 'get_students_list':
-            $stmt = $pdo->query('SELECT student_id, student_name FROM students ORDER BY student_id ASC');
+            // ถ้าส่ง classmates=1 และผู้ใช้เป็นนักเรียน → คืนเฉพาะเพื่อนห้องเดียวกัน
+            // (ใช้ในหน้าประเมินเพื่อน/ตนเอง เพื่อจำกัดรายชื่อเป้าหมายให้อยู่ในห้องของตนเอง)
+            $onlyClassmates = isset($_GET['classmates']) && $_GET['classmates'] == '1'
+                && isset($_SESSION['user']) && $_SESSION['user']['role'] === 'student';
+            if ($onlyClassmates) {
+                $meStmt = $pdo->prepare('SELECT classroom FROM students WHERE student_id = ?');
+                $meStmt->execute([$_SESSION['user']['id']]);
+                $myRoom = $meStmt->fetchColumn();
+                if ($myRoom !== false && $myRoom !== null && trim($myRoom) !== '') {
+                    $stmt = $pdo->prepare('SELECT student_id, student_name FROM students WHERE classroom = ? ORDER BY student_id ASC');
+                    $stmt->execute([$myRoom]);
+                } else {
+                    // ยังไม่ได้กำหนดห้องให้นักเรียนคนนี้ → คืนทั้งหมดเพื่อไม่ให้รายชื่อว่างเปล่า
+                    $stmt = $pdo->query('SELECT student_id, student_name FROM students ORDER BY student_id ASC');
+                }
+            } else {
+                $stmt = $pdo->query('SELECT student_id, student_name FROM students ORDER BY student_id ASC');
+            }
             $students = [];
             while ($row = $stmt->fetch()) {
                 $students[$row['student_id']] = formatNamePrefix($row['student_name']);

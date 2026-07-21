@@ -45,35 +45,45 @@ require_once 'header.php';
       </div>
     </div>
     <div class="p-4 bg-white">
+      <?php
+        // นักเรียนประเมินเฉพาะ หน่วยที่ 1 และ หน่วยที่ 2 เท่านั้น (ไม่มี Pretest/Posttest)
+        // ครูยังคงเห็นครบทั้ง 4 รอบเพื่อใช้วัดผลก่อน-หลังเรียนในงานวิจัย
+        $isStudentEval = ($sessionUser['role'] === 'student');
+        $phaseColClass = $isStudentEval ? 'col-md-6 col-12' : 'col-md-3 col-6';
+      ?>
       <div class="row g-3">
-        <div class="col-md-3 col-6">
+        <?php if (!$isStudentEval): ?>
+        <div class="<?php echo $phaseColClass; ?>">
           <button type="button" class="phase-btn w-100 btn btn-outline-primary rounded-3 p-3 text-center fw-bold" data-phase="pretest" onclick="selectPhase('pretest')">
             <div class="fs-2 mb-2">📝</div>
             <div class="fw-bold">ก่อนเรียน</div>
             <div class="text-muted small">Pretest (T1)</div>
           </button>
         </div>
-        <div class="col-md-3 col-6">
+        <?php endif; ?>
+        <div class="<?php echo $phaseColClass; ?>">
           <button type="button" class="phase-btn w-100 btn btn-outline-success rounded-3 p-3 text-center fw-bold" data-phase="task1" onclick="selectPhase('task1')">
             <div class="fs-2 mb-2">📚</div>
             <div class="fw-bold">ภารงาน หน่วยที่ 1</div>
             <div class="text-muted small">Task Unit 1</div>
           </button>
         </div>
-        <div class="col-md-3 col-6">
+        <div class="<?php echo $phaseColClass; ?>">
           <button type="button" class="phase-btn w-100 btn btn-outline-warning rounded-3 p-3 text-center fw-bold" data-phase="task2" onclick="selectPhase('task2')">
             <div class="fs-2 mb-2">📖</div>
             <div class="fw-bold">ภารงาน หน่วยที่ 2</div>
             <div class="text-muted small">Task Unit 2</div>
           </button>
         </div>
-        <div class="col-md-3 col-6">
+        <?php if (!$isStudentEval): ?>
+        <div class="<?php echo $phaseColClass; ?>">
           <button type="button" class="phase-btn w-100 btn btn-outline-danger rounded-3 p-3 text-center fw-bold" data-phase="posttest" onclick="selectPhase('posttest')">
             <div class="fs-2 mb-2">🎓</div>
             <div class="fw-bold">หลังเรียน</div>
             <div class="text-muted small">Posttest (T2)</div>
           </button>
         </div>
+        <?php endif; ?>
       </div>
     </div>
   </div>
@@ -398,7 +408,9 @@ require_once 'header.php';
   // โหลดรายชื่อนักเรียนจาก API
   async function loadStudents() {
     try {
-      const response = await fetch(`api.php?action=get_students_list&_t=${new Date().getTime()}`);
+      // นักเรียน (โหมดประเมินตนเอง/ประเมินเพื่อน) เห็นเฉพาะรายชื่อเพื่อนห้องเดียวกัน
+      const scope = (modeParam === 'peer' || modeParam === 'self') ? '&classmates=1' : '';
+      const response = await fetch(`api.php?action=get_students_list${scope}&_t=${new Date().getTime()}`);
       const res = await response.json();
       if (res.success) {
         studentDB = res.students;
