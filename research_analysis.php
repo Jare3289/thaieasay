@@ -20,7 +20,7 @@ require_once 'header.php';
     </div>
     <div class="alert alert-primary rounded-0 mb-0 py-2 px-4 small border-0 d-flex align-items-center gap-2">
       <i class="bi bi-info-circle-fill"></i>
-      <span><strong>กลุ่มทดลอง (Experimental Group):</strong> ระบบกำหนดนักเรียน<strong>ห้อง 606</strong> เป็นกลุ่มทดลองของงานวิจัยชุดนี้ ทุกองค์ประกอบของการวิเคราะห์ในหน้านี้ — ทั้งค่า ICC (คะแนนรวม + 4 ด้าน) และ Paired t-test — คำนวณจากนักเรียนห้อง 606 เท่านั้น (ตั้งค่าห้องเรียนของนักเรียนได้ที่หน้า <a href="manage_students.php" class="alert-link">จัดการข้อมูลนักเรียน</a>)</span>
+      <span><strong>กลุ่มทดลอง (Experimental Group):</strong> ระบบกำหนดนักเรียน<strong>ห้อง 606</strong> เป็นกลุ่มทดลองของงานวิจัยชุดนี้ ทุกส่วนของหน้านี้ — ค่า ICC (คะแนนรวม + 4 ด้าน), Paired t-test, ศูนย์วิเคราะห์เชิงคุณภาพ และเรียงความนักเรียน — กรองให้แสดงเฉพาะข้อมูลของนักเรียนห้อง 606 เท่านั้น (ตั้งค่าห้องเรียนของนักเรียนได้ที่หน้า <a href="manage_students.php" class="alert-link">จัดการข้อมูลนักเรียน</a>)</span>
     </div>
     <div class="card-body p-4 text-start">
 
@@ -324,6 +324,16 @@ require_once 'header.php';
   let studentDB = {};
   let classroomResearchData = null;
   let icctaskPhase = 'task1';
+
+  // คืนค่าเซตของรหัสนักเรียนห้อง 606 (กลุ่มทดลอง) เพื่อกรองข้อมูลทุกส่วนของหน้านี้ให้ตรงกัน
+  function getExperimentalStudentIds() {
+    if (!classroomResearchData || !Array.isArray(classroomResearchData.students)) return new Set();
+    return new Set(
+      classroomResearchData.students
+        .filter(s => s.classroom === EXPERIMENTAL_CLASSROOM)
+        .map(s => s.student_id)
+    );
+  }
 
   const criteriaMap = {
     '1.1': { name: '1.1 ความตรงประเด็น (คะแนนเต็ม 12)', mult: 3 },
@@ -721,9 +731,10 @@ require_once 'header.php';
     const filterCriteria = document.getElementById('qualitativeCriteriaFilter').value;
     const query = document.getElementById('qualitativeSearchInput').value.toLowerCase().trim();
 
-    const problems = classroomResearchData.problems;
-    const peerReviews = classroomResearchData.peer_reviews;
-    const reflections = classroomResearchData.reflections;
+    const experimentalIds = getExperimentalStudentIds();
+    const problems = classroomResearchData.problems.filter(p => experimentalIds.has(p.student_id));
+    const peerReviews = classroomResearchData.peer_reviews.filter(pr => experimentalIds.has(pr.student_id));
+    const reflections = classroomResearchData.reflections.filter(rf => experimentalIds.has(rf.student_id));
 
     // ประมวลผลบทวิเคราะห์เชิงคุณภาพ
     const qualParagraphEl = document.getElementById('qualitativeReportParagraph');
@@ -921,9 +932,10 @@ require_once 'header.php';
     let csvContent = "﻿"; // UTF-8 BOM
     csvContent += "Student ID,Student Name,Data Type,Sub-criteria,Content / Problem / Strength,Solution / Improvement / Feedback,Encouragement / Goals\n";
 
-    const problems = classroomResearchData.problems;
-    const peerReviews = classroomResearchData.peer_reviews;
-    const reflections = classroomResearchData.reflections;
+    const experimentalIds = getExperimentalStudentIds();
+    const problems = classroomResearchData.problems.filter(p => experimentalIds.has(p.student_id));
+    const peerReviews = classroomResearchData.peer_reviews.filter(pr => experimentalIds.has(pr.student_id));
+    const reflections = classroomResearchData.reflections.filter(rf => experimentalIds.has(rf.student_id));
 
     const escapeCSV = (str) => {
       if (!str) return '';
@@ -985,11 +997,14 @@ require_once 'header.php';
     const container = document.getElementById('essayViewerContainer');
     container.innerHTML = '<div class="text-center py-5 text-muted"><span class="spinner-border spinner-border-sm me-2"></span>กำลังโหลดเรียงความ...</div>';
     try {
+      if (researchDataPromise) await researchDataPromise;
+      const experimentalIds = getExperimentalStudentIds();
       const res = await fetch('api.php?action=get_all_essays');
       const data = await res.json();
       if (data.success) {
-        allEssaysCache = data.essays;
-        renderEssayViewer(data.essays);
+        // กรองเฉพาะเรียงความของนักเรียนห้อง 606 (กลุ่มทดลอง) ไม่ให้ปนกับห้องอื่น
+        allEssaysCache = data.essays.filter(e => experimentalIds.has(e.student_id));
+        renderEssayViewer(allEssaysCache);
       } else {
         container.innerHTML = `<div class="text-center py-5 text-danger fw-bold">เกิดข้อผิดพลาด: ${data.error}</div>`;
       }
@@ -1190,9 +1205,11 @@ require_once 'header.php';
   // ============================================
 
   // --- เริ่มรันอัตโนมัติ ---
+  let researchDataPromise = null;
   (async function init() {
+    researchDataPromise = loadResearchData();
     await loadStudents();
-    await loadResearchData();
+    await researchDataPromise;
   })();
 </script>
 
