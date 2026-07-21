@@ -132,15 +132,13 @@ require_once 'header.php';
             <?php endif; ?>
           </div>
           <?php if ($sessionUser['role'] === 'expert'): ?>
+          <!-- ผู้เชี่ยวชาญตรวจเฉพาะ หน่วยที่ 1 เท่านั้น (ล็อกไว้ ไม่มีหน่วยที่ 2 และ Pretest/Posttest) -->
           <div class="col-md-4 col-sm-12 mt-3 mt-md-0">
             <label class="form-label fw-bold text-secondary small text-uppercase tracking-wider">หน่วยการเรียน <span class="text-danger">*</span></label>
             <div class="d-flex gap-2">
-              <button type="button" id="btnTask1" class="btn btn-success btn-sm fw-bold flex-fill rounded-3 py-2" onclick="selectPhase('task1')">
+              <span class="btn btn-success btn-sm fw-bold flex-fill rounded-3 py-2 disabled" aria-disabled="true">
                 📚 หน่วยที่ 1
-              </button>
-              <button type="button" id="btnTask2" class="btn btn-outline-warning btn-sm fw-bold flex-fill rounded-3 py-2" onclick="selectPhase('task2')">
-                📖 หน่วยที่ 2
-              </button>
+              </span>
             </div>
           </div>
           <?php endif; ?>
