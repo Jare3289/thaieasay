@@ -244,6 +244,16 @@ require_once 'header.php';
         <span class="text-primary text-center fw-bold small mt-3 d-block">เปิดหน้าจัดการนักเรียน &rarr;</span>
       </a>
     </div>
+    <div class="col-md-4 col-sm-12">
+      <a href="research_analysis.php" class="btn menu-card w-100 py-5 text-decoration-none">
+        <div class="text-center w-100">
+          <div class="fs-1 mb-3">🔬</div>
+          <h4 class="fw-bold text-dark mb-2">วิเคราะห์สถิติงานวิจัย</h4>
+          <p class="text-muted small font-light">ค่าความสอดคล้องผู้ตรวจ (ICC), Paired t-test และการวิเคราะห์เชิงคุณภาพของกลุ่มทดลอง (ห้อง 606)</p>
+        </div>
+        <span class="text-primary text-center fw-bold small mt-3 d-block">เปิดหน้าวิเคราะห์สถิติ &rarr;</span>
+      </a>
+    </div>
   </div>
   <?php endif; ?>
 </div>
