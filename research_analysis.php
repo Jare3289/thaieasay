@@ -1298,8 +1298,9 @@ require_once 'header.php';
   // --- เริ่มรันอัตโนมัติ ---
   let researchDataPromise = null;
   (async function init() {
-    researchDataPromise = loadResearchData();
+    // ต้องรอ studentDB ให้พร้อมก่อนเสมอ เพราะ renderQualitativeHub() ใช้ studentDB แปลงรหัสเป็นชื่อ
     await loadStudents();
+    researchDataPromise = loadResearchData();
     await researchDataPromise;
     loadEssayViewer(); // โหลดล่วงหน้าเบื้องหลัง เพื่อให้ตัวเลข KPI และแท็บเรียงความพร้อมใช้งานทันที
   })();
