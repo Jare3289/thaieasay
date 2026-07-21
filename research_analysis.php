@@ -24,31 +24,72 @@ require_once 'header.php';
     </div>
     <div class="card-body p-4 text-start">
 
-      <!-- แท็บเลื่อนเลือกประเภทสถิติ -->
-      <ul class="nav nav-pills mb-4 gap-2 bg-light p-2 rounded-3 border" id="researchTab" role="tablist">
+      <!-- แถบสรุปตัวเลขสำคัญ (KPI Overview) -->
+      <div class="row g-3 mb-4" id="researchKpiRow">
+        <div class="col-md-3 col-6">
+          <div class="card border-0 rounded-3 p-3 text-center bg-light h-100">
+            <div class="text-muted small fw-semibold mb-1 text-truncate"><i class="bi bi-people-fill me-1 text-primary"></i>ICC ภาพรวม</div>
+            <div class="fs-4 fw-bold text-primary mb-1" id="kpiIccOverall">-</div>
+            <span class="badge bg-secondary" id="kpiIccBadge">รอข้อมูล</span>
+          </div>
+        </div>
+        <div class="col-md-3 col-6">
+          <div class="card border-0 rounded-3 p-3 text-center bg-light h-100">
+            <div class="text-muted small fw-semibold mb-1 text-truncate"><i class="bi bi-graph-up-arrow me-1 text-success"></i>Paired t-test</div>
+            <div class="fs-4 fw-bold text-success mb-1" id="kpiTtestValue">-</div>
+            <span class="badge bg-secondary" id="kpiTtestBadge">รอข้อมูล</span>
+          </div>
+        </div>
+        <div class="col-md-3 col-6">
+          <div class="card border-0 rounded-3 p-3 text-center bg-light h-100">
+            <div class="text-muted small fw-semibold mb-1 text-truncate"><i class="bi bi-chat-square-text-fill me-1 text-warning-emphasis"></i>ข้อมูลเชิงคุณภาพ</div>
+            <div class="fs-4 fw-bold text-warning-emphasis mb-1" id="kpiQualCount">-</div>
+            <span class="text-muted small">รายการที่บันทึกไว้</span>
+          </div>
+        </div>
+        <div class="col-md-3 col-6">
+          <div class="card border-0 rounded-3 p-3 text-center bg-light h-100">
+            <div class="text-muted small fw-semibold mb-1 text-truncate"><i class="bi bi-pencil-square me-1 text-danger"></i>เรียงความ</div>
+            <div class="fs-4 fw-bold text-danger mb-1" id="kpiEssayCount">-</div>
+            <span class="text-muted small">ฉบับที่ส่งแล้ว</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- แท็บกลุ่มหลัก: แยกเชิงปริมาณ / เชิงคุณภาพให้ชัดเจน -->
+      <ul class="nav nav-tabs nav-fill mb-0" id="analysisGroupTab" role="tablist">
         <li class="nav-item" role="presentation">
-          <button class="nav-link active fw-bold text-dark px-4 py-2.5 rounded-3 d-flex align-items-center gap-2" id="reliability-tab" data-bs-toggle="pill" data-bs-target="#tab-reliability" type="button" role="tab" aria-selected="true">
-            🤝 ส่วนที่ 1 — ค่าความสอดคล้องผู้ตรวจ 3 คน (ICC)
+          <button class="nav-link active fw-bold d-flex align-items-center justify-content-center gap-2 py-3" id="group-quant-tab" data-bs-toggle="tab" data-bs-target="#group-quant" type="button" role="tab" aria-selected="true">
+            <i class="bi bi-bar-chart-line-fill"></i> การวิเคราะห์เชิงปริมาณ (Quantitative)
           </button>
         </li>
         <li class="nav-item" role="presentation">
-          <button class="nav-link fw-bold text-dark px-4 py-2.5 rounded-3 d-flex align-items-center gap-2" id="ttest-tab" data-bs-toggle="pill" data-bs-target="#tab-ttest" type="button" role="tab" aria-selected="false">
-            📈 ส่วนที่ 2 — ประสิทธิภาพการพัฒนาการเขียน (Paired t-test)
-          </button>
-        </li>
-        <li class="nav-item" role="presentation">
-          <button class="nav-link fw-bold text-dark px-4 py-2.5 rounded-3 d-flex align-items-center gap-2" id="qualitative-tab" data-bs-toggle="pill" data-bs-target="#tab-qualitative" type="button" role="tab" aria-selected="false">
-            🔬 ส่วนที่ 3 — ศูนย์วิเคราะห์เชิงคุณภาพ (Content Analysis Hub)
-          </button>
-        </li>
-        <li class="nav-item" role="presentation">
-          <button class="nav-link fw-bold text-dark px-4 py-2.5 rounded-3 d-flex align-items-center gap-2" id="essays-tab" data-bs-toggle="pill" data-bs-target="#tab-essays" type="button" role="tab" aria-selected="false" onclick="loadEssayViewer()">
-            ✍️ ส่วนที่ 4 — เรียงความนักเรียน (Essay Viewer)
+          <button class="nav-link fw-bold d-flex align-items-center justify-content-center gap-2 py-3" id="group-qual-tab" data-bs-toggle="tab" data-bs-target="#group-qual" type="button" role="tab" aria-selected="false">
+            <i class="bi bi-chat-square-quote-fill"></i> การวิเคราะห์เชิงคุณภาพ (Qualitative)
           </button>
         </li>
       </ul>
 
-      <div class="tab-content" id="researchTabContent">
+      <div class="tab-content border border-top-0 rounded-bottom-4 p-4 bg-white shadow-sm" id="analysisGroupContent">
+
+        <!-- กลุ่ม 1: เชิงปริมาณ -->
+        <div class="tab-pane fade show active" id="group-quant" role="tabpanel" aria-labelledby="group-quant-tab">
+
+          <!-- แท็บเลื่อนเลือกประเภทสถิติเชิงปริมาณ -->
+          <ul class="nav nav-pills mb-4 gap-2 bg-light p-2 rounded-3 border" id="researchTab" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active fw-bold text-dark px-4 py-2.5 rounded-3 d-flex align-items-center gap-2" id="reliability-tab" data-bs-toggle="pill" data-bs-target="#tab-reliability" type="button" role="tab" aria-selected="true">
+                <i class="bi bi-people-fill"></i> ค่าความสอดคล้องผู้ตรวจ 3 คน (ICC)
+              </button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link fw-bold text-dark px-4 py-2.5 rounded-3 d-flex align-items-center gap-2" id="ttest-tab" data-bs-toggle="pill" data-bs-target="#tab-ttest" type="button" role="tab" aria-selected="false">
+                <i class="bi bi-graph-up-arrow"></i> ประสิทธิภาพการพัฒนาการเขียน (Paired t-test)
+              </button>
+            </li>
+          </ul>
+
+          <div class="tab-content" id="researchTabContent">
 
         <!-- 1. ICC Reliability Tab -->
         <div class="tab-pane fade show active" id="tab-reliability" role="tabpanel" aria-labelledby="reliability-tab">
@@ -206,8 +247,30 @@ require_once 'header.php';
           </div>
         </div>
 
+          </div>
+        </div>
+
+        <!-- กลุ่ม 2: เชิงคุณภาพ -->
+        <div class="tab-pane fade" id="group-qual" role="tabpanel" aria-labelledby="group-qual-tab">
+
+          <!-- แท็บเลื่อนเลือกประเภทข้อมูลเชิงคุณภาพ -->
+          <ul class="nav nav-pills mb-4 gap-2 bg-light p-2 rounded-3 border" id="qualGroupTab" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active fw-bold text-dark px-4 py-2.5 rounded-3 d-flex align-items-center gap-2" id="qualitative-tab" data-bs-toggle="pill" data-bs-target="#tab-qualitative" type="button" role="tab" aria-selected="true">
+                <i class="bi bi-chat-square-text-fill"></i> ศูนย์วิเคราะห์เชิงคุณภาพ (Content Analysis Hub)
+              </button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link fw-bold text-dark px-4 py-2.5 rounded-3 d-flex align-items-center gap-2" id="essays-tab" data-bs-toggle="pill" data-bs-target="#tab-essays" type="button" role="tab" aria-selected="false" onclick="loadEssayViewer()">
+                <i class="bi bi-pencil-square"></i> เรียงความนักเรียน (Essay Viewer)
+              </button>
+            </li>
+          </ul>
+
+          <div class="tab-content" id="qualGroupContent">
+
         <!-- 3. Qualitative Content Analysis Hub Tab -->
-        <div class="tab-pane fade" id="tab-qualitative" role="tabpanel" aria-labelledby="qualitative-tab">
+        <div class="tab-pane fade show active" id="tab-qualitative" role="tabpanel" aria-labelledby="qualitative-tab">
           <div class="card border-0 rounded-3 p-3 bg-light shadow-sm mb-4">
             <div class="row g-2 align-items-center">
               <div class="col-md-4 col-sm-12">
@@ -269,7 +332,7 @@ require_once 'header.php';
                 <option value="task2">ภารงาน หน่วยที่ 2</option>
                 <option value="posttest">หลังเรียน</option>
               </select>
-              <input type="text" id="essaySearchInput" onkeyup="filterEssayViewer()" class="form-control form-control-sm border-2 rounded-pill" placeholder="🔍 ค้นหาชื่อหรือเนื้อหา..." style="width:220px;">
+              <input type="text" id="essaySearchInput" onkeyup="filterEssayViewer()" class="form-control form-control-sm border-2 rounded-pill" placeholder="ค้นหาชื่อหรือเนื้อหา..." style="width:220px;">
               <button class="btn btn-outline-primary btn-sm rounded-pill px-3" onclick="exportEssaysCSV()">
                 <i class="bi bi-download me-1"></i>ส่งออก CSV
               </button>
@@ -312,6 +375,9 @@ require_once 'header.php';
           </div>
         </div>
 
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
@@ -333,6 +399,19 @@ require_once 'header.php';
         .filter(s => s.classroom === EXPERIMENTAL_CLASSROOM)
         .map(s => s.student_id)
     );
+  }
+
+  // อัปเดตแถบสรุปตัวเลขสำคัญ (KPI) ด้านบนของหน้า
+  function setKpiValue(id, text) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  }
+  function setKpiBadge(id, text, cssClass) {
+    const el = document.getElementById(id);
+    if (el) {
+      el.textContent = text;
+      el.className = 'badge ' + cssClass;
+    }
   }
 
   const criteriaMap = {
@@ -475,6 +554,8 @@ require_once 'header.php';
       tableBody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-muted">ต้องการข้อมูลนักเรียน<strong>ห้อง 606</strong>ที่ครูผู้สอน + ผู้เชี่ยวชาญ 2 คน ตรวจครบ อย่างน้อย 2 คน</td></tr>`;
       const p = document.getElementById('pearsonReportParagraph');
       if (p) p.innerHTML = `<h6 class="fw-bold text-dark mb-2"><i class="bi bi-file-earmark-text text-primary"></i> บทวิเคราะห์ค่าความสอดคล้องผู้ตรวจ (ICC)</h6><p class="mb-0 text-muted">ยังมีข้อมูลไม่พอสำหรับคำนวณ ICC — ต้องมีนักเรียนห้อง 606 ที่ผู้ตรวจครบ 3 คนอย่างน้อย 2 คน</p>`;
+      setKpiValue('kpiIccOverall', 'N/A');
+      setKpiBadge('kpiIccBadge', 'ข้อมูลไม่พอ', 'bg-secondary');
       return;
     }
 
@@ -494,6 +575,8 @@ require_once 'header.php';
     const overallInterp = getICCInterpretation(overallICC);
     interpEl.textContent = overallInterp.text;
     interpEl.className = "badge " + overallInterp.css;
+    setKpiValue('kpiIccOverall', overallICC !== null ? overallICC.toFixed(3) : 'N/A');
+    setKpiBadge('kpiIccBadge', overallInterp.text.split(' (')[0], overallInterp.css);
 
     let html = '';
     const iccVals = [];
@@ -641,6 +724,8 @@ require_once 'header.php';
     if (N < 2) {
       rowEl.innerHTML = `<td colspan="9" class="text-center py-4 text-muted">ต้องการข้อมูลผลคะแนนที่ตรงคู่กันระหว่าง Pretest และ Posttest ของนักเรียนห้อง 606 อย่างน้อย 2 คน</td>`;
       interpEl.innerHTML = `<i class="bi bi-exclamation-triangle-fill text-warning"></i> ไม่สามารถคำนวณสถิติ Paired t-test ได้ เนื่องจากจำนวนตัวอย่างที่จับคู่มีไม่เพียงพอ (N = ${N})`;
+      setKpiValue('kpiTtestValue', 'N/A');
+      setKpiBadge('kpiTtestBadge', 'ข้อมูลไม่พอ', 'bg-secondary');
       return;
     }
 
@@ -681,6 +766,9 @@ require_once 'header.php';
     let signStr = isSignificant
       ? `<span class="text-success fw-bold"><i class="bi bi-check-circle-fill"></i> มีนัยสำคัญทางสถิติที่ระดับ .05 (p = ${pValue < 0.001 ? '< .001' : pValue.toFixed(4)})</span>`
       : `<span class="text-danger fw-bold"><i class="bi bi-x-circle-fill"></i> ไม่มีนัยสำคัญทางสถิติที่ระดับ .05 (p = ${pValue.toFixed(4)})</span>`;
+
+    setKpiValue('kpiTtestValue', (meanDiff >= 0 ? '+' : '') + meanDiff.toFixed(2));
+    setKpiBadge('kpiTtestBadge', isSignificant ? 'มีนัยสำคัญ (p<.05)' : 'ไม่มีนัยสำคัญ', isSignificant ? 'bg-success' : 'bg-secondary');
 
     interpEl.innerHTML = `
       <div class="mb-2"><strong>วิเคราะห์ผลต่างเฉลี่ยสัมฤทธิ์:</strong></div>
@@ -735,6 +823,8 @@ require_once 'header.php';
     const problems = classroomResearchData.problems.filter(p => experimentalIds.has(p.student_id));
     const peerReviews = classroomResearchData.peer_reviews.filter(pr => experimentalIds.has(pr.student_id));
     const reflections = classroomResearchData.reflections.filter(rf => experimentalIds.has(rf.student_id));
+
+    setKpiValue('kpiQualCount', (problems.length + peerReviews.length + reflections.length).toLocaleString('th-TH'));
 
     // ประมวลผลบทวิเคราะห์เชิงคุณภาพ
     const qualParagraphEl = document.getElementById('qualitativeReportParagraph');
@@ -1004,6 +1094,7 @@ require_once 'header.php';
       if (data.success) {
         // กรองเฉพาะเรียงความของนักเรียนห้อง 606 (กลุ่มทดลอง) ไม่ให้ปนกับห้องอื่น
         allEssaysCache = data.essays.filter(e => experimentalIds.has(e.student_id));
+        setKpiValue('kpiEssayCount', allEssaysCache.length.toLocaleString('th-TH'));
         renderEssayViewer(allEssaysCache);
       } else {
         container.innerHTML = `<div class="text-center py-5 text-danger fw-bold">เกิดข้อผิดพลาด: ${data.error}</div>`;
@@ -1210,6 +1301,7 @@ require_once 'header.php';
     researchDataPromise = loadResearchData();
     await loadStudents();
     await researchDataPromise;
+    loadEssayViewer(); // โหลดล่วงหน้าเบื้องหลัง เพื่อให้ตัวเลข KPI และแท็บเรียงความพร้อมใช้งานทันที
   })();
 </script>
 
