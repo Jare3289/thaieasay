@@ -254,6 +254,16 @@ require_once 'header.php';
         <span class="text-primary text-center fw-bold small mt-3 d-block">เปิดหน้าวิเคราะห์สถิติ &rarr;</span>
       </a>
     </div>
+    <div class="col-md-4 col-sm-12">
+      <a href="peer_pairing.php" class="btn menu-card w-100 py-5 text-decoration-none">
+        <div class="text-center w-100">
+          <div class="fs-1 mb-3">🤝</div>
+          <h4 class="fw-bold text-dark mb-2">จับคู่ประเมินเพื่อน</h4>
+          <p class="text-muted small font-light">กำหนดคู่ประเมินเพื่อนล่วงหน้าต่อรอบ เพื่อให้นักเรียนไม่ต้องค้นชื่อจากรายชื่อทั้งหมดเอง</p>
+        </div>
+        <span class="text-primary text-center fw-bold small mt-3 d-block">เปิดหน้าจับคู่ &rarr;</span>
+      </a>
+    </div>
   </div>
   <?php endif; ?>
 </div>

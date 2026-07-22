@@ -112,6 +112,9 @@ require_once 'header.php';
               <i class="bi bi-info-circle-fill"></i> ระบบจำกัดการเลือกเฉพาะข้อมูลของคุณเนื่องจากกำลังทำโหมด "ตนเองประเมิน"
             </p>
             <?php endif; ?>
+            <?php if ($mode_param === 'peer'): ?>
+            <p id="peerPairNotice" class="mt-2 small fw-bold mb-0 d-none"></p>
+            <?php endif; ?>
           </div>
           <?php if ($sessionUser['role'] === 'expert'): ?>
           <div class="col-md-4 col-sm-12 mt-3 mt-md-0">
@@ -669,6 +672,43 @@ require_once 'header.php';
     task2:    'ภารงาน หน่วยที่ 2 (Task 2)',
     posttest: 'หลังเรียน (Posttest - T2)'
   };
+
+  // โหมดประเมินเพื่อน: ค้นหาคู่ที่ครูจับไว้ล่วงหน้าสำหรับรอบนี้ แล้วล็อกช่องเลือกนักเรียนอัตโนมัติ
+  // ถ้าไม่มีคู่ที่จับไว้ (ครูยังไม่ได้จับคู่รอบนี้) จะเปิดให้เลือกจาก dropdown เดิมพร้อมข้อความเตือน
+  async function tryLockPeerPartner(phase) {
+    const tSelect = document.getElementById('targetStudentSelect');
+    const noticeEl = document.getElementById('peerPairNotice');
+    if (!tSelect) return;
+    try {
+      const res = await (await fetch(`api.php?action=get_my_peer_pair&round=${encodeURIComponent(phase)}`)).json();
+      if (res.success && res.found) {
+        tSelect.value = res.partnerId;
+        tSelect.disabled = true;
+        if (noticeEl) {
+          noticeEl.className = 'mt-2 text-success small fw-bold mb-0';
+          noticeEl.innerHTML = `<i class="bi bi-check-circle-fill"></i> ครูจับคู่ให้ประเมิน: ${res.partnerId} - ${res.partnerName}`;
+          noticeEl.classList.remove('d-none');
+        }
+        checkExistingEvaluation(res.partnerId);
+      } else {
+        tSelect.disabled = false;
+        if (noticeEl) {
+          noticeEl.className = 'mt-2 text-warning-emphasis small fw-bold mb-0';
+          noticeEl.innerHTML = '<i class="bi bi-exclamation-triangle-fill"></i> ยังไม่มีการจับคู่ประเมินเพื่อนสำหรับรอบนี้ กรุณาเลือกเพื่อนด้วยตนเองจากรายชื่อด้านบน';
+          noticeEl.classList.remove('d-none');
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      tSelect.disabled = false;
+      if (noticeEl) {
+        noticeEl.className = 'mt-2 text-warning-emphasis small fw-bold mb-0';
+        noticeEl.innerHTML = '<i class="bi bi-exclamation-triangle-fill"></i> ไม่สามารถตรวจสอบการจับคู่ได้ กรุณาเลือกเพื่อนด้วยตนเองจากรายชื่อด้านบน';
+        noticeEl.classList.remove('d-none');
+      }
+    }
+  }
+
   function selectPhase(phase) {
     document.getElementById('selectedTestPhase').value = phase;
     const picker = document.getElementById('phasePicker');
@@ -693,9 +733,13 @@ require_once 'header.php';
       }
     }
 
-    // reload existing if student already selected
-    const id = document.getElementById('targetStudentSelect').value;
-    if (id) checkExistingEvaluation(id);
+    if (modeParam === 'peer') {
+      tryLockPeerPartner(phase);
+    } else {
+      // reload existing if student already selected
+      const id = document.getElementById('targetStudentSelect').value;
+      if (id) checkExistingEvaluation(id);
+    }
   }
   function resetPhase() {
     document.getElementById('evalSection').classList.add('d-none');

@@ -56,8 +56,13 @@ $role = $sessionUser['role'];
           <div class="tab-pane fade show active" id="obstacles" role="tabpanel" aria-labelledby="obstacles-tab">
             <form id="formObstacles">
               <h5 class="fw-bold text-dark mb-3">แบบบันทึกปัญหาการเขียนจากร่างแรก</h5>
-              <p class="text-muted small mb-3">คำชี้แจง: ให้วิเคราะห์และบันทึกอุปสรรคหรือข้อบกพร่องที่พบจากร่างแรก พร้อมเสนอแนวทางการแก้ไขเพื่อปรับปรุง</p>
-              
+              <p class="text-muted small mb-3">คำชี้แจง: ทำเครื่องหมาย <b>"พบปัญหาในด้านนี้"</b> เฉพาะด้านที่พบปัญหาจริงจากร่างแรก แล้วจึงระบุปัญหาและแนวทางแก้ไข ด้านที่ไม่ได้เลือกไม่จำเป็นต้องกรอก</p>
+
+              <div class="alert alert-info d-flex justify-content-between align-items-center rounded-3 mb-3 py-2 px-3">
+                <span><i class="bi bi-info-circle"></i> เลือกเฉพาะด้านที่พบปัญหาจริง แล้วกรอกรายละเอียด</span>
+                <span class="badge bg-primary fs-6" id="problemsSelectedCount">0 ด้านที่เลือก</span>
+              </div>
+
               <div class="table-responsive rounded-3 border mb-4">
                 <table class="table table-striped table-hover align-middle mb-0">
                   <thead class="table-primary text-dark">
@@ -70,69 +75,135 @@ $role = $sessionUser['role'];
                   <tbody>
                     <!-- ด้านเนื้อหาสาระ -->
                     <tr class="table-light"><td colspan="3" class="fw-bold">1) ด้านเนื้อหาสาระ</td></tr>
-                    <tr>
-                      <td class="ps-3 small">1.1 ความตรงประเด็น</td>
-                      <td><textarea name="prob_1_1" class="form-control form-control-sm" rows="2" placeholder="ระบุปัญหา..."></textarea></td>
-                      <td><textarea name="sol_1_1" class="form-control form-control-sm" rows="2" placeholder="ระบุแนวทางแก้ไข..."></textarea></td>
+                    <tr data-criteria-row="1_1">
+                      <td class="ps-3 small">
+                        <div class="form-check">
+                          <input class="form-check-input problem-toggle" type="checkbox" id="ptoggle_1_1" data-key="1_1">
+                          <label class="form-check-label fw-semibold" for="ptoggle_1_1" style="cursor:pointer;">1.1 ความตรงประเด็น</label>
+                        </div>
+                        <div class="text-muted ps-4" style="font-size:0.7rem;">พบปัญหาในด้านนี้</div>
+                      </td>
+                      <td><textarea name="prob_1_1" class="form-control form-control-sm problem-field" data-key="1_1" rows="2" placeholder="ระบุปัญหา..." disabled></textarea></td>
+                      <td><textarea name="sol_1_1" class="form-control form-control-sm problem-field" data-key="1_1" rows="2" placeholder="ระบุแนวทางแก้ไข..." disabled></textarea></td>
                     </tr>
-                    <tr>
-                      <td class="ps-3 small">1.2 แก่นเรื่องที่ชัดเจน</td>
-                      <td><textarea name="prob_1_2" class="form-control form-control-sm" rows="2" placeholder="ระบุปัญหา..."></textarea></td>
-                      <td><textarea name="sol_1_2" class="form-control form-control-sm" rows="2" placeholder="ระบุแนวทางแก้ไข..."></textarea></td>
+                    <tr data-criteria-row="1_2">
+                      <td class="ps-3 small">
+                        <div class="form-check">
+                          <input class="form-check-input problem-toggle" type="checkbox" id="ptoggle_1_2" data-key="1_2">
+                          <label class="form-check-label fw-semibold" for="ptoggle_1_2" style="cursor:pointer;">1.2 แก่นเรื่องที่ชัดเจน</label>
+                        </div>
+                        <div class="text-muted ps-4" style="font-size:0.7rem;">พบปัญหาในด้านนี้</div>
+                      </td>
+                      <td><textarea name="prob_1_2" class="form-control form-control-sm problem-field" data-key="1_2" rows="2" placeholder="ระบุปัญหา..." disabled></textarea></td>
+                      <td><textarea name="sol_1_2" class="form-control form-control-sm problem-field" data-key="1_2" rows="2" placeholder="ระบุแนวทางแก้ไข..." disabled></textarea></td>
                     </tr>
-                    <tr>
-                      <td class="ps-3 small">1.3 การขยายความและเหตุผล</td>
-                      <td><textarea name="prob_1_3" class="form-control form-control-sm" rows="2" placeholder="ระบุปัญหา..."></textarea></td>
-                      <td><textarea name="sol_1_3" class="form-control form-control-sm" rows="2" placeholder="ระบุแนวทางแก้ไข..."></textarea></td>
+                    <tr data-criteria-row="1_3">
+                      <td class="ps-3 small">
+                        <div class="form-check">
+                          <input class="form-check-input problem-toggle" type="checkbox" id="ptoggle_1_3" data-key="1_3">
+                          <label class="form-check-label fw-semibold" for="ptoggle_1_3" style="cursor:pointer;">1.3 การขยายความและเหตุผล</label>
+                        </div>
+                        <div class="text-muted ps-4" style="font-size:0.7rem;">พบปัญหาในด้านนี้</div>
+                      </td>
+                      <td><textarea name="prob_1_3" class="form-control form-control-sm problem-field" data-key="1_3" rows="2" placeholder="ระบุปัญหา..." disabled></textarea></td>
+                      <td><textarea name="sol_1_3" class="form-control form-control-sm problem-field" data-key="1_3" rows="2" placeholder="ระบุแนวทางแก้ไข..." disabled></textarea></td>
                     </tr>
-                    
+
                     <!-- ด้านองค์ประกอบและการลำดับ -->
                     <tr class="table-light"><td colspan="3" class="fw-bold">2) ด้านองค์ประกอบและการลำดับ</td></tr>
-                    <tr>
-                      <td class="ps-3 small">2.1 ความครบถ้วนขององค์ประกอบ</td>
-                      <td><textarea name="prob_2_1" class="form-control form-control-sm" rows="2" placeholder="ระบุปัญหา..."></textarea></td>
-                      <td><textarea name="sol_2_1" class="form-control form-control-sm" rows="2" placeholder="ระบุแนวทางแก้ไข..."></textarea></td>
+                    <tr data-criteria-row="2_1">
+                      <td class="ps-3 small">
+                        <div class="form-check">
+                          <input class="form-check-input problem-toggle" type="checkbox" id="ptoggle_2_1" data-key="2_1">
+                          <label class="form-check-label fw-semibold" for="ptoggle_2_1" style="cursor:pointer;">2.1 ความครบถ้วนขององค์ประกอบ</label>
+                        </div>
+                        <div class="text-muted ps-4" style="font-size:0.7rem;">พบปัญหาในด้านนี้</div>
+                      </td>
+                      <td><textarea name="prob_2_1" class="form-control form-control-sm problem-field" data-key="2_1" rows="2" placeholder="ระบุปัญหา..." disabled></textarea></td>
+                      <td><textarea name="sol_2_1" class="form-control form-control-sm problem-field" data-key="2_1" rows="2" placeholder="ระบุแนวทางแก้ไข..." disabled></textarea></td>
                     </tr>
-                    <tr>
-                      <td class="ps-3 small">2.2 การลำดับประเด็นเป็นระบบ</td>
-                      <td><textarea name="prob_2_2" class="form-control form-control-sm" rows="2" placeholder="ระบุปัญหา..."></textarea></td>
-                      <td><textarea name="sol_2_2" class="form-control form-control-sm" rows="2" placeholder="ระบุแนวทางแก้ไข..."></textarea></td>
+                    <tr data-criteria-row="2_2">
+                      <td class="ps-3 small">
+                        <div class="form-check">
+                          <input class="form-check-input problem-toggle" type="checkbox" id="ptoggle_2_2" data-key="2_2">
+                          <label class="form-check-label fw-semibold" for="ptoggle_2_2" style="cursor:pointer;">2.2 การลำดับประเด็นเป็นระบบ</label>
+                        </div>
+                        <div class="text-muted ps-4" style="font-size:0.7rem;">พบปัญหาในด้านนี้</div>
+                      </td>
+                      <td><textarea name="prob_2_2" class="form-control form-control-sm problem-field" data-key="2_2" rows="2" placeholder="ระบุปัญหา..." disabled></textarea></td>
+                      <td><textarea name="sol_2_2" class="form-control form-control-sm problem-field" data-key="2_2" rows="2" placeholder="ระบุแนวทางแก้ไข..." disabled></textarea></td>
                     </tr>
-                    
+
                     <!-- ด้านการใช้สำนวนภาษา -->
                     <tr class="table-light"><td colspan="3" class="fw-bold">3) ด้านการใช้สำนวนภาษา</td></tr>
-                    <tr>
-                      <td class="ps-3 small">3.1 การใช้ประโยคถูกต้อง</td>
-                      <td><textarea name="prob_3_1" class="form-control form-control-sm" rows="2" placeholder="ระบุปัญหา..."></textarea></td>
-                      <td><textarea name="sol_3_1" class="form-control form-control-sm" rows="2" placeholder="ระบุแนวทางแก้ไข..."></textarea></td>
+                    <tr data-criteria-row="3_1">
+                      <td class="ps-3 small">
+                        <div class="form-check">
+                          <input class="form-check-input problem-toggle" type="checkbox" id="ptoggle_3_1" data-key="3_1">
+                          <label class="form-check-label fw-semibold" for="ptoggle_3_1" style="cursor:pointer;">3.1 การใช้ประโยคถูกต้อง</label>
+                        </div>
+                        <div class="text-muted ps-4" style="font-size:0.7rem;">พบปัญหาในด้านนี้</div>
+                      </td>
+                      <td><textarea name="prob_3_1" class="form-control form-control-sm problem-field" data-key="3_1" rows="2" placeholder="ระบุปัญหา..." disabled></textarea></td>
+                      <td><textarea name="sol_3_1" class="form-control form-control-sm problem-field" data-key="3_1" rows="2" placeholder="ระบุแนวทางแก้ไข..." disabled></textarea></td>
                     </tr>
-                    <tr>
-                      <td class="ps-3 small">3.2 การเลือกใช้คำ</td>
-                      <td><textarea name="prob_3_2" class="form-control form-control-sm" rows="2" placeholder="ระjuปัญหา..."></textarea></td>
-                      <td><textarea name="sol_3_2" class="form-control form-control-sm" rows="2" placeholder="ระบุแนวทางแก้ไข..."></textarea></td>
+                    <tr data-criteria-row="3_2">
+                      <td class="ps-3 small">
+                        <div class="form-check">
+                          <input class="form-check-input problem-toggle" type="checkbox" id="ptoggle_3_2" data-key="3_2">
+                          <label class="form-check-label fw-semibold" for="ptoggle_3_2" style="cursor:pointer;">3.2 การเลือกใช้คำ</label>
+                        </div>
+                        <div class="text-muted ps-4" style="font-size:0.7rem;">พบปัญหาในด้านนี้</div>
+                      </td>
+                      <td><textarea name="prob_3_2" class="form-control form-control-sm problem-field" data-key="3_2" rows="2" placeholder="ระบุปัญหา..." disabled></textarea></td>
+                      <td><textarea name="sol_3_2" class="form-control form-control-sm problem-field" data-key="3_2" rows="2" placeholder="ระบุแนวทางแก้ไข..." disabled></textarea></td>
                     </tr>
-                    <tr>
-                      <td class="ps-3 small">3.3 ระดับภาษาเหมาะสม</td>
-                      <td><textarea name="prob_3_3" class="form-control form-control-sm" rows="2" placeholder="ระบุปัญหา..."></textarea></td>
-                      <td><textarea name="sol_3_3" class="form-control form-control-sm" rows="2" placeholder="ระบุแนวทางแก้ไข..."></textarea></td>
+                    <tr data-criteria-row="3_3">
+                      <td class="ps-3 small">
+                        <div class="form-check">
+                          <input class="form-check-input problem-toggle" type="checkbox" id="ptoggle_3_3" data-key="3_3">
+                          <label class="form-check-label fw-semibold" for="ptoggle_3_3" style="cursor:pointer;">3.3 ระดับภาษาเหมาะสม</label>
+                        </div>
+                        <div class="text-muted ps-4" style="font-size:0.7rem;">พบปัญหาในด้านนี้</div>
+                      </td>
+                      <td><textarea name="prob_3_3" class="form-control form-control-sm problem-field" data-key="3_3" rows="2" placeholder="ระบุปัญหา..." disabled></textarea></td>
+                      <td><textarea name="sol_3_3" class="form-control form-control-sm problem-field" data-key="3_3" rows="2" placeholder="ระบุแนวทางแก้ไข..." disabled></textarea></td>
                     </tr>
-                    
+
                     <!-- ด้านอักขรวิธีและกลไกการเขียน -->
                     <tr class="table-light"><td colspan="3" class="fw-bold">4) ด้านอักขรวิธีและกลไกการเขียน</td></tr>
-                    <tr>
-                      <td class="ps-3 small">4.1 การสะกดคำถูกต้อง</td>
-                      <td><textarea name="prob_4_1" class="form-control form-control-sm" rows="2" placeholder="ระบุปัญหา..."></textarea></td>
-                      <td><textarea name="sol_4_1" class="form-control form-control-sm" rows="2" placeholder="ระบุแนวทางแก้ไข..."></textarea></td>
+                    <tr data-criteria-row="4_1">
+                      <td class="ps-3 small">
+                        <div class="form-check">
+                          <input class="form-check-input problem-toggle" type="checkbox" id="ptoggle_4_1" data-key="4_1">
+                          <label class="form-check-label fw-semibold" for="ptoggle_4_1" style="cursor:pointer;">4.1 การสะกดคำถูกต้อง</label>
+                        </div>
+                        <div class="text-muted ps-4" style="font-size:0.7rem;">พบปัญหาในด้านนี้</div>
+                      </td>
+                      <td><textarea name="prob_4_1" class="form-control form-control-sm problem-field" data-key="4_1" rows="2" placeholder="ระบุปัญหา..." disabled></textarea></td>
+                      <td><textarea name="sol_4_1" class="form-control form-control-sm problem-field" data-key="4_1" rows="2" placeholder="ระบุแนวทางแก้ไข..." disabled></textarea></td>
                     </tr>
-                    <tr>
-                      <td class="ps-3 small">4.2 การเว้นวรรค</td>
-                      <td><textarea name="prob_4_2" class="form-control form-control-sm" rows="2" placeholder="ระบุปัญหา..."></textarea></td>
-                      <td><textarea name="sol_4_2" class="form-control form-control-sm" rows="2" placeholder="ระบุแนวทางแก้ไข..."></textarea></td>
+                    <tr data-criteria-row="4_2">
+                      <td class="ps-3 small">
+                        <div class="form-check">
+                          <input class="form-check-input problem-toggle" type="checkbox" id="ptoggle_4_2" data-key="4_2">
+                          <label class="form-check-label fw-semibold" for="ptoggle_4_2" style="cursor:pointer;">4.2 การเว้นวรรค</label>
+                        </div>
+                        <div class="text-muted ps-4" style="font-size:0.7rem;">พบปัญหาในด้านนี้</div>
+                      </td>
+                      <td><textarea name="prob_4_2" class="form-control form-control-sm problem-field" data-key="4_2" rows="2" placeholder="ระบุปัญหา..." disabled></textarea></td>
+                      <td><textarea name="sol_4_2" class="form-control form-control-sm problem-field" data-key="4_2" rows="2" placeholder="ระบุแนวทางแก้ไข..." disabled></textarea></td>
                     </tr>
-                    <tr>
-                      <td class="ps-3 small">4.3 ความเรียบร้อยของลายมือและกระดาษ</td>
-                      <td><textarea name="prob_4_3" class="form-control form-control-sm" rows="2" placeholder="ระบุปัญหา..."></textarea></td>
-                      <td><textarea name="sol_4_3" class="form-control form-control-sm" rows="2" placeholder="ระบุแนวทางแก้ไข..."></textarea></td>
+                    <tr data-criteria-row="4_3">
+                      <td class="ps-3 small">
+                        <div class="form-check">
+                          <input class="form-check-input problem-toggle" type="checkbox" id="ptoggle_4_3" data-key="4_3">
+                          <label class="form-check-label fw-semibold" for="ptoggle_4_3" style="cursor:pointer;">4.3 ความเรียบร้อยของลายมือและกระดาษ</label>
+                        </div>
+                        <div class="text-muted ps-4" style="font-size:0.7rem;">พบปัญหาในด้านนี้</div>
+                      </td>
+                      <td><textarea name="prob_4_3" class="form-control form-control-sm problem-field" data-key="4_3" rows="2" placeholder="ระบุปัญหา..." disabled></textarea></td>
+                      <td><textarea name="sol_4_3" class="form-control form-control-sm problem-field" data-key="4_3" rows="2" placeholder="ระบุแนวทางแก้ไข..." disabled></textarea></td>
                     </tr>
                   </tbody>
                 </table>
@@ -602,6 +673,32 @@ $role = $sessionUser['role'];
     });
   }
 
+  // ==========================================
+  // แบบบันทึกปัญหาการเขียน: เลือกเฉพาะด้านที่พบปัญหาจริง
+  // ==========================================
+  const PROBLEM_ROW_KEYS = ['1_1', '1_2', '1_3', '2_1', '2_2', '3_1', '3_2', '3_3', '4_1', '4_2', '4_3'];
+
+  function toggleProblemRow(key, isChecked) {
+    document.querySelectorAll(`.problem-field[data-key="${key}"]`).forEach(ta => {
+      ta.disabled = !isChecked;
+    });
+    const row = document.querySelector(`tr[data-criteria-row="${key}"]`);
+    if (row) row.classList.toggle('table-warning', isChecked);
+  }
+
+  function updateProblemsSelectedCount() {
+    const checked = document.querySelectorAll('.problem-toggle:checked').length;
+    const el = document.getElementById('problemsSelectedCount');
+    if (el) el.textContent = `${checked} ด้านที่เลือก`;
+  }
+
+  document.querySelectorAll('.problem-toggle').forEach(cb => {
+    cb.addEventListener('change', () => {
+      toggleProblemRow(cb.dataset.key, cb.checked);
+      updateProblemsSelectedCount();
+    });
+  });
+
   // ฟังก์ชันวิเคราะห์คีย์เวิร์ด/แนวโน้มคำสำคัญในบทสะท้อนและอุปสรรคการเขียน
   function analyzeKeywords(texts) {
     // กำหนดคำสำคัญเป้าหมายที่เกี่ยวข้องกับการเขียนและเกณฑ์ประเมิน
@@ -664,9 +761,20 @@ $role = $sessionUser['role'];
           const form = document.getElementById('formObstacles');
           Object.keys(d).forEach(key => {
             const input = form.querySelector(`[name="${key}"]`);
-            if (input) input.value = d[key];
+            if (input) input.value = d[key] || '';
+          });
+
+          // เปิดใช้งาน (ติ๊กเลือก) เฉพาะแถวที่มีข้อมูลเดิมบันทึกไว้อยู่แล้ว
+          PROBLEM_ROW_KEYS.forEach(key => {
+            const hasData = (d[`prob_${key}`] && d[`prob_${key}`].trim()) || (d[`sol_${key}`] && d[`sol_${key}`].trim());
+            const cb = document.getElementById(`ptoggle_${key}`);
+            if (cb) {
+              cb.checked = !!hasData;
+              toggleProblemRow(key, !!hasData);
+            }
           });
         }
+        updateProblemsSelectedCount();
       } catch (err) {
         console.error(err);
       }
@@ -719,10 +827,18 @@ $role = $sessionUser['role'];
     // Event listeners สำหรับการกดปุ่มส่งแบบบันทึกต่าง ๆ
     document.getElementById('formObstacles').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const formData = new FormData(e.target);
+
+      // บันทึกเฉพาะด้านที่ติ๊กเลือกไว้ (พบปัญหาในด้านนี้) เท่านั้น ด้านที่ไม่ได้เลือกจะไม่ถูกบันทึกทับ
+      const checkedKeys = Array.from(document.querySelectorAll('.problem-toggle:checked')).map(cb => cb.dataset.key);
+      if (checkedKeys.length === 0) {
+        if (!confirm('คุณยังไม่ได้เลือกด้านที่พบปัญหาเลย ต้องการบันทึกแบบไม่มีข้อมูลหรือไม่?')) return;
+      }
       const problems = {};
-      formData.forEach((value, key) => {
-        problems[key] = value;
+      checkedKeys.forEach(key => {
+        const probEl = document.querySelector(`[name="prob_${key}"]`);
+        const solEl = document.querySelector(`[name="sol_${key}"]`);
+        problems[`prob_${key}`] = probEl ? probEl.value.trim() : '';
+        problems[`sol_${key}`] = solEl ? solEl.value.trim() : '';
       });
 
       try {
@@ -775,54 +891,6 @@ $role = $sessionUser['role'];
         const res = await response.json();
         if (res.success) {
           alert('บันทึกแบบรายการตรวจสอบตนเอง (Self-Checklist) เรียบร้อย!');
-        } else {
-          alert('เกิดข้อผิดพลาด: ' + res.error);
-        }
-      } catch (err) {
-        alert('เกิดข้อผิดพลาดทางเทคนิคเครือข่าย');
-      }
-    });
-
-    document.getElementById('formPeer').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const formData = new FormData(e.target);
-      const targetId = document.getElementById('peerTargetStudent').value;
-      if (!targetId) {
-        alert('กรุณาเลือกชื่อเพื่อนก่อนส่งแบบประเมิน');
-        return;
-      }
-      
-      const scores = {};
-      let strength = '', improvement = '', encouragement = '';
-      formData.forEach((value, key) => {
-        if (key === 'strength') strength = value;
-        else if (key === 'improvement') improvement = value;
-        else if (key === 'encouragement') encouragement = value;
-        else if (key.startsWith('peer_')) {
-          // peer_1_1 -> 1.1
-          const realKey = key.substring(5).replace('_', '.');
-          scores[realKey] = value;
-        }
-      });
-
-      try {
-        const response = await fetch('api.php', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'save_peer_review',
-            studentId: targetId,
-            reviewerId: currentUserId,
-            scores: scores,
-            strength: strength,
-            improvement: improvement,
-            encouragement: encouragement
-          })
-        });
-        const res = await response.json();
-        if (res.success) {
-          alert('ส่งการประเมินและสะท้อนข้อมูลกลับไปยังเพื่อนสำเร็จ!');
-          e.target.reset();
         } else {
           alert('เกิดข้อผิดพลาด: ' + res.error);
         }
