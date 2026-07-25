@@ -99,14 +99,15 @@ require_once 'header.php';
       <div class="mb-4 p-3 rounded-3" style="background: linear-gradient(135deg,#eef2ff 0%,#f0f9ff 100%); border: 1px dashed #93c5fd;">
         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
           <label class="form-label fw-bold text-dark fs-6 mb-0">
-            📷 อ่านข้อความจากรูปภาพ (OCR) <span class="badge bg-primary-subtle text-primary small align-middle">Unlimited-OCR</span>
+            📷 อ่านข้อความจากรูปภาพ (OCR) <span class="badge bg-success-subtle text-success small align-middle">ฟรี · ไม่ต้องตั้งเซิร์ฟเวอร์</span>
           </label>
           <button type="button" class="btn btn-sm btn-link text-decoration-none p-0" onclick="toggleOcrPanel()">
             <span id="ocrToggleText"><i class="bi bi-chevron-down"></i> เปิดใช้งาน</span>
           </button>
         </div>
         <p class="text-muted small mb-2">
-          ถ่ายภาพหรือเลือกไฟล์รูปเรียงความที่เขียนบนกระดาษ ระบบจะถอดข้อความออกมาเป็นย่อหน้าให้อัตโนมัติ แล้วนำไปเติมในช่องด้านล่างได้เลย
+          ถ่ายภาพหรือเลือกไฟล์รูปเรียงความที่เขียนบนกระดาษ ระบบจะถอดข้อความออกมาให้ แล้วนำไปเติมในช่องด้านล่างได้เลย
+          <span class="text-secondary">(อ่านในเครื่องของคุณโดยตรง ไม่ส่งรูปขึ้นอินเทอร์เน็ต · ครั้งแรกจะโหลดข้อมูลภาษาสักครู่)</span>
         </p>
 
         <div id="ocrPanel" class="d-none">
@@ -255,6 +256,9 @@ require_once 'header.php';
     </div>
   </div>
 </div>
+
+<!-- Tesseract.js: OCR ที่ทำงานในเบราว์เซอร์ (ฟรี ไม่ต้องมีเซิร์ฟเวอร์/คีย์) -->
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
 <style>
 .essay-phase-btn { transition: all 0.2s ease; min-height: 90px; }
@@ -653,35 +657,48 @@ async function runOcr() {
     showToast('กรุณาเลือกหรือถ่ายรูปก่อน', 'error');
     return;
   }
+  if (typeof Tesseract === 'undefined') {
+    showToast('โหลดไลบรารี OCR ไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ตแล้วรีเฟรชหน้า', 'error');
+    return;
+  }
+
   const btn = document.getElementById('ocrRunBtn');
   const status = document.getElementById('ocrStatus');
   const origHTML = btn.innerHTML;
   btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>กำลังอ่าน...';
   btn.disabled = true;
-  status.textContent = 'กำลังส่งรูปไปถอดข้อความ (อาจใช้เวลาสักครู่)...';
+  status.textContent = 'กำลังเตรียมตัวอ่าน...';
   status.className = 'ms-2 small text-primary';
 
   try {
-    const form = new FormData();
-    form.append('image', ocrSelectedFile);
-    const res = await fetch('api.php?action=ocr_essay', { method: 'POST', body: form });
-    const data = await res.json();
+    // อ่านข้อความในเครื่องนักเรียนเอง รองรับภาษาไทย + อังกฤษ (ไม่ส่งรูปออกนอกเครื่อง)
+    const { data } = await Tesseract.recognize(ocrSelectedFile, 'tha+eng', {
+      logger: m => {
+        if (m.status === 'recognizing text') {
+          status.textContent = `กำลังอ่านข้อความ... ${Math.round((m.progress || 0) * 100)}%`;
+        } else if (m.status && m.status.indexOf('loading') !== -1) {
+          status.textContent = `กำลังโหลดข้อมูลภาษา (ครั้งแรกครั้งเดียว)... ${Math.round((m.progress || 0) * 100)}%`;
+        }
+      }
+    });
 
-    if (data.success) {
-      ocrParagraphs = Array.isArray(data.paragraphs) ? data.paragraphs : [];
-      document.getElementById('ocrResultText').value = data.text || '';
-      status.textContent = `✓ อ่านสำเร็จ (${ocrParagraphs.length} ย่อหน้า)`;
+    const text = (data && data.text) ? data.text.trim() : '';
+    document.getElementById('ocrResultText').value = text;
+    ocrParagraphs = text.split(/\n\s*\n+/).map(p => p.trim()).filter(Boolean);
+
+    if (text) {
+      status.textContent = '✓ อ่านสำเร็จ — โปรดตรวจทานข้อความ';
       status.className = 'ms-2 small text-success';
-      showToast('อ่านข้อความจากรูปสำเร็จ! ตรวจทานแล้วกดเติมลงในช่องได้เลย', 'success');
+      showToast('อ่านข้อความจากรูปสำเร็จ! ตรวจทาน/แก้ไขแล้วกดเติมลงในช่องได้เลย', 'success');
     } else {
-      status.textContent = '⚠️ อ่านไม่สำเร็จ';
-      status.className = 'ms-2 small text-danger';
-      showToast('OCR ผิดพลาด: ' + (data.error || 'ไม่ทราบสาเหตุ'), 'error');
+      status.textContent = '⚠️ อ่านข้อความไม่ได้ (ลองถ่ายให้ชัดขึ้น)';
+      status.className = 'ms-2 small text-warning';
+      showToast('อ่านข้อความจากรูปไม่ได้ ลองถ่ายภาพให้ชัด แสงพอ และตัวหนังสือตรง', 'error');
     }
   } catch (err) {
-    status.textContent = '⚠️ เชื่อมต่อไม่ได้';
+    status.textContent = '⚠️ เกิดข้อผิดพลาด';
     status.className = 'ms-2 small text-danger';
-    showToast('ไม่สามารถเชื่อมต่อระบบ OCR ได้', 'error');
+    showToast('ไม่สามารถอ่านรูปได้: ' + (err && err.message ? err.message : 'ไม่ทราบสาเหตุ'), 'error');
   } finally {
     btn.innerHTML = origHTML;
     btn.disabled = false;
