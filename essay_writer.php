@@ -730,11 +730,15 @@ function applyOcrResult(mode) {
     document.getElementById('bodyParagraphsContainer').innerHTML = '';
 
     if (paras.length === 1) {
+      // มีย่อหน้าเดียว: ใส่เป็นคำนำ เว้นช่องเนื้อเรื่อง/สรุปให้กรอกเอง
       document.getElementById('essayIntro').value = paras[0];
+      document.getElementById('essayConclusion').value = '';
       addBodyParagraph();
     } else if (paras.length === 2) {
+      // สองย่อหน้า: ย่อหน้าแรก=คำนำ, ย่อหน้าสุดท้าย=สรุป, เว้นช่องเนื้อเรื่องให้กรอกเอง
       document.getElementById('essayIntro').value = paras[0];
-      addBodyParagraph(paras[1]);
+      document.getElementById('essayConclusion').value = paras[1];
+      addBodyParagraph();
     } else {
       document.getElementById('essayIntro').value = paras[0];
       document.getElementById('essayConclusion').value = paras[paras.length - 1];
