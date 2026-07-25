@@ -95,59 +95,6 @@ require_once 'header.php';
         พิมพ์เรียงความตามที่เขียนไว้บนกระดาษให้ตรงกันมากที่สุด ระบบจะนับจำนวนคำและบันทึกเก็บไว้เพื่อนำไปวิเคราะห์เชิงคุณภาพโดยคุณครูผู้สอน
       </div>
 
-      <!-- OCR: อ่านข้อความจากรูปภาพ -->
-      <div class="mb-4 p-3 rounded-3" style="background: linear-gradient(135deg,#eef2ff 0%,#f0f9ff 100%); border: 1px dashed #93c5fd;">
-        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
-          <label class="form-label fw-bold text-dark fs-6 mb-0">
-            📷 อ่านข้อความจากรูปภาพ (OCR)
-          </label>
-        </div>
-        <p class="text-muted small mb-2">
-          ถ่ายภาพหรือเลือกไฟล์รูปเรียงความที่เขียนบนกระดาษ ระบบจะถอดข้อความออกมาให้ แล้วนำไปเติมในช่องด้านล่างได้เลย
-          <span class="text-secondary">(อ่านในเครื่องของคุณโดยตรง ไม่ส่งรูปขึ้นอินเทอร์เน็ต · ครั้งแรกจะโหลดข้อมูลภาษาสักครู่)</span>
-        </p>
-
-        <div id="ocrPanel">
-          <div class="row g-3 align-items-start">
-            <div class="col-12 col-md-5">
-              <input type="file" id="ocrFileInput" class="form-control form-control-sm rounded-3"
-                accept="image/*" capture="environment" onchange="handleOcrFile(this)">
-              <div class="text-muted mt-1" style="font-size:0.72rem;">รองรับ JPG / PNG (ไม่เกิน 12 MB) — บนมือถือจะเปิดกล้องให้ถ่ายได้</div>
-              <div id="ocrPreviewWrap" class="mt-2 d-none">
-                <img id="ocrPreviewImg" src="" alt="ตัวอย่างรูป" class="img-fluid rounded-3 border" style="max-height: 220px;">
-              </div>
-              <button type="button" id="ocrRunBtn" class="btn btn-primary btn-sm rounded-pill px-4 mt-2 fw-bold" onclick="runOcr()" disabled>
-                <i class="bi bi-magic me-1"></i>อ่านข้อความจากรูป
-              </button>
-              <span id="ocrStatus" class="ms-2 small text-muted"></span>
-            </div>
-
-            <div class="col-12 col-md-7">
-              <label class="form-label small fw-bold text-secondary mb-1">ข้อความที่อ่านได้ (แก้ไขได้ก่อนนำไปใช้)</label>
-              <textarea id="ocrResultText" class="form-control border-2 rounded-3" rows="7"
-                placeholder="ผลการอ่านข้อความจะแสดงที่นี่..." style="font-family: 'Sarabun', sans-serif; font-size: 0.95rem; line-height: 1.7;"></textarea>
-              <div class="d-flex flex-wrap gap-2 mt-2">
-                <button type="button" class="btn btn-success btn-sm rounded-pill px-3 fw-bold" onclick="applyOcrResult('auto')">
-                  <i class="bi bi-magic me-1"></i>เติมอัตโนมัติ (แบ่ง คำนำ/เนื้อเรื่อง/สรุป)
-                </button>
-                <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" onclick="applyOcrResult('intro')">
-                  ↳ ใส่ในคำนำ
-                </button>
-                <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" onclick="applyOcrResult('body')">
-                  ↳ เพิ่มเป็นย่อหน้าเนื้อเรื่อง
-                </button>
-                <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" onclick="applyOcrResult('conclusion')">
-                  ↳ ใส่ในสรุป
-                </button>
-              </div>
-              <div class="text-muted mt-1" style="font-size:0.72rem;">
-                <i class="bi bi-info-circle me-1"></i>OCR อาจอ่านลายมือผิดพลาดได้บ้าง โปรดตรวจทานและแก้ไขข้อความให้ถูกต้องก่อนบันทึก
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <!-- Essay sections -->
       <div class="space-y-4">
         <!-- 1. Introduction -->
@@ -253,9 +200,6 @@ require_once 'header.php';
     </div>
   </div>
 </div>
-
-<!-- Tesseract.js: OCR ที่ทำงานในเบราว์เซอร์ (ฟรี ไม่ต้องมีเซิร์ฟเวอร์/คีย์) -->
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
 <style>
 .essay-phase-btn { transition: all 0.2s ease; min-height: 90px; }
@@ -608,135 +552,6 @@ async function loadSavedList() {
       </div>
     `;
   }).join('');
-}
-
-// ===== OCR (อ่านข้อความจากรูปภาพด้วย Unlimited-OCR) =====
-let ocrSelectedFile = null;
-let ocrParagraphs = [];
-
-function handleOcrFile(input) {
-  const file = input.files && input.files[0];
-  ocrSelectedFile = file || null;
-  const runBtn = document.getElementById('ocrRunBtn');
-  const wrap = document.getElementById('ocrPreviewWrap');
-  const img = document.getElementById('ocrPreviewImg');
-
-  if (!file) {
-    runBtn.disabled = true;
-    wrap.classList.add('d-none');
-    return;
-  }
-  if (file.size > 12 * 1024 * 1024) {
-    showToast('ไฟล์รูปภาพใหญ่เกินไป (จำกัดไม่เกิน 12 MB)', 'error');
-    input.value = '';
-    ocrSelectedFile = null;
-    runBtn.disabled = true;
-    wrap.classList.add('d-none');
-    return;
-  }
-  const reader = new FileReader();
-  reader.onload = e => { img.src = e.target.result; wrap.classList.remove('d-none'); };
-  reader.readAsDataURL(file);
-  runBtn.disabled = false;
-}
-
-async function runOcr() {
-  if (!ocrSelectedFile) {
-    showToast('กรุณาเลือกหรือถ่ายรูปก่อน', 'error');
-    return;
-  }
-  if (typeof Tesseract === 'undefined') {
-    showToast('โหลดไลบรารี OCR ไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ตแล้วรีเฟรชหน้า', 'error');
-    return;
-  }
-
-  const btn = document.getElementById('ocrRunBtn');
-  const status = document.getElementById('ocrStatus');
-  const origHTML = btn.innerHTML;
-  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>กำลังอ่าน...';
-  btn.disabled = true;
-  status.textContent = 'กำลังเตรียมตัวอ่าน...';
-  status.className = 'ms-2 small text-primary';
-
-  try {
-    // อ่านข้อความในเครื่องนักเรียนเอง รองรับภาษาไทย + อังกฤษ (ไม่ส่งรูปออกนอกเครื่อง)
-    const { data } = await Tesseract.recognize(ocrSelectedFile, 'tha+eng', {
-      logger: m => {
-        if (m.status === 'recognizing text') {
-          status.textContent = `กำลังอ่านข้อความ... ${Math.round((m.progress || 0) * 100)}%`;
-        } else if (m.status && m.status.indexOf('loading') !== -1) {
-          status.textContent = `กำลังโหลดข้อมูลภาษา (ครั้งแรกครั้งเดียว)... ${Math.round((m.progress || 0) * 100)}%`;
-        }
-      }
-    });
-
-    const text = (data && data.text) ? data.text.trim() : '';
-    document.getElementById('ocrResultText').value = text;
-    ocrParagraphs = text.split(/\n\s*\n+/).map(p => p.trim()).filter(Boolean);
-
-    if (text) {
-      status.textContent = '✓ อ่านสำเร็จ — แบ่งย่อหน้าให้อัตโนมัติแล้ว โปรดตรวจทาน';
-      status.className = 'ms-2 small text-success';
-      // แบ่งย่อหน้าแรก=คำนำ, ย่อหน้าสุดท้าย=สรุป, ที่เหลือ=เนื้อเรื่อง แล้วเติมลงช่องทันที
-      applyOcrResult('auto');
-    } else {
-      status.textContent = '⚠️ อ่านข้อความไม่ได้ (ลองถ่ายให้ชัดขึ้น)';
-      status.className = 'ms-2 small text-warning';
-      showToast('อ่านข้อความจากรูปไม่ได้ ลองถ่ายภาพให้ชัด แสงพอ และตัวหนังสือตรง', 'error');
-    }
-  } catch (err) {
-    status.textContent = '⚠️ เกิดข้อผิดพลาด';
-    status.className = 'ms-2 small text-danger';
-    showToast('ไม่สามารถอ่านรูปได้: ' + (err && err.message ? err.message : 'ไม่ทราบสาเหตุ'), 'error');
-  } finally {
-    btn.innerHTML = origHTML;
-    btn.disabled = false;
-  }
-}
-
-// แยกข้อความในกล่องผลลัพธ์ออกเป็นย่อหน้า (เผื่อผู้ใช้แก้ไขข้อความเอง)
-function getOcrParagraphs() {
-  const text = document.getElementById('ocrResultText').value;
-  return text.split(/\n\s*\n+/).map(p => p.trim()).filter(Boolean);
-}
-
-function applyOcrResult(mode) {
-  const paras = getOcrParagraphs();
-  if (paras.length === 0) {
-    showToast('ยังไม่มีข้อความให้เติม กรุณาอ่านรูปก่อน', 'error');
-    return;
-  }
-
-  if (mode === 'intro') {
-    document.getElementById('essayIntro').value = paras.join('\n\n');
-  } else if (mode === 'conclusion') {
-    document.getElementById('essayConclusion').value = paras.join('\n\n');
-  } else if (mode === 'body') {
-    paras.forEach(p => addBodyParagraph(p));
-  } else {
-    // auto: แบ่งย่อหน้าแรกเป็นคำนำ ย่อหน้าสุดท้ายเป็นสรุป ที่เหลือเป็นเนื้อเรื่อง
-    document.getElementById('bodyParagraphsContainer').innerHTML = '';
-
-    if (paras.length === 1) {
-      // มีย่อหน้าเดียว: ใส่เป็นคำนำ เว้นช่องเนื้อเรื่อง/สรุปให้กรอกเอง
-      document.getElementById('essayIntro').value = paras[0];
-      document.getElementById('essayConclusion').value = '';
-      addBodyParagraph();
-    } else if (paras.length === 2) {
-      // สองย่อหน้า: ย่อหน้าแรก=คำนำ, ย่อหน้าสุดท้าย=สรุป, เว้นช่องเนื้อเรื่องให้กรอกเอง
-      document.getElementById('essayIntro').value = paras[0];
-      document.getElementById('essayConclusion').value = paras[1];
-      addBodyParagraph();
-    } else {
-      document.getElementById('essayIntro').value = paras[0];
-      document.getElementById('essayConclusion').value = paras[paras.length - 1];
-      paras.slice(1, -1).forEach(p => addBodyParagraph(p));
-    }
-  }
-
-  updateWordCount();
-  showToast('เติมข้อความจาก OCR ลงในช่องเรียบร้อยแล้ว โปรดตรวจทานอีกครั้ง', 'success');
-  document.getElementById('essayIntro').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 // Init
