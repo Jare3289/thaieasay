@@ -687,9 +687,10 @@ async function runOcr() {
     ocrParagraphs = text.split(/\n\s*\n+/).map(p => p.trim()).filter(Boolean);
 
     if (text) {
-      status.textContent = '✓ อ่านสำเร็จ — โปรดตรวจทานข้อความ';
+      status.textContent = '✓ อ่านสำเร็จ — แบ่งย่อหน้าให้อัตโนมัติแล้ว โปรดตรวจทาน';
       status.className = 'ms-2 small text-success';
-      showToast('อ่านข้อความจากรูปสำเร็จ! ตรวจทาน/แก้ไขแล้วกดเติมลงในช่องได้เลย', 'success');
+      // แบ่งย่อหน้าแรก=คำนำ, ย่อหน้าสุดท้าย=สรุป, ที่เหลือ=เนื้อเรื่อง แล้วเติมลงช่องทันที
+      applyOcrResult('auto');
     } else {
       status.textContent = '⚠️ อ่านข้อความไม่ได้ (ลองถ่ายให้ชัดขึ้น)';
       status.className = 'ms-2 small text-warning';
