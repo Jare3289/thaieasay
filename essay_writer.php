@@ -640,6 +640,59 @@ function handleOcrFile(input) {
   runBtn.disabled = false;
 }
 
+// ปรับแต่งรูปก่อนส่งเข้า OCR: ขยายด้านยาวให้ ~2000px, แปลงเป็นสีเทา แล้วยืดคอนทราสต์ให้เต็มช่วง
+// ช่วยให้ Tesseract อ่านตัวหนังสือ (โดยเฉพาะภาพถ่ายที่แสงไม่สม่ำเสมอ) ได้ชัดขึ้น
+function preprocessForOcr(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      try {
+        const maxSide = Math.max(img.width, img.height) || 1;
+        let scale = 2000 / maxSide;      // ขยายรูปเล็กให้ใหญ่ขึ้น
+        if (scale < 1) scale = 1;        // ไม่ย่อรูปที่ใหญ่อยู่แล้ว
+        if (maxSide * scale > 3000) scale = 3000 / maxSide; // จำกัดไม่ให้ใหญ่เกินไป
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+
+        const imgData = ctx.getImageData(0, 0, w, h);
+        const d = imgData.data;
+
+        // 1) แปลงเป็นสีเทา และหาค่าต่ำสุด/สูงสุดเพื่อยืดคอนทราสต์
+        let min = 255, max = 0;
+        const gray = new Uint8ClampedArray(w * h);
+        for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+          const g = (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) | 0;
+          gray[p] = g;
+          if (g < min) min = g;
+          if (g > max) max = g;
+        }
+        const range = (max - min) || 1;
+
+        // 2) ยืดคอนทราสต์ให้เต็มช่วง 0-255 (ตัวหนังสือเข้ม พื้นหลังสว่าง)
+        for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+          const v = ((gray[p] - min) * 255 / range) | 0;
+          d[i] = d[i + 1] = d[i + 2] = v;
+        }
+        ctx.putImageData(imgData, 0, 0);
+        resolve(canvas);
+      } catch (e) {
+        // ถ้าปรับแต่งไม่ได้ (เช่น เบราว์เซอร์เก่า) ให้ใช้ไฟล์เดิม
+        resolve(file);
+      }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
+
 async function runOcr() {
   if (!ocrSelectedFile) {
     showToast('กรุณาเลือกหรือถ่ายรูปก่อน', 'error');
@@ -655,19 +708,25 @@ async function runOcr() {
   const origHTML = btn.innerHTML;
   btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>กำลังอ่าน...';
   btn.disabled = true;
-  status.textContent = 'กำลังเตรียมตัวอ่าน...';
+  status.textContent = 'กำลังปรับแต่งรูปเพื่อให้อ่านแม่นขึ้น...';
   status.className = 'ms-2 small text-primary';
 
   try {
+    // ปรับแต่งรูปก่อนอ่าน (ขยายภาพ + ขาวดำ + เพิ่มคอนทราสต์) ช่วยให้ OCR แม่นขึ้นมาก
+    const prepared = await preprocessForOcr(ocrSelectedFile);
+
     // อ่านข้อความในเครื่องนักเรียนเอง รองรับภาษาไทย + อังกฤษ (ไม่ส่งรูปออกนอกเครื่อง)
-    const { data } = await Tesseract.recognize(ocrSelectedFile, 'tha+eng', {
+    const { data } = await Tesseract.recognize(prepared, 'tha+eng', {
       logger: m => {
         if (m.status === 'recognizing text') {
           status.textContent = `กำลังอ่านข้อความ... ${Math.round((m.progress || 0) * 100)}%`;
         } else if (m.status && m.status.indexOf('loading') !== -1) {
           status.textContent = `กำลังโหลดข้อมูลภาษา (ครั้งแรกครั้งเดียว)... ${Math.round((m.progress || 0) * 100)}%`;
         }
-      }
+      },
+      // โหมดอ่านแบบ "ข้อความเป็นบล็อกย่อหน้า" และคงช่องว่างระหว่างคำ
+      tessedit_pageseg_mode: '6',
+      preserve_interword_spaces: '1'
     });
 
     const text = (data && data.text) ? data.text.trim() : '';
