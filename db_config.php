@@ -65,9 +65,11 @@ try {
 if (!defined('OCR_API_URL')) {
     // ปลายทาง endpoint แบบ OpenAI-compatible (chat completions)
     $ocr_url = getenv('OCR_API_URL');
+    // ค่าเริ่มต้นตรงกับคำสั่งรันของ SGLang (port 10000) ตามคู่มือ Unlimited-OCR
+    // ดูวิธีตั้งเซิร์ฟเวอร์ได้ที่ไฟล์ OCR_SETUP.md
     define('OCR_API_URL', $ocr_url !== false && $ocr_url !== ''
         ? $ocr_url
-        : 'http://localhost:8000/v1/chat/completions');
+        : 'http://127.0.0.1:10000/v1/chat/completions');
 }
 if (!defined('OCR_API_KEY')) {
     $ocr_key = getenv('OCR_API_KEY');
@@ -75,9 +77,10 @@ if (!defined('OCR_API_KEY')) {
 }
 if (!defined('OCR_MODEL')) {
     $ocr_model = getenv('OCR_MODEL');
+    // ต้องตรงกับ --served-model-name ตอนรันเซิร์ฟเวอร์ (SGLang ตัวอย่างใช้ "Unlimited-OCR")
     define('OCR_MODEL', $ocr_model !== false && $ocr_model !== ''
         ? $ocr_model
-        : 'baidu/Unlimited-OCR');
+        : 'Unlimited-OCR');
 }
 
 /**
