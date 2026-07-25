@@ -758,6 +758,9 @@ async function runOcr() {
     return;
   }
 
+  // จำรอบ (phase) ที่กำลังทำงานตอนเริ่มอ่าน เพื่อกันการเติมทับรอบใหม่หากผู้ใช้สลับรอบระหว่างที่ OCR ยังทำงาน
+  const phaseAtStart = currentEssayPhase;
+
   const btn = document.getElementById('ocrRunBtn');
   const status = document.getElementById('ocrStatus');
   const origHTML = btn.innerHTML;
@@ -793,10 +796,17 @@ async function runOcr() {
     ocrParagraphs = text.split(/\n\s*\n+/).map(p => p.trim()).filter(Boolean);
 
     if (text) {
-      status.textContent = `✓ อ่านสำเร็จ (${source}) — แบ่งย่อหน้าให้แล้ว โปรดตรวจทาน`;
-      status.className = 'ms-2 small text-success';
-      // แบ่งย่อหน้าแรก=คำนำ, ย่อหน้าสุดท้าย=สรุป, ที่เหลือ=เนื้อเรื่อง แล้วเติมลงช่องทันที
-      applyOcrResult('auto');
+      // ถ้าผู้ใช้สลับไปรอบอื่นระหว่างที่ OCR ทำงาน อย่าเติมทับรอบใหม่ — แสดงผลไว้ให้เติมเองแทน
+      if (currentEssayPhase !== phaseAtStart) {
+        status.textContent = '✓ อ่านสำเร็จ — คุณสลับรอบไปแล้ว กดปุ่ม "เติมอัตโนมัติ" เองถ้าต้องการใช้ในรอบนี้';
+        status.className = 'ms-2 small text-warning';
+        showToast('อ่านข้อความเสร็จ แต่คุณสลับรอบไปแล้ว จึงไม่ได้เติมให้อัตโนมัติ (กดเติมเองได้ในกล่องผลลัพธ์)', 'error');
+      } else {
+        status.textContent = `✓ อ่านสำเร็จ (${source}) — แบ่งย่อหน้าให้แล้ว โปรดตรวจทาน`;
+        status.className = 'ms-2 small text-success';
+        // แบ่งย่อหน้าแรก=คำนำ, ย่อหน้าสุดท้าย=สรุป, ที่เหลือ=เนื้อเรื่อง แล้วเติมลงช่องทันที
+        applyOcrResult('auto');
+      }
     } else {
       status.textContent = '⚠️ อ่านข้อความไม่ได้ (ลองถ่ายให้ชัดขึ้น)';
       status.className = 'ms-2 small text-warning';
