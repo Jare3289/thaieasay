@@ -51,6 +51,39 @@ try {
 }
 
 /**
+ * ---------------------------------------------------------------------------
+ * ตั้งค่าเซิร์ฟเวอร์ OCR (baidu/Unlimited-OCR)
+ * ---------------------------------------------------------------------------
+ * โมเดล Unlimited-OCR รันบนเซิร์ฟเวอร์ GPU และเปิดให้เรียกผ่าน API แบบ
+ * OpenAI-compatible (ผ่าน vLLM หรือ SGLang) — เว็บ PHP นี้จะทำหน้าที่เป็น
+ * "ตัวกลาง" ส่งรูปภาพไปถอดข้อความแล้วรับผลกลับมา
+ *
+ * ตั้งค่าได้ 2 วิธี (ไม่ต้องแก้โค้ด):
+ *   1) ตั้งค่า Environment Variable: OCR_API_URL, OCR_API_KEY, OCR_MODEL
+ *   2) แก้ค่า default ด้านล่างนี้ให้ตรงกับเซิร์ฟเวอร์ที่โฮสต์โมเดลไว้
+ */
+if (!defined('OCR_API_URL')) {
+    // ปลายทาง endpoint แบบ OpenAI-compatible (chat completions)
+    $ocr_url = getenv('OCR_API_URL');
+    // ค่าเริ่มต้นตรงกับคำสั่งรันของ SGLang (port 10000) ตามคู่มือ Unlimited-OCR
+    // ดูวิธีตั้งเซิร์ฟเวอร์ได้ที่ไฟล์ OCR_SETUP.md
+    define('OCR_API_URL', $ocr_url !== false && $ocr_url !== ''
+        ? $ocr_url
+        : 'http://127.0.0.1:10000/v1/chat/completions');
+}
+if (!defined('OCR_API_KEY')) {
+    $ocr_key = getenv('OCR_API_KEY');
+    define('OCR_API_KEY', $ocr_key !== false ? $ocr_key : 'EMPTY');
+}
+if (!defined('OCR_MODEL')) {
+    $ocr_model = getenv('OCR_MODEL');
+    // ต้องตรงกับ --served-model-name ตอนรันเซิร์ฟเวอร์ (SGLang ตัวอย่างใช้ "Unlimited-OCR")
+    define('OCR_MODEL', $ocr_model !== false && $ocr_model !== ''
+        ? $ocr_model
+        : 'Unlimited-OCR');
+}
+
+/**
  * รันคำสั่ง DDL แบบปลอดภัย (ไม่ให้ล้มทั้งหน้าเมื่อคำสั่งใดคำสั่งหนึ่งผิดพลาด)
  */
 function safe_ddl(PDO $pdo, $sql) {

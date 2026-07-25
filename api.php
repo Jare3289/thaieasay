@@ -1295,6 +1295,134 @@ try {
             echo json_encode(['success' => true, 'essays' => $essays]);
             break;
 
+        // Essay: อ่านข้อความจากรูปภาพด้วย OCR (baidu/Unlimited-OCR)
+        // รับรูปถ่ายเรียงความที่เขียนบนกระดาษ → ส่งไปเซิร์ฟเวอร์ OCR → คืนข้อความที่ถอดได้
+        case 'ocr_essay':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'student') {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'error' => 'ต้องเข้าสู่ระบบในฐานะนักเรียนก่อนใช้งาน OCR']);
+                exit;
+            }
+
+            // รับไฟล์รูปภาพ (multipart/form-data) หรือ base64 (JSON)
+            $imageData = null;   // ข้อมูลไบต์ดิบของรูป
+            $mimeType  = 'image/jpeg';
+
+            if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
+                $tmpPath  = $_FILES['image']['tmp_name'];
+                $fileSize = $_FILES['image']['size'];
+                // จำกัดขนาดไฟล์ไม่เกิน 12 MB เพื่อกันการอัปโหลดไฟล์ใหญ่เกินไป
+                if ($fileSize > 12 * 1024 * 1024) {
+                    echo json_encode(['success' => false, 'error' => 'ไฟล์รูปภาพใหญ่เกินไป (จำกัดไม่เกิน 12 MB)']);
+                    exit;
+                }
+                // ตรวจชนิดไฟล์ว่าเป็นรูปภาพจริง
+                $finfo = function_exists('finfo_open') ? finfo_open(FILEINFO_MIME_TYPE) : false;
+                $detected = $finfo ? finfo_file($finfo, $tmpPath) : ($_FILES['image']['type'] ?? '');
+                if ($finfo) finfo_close($finfo);
+                if (strpos((string)$detected, 'image/') !== 0) {
+                    echo json_encode(['success' => false, 'error' => 'ไฟล์ที่อัปโหลดไม่ใช่รูปภาพ']);
+                    exit;
+                }
+                $mimeType  = $detected;
+                $imageData = file_get_contents($tmpPath);
+            } elseif (isset($request_data['image_base64']) && $request_data['image_base64']) {
+                // รองรับกรณีส่งมาเป็น data URL หรือ base64 ล้วน
+                $raw = $request_data['image_base64'];
+                if (preg_match('#^data:(image/[a-zA-Z0-9.+-]+);base64,#', $raw, $m)) {
+                    $mimeType = $m[1];
+                    $raw = substr($raw, strpos($raw, ',') + 1);
+                }
+                $imageData = base64_decode($raw, true);
+                if ($imageData === false) {
+                    echo json_encode(['success' => false, 'error' => 'ข้อมูลรูปภาพไม่ถูกต้อง']);
+                    exit;
+                }
+            }
+
+            if ($imageData === null || $imageData === '' || $imageData === false) {
+                echo json_encode(['success' => false, 'error' => 'ไม่พบรูปภาพที่ต้องการอ่าน กรุณาถ่ายภาพหรือเลือกไฟล์ก่อน']);
+                exit;
+            }
+
+            // สร้าง data URL สำหรับส่งเข้า API แบบ OpenAI-compatible (vision)
+            $dataUrl = 'data:' . $mimeType . ';base64,' . base64_encode($imageData);
+
+            $payload = [
+                'model'       => OCR_MODEL,
+                'temperature' => 0,
+                'max_tokens'  => 8192,
+                'messages'    => [[
+                    'role'    => 'user',
+                    'content' => [
+                        // prompt มาตรฐานของ Unlimited-OCR สำหรับถอดข้อความทั้งเอกสาร
+                        ['type' => 'text', 'text' => 'document parsing.'],
+                        ['type' => 'image_url', 'image_url' => ['url' => $dataUrl]],
+                    ],
+                ]],
+            ];
+
+            $ch = curl_init(OCR_API_URL);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST           => true,
+                CURLOPT_POSTFIELDS     => json_encode($payload),
+                CURLOPT_HTTPHEADER     => [
+                    'Content-Type: application/json',
+                    'Authorization: Bearer ' . OCR_API_KEY,
+                ],
+                CURLOPT_TIMEOUT        => 120,
+                CURLOPT_CONNECTTIMEOUT => 15,
+            ]);
+            $ocrResponse = curl_exec($ch);
+            $httpCode    = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlErr     = curl_error($ch);
+            curl_close($ch);
+
+            if ($ocrResponse === false) {
+                echo json_encode([
+                    'success' => false,
+                    'error'   => 'เชื่อมต่อเซิร์ฟเวอร์ OCR ไม่ได้: ' . ($curlErr ?: 'ไม่ทราบสาเหตุ') .
+                                 ' (โปรดตรวจสอบการตั้งค่า OCR_API_URL)',
+                ]);
+                exit;
+            }
+            if ($httpCode < 200 || $httpCode >= 300) {
+                echo json_encode([
+                    'success' => false,
+                    'error'   => 'เซิร์ฟเวอร์ OCR ตอบกลับสถานะ ' . $httpCode,
+                    'detail'  => mb_substr((string)$ocrResponse, 0, 500),
+                ]);
+                exit;
+            }
+
+            $ocrJson = json_decode($ocrResponse, true);
+            $text    = $ocrJson['choices'][0]['message']['content'] ?? null;
+            if ($text === null) {
+                echo json_encode([
+                    'success' => false,
+                    'error'   => 'อ่านผลลัพธ์จากเซิร์ฟเวอร์ OCR ไม่ได้',
+                    'detail'  => mb_substr((string)$ocrResponse, 0, 500),
+                ]);
+                exit;
+            }
+
+            // แยกผลลัพธ์ออกเป็นย่อหน้า (ตัดด้วยบรรทัดว่าง) เพื่อให้ฝั่งหน้าเว็บนำไปเติมช่องได้เลย
+            $normalized = str_replace(["\r\n", "\r"], "\n", trim($text));
+            $rawParas   = preg_split('/\n\s*\n+/u', $normalized);
+            $paragraphs = [];
+            foreach ($rawParas as $p) {
+                $p = trim($p);
+                if ($p !== '') $paragraphs[] = $p;
+            }
+
+            echo json_encode([
+                'success'    => true,
+                'text'       => $normalized,
+                'paragraphs' => $paragraphs,
+            ]);
+            break;
+
         default:
             echo json_encode(['success' => false, 'error' => 'Action not found']);
             break;
