@@ -98,7 +98,9 @@ if (!defined('OCR_MODEL')) {
 if (!defined('OCRSPACE_API_KEY')) {
     $ocrspace_key = getenv('OCRSPACE_API_KEY');
     // ▼▼▼ ใส่คีย์ฟรีของคุณตรงนี้ (ในเครื่องหมายคำพูด) เพื่อเปิดใช้ OCR.space ▼▼▼
-    define('OCRSPACE_API_KEY', $ocrspace_key !== false ? $ocrspace_key : '');
+    define('OCRSPACE_API_KEY', $ocrspace_key !== false && $ocrspace_key !== ''
+        ? $ocrspace_key
+        : 'K83201554088957');
 }
 if (!defined('OCRSPACE_URL')) {
     $ocrspace_url = getenv('OCRSPACE_URL');
