@@ -99,18 +99,15 @@ require_once 'header.php';
       <div class="mb-4 p-3 rounded-3" style="background: linear-gradient(135deg,#eef2ff 0%,#f0f9ff 100%); border: 1px dashed #93c5fd;">
         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
           <label class="form-label fw-bold text-dark fs-6 mb-0">
-            📷 อ่านข้อความจากรูปภาพ (OCR) <span class="badge bg-success-subtle text-success small align-middle">ฟรี · ไม่ต้องตั้งเซิร์ฟเวอร์</span>
+            📷 อ่านข้อความจากรูปภาพ (OCR)
           </label>
-          <button type="button" class="btn btn-sm btn-link text-decoration-none p-0" onclick="toggleOcrPanel()">
-            <span id="ocrToggleText"><i class="bi bi-chevron-down"></i> เปิดใช้งาน</span>
-          </button>
         </div>
         <p class="text-muted small mb-2">
           ถ่ายภาพหรือเลือกไฟล์รูปเรียงความที่เขียนบนกระดาษ ระบบจะถอดข้อความออกมาให้ แล้วนำไปเติมในช่องด้านล่างได้เลย
           <span class="text-secondary">(อ่านในเครื่องของคุณโดยตรง ไม่ส่งรูปขึ้นอินเทอร์เน็ต · ครั้งแรกจะโหลดข้อมูลภาษาสักครู่)</span>
         </p>
 
-        <div id="ocrPanel" class="d-none">
+        <div id="ocrPanel">
           <div class="row g-3 align-items-start">
             <div class="col-12 col-md-5">
               <input type="file" id="ocrFileInput" class="form-control form-control-sm rounded-3"
@@ -616,15 +613,6 @@ async function loadSavedList() {
 // ===== OCR (อ่านข้อความจากรูปภาพด้วย Unlimited-OCR) =====
 let ocrSelectedFile = null;
 let ocrParagraphs = [];
-
-function toggleOcrPanel() {
-  const panel = document.getElementById('ocrPanel');
-  const label = document.getElementById('ocrToggleText');
-  const isHidden = panel.classList.toggle('d-none');
-  label.innerHTML = isHidden
-    ? '<i class="bi bi-chevron-down"></i> เปิดใช้งาน'
-    : '<i class="bi bi-chevron-up"></i> ซ่อน';
-}
 
 function handleOcrFile(input) {
   const file = input.files && input.files[0];
