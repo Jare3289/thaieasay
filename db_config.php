@@ -84,6 +84,44 @@ if (!defined('OCR_MODEL')) {
 }
 
 /**
+ * ---------------------------------------------------------------------------
+ * ตั้งค่า OCR.space (บริการ OCR ออนไลน์ คีย์ฟรี — แม่นกว่า Tesseract โดยเฉพาะภาษาไทย)
+ * ---------------------------------------------------------------------------
+ * วิธีใช้: สมัครคีย์ฟรีที่ https://ocr.space/ocrapi/freekey (ไม่ต้องใช้บัตร)
+ * แล้วนำคีย์มาใส่ที่ OCRSPACE_API_KEY (หรือตั้งเป็น Environment Variable)
+ *
+ * - ถ้าใส่คีย์ไว้     → หน้าเว็บจะใช้ OCR.space อ่าน (แม่นขึ้น)
+ * - ถ้าเว้นว่าง ('') → หน้าเว็บจะใช้ Tesseract อ่านในเครื่องแทนโดยอัตโนมัติ
+ *
+ * ดูรายละเอียดเพิ่มเติมได้ที่ไฟล์ OCR_SETUP.md
+ */
+if (!defined('OCRSPACE_API_KEY')) {
+    $ocrspace_key = getenv('OCRSPACE_API_KEY');
+    // ▼▼▼ ใส่คีย์ฟรีของคุณตรงนี้ (ในเครื่องหมายคำพูด) เพื่อเปิดใช้ OCR.space ▼▼▼
+    define('OCRSPACE_API_KEY', $ocrspace_key !== false ? $ocrspace_key : '');
+}
+if (!defined('OCRSPACE_URL')) {
+    $ocrspace_url = getenv('OCRSPACE_URL');
+    define('OCRSPACE_URL', $ocrspace_url !== false && $ocrspace_url !== ''
+        ? $ocrspace_url
+        : 'https://api.ocr.space/parse/image');
+}
+if (!defined('OCRSPACE_LANGUAGE')) {
+    $ocrspace_lang = getenv('OCRSPACE_LANGUAGE');
+    // 'tha' = ภาษาไทย (รองรับใน OCR Engine 1)
+    define('OCRSPACE_LANGUAGE', $ocrspace_lang !== false && $ocrspace_lang !== ''
+        ? $ocrspace_lang
+        : 'tha');
+}
+if (!defined('OCRSPACE_ENGINE')) {
+    $ocrspace_engine = getenv('OCRSPACE_ENGINE');
+    // Engine 1 รองรับภาษาไทย; Engine 2 เหมาะกับภาษาละติน
+    define('OCRSPACE_ENGINE', $ocrspace_engine !== false && $ocrspace_engine !== ''
+        ? $ocrspace_engine
+        : '1');
+}
+
+/**
  * รันคำสั่ง DDL แบบปลอดภัย (ไม่ให้ล้มทั้งหน้าเมื่อคำสั่งใดคำสั่งหนึ่งผิดพลาด)
  */
 function safe_ddl(PDO $pdo, $sql) {

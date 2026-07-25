@@ -1369,70 +1369,126 @@ try {
                 exit;
             }
 
-            // สร้าง data URL สำหรับส่งเข้า API แบบ OpenAI-compatible (vision)
             $dataUrl = 'data:' . $mimeType . ';base64,' . base64_encode($imageData);
 
-            $payload = [
-                'model'       => OCR_MODEL,
-                'temperature' => 0,
-                'max_tokens'  => 8192,
-                'messages'    => [[
-                    'role'    => 'user',
-                    'content' => [
-                        // prompt มาตรฐานของ Unlimited-OCR สำหรับถอดข้อความทั้งเอกสาร
-                        ['type' => 'text', 'text' => 'document parsing.'],
-                        ['type' => 'image_url', 'image_url' => ['url' => $dataUrl]],
+            // เลือกผู้ให้บริการ OCR: OCR.space (แนะนำ) หรือ endpoint แบบ OpenAI-compatible (ขั้นสูง)
+            $ocrspaceKey     = defined('OCRSPACE_API_KEY') ? OCRSPACE_API_KEY : '';
+            $openaiEnvUrl    = getenv('OCR_API_URL'); // ถือว่าตั้งค่า OpenAI-compatible ไว้ก็ต่อเมื่อกำหนดผ่าน env
+            $openaiConfigured = $openaiEnvUrl !== false && $openaiEnvUrl !== '';
+
+            $text = null;
+
+            if ($ocrspaceKey !== '') {
+                // ---- OCR.space ----
+                // แผนฟรีจำกัดไฟล์ไม่เกิน 1 MB — ฝั่งหน้าเว็บย่อรูปมาให้แล้ว แต่กันไว้อีกชั้น
+                if (strlen($imageData) > 1024 * 1024) {
+                    echo json_encode([
+                        'success' => false,
+                        'error'   => 'รูปใหญ่เกินขีดจำกัดของ OCR.space (ไม่เกิน 1 MB) กรุณาถ่าย/เลือกรูปที่เล็กลง',
+                    ]);
+                    exit;
+                }
+                $ch = curl_init(OCRSPACE_URL);
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_POST           => true,
+                    CURLOPT_POSTFIELDS     => [
+                        'base64Image'        => $dataUrl,
+                        'language'           => OCRSPACE_LANGUAGE,
+                        'OCREngine'          => OCRSPACE_ENGINE,
+                        'scale'              => 'true',
+                        'isOverlayRequired'  => 'false',
                     ],
-                ]],
-            ];
-
-            $ch = curl_init(OCR_API_URL);
-            curl_setopt_array($ch, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_POST           => true,
-                CURLOPT_POSTFIELDS     => json_encode($payload),
-                CURLOPT_HTTPHEADER     => [
-                    'Content-Type: application/json',
-                    'Authorization: Bearer ' . OCR_API_KEY,
-                ],
-                CURLOPT_TIMEOUT        => 120,
-                CURLOPT_CONNECTTIMEOUT => 15,
-            ]);
-            $ocrResponse = curl_exec($ch);
-            $httpCode    = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $curlErr     = curl_error($ch);
-            curl_close($ch);
-
-            if ($ocrResponse === false) {
-                echo json_encode([
-                    'success' => false,
-                    'error'   => 'เชื่อมต่อเซิร์ฟเวอร์ OCR ไม่ได้: ' . ($curlErr ?: 'ไม่ทราบสาเหตุ') .
-                                 ' (โปรดตรวจสอบการตั้งค่า OCR_API_URL)',
+                    CURLOPT_HTTPHEADER     => ['apikey: ' . $ocrspaceKey],
+                    CURLOPT_TIMEOUT        => 60,
+                    CURLOPT_CONNECTTIMEOUT => 15,
                 ]);
-                exit;
-            }
-            if ($httpCode < 200 || $httpCode >= 300) {
-                echo json_encode([
-                    'success' => false,
-                    'error'   => 'เซิร์ฟเวอร์ OCR ตอบกลับสถานะ ' . $httpCode,
-                    'detail'  => mb_substr((string)$ocrResponse, 0, 500),
-                ]);
-                exit;
-            }
+                $ocrResponse = curl_exec($ch);
+                $httpCode    = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $curlErr     = curl_error($ch);
+                curl_close($ch);
 
-            $ocrJson = json_decode($ocrResponse, true);
-            $text    = $ocrJson['choices'][0]['message']['content'] ?? null;
-            if ($text === null) {
+                if ($ocrResponse === false) {
+                    echo json_encode(['success' => false, 'error' => 'เชื่อมต่อ OCR.space ไม่ได้: ' . ($curlErr ?: 'ไม่ทราบสาเหตุ')]);
+                    exit;
+                }
+                $ocrJson = json_decode($ocrResponse, true);
+                if (!is_array($ocrJson)) {
+                    echo json_encode(['success' => false, 'error' => 'อ่านผลลัพธ์จาก OCR.space ไม่ได้', 'detail' => mb_substr((string)$ocrResponse, 0, 400)]);
+                    exit;
+                }
+                // OCR.space แจ้ง error ได้ทั้งแบบ string และ array
+                if (!empty($ocrJson['IsErroredOnProcessing'])) {
+                    $msg = $ocrJson['ErrorMessage'] ?? 'เกิดข้อผิดพลาดที่ OCR.space';
+                    if (is_array($msg)) $msg = implode(' ', $msg);
+                    echo json_encode(['success' => false, 'error' => 'OCR.space: ' . $msg]);
+                    exit;
+                }
+                $text = '';
+                if (!empty($ocrJson['ParsedResults']) && is_array($ocrJson['ParsedResults'])) {
+                    foreach ($ocrJson['ParsedResults'] as $pr) {
+                        if (isset($pr['ParsedText'])) $text .= $pr['ParsedText'];
+                    }
+                }
+
+            } elseif ($openaiConfigured) {
+                // ---- endpoint แบบ OpenAI-compatible (เช่น baidu/Unlimited-OCR) — ทางเลือกขั้นสูง ----
+                $payload = [
+                    'model'       => OCR_MODEL,
+                    'temperature' => 0,
+                    'max_tokens'  => 8192,
+                    'messages'    => [[
+                        'role'    => 'user',
+                        'content' => [
+                            ['type' => 'text', 'text' => 'document parsing.'],
+                            ['type' => 'image_url', 'image_url' => ['url' => $dataUrl]],
+                        ],
+                    ]],
+                ];
+                $ch = curl_init(OCR_API_URL);
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_POST           => true,
+                    CURLOPT_POSTFIELDS     => json_encode($payload),
+                    CURLOPT_HTTPHEADER     => [
+                        'Content-Type: application/json',
+                        'Authorization: Bearer ' . OCR_API_KEY,
+                    ],
+                    CURLOPT_TIMEOUT        => 120,
+                    CURLOPT_CONNECTTIMEOUT => 15,
+                ]);
+                $ocrResponse = curl_exec($ch);
+                $httpCode    = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $curlErr     = curl_error($ch);
+                curl_close($ch);
+
+                if ($ocrResponse === false) {
+                    echo json_encode(['success' => false, 'error' => 'เชื่อมต่อเซิร์ฟเวอร์ OCR ไม่ได้: ' . ($curlErr ?: 'ไม่ทราบสาเหตุ')]);
+                    exit;
+                }
+                if ($httpCode < 200 || $httpCode >= 300) {
+                    echo json_encode(['success' => false, 'error' => 'เซิร์ฟเวอร์ OCR ตอบกลับสถานะ ' . $httpCode, 'detail' => mb_substr((string)$ocrResponse, 0, 400)]);
+                    exit;
+                }
+                $ocrJson = json_decode($ocrResponse, true);
+                $text    = $ocrJson['choices'][0]['message']['content'] ?? null;
+                if ($text === null) {
+                    echo json_encode(['success' => false, 'error' => 'อ่านผลลัพธ์จากเซิร์ฟเวอร์ OCR ไม่ได้', 'detail' => mb_substr((string)$ocrResponse, 0, 400)]);
+                    exit;
+                }
+
+            } else {
+                // ยังไม่ได้ตั้งค่าผู้ให้บริการ OCR ฝั่งเซิร์ฟเวอร์ → บอกให้หน้าเว็บใช้ Tesseract แทน
                 echo json_encode([
-                    'success' => false,
-                    'error'   => 'อ่านผลลัพธ์จากเซิร์ฟเวอร์ OCR ไม่ได้',
-                    'detail'  => mb_substr((string)$ocrResponse, 0, 500),
+                    'success'    => false,
+                    'configured' => false,
+                    'error'      => 'ยังไม่ได้ตั้งค่า OCR ฝั่งเซิร์ฟเวอร์ (OCRSPACE_API_KEY)',
                 ]);
                 exit;
             }
 
             // แยกผลลัพธ์ออกเป็นย่อหน้า (ตัดด้วยบรรทัดว่าง) เพื่อให้ฝั่งหน้าเว็บนำไปเติมช่องได้เลย
-            $normalized = str_replace(["\r\n", "\r"], "\n", trim($text));
+            $normalized = str_replace(["\r\n", "\r"], "\n", trim((string)$text));
             $rawParas   = preg_split('/\n\s*\n+/u', $normalized);
             $paragraphs = [];
             foreach ($rawParas as $p) {
@@ -1442,6 +1498,7 @@ try {
 
             echo json_encode([
                 'success'    => true,
+                'provider'   => $ocrspaceKey !== '' ? 'ocrspace' : 'openai',
                 'text'       => $normalized,
                 'paragraphs' => $paragraphs,
             ]);

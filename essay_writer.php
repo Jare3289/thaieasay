@@ -104,7 +104,7 @@ require_once 'header.php';
         </div>
         <p class="text-muted small mb-2">
           ถ่ายภาพหรือเลือกไฟล์รูปเรียงความที่เขียนบนกระดาษ ระบบจะถอดข้อความออกมาให้ แล้วนำไปเติมในช่องด้านล่างได้เลย
-          <span class="text-secondary">(อ่านในเครื่องของคุณโดยตรง ไม่ส่งรูปขึ้นอินเทอร์เน็ต · ครั้งแรกจะโหลดข้อมูลภาษาสักครู่)</span>
+          <span class="text-secondary">(ถ้าตั้งค่า OCR.space ไว้จะใช้บริการนั้นเพื่อความแม่นยำ มิฉะนั้นจะอ่านในเครื่องด้วย Tesseract)</span>
         </p>
 
         <div id="ocrPanel">
@@ -693,13 +693,68 @@ function preprocessForOcr(file) {
   });
 }
 
+// แปลง canvas เป็นไฟล์ JPEG ที่ขนาดไม่เกิน maxBytes (สำหรับส่งไป OCR.space ที่จำกัด 1 MB)
+function canvasToJpegBlob(canvas, quality) {
+  return new Promise(res => canvas.toBlob(b => res(b), 'image/jpeg', quality));
+}
+async function canvasToBlobUnder(canvas, maxBytes) {
+  let quality = 0.85;
+  let blob = await canvasToJpegBlob(canvas, quality);
+  while (blob && blob.size > maxBytes && quality > 0.4) {
+    quality -= 0.15;
+    blob = await canvasToJpegBlob(canvas, quality);
+  }
+  let cur = canvas;
+  while (blob && blob.size > maxBytes && cur.width > 400) {
+    const nc = document.createElement('canvas');
+    nc.width = Math.round(cur.width * 0.8);
+    nc.height = Math.round(cur.height * 0.8);
+    nc.getContext('2d').drawImage(cur, 0, 0, nc.width, nc.height);
+    cur = nc;
+    blob = await canvasToJpegBlob(cur, 0.7);
+  }
+  return blob;
+}
+
+// อ่านด้วย OCR.space ผ่านเซิร์ฟเวอร์ (คืน text ถ้าสำเร็จ, null ถ้ายังไม่ได้ตั้งค่า, โยน error ถ้าตั้งค่าแล้วแต่ล้มเหลว)
+async function tryServerOcr(preparedCanvas, status) {
+  if (!(preparedCanvas instanceof HTMLCanvasElement)) return null;
+  const blob = await canvasToBlobUnder(preparedCanvas, 950 * 1024);
+  if (!blob) return null;
+
+  status.textContent = 'กำลังส่งไปอ่านด้วย OCR.space...';
+  const form = new FormData();
+  form.append('image', blob, 'essay.jpg');
+  const res = await fetch('api.php?action=ocr_essay', { method: 'POST', body: form });
+  const data = await res.json();
+
+  if (data.success) return (data.text || '');
+  if (data.configured === false) return null;         // ยังไม่ได้ตั้งค่าคีย์ → ให้ไปใช้ Tesseract
+  throw new Error(data.error || 'OCR.space ผิดพลาด'); // ตั้งค่าแล้วแต่ล้มเหลว
+}
+
+// อ่านด้วย Tesseract ในเครื่อง (สำรอง / ค่าเริ่มต้นเมื่อยังไม่ได้ตั้ง OCR.space)
+async function tryLocalOcr(prepared, status) {
+  if (typeof Tesseract === 'undefined') {
+    throw new Error('โหลดไลบรารี OCR ไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ตแล้วรีเฟรชหน้า');
+  }
+  const { data } = await Tesseract.recognize(prepared, 'tha+eng', {
+    logger: m => {
+      if (m.status === 'recognizing text') {
+        status.textContent = `กำลังอ่านในเครื่อง... ${Math.round((m.progress || 0) * 100)}%`;
+      } else if (m.status && m.status.indexOf('loading') !== -1) {
+        status.textContent = `กำลังโหลดข้อมูลภาษา (ครั้งแรกครั้งเดียว)... ${Math.round((m.progress || 0) * 100)}%`;
+      }
+    },
+    tessedit_pageseg_mode: '6',
+    preserve_interword_spaces: '1'
+  });
+  return (data && data.text) ? data.text : '';
+}
+
 async function runOcr() {
   if (!ocrSelectedFile) {
     showToast('กรุณาเลือกหรือถ่ายรูปก่อน', 'error');
-    return;
-  }
-  if (typeof Tesseract === 'undefined') {
-    showToast('โหลดไลบรารี OCR ไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ตแล้วรีเฟรชหน้า', 'error');
     return;
   }
 
@@ -715,26 +770,30 @@ async function runOcr() {
     // ปรับแต่งรูปก่อนอ่าน (ขยายภาพ + ขาวดำ + เพิ่มคอนทราสต์) ช่วยให้ OCR แม่นขึ้นมาก
     const prepared = await preprocessForOcr(ocrSelectedFile);
 
-    // อ่านข้อความในเครื่องนักเรียนเอง รองรับภาษาไทย + อังกฤษ (ไม่ส่งรูปออกนอกเครื่อง)
-    const { data } = await Tesseract.recognize(prepared, 'tha+eng', {
-      logger: m => {
-        if (m.status === 'recognizing text') {
-          status.textContent = `กำลังอ่านข้อความ... ${Math.round((m.progress || 0) * 100)}%`;
-        } else if (m.status && m.status.indexOf('loading') !== -1) {
-          status.textContent = `กำลังโหลดข้อมูลภาษา (ครั้งแรกครั้งเดียว)... ${Math.round((m.progress || 0) * 100)}%`;
-        }
-      },
-      // โหมดอ่านแบบ "ข้อความเป็นบล็อกย่อหน้า" และคงช่องว่างระหว่างคำ
-      tessedit_pageseg_mode: '6',
-      preserve_interword_spaces: '1'
-    });
+    let text = null;
+    let source = '';
 
-    const text = (data && data.text) ? data.text.trim() : '';
+    // 1) ลองใช้ OCR.space ก่อน (ถ้าตั้งค่าคีย์ไว้ฝั่งเซิร์ฟเวอร์)
+    try {
+      const serverText = await tryServerOcr(prepared, status);
+      if (serverText !== null) { text = serverText; source = 'OCR.space'; }
+    } catch (serverErr) {
+      // ตั้งค่า OCR.space แล้วแต่อ่านไม่สำเร็จ → แจ้งเตือนแล้วไปใช้ Tesseract แทน
+      showToast((serverErr.message || 'OCR.space ผิดพลาด') + ' — จะลองอ่านในเครื่องแทน', 'error');
+    }
+
+    // 2) ถ้ายังไม่ได้ข้อความ ใช้ Tesseract ในเครื่อง
+    if (text === null) {
+      text = await tryLocalOcr(prepared, status);
+      source = 'ในเครื่อง';
+    }
+
+    text = (text || '').trim();
     document.getElementById('ocrResultText').value = text;
     ocrParagraphs = text.split(/\n\s*\n+/).map(p => p.trim()).filter(Boolean);
 
     if (text) {
-      status.textContent = '✓ อ่านสำเร็จ — แบ่งย่อหน้าให้อัตโนมัติแล้ว โปรดตรวจทาน';
+      status.textContent = `✓ อ่านสำเร็จ (${source}) — แบ่งย่อหน้าให้แล้ว โปรดตรวจทาน`;
       status.className = 'ms-2 small text-success';
       // แบ่งย่อหน้าแรก=คำนำ, ย่อหน้าสุดท้าย=สรุป, ที่เหลือ=เนื้อเรื่อง แล้วเติมลงช่องทันที
       applyOcrResult('auto');
