@@ -1330,14 +1330,38 @@ try {
                 // รองรับกรณีส่งมาเป็น data URL หรือ base64 ล้วน
                 $raw = $request_data['image_base64'];
                 if (preg_match('#^data:(image/[a-zA-Z0-9.+-]+);base64,#', $raw, $m)) {
-                    $mimeType = $m[1];
+                    // ไม่เชื่อชนิดไฟล์จาก prefix — จะตรวจจากเนื้อไฟล์จริงหลังถอดรหัสอีกครั้ง
                     $raw = substr($raw, strpos($raw, ',') + 1);
                 }
                 $imageData = base64_decode($raw, true);
+                unset($raw); // คืนหน่วยความจำของสตริง base64 ที่ไม่ใช้แล้ว
                 if ($imageData === false) {
                     echo json_encode(['success' => false, 'error' => 'ข้อมูลรูปภาพไม่ถูกต้อง']);
                     exit;
                 }
+                // จำกัดขนาดหลังถอดรหัส (เช่นเดียวกับการอัปโหลดไฟล์แบบ multipart)
+                if (strlen($imageData) > 12 * 1024 * 1024) {
+                    echo json_encode(['success' => false, 'error' => 'ไฟล์รูปภาพใหญ่เกินไป (จำกัดไม่เกิน 12 MB)']);
+                    exit;
+                }
+                // ตรวจว่าเป็นรูปภาพจริงจากเนื้อไฟล์ที่ถอดได้ (ไม่เชื่อชนิดที่ client ส่งมา)
+                $detected = false;
+                if (function_exists('finfo_open')) {
+                    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                    if ($finfo) {
+                        $detected = finfo_buffer($finfo, $imageData);
+                        finfo_close($finfo);
+                    }
+                }
+                if ($detected === false && function_exists('getimagesizefromstring')) {
+                    $info = @getimagesizefromstring($imageData);
+                    $detected = ($info && isset($info['mime'])) ? $info['mime'] : false;
+                }
+                if (strpos((string)$detected, 'image/') !== 0) {
+                    echo json_encode(['success' => false, 'error' => 'ไฟล์ที่อัปโหลดไม่ใช่รูปภาพ']);
+                    exit;
+                }
+                $mimeType = $detected;
             }
 
             if ($imageData === null || $imageData === '' || $imageData === false) {

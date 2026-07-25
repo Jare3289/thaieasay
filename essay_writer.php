@@ -99,18 +99,15 @@ require_once 'header.php';
       <div class="mb-4 p-3 rounded-3" style="background: linear-gradient(135deg,#eef2ff 0%,#f0f9ff 100%); border: 1px dashed #93c5fd;">
         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
           <label class="form-label fw-bold text-dark fs-6 mb-0">
-            📷 อ่านข้อความจากรูปภาพ (OCR) <span class="badge bg-success-subtle text-success small align-middle">ฟรี · ไม่ต้องตั้งเซิร์ฟเวอร์</span>
+            📷 อ่านข้อความจากรูปภาพ (OCR)
           </label>
-          <button type="button" class="btn btn-sm btn-link text-decoration-none p-0" onclick="toggleOcrPanel()">
-            <span id="ocrToggleText"><i class="bi bi-chevron-down"></i> เปิดใช้งาน</span>
-          </button>
         </div>
         <p class="text-muted small mb-2">
           ถ่ายภาพหรือเลือกไฟล์รูปเรียงความที่เขียนบนกระดาษ ระบบจะถอดข้อความออกมาให้ แล้วนำไปเติมในช่องด้านล่างได้เลย
           <span class="text-secondary">(อ่านในเครื่องของคุณโดยตรง ไม่ส่งรูปขึ้นอินเทอร์เน็ต · ครั้งแรกจะโหลดข้อมูลภาษาสักครู่)</span>
         </p>
 
-        <div id="ocrPanel" class="d-none">
+        <div id="ocrPanel">
           <div class="row g-3 align-items-start">
             <div class="col-12 col-md-5">
               <input type="file" id="ocrFileInput" class="form-control form-control-sm rounded-3"
@@ -617,15 +614,6 @@ async function loadSavedList() {
 let ocrSelectedFile = null;
 let ocrParagraphs = [];
 
-function toggleOcrPanel() {
-  const panel = document.getElementById('ocrPanel');
-  const label = document.getElementById('ocrToggleText');
-  const isHidden = panel.classList.toggle('d-none');
-  label.innerHTML = isHidden
-    ? '<i class="bi bi-chevron-down"></i> เปิดใช้งาน'
-    : '<i class="bi bi-chevron-up"></i> ซ่อน';
-}
-
 function handleOcrFile(input) {
   const file = input.files && input.files[0];
   ocrSelectedFile = file || null;
@@ -687,9 +675,10 @@ async function runOcr() {
     ocrParagraphs = text.split(/\n\s*\n+/).map(p => p.trim()).filter(Boolean);
 
     if (text) {
-      status.textContent = '✓ อ่านสำเร็จ — โปรดตรวจทานข้อความ';
+      status.textContent = '✓ อ่านสำเร็จ — แบ่งย่อหน้าให้อัตโนมัติแล้ว โปรดตรวจทาน';
       status.className = 'ms-2 small text-success';
-      showToast('อ่านข้อความจากรูปสำเร็จ! ตรวจทาน/แก้ไขแล้วกดเติมลงในช่องได้เลย', 'success');
+      // แบ่งย่อหน้าแรก=คำนำ, ย่อหน้าสุดท้าย=สรุป, ที่เหลือ=เนื้อเรื่อง แล้วเติมลงช่องทันที
+      applyOcrResult('auto');
     } else {
       status.textContent = '⚠️ อ่านข้อความไม่ได้ (ลองถ่ายให้ชัดขึ้น)';
       status.className = 'ms-2 small text-warning';
@@ -729,11 +718,15 @@ function applyOcrResult(mode) {
     document.getElementById('bodyParagraphsContainer').innerHTML = '';
 
     if (paras.length === 1) {
+      // มีย่อหน้าเดียว: ใส่เป็นคำนำ เว้นช่องเนื้อเรื่อง/สรุปให้กรอกเอง
       document.getElementById('essayIntro').value = paras[0];
+      document.getElementById('essayConclusion').value = '';
       addBodyParagraph();
     } else if (paras.length === 2) {
+      // สองย่อหน้า: ย่อหน้าแรก=คำนำ, ย่อหน้าสุดท้าย=สรุป, เว้นช่องเนื้อเรื่องให้กรอกเอง
       document.getElementById('essayIntro').value = paras[0];
-      addBodyParagraph(paras[1]);
+      document.getElementById('essayConclusion').value = paras[1];
+      addBodyParagraph();
     } else {
       document.getElementById('essayIntro').value = paras[0];
       document.getElementById('essayConclusion').value = paras[paras.length - 1];
