@@ -513,8 +513,13 @@ $role = $sessionUser['role'];
                   </button>
                 </li>
                 <li class="nav-item" role="presentation">
+                  <button class="nav-link sub-tab-btn" id="pill-enabling-tab" data-bs-toggle="pill" data-bs-target="#pill-enabling" type="button" role="tab" aria-controls="pill-enabling" aria-selected="false">
+                    🌱 4. ขั้นส่งเสริมการเรียนรู้ (Enabling)
+                  </button>
+                </li>
+                <li class="nav-item" role="presentation">
                   <button class="nav-link sub-tab-btn" id="pill-individual-tab" data-bs-toggle="pill" data-bs-target="#pill-individual" type="button" role="tab" aria-controls="pill-individual" aria-selected="false">
-                    👤 4. ผลรายบุคคล (<span id="countIndividual">0</span> คน)
+                    👤 5. ผลรายบุคคล (<span id="countIndividual">0</span> คน)
                   </button>
                 </li>
               </ul>
@@ -528,12 +533,6 @@ $role = $sessionUser['role'];
                     <p class="text-muted small mb-2" style="font-size: 0.75rem;">แสดงเฉพาะคำที่เกี่ยวข้องกับปัญหา/เกณฑ์การเขียน และคำที่พบบ่อยจะมีขนาดใหญ่ขึ้น</p>
                     <div class="word-cloud" id="obstaclesTrendsContainer"></div>
                   </div>
-                  <!-- ขั้นส่งเสริมการเรียนรู้ (Enabling): ขอบเขตการเรียนรู้เพิ่มเติมที่แนะนำ -->
-                  <div class="card border-0 p-3 mb-4 rounded-4" id="obstaclesSuggestPanel" style="display: none; background: linear-gradient(135deg,#fff7ed,#ffedd5);">
-                    <h6 class="fw-bold text-dark mb-1"><i class="bi bi-lightbulb-fill text-warning"></i> ขั้นส่งเสริมการเรียนรู้ (Enabling): ขอบเขตการเรียนรู้เพิ่มเติมที่แนะนำ</h6>
-                    <p class="text-muted small mb-3" style="font-size: 0.75rem;">แนะนำจากอุปสรรคที่นักเรียนพบบ่อยที่สุด เพื่อออกแบบกิจกรรมเสริมให้ตรงจุด</p>
-                    <div id="obstaclesSuggestContainer"></div>
-                  </div>
                   <div class="row g-3" id="gridObstacles">
                     <div class="text-center py-5 text-muted">กำลังโหลดรายงานอุปสรรคการเขียน...</div>
                   </div>
@@ -541,12 +540,6 @@ $role = $sessionUser['role'];
 
                 <!-- Tab 2: ตรวจสอบตนเอง -->
                 <div class="tab-pane fade" id="pill-checklist" role="tabpanel" aria-labelledby="pill-checklist-tab">
-                  <!-- ขั้นส่งเสริมการเรียนรู้ (Enabling): ขอบเขตการเรียนรู้เพิ่มเติมที่แนะนำ -->
-                  <div class="card border-0 p-3 mb-4 rounded-4" id="checklistSuggestPanel" style="display: none; background: linear-gradient(135deg,#fff7ed,#ffedd5);">
-                    <h6 class="fw-bold text-dark mb-1"><i class="bi bi-lightbulb-fill text-warning"></i> ขั้นส่งเสริมการเรียนรู้ (Enabling): ขอบเขตการเรียนรู้เพิ่มเติมที่แนะนำ</h6>
-                    <p class="text-muted small mb-3" style="font-size: 0.75rem;">แนะนำจากเกณฑ์ที่นักเรียนประเมินตนเองว่ายัง "ต้องปรับปรุง" หรือ "ทำได้บางส่วน" มากที่สุด</p>
-                    <div id="checklistSuggestContainer"></div>
-                  </div>
                   <div class="row g-3" id="gridChecklist">
                     <div class="text-center py-5 text-muted">กำลังโหลดรายงานการตรวจสอบตนเอง...</div>
                   </div>
@@ -560,18 +553,47 @@ $role = $sessionUser['role'];
                     <p class="text-muted small mb-2" style="font-size: 0.75rem;">แสดงเฉพาะคำที่เกี่ยวข้องกับปัญหา/เกณฑ์การเขียน และคำที่พบบ่อยจะมีขนาดใหญ่ขึ้น</p>
                     <div class="word-cloud" id="reflectionTrendsContainer"></div>
                   </div>
-                  <!-- ขั้นส่งเสริมการเรียนรู้ (Enabling): ขอบเขตการเรียนรู้เพิ่มเติมที่แนะนำ -->
-                  <div class="card border-0 p-3 mb-4 rounded-4" id="reflectionSuggestPanel" style="display: none; background: linear-gradient(135deg,#fff7ed,#ffedd5);">
-                    <h6 class="fw-bold text-dark mb-1"><i class="bi bi-lightbulb-fill text-warning"></i> ขั้นส่งเสริมการเรียนรู้ (Enabling): ขอบเขตการเรียนรู้เพิ่มเติมที่แนะนำ</h6>
-                    <p class="text-muted small mb-3" style="font-size: 0.75rem;">แนะนำจากประเด็นที่นักเรียนสะท้อนถึงบ่อยที่สุด เพื่อต่อยอดสู่การเรียนรู้ขั้นถัดไป</p>
-                    <div id="reflectionSuggestContainer"></div>
-                  </div>
                   <div class="row g-3" id="gridReflection">
                     <div class="text-center py-5 text-muted">กำลังโหลดรายงานสะท้อนคิดการเรียนรู้...</div>
                   </div>
                 </div>
 
-                <!-- Tab 4: ผลรายบุคคล (แสดงข้อมูลครบทุกคนในที่เดียว) -->
+                <!-- Tab 4: ขั้นส่งเสริมการเรียนรู้ (Enabling) — รวมข้อเสนอแนะขอบเขตการเรียนรู้เพิ่มเติมทั้งหมด -->
+                <div class="tab-pane fade" id="pill-enabling" role="tabpanel" aria-labelledby="pill-enabling-tab">
+                  <div class="card border-0 rounded-4 p-3 mb-4" style="background: linear-gradient(135deg, var(--primary-navy) 0%, var(--secondary-blue) 100%);">
+                    <h5 class="fw-bold text-white mb-1"><i class="bi bi-lightbulb-fill"></i> ขั้นส่งเสริมการเรียนรู้ (Enabling): ขอบเขตการเรียนรู้เพิ่มเติมที่แนะนำ</h5>
+                    <p class="text-white-50 small mb-0">รวบรวมข้อเสนอแนะจากทั้ง 3 แหล่งข้อมูลไว้ในที่เดียว แต่ละส่วนมีบทวิเคราะห์ภาพรวมและรายการที่จัดลำดับความสำคัญจากมากไปน้อย เพื่อให้ครูออกแบบกิจกรรมเสริมได้ตรงจุด</p>
+                  </div>
+
+                  <!-- 1) จากอุปสรรคและแผนการแก้ปัญหา -->
+                  <div class="card border-0 p-3 mb-4 rounded-4" id="obstaclesSuggestPanel" style="display: none; background: linear-gradient(135deg,#fff7ed,#ffedd5);">
+                    <h6 class="fw-bold text-dark mb-1"><i class="bi bi-exclamation-octagon text-danger"></i> 1. จากอุปสรรคและแผนการแก้ปัญหา 📝</h6>
+                    <p class="text-muted small mb-3" style="font-size: 0.75rem;">แนะนำจากอุปสรรคที่นักเรียนพบบ่อยที่สุด เพื่อออกแบบกิจกรรมเสริมให้ตรงจุด</p>
+                    <div id="obstaclesSuggestContainer"></div>
+                  </div>
+
+                  <!-- 2) จากการตรวจสอบตนเอง -->
+                  <div class="card border-0 p-3 mb-4 rounded-4" id="checklistSuggestPanel" style="display: none; background: linear-gradient(135deg,#fff7ed,#ffedd5);">
+                    <h6 class="fw-bold text-dark mb-1"><i class="bi bi-patch-check text-success"></i> 2. จากการตรวจสอบตนเอง 📋</h6>
+                    <p class="text-muted small mb-3" style="font-size: 0.75rem;">แนะนำจากเกณฑ์ที่นักเรียนประเมินตนเองว่ายัง "ต้องปรับปรุง" หรือ "ทำได้บางส่วน" มากที่สุด</p>
+                    <div id="checklistSuggestContainer"></div>
+                  </div>
+
+                  <!-- 3) จากบทสะท้อนคิด -->
+                  <div class="card border-0 p-3 mb-4 rounded-4" id="reflectionSuggestPanel" style="display: none; background: linear-gradient(135deg,#fff7ed,#ffedd5);">
+                    <h6 class="fw-bold text-dark mb-1"><i class="bi bi-lightbulb text-info"></i> 3. จากบทสะท้อนการเรียนรู้ 💡</h6>
+                    <p class="text-muted small mb-3" style="font-size: 0.75rem;">แนะนำจากประเด็นที่นักเรียนสะท้อนถึงบ่อยที่สุด เพื่อต่อยอดสู่การเรียนรู้ขั้นถัดไป</p>
+                    <div id="reflectionSuggestContainer"></div>
+                  </div>
+
+                  <!-- แสดงเมื่อยังไม่มีข้อเสนอแนะเลย -->
+                  <div id="enablingEmpty" class="text-center py-5 text-muted" style="display: none;">
+                    <div class="fs-1 mb-2">🌱</div>
+                    <p class="mb-0">ยังไม่มีข้อมูลเพียงพอสำหรับสร้างข้อเสนอแนะขอบเขตการเรียนรู้เพิ่มเติม</p>
+                  </div>
+                </div>
+
+                <!-- Tab 5: ผลรายบุคคล (แสดงข้อมูลครบทุกคนในที่เดียว) -->
                 <div class="tab-pane fade" id="pill-individual" role="tabpanel" aria-labelledby="pill-individual-tab">
                   <p class="text-muted small mb-3"><i class="bi bi-info-circle"></i> ตารางผลรายบุคคลของนักเรียนทุกคนที่มีข้อมูล คลิกที่แถวเพื่อขยายดูรายละเอียดทั้งหมด (อุปสรรค + ตรวจสอบตนเอง + สะท้อนคิด) โดยไม่ต้องสลับไปแท็บอื่น</p>
                   <div id="gridIndividual" class="table-responsive">
@@ -1635,6 +1657,13 @@ $role = $sessionUser['role'];
             buildEnablingNarrative('reflection', reflectionSuggestTop),
             reflectionSuggestTop
           );
+
+          // แสดงข้อความว่าง หากยังไม่มีข้อเสนอแนะจากทั้ง 3 แหล่งเลย
+          const enablingEmpty = document.getElementById('enablingEmpty');
+          if (enablingEmpty) {
+            const hasAnySuggest = obstacleSuggestItems.length > 0 || checklistSuggestItems.length > 0 || reflectionSuggestTop.length > 0;
+            enablingEmpty.style.display = hasAnySuggest ? 'none' : 'block';
+          }
 
           // อัปเดตจำนวนนักเรียนในแต่ละกิจกรรมมอนิเตอร์ย่อย (ปุ่มแท็บ)
           document.getElementById('countObstacles').textContent = countObstaclesStudentsSet.size;
