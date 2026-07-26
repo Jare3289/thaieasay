@@ -565,25 +565,11 @@ $role = $sessionUser['role'];
                     <p class="text-white-50 small mb-0">รวบรวมข้อเสนอแนะจากทั้ง 3 แหล่งข้อมูลไว้ในที่เดียว แต่ละส่วนมีบทวิเคราะห์ภาพรวมและรายการที่จัดลำดับความสำคัญจากมากไปน้อย เพื่อให้ครูออกแบบกิจกรรมเสริมได้ตรงจุด</p>
                   </div>
 
-                  <!-- 1) จากอุปสรรคและแผนการแก้ปัญหา -->
-                  <div class="card border-0 p-3 mb-4 rounded-4" id="obstaclesSuggestPanel" style="display: none; background: linear-gradient(135deg,#fff7ed,#ffedd5);">
-                    <h6 class="fw-bold text-dark mb-1"><i class="bi bi-exclamation-octagon text-danger"></i> 1. จากอุปสรรคและแผนการแก้ปัญหา 📝</h6>
-                    <p class="text-muted small mb-3" style="font-size: 0.75rem;">แนะนำจากอุปสรรคที่นักเรียนพบบ่อยที่สุด เพื่อออกแบบกิจกรรมเสริมให้ตรงจุด</p>
-                    <div id="obstaclesSuggestContainer"></div>
-                  </div>
-
-                  <!-- 2) จากการตรวจสอบตนเอง -->
-                  <div class="card border-0 p-3 mb-4 rounded-4" id="checklistSuggestPanel" style="display: none; background: linear-gradient(135deg,#fff7ed,#ffedd5);">
-                    <h6 class="fw-bold text-dark mb-1"><i class="bi bi-patch-check text-success"></i> 2. จากการตรวจสอบตนเอง 📋</h6>
-                    <p class="text-muted small mb-3" style="font-size: 0.75rem;">แนะนำจากเกณฑ์ที่นักเรียนประเมินตนเองว่ายัง "ต้องปรับปรุง" หรือ "ทำได้บางส่วน" มากที่สุด</p>
-                    <div id="checklistSuggestContainer"></div>
-                  </div>
-
-                  <!-- 3) จากบทสะท้อนคิด -->
-                  <div class="card border-0 p-3 mb-4 rounded-4" id="reflectionSuggestPanel" style="display: none; background: linear-gradient(135deg,#fff7ed,#ffedd5);">
-                    <h6 class="fw-bold text-dark mb-1"><i class="bi bi-lightbulb text-info"></i> 3. จากบทสะท้อนการเรียนรู้ 💡</h6>
-                    <p class="text-muted small mb-3" style="font-size: 0.75rem;">แนะนำจากประเด็นที่นักเรียนสะท้อนถึงบ่อยที่สุด เพื่อต่อยอดสู่การเรียนรู้ขั้นถัดไป</p>
-                    <div id="reflectionSuggestContainer"></div>
+                  <!-- ข้อเสนอแนะขอบเขตการเรียนรู้เพิ่มเติม (วิเคราะห์รวมจากทั้ง 3 แหล่งข้อมูล) -->
+                  <div class="card border-0 p-3 mb-4 rounded-4" id="enablingPanel" style="display: none; background: linear-gradient(135deg,#fff7ed,#ffedd5);">
+                    <h6 class="fw-bold text-dark mb-1"><i class="bi bi-lightbulb-fill text-warning"></i> ขอบเขตการเรียนรู้เพิ่มเติมที่แนะนำ (วิเคราะห์ภาพรวม)</h6>
+                    <p class="text-muted small mb-3" style="font-size: 0.75rem;">สังเคราะห์จากทั้ง 3 แหล่งข้อมูลรวมกัน ได้แก่ อุปสรรคการเขียน การประเมินตนเอง และบทสะท้อนการเรียนรู้ แล้วจัดลำดับความสำคัญจากมากไปน้อย</p>
+                    <div id="enablingContainer"></div>
                   </div>
 
                   <!-- แสดงเมื่อยังไม่มีข้อเสนอแนะเลย -->
@@ -916,27 +902,20 @@ $role = $sessionUser['role'];
     return anyData;
   }
 
-  // สร้างบทวิเคราะห์ (narrative) สรุปภาพรวมของข้อมูลในแต่ละด้าน
-  // items ต้องเรียงจากสำคัญมากไปน้อยแล้ว และมีฟิลด์ label, count, unit
-  function buildEnablingNarrative(kind, items, totalStudents) {
+  // สร้างบทวิเคราะห์ (narrative) ภาพรวมแบบสังเคราะห์จากทั้ง 3 แหล่งข้อมูลรวมกัน
+  // items ต้องเรียงจากสำคัญมากไปน้อยแล้ว และมีฟิลด์ label, sourceCount
+  function buildUnifiedEnablingNarrative(items) {
     if (!items || items.length === 0) return '';
-    const lead = (kind === 'obstacle')
-      ? 'จากการวิเคราะห์แบบบันทึกอุปสรรคการเขียนของนักเรียนทั้งชั้น'
-      : (kind === 'checklist')
-        ? 'จากผลการประเมินตนเองของนักเรียน (Self-Assessment)'
-        : 'จากบทสะท้อนการเรียนรู้ของนักเรียน';
-    const top = items.slice(0, 3).map(it => `“${it.label}” (${it.count} ${it.unit})`);
-    let body = `${lead} พบว่าประเด็นที่ปรากฏเด่นชัดที่สุดคือ ${top[0]}`;
+    const top = items.slice(0, 3).map(it => `“${it.label}”`);
+    let body = 'จากการวิเคราะห์ข้อมูลทั้ง 3 แหล่งประกอบกัน (อุปสรรคการเขียน การประเมินตนเอง และบทสะท้อนการเรียนรู้) ';
+    body += `พบว่าขอบเขตการเรียนรู้ที่ควรได้รับการส่งเสริมมากที่สุดคือ ${top[0]}`;
     if (top.length > 1) body += ` รองลงมาได้แก่ ${top.slice(1).join(' และ ')}`;
-    body += ' ';
-    if (kind === 'obstacle') {
-      body += 'สะท้อนว่านักเรียนจำนวนไม่น้อยยังติดขัดในทักษะกลุ่มเดียวกันนี้ ครูจึงควรออกแบบกิจกรรมในขั้นส่งเสริมการเรียนรู้ (Enabling) ที่มุ่งแก้ปัญหาดังกล่าวเป็นลำดับแรก เพื่อลดช่องว่างก่อนเข้าสู่การเขียนอิสระ';
-    } else if (kind === 'checklist') {
-      body += 'สะท้อนว่าเกณฑ์เหล่านี้เป็นจุดที่นักเรียนประเมินว่าตนเองยังทำได้ไม่เต็มที่ ควรได้รับการฝึกซ้ำและให้ข้อมูลย้อนกลับอย่างใกล้ชิดในขั้น Enabling';
-    } else {
-      body += 'สะท้อนว่าเป็นประเด็นที่นักเรียนให้ความสำคัญหรือยังกังวลอยู่ ครูสามารถต่อยอดเป็นหัวข้อเสริมในขั้น Enabling เพื่อเชื่อมสิ่งที่นักเรียนสะท้อนไปสู่การพัฒนาขั้นถัดไป';
+    body += '. ';
+    const multi = items.filter(it => it.sourceCount >= 2).length;
+    if (multi > 0) {
+      body += `ในจำนวนนี้มี ${multi} ประเด็นที่ปรากฏซ้ำในมากกว่าหนึ่งแหล่งข้อมูล จึงสะท้อนความจำเป็นที่ชัดเจนและควรได้รับความสำคัญเป็นลำดับต้น ๆ `;
     }
-    body += ' โดยเรียงลำดับความสำคัญจากมากไปน้อยดังนี้:';
+    body += 'ครูควรออกแบบกิจกรรมในขั้นส่งเสริมการเรียนรู้ (Enabling) แบบบูรณาการ โดยเรียงลำดับความสำคัญจากมากไปน้อยดังนี้:';
     return body;
   }
 
@@ -1597,73 +1576,49 @@ $role = $sessionUser['role'];
           const hasReflectionKw = renderReflectionCloudByField(reflectionTrendsContainer, reflectionByField);
           reflectionTrendsPanel.style.display = hasReflectionKw ? 'block' : 'none';
 
-          // 5. ข้อเสนอแนะขอบเขตการเรียนรู้เพิ่มเติม (ขั้น Enabling) — บทวิเคราะห์ + แจกแจงตามลำดับความสำคัญ
-          // 5.1 จากอุปสรรค → เกณฑ์ที่นักเรียนพบปัญหามากที่สุด
-          const obstacleSuggestItems = Object.keys(obstacleCounts)
-            .sort((a, b) => obstacleCounts[b] - obstacleCounts[a])
-            .slice(0, 6)
-            .map(key => ({
-              area: criteriaToLearningArea[key] || criteriaLabelMap[key],
-              label: criteriaLabelMap[key],
-              count: obstacleCounts[key],
-              unit: 'คน',
-              reason: `มีนักเรียน ${obstacleCounts[key]} คนระบุว่าพบอุปสรรคในเกณฑ์ “${criteriaLabelMap[key]}”`
-            }));
-          renderEnablingSuggestions(
-            document.getElementById('obstaclesSuggestPanel'),
-            document.getElementById('obstaclesSuggestContainer'),
-            buildEnablingNarrative('obstacle', obstacleSuggestItems),
-            obstacleSuggestItems
-          );
+          // 5. ข้อเสนอแนะขอบเขตการเรียนรู้เพิ่มเติม (ขั้น Enabling)
+          //    สังเคราะห์ทั้ง 3 แหล่งข้อมูลรวมกันเป็นชุดเดียว จัดกลุ่มตามเกณฑ์/ขอบเขตการเรียนรู้
+          // แปลงคีย์เวิร์ดบทสะท้อนคิด → เกณฑ์ ผ่านข้อความของ criteriaToLearningArea
+          const areaTextToKey = {};
+          Object.keys(criteriaToLearningArea).forEach(k => { areaTextToKey[criteriaToLearningArea[k]] = k; });
 
-          // 5.2 จากการตรวจสอบตนเอง → เกณฑ์ที่ยังอ่อนที่สุด
-          const checklistSuggestItems = Object.keys(checklistWeak)
-            .sort((a, b) => checklistWeak[b] - checklistWeak[a])
-            .slice(0, 6)
-            .map(key => ({
-              area: criteriaToLearningArea[key] || criteriaLabelMap[key],
-              label: criteriaLabelMap[key],
-              count: checklistWeak[key],
-              unit: 'คน',
-              reason: `มีนักเรียน ${checklistWeak[key]} คนประเมินตนเองว่ายัง “ทำได้บางส่วน/ต้องปรับปรุง” ในเกณฑ์ “${criteriaLabelMap[key]}”`
-            }));
-          renderEnablingSuggestions(
-            document.getElementById('checklistSuggestPanel'),
-            document.getElementById('checklistSuggestContainer'),
-            buildEnablingNarrative('checklist', checklistSuggestItems),
-            checklistSuggestItems
-          );
-
-          // 5.3 จากบทสะท้อนคิด → แปลงคำสำคัญเป็นขอบเขตการเรียนรู้ (ตัดซ้ำ)
-          const seenRefAreas = new Set();
-          const reflectionSuggestItems = [];
+          const areaAgg = {}; // key เกณฑ์ → { ob, chk, ref }
+          const ensureAgg = (k) => { if (!areaAgg[k]) areaAgg[k] = { ob: 0, chk: 0, ref: 0 }; return areaAgg[k]; };
+          Object.keys(obstacleCounts).forEach(k => { ensureAgg(k).ob += obstacleCounts[k]; });
+          Object.keys(checklistWeak).forEach(k => { ensureAgg(k).chk += checklistWeak[k]; });
           reflectionKeywords.forEach(item => {
-            const area = keywordToLearningArea[item.keyword];
-            if (area && !seenRefAreas.has(area)) {
-              seenRefAreas.add(area);
-              reflectionSuggestItems.push({
-                area,
-                label: item.keyword,
-                count: item.count,
-                unit: 'ครั้ง',
-                reason: `นักเรียนกล่าวถึง “${item.keyword}” ${item.count} ครั้งในบทสะท้อนคิด`
-              });
-            }
+            const areaText = keywordToLearningArea[item.keyword];
+            const k = areaText ? areaTextToKey[areaText] : null;
+            if (k) ensureAgg(k).ref += item.count;
           });
-          const reflectionSuggestTop = reflectionSuggestItems.slice(0, 6);
+
+          const enablingItems = Object.keys(areaAgg).map(k => {
+            const a = areaAgg[k];
+            const total = a.ob + a.chk + a.ref;
+            const sourceCount = (a.ob > 0 ? 1 : 0) + (a.chk > 0 ? 1 : 0) + (a.ref > 0 ? 1 : 0);
+            const parts = [];
+            if (a.ob > 0)  parts.push(`อุปสรรค ${a.ob} คน`);
+            if (a.chk > 0) parts.push(`ประเมินตนเอง ${a.chk} คน`);
+            if (a.ref > 0) parts.push(`สะท้อนคิด ${a.ref} ครั้ง`);
+            return {
+              area: criteriaToLearningArea[k] || criteriaLabelMap[k],
+              label: criteriaLabelMap[k],
+              total,
+              sourceCount,
+              reason: `หลักฐานจาก ${sourceCount} แหล่ง — ${parts.join(' · ')}`
+            };
+          }).sort((a, b) => (b.total - a.total) || (b.sourceCount - a.sourceCount)).slice(0, 8);
+
           renderEnablingSuggestions(
-            document.getElementById('reflectionSuggestPanel'),
-            document.getElementById('reflectionSuggestContainer'),
-            buildEnablingNarrative('reflection', reflectionSuggestTop),
-            reflectionSuggestTop
+            document.getElementById('enablingPanel'),
+            document.getElementById('enablingContainer'),
+            buildUnifiedEnablingNarrative(enablingItems),
+            enablingItems
           );
 
-          // แสดงข้อความว่าง หากยังไม่มีข้อเสนอแนะจากทั้ง 3 แหล่งเลย
+          // แสดงข้อความว่าง หากยังไม่มีข้อเสนอแนะเลย
           const enablingEmpty = document.getElementById('enablingEmpty');
-          if (enablingEmpty) {
-            const hasAnySuggest = obstacleSuggestItems.length > 0 || checklistSuggestItems.length > 0 || reflectionSuggestTop.length > 0;
-            enablingEmpty.style.display = hasAnySuggest ? 'none' : 'block';
-          }
+          if (enablingEmpty) enablingEmpty.style.display = (enablingItems.length > 0) ? 'none' : 'block';
 
           // อัปเดตจำนวนนักเรียนในแต่ละกิจกรรมมอนิเตอร์ย่อย (ปุ่มแท็บ)
           document.getElementById('countObstacles').textContent = countObstaclesStudentsSet.size;
