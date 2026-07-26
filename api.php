@@ -1172,30 +1172,33 @@ try {
                 exit;
             }
 
-            $targetKeywords = ['คำเชื่อม', 'คำสะกด', 'สะกดผิด', 'ประโยค', 'คำศัพท์', 'ระดับภาษา', 'โครงเรื่อง',
-                'เนื้อหา', 'เวลา', 'การลำดับ', 'ขยายความ', 'เหตุผล', 'ย่อหน้า', 'เว้นวรรค',
-                'เรียงความ', 'แก้ไข', 'วรรคตอน', 'คำซ้ำ', 'กังวล', 'ร่างแรก', 'ปรับปรุง'];
-            $stopWords = ['และ', 'หรือ', 'แต่', 'ที่', 'ซึ่ง', 'อัน', 'ใน', 'การ', 'ความ', 'ให้', 'ได้', 'มี',
-                'เป็น', 'จะ', 'ของ', 'กับ', 'เพื่อ', 'ไป', 'มา', 'นี้', 'นั้น', 'แล้ว', 'ก็', 'เลย', 'คือ',
-                'ได้แก่', 'เช่น', 'มาก', 'เพราะ', 'คน'];
+            // คำสำคัญที่ "สื่อถึงปัญหา/ทักษะการเขียนตามเกณฑ์" เท่านั้น (คัดมาแล้ว ไม่นับคำทั่วไป)
+            // เลือกให้ไม่ซ้อนทับกันเป็น substring เพื่อไม่ให้ตัวเลขความถี่บวมเกินจริง
+            $targetKeywords = [
+                // ด้านเนื้อหาสาระ
+                'ประเด็น', 'ใจความ', 'แก่นเรื่อง', 'เนื้อหา', 'สาระ',
+                'ขยายความ', 'เหตุผล', 'ตัวอย่าง', 'รายละเอียด',
+                // ด้านองค์ประกอบและการลำดับ
+                'โครงเรื่อง', 'โครงสร้าง', 'องค์ประกอบ', 'คำนำ', 'สรุป', 'ย่อหน้า', 'ลำดับ', 'เชื่อมโยง', 'เรียบเรียง',
+                // ด้านสำนวนภาษา
+                'ประโยค', 'ไวยากรณ์', 'คำศัพท์', 'คำเชื่อม', 'ระดับภาษา', 'ภาษาพูด', 'สำนวน', 'คำซ้ำ', 'เลือกใช้คำ',
+                // ด้านอักขรวิธีและกลไกการเขียน
+                'สะกด', 'เว้นวรรค', 'วรรคตอน', 'เครื่องหมาย', 'ลายมือ', 'เรียบร้อย', 'สะอาด',
+                // คำที่บ่งชี้ว่าเป็นปัญหา/อุปสรรคโดยตรง
+                'ปัญหา', 'อุปสรรค', 'ยาก', 'สับสน', 'ผิดพลาด', 'ไม่เข้าใจ', 'กังวล', 'เวลา'
+            ];
 
-            $analyzeKw = function ($texts) use ($targetKeywords, $stopWords) {
+            // นับเฉพาะคำสำคัญที่คัดไว้ (substring) — ไม่แยกคำทั่วไป เพื่อให้ Word Cloud
+            // แสดงเฉพาะคำที่เกี่ยวกับปัญหา/เกณฑ์การเขียนจริง ไม่ใช่คำที่ไม่สื่อความหมาย
+            $analyzeKw = function ($texts) use ($targetKeywords) {
                 $counts = [];
                 foreach ($targetKeywords as $kw) { $counts[$kw] = 0; }
                 foreach ($texts as $text) {
                     if (!$text) continue;
                     $lower = mb_strtolower($text, 'UTF-8');
-                    // 1) นับคำเป้าหมายแบบ substring
                     foreach ($targetKeywords as $kw) {
-                        $counts[$kw] += mb_substr_count($lower, $kw);
-                    }
-                    // 2) แยกคำทั่วไปด้วยช่องว่าง/เครื่องหมายวรรคตอน
-                    $tokens = preg_split('/[\s,\.\?\!\(\)\[\]\{\}\-\+\*\/\\\\_:;"\']+/u', $lower, -1, PREG_SPLIT_NO_EMPTY);
-                    foreach ($tokens as $t) {
-                        $t = trim($t);
-                        if ($t === '' || mb_strlen($t, 'UTF-8') <= 2) continue;
-                        if (in_array($t, $stopWords, true) || in_array($t, $targetKeywords, true)) continue;
-                        $counts[$t] = ($counts[$t] ?? 0) + 1;
+                        $c = mb_substr_count($lower, $kw);
+                        if ($c > 0) $counts[$kw] += $c;
                     }
                 }
                 $arr = [];
@@ -1219,20 +1222,27 @@ try {
                 }
             }
 
-            // รวมข้อความจากบทสะท้อนคิดทั้ง 4 ด้าน
-            $refTexts = [];
+            // บทสะท้อนคิด: แยกตามคำถามแต่ละข้อ (per-field) และรวมทั้งหมด (combined)
             $refCols = ['content_structure', 'language_mechanics', 'feedback_applied', 'future_goals'];
             $refRows = $pdo->query('SELECT content_structure, language_mechanics, feedback_applied, future_goals FROM learning_reflections')->fetchAll();
-            foreach ($refRows as $r) {
-                foreach ($refCols as $c) {
-                    if (!empty($r[$c]) && trim($r[$c]) !== '') $refTexts[] = $r[$c];
+            $refByField = [];
+            $refTexts = [];
+            foreach ($refCols as $c) {
+                $fieldTexts = [];
+                foreach ($refRows as $r) {
+                    if (!empty($r[$c]) && trim($r[$c]) !== '') {
+                        $fieldTexts[] = $r[$c];
+                        $refTexts[] = $r[$c];
+                    }
                 }
+                $refByField[$c] = $analyzeKw($fieldTexts);
             }
 
             echo json_encode([
-                'success'     => true,
-                'obstacles'   => $analyzeKw($obTexts),
-                'reflections' => $analyzeKw($refTexts)
+                'success'             => true,
+                'obstacles'           => $analyzeKw($obTexts),
+                'reflections'         => $analyzeKw($refTexts),
+                'reflections_by_field' => $refByField
             ]);
             break;
 

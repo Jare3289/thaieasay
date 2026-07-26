@@ -488,6 +488,11 @@ $role = $sessionUser['role'];
                 border-left: 4px solid #f59e0b;
                 background: #ffffff;
               }
+              /* ตารางผลรายบุคคล: หมุนลูกศรเมื่อขยายแถว และไม่ให้แถวรายละเอียดมี hover */
+              .indiv-caret { transition: transform 0.2s ease; }
+              .indiv-row[aria-expanded="true"] .indiv-caret { transform: rotate(180deg); }
+              .indiv-row[aria-expanded="true"] { background-color: #eff6ff; }
+              .indiv-detail-row:hover > * { background-color: transparent !important; }
             </style>
 
             <div class="mb-4">
@@ -520,14 +525,14 @@ $role = $sessionUser['role'];
                   <!-- Keyword word cloud (คำที่พบบ่อยจะใหญ่ขึ้น) -->
                   <div class="card border-0 bg-light p-3 mb-4 rounded-4" id="obstaclesTrendsPanel" style="display: none;">
                     <h6 class="fw-bold text-dark mb-2"><i class="bi bi-cloud-fill text-danger"></i> 📊 คลาวด์คำสำคัญที่เป็นอุปสรรคบ่อยในห้องเรียน (Obstacle Keywords)</h6>
-                    <p class="text-muted small mb-2" style="font-size: 0.75rem;">คำที่ถูกกล่าวถึงบ่อยจะแสดงด้วยขนาดตัวอักษรที่ใหญ่ขึ้น</p>
+                    <p class="text-muted small mb-2" style="font-size: 0.75rem;">แสดงเฉพาะคำที่เกี่ยวข้องกับปัญหา/เกณฑ์การเขียน และคำที่พบบ่อยจะมีขนาดใหญ่ขึ้น</p>
                     <div class="word-cloud" id="obstaclesTrendsContainer"></div>
                   </div>
                   <!-- ขั้นส่งเสริมการเรียนรู้ (Enabling): ขอบเขตการเรียนรู้เพิ่มเติมที่แนะนำ -->
                   <div class="card border-0 p-3 mb-4 rounded-4" id="obstaclesSuggestPanel" style="display: none; background: linear-gradient(135deg,#fff7ed,#ffedd5);">
                     <h6 class="fw-bold text-dark mb-1"><i class="bi bi-lightbulb-fill text-warning"></i> ขั้นส่งเสริมการเรียนรู้ (Enabling): ขอบเขตการเรียนรู้เพิ่มเติมที่แนะนำ</h6>
                     <p class="text-muted small mb-3" style="font-size: 0.75rem;">แนะนำจากอุปสรรคที่นักเรียนพบบ่อยที่สุด เพื่อออกแบบกิจกรรมเสริมให้ตรงจุด</p>
-                    <div id="obstaclesSuggestContainer" class="row g-2"></div>
+                    <div id="obstaclesSuggestContainer"></div>
                   </div>
                   <div class="row g-3" id="gridObstacles">
                     <div class="text-center py-5 text-muted">กำลังโหลดรายงานอุปสรรคการเขียน...</div>
@@ -540,7 +545,7 @@ $role = $sessionUser['role'];
                   <div class="card border-0 p-3 mb-4 rounded-4" id="checklistSuggestPanel" style="display: none; background: linear-gradient(135deg,#fff7ed,#ffedd5);">
                     <h6 class="fw-bold text-dark mb-1"><i class="bi bi-lightbulb-fill text-warning"></i> ขั้นส่งเสริมการเรียนรู้ (Enabling): ขอบเขตการเรียนรู้เพิ่มเติมที่แนะนำ</h6>
                     <p class="text-muted small mb-3" style="font-size: 0.75rem;">แนะนำจากเกณฑ์ที่นักเรียนประเมินตนเองว่ายัง "ต้องปรับปรุง" หรือ "ทำได้บางส่วน" มากที่สุด</p>
-                    <div id="checklistSuggestContainer" class="row g-2"></div>
+                    <div id="checklistSuggestContainer"></div>
                   </div>
                   <div class="row g-3" id="gridChecklist">
                     <div class="text-center py-5 text-muted">กำลังโหลดรายงานการตรวจสอบตนเอง...</div>
@@ -551,15 +556,15 @@ $role = $sessionUser['role'];
                 <div class="tab-pane fade" id="pill-reflection" role="tabpanel" aria-labelledby="pill-reflection-tab">
                   <!-- Keyword word cloud (คำที่พบบ่อยจะใหญ่ขึ้น) -->
                   <div class="card border-0 bg-light p-3 mb-4 rounded-4" id="reflectionTrendsPanel" style="display: none;">
-                    <h6 class="fw-bold text-dark mb-2"><i class="bi bi-cloud-fill text-info"></i> 📊 คลาวด์คำสำคัญในบทสะท้อนคิด (Reflection Keywords)</h6>
-                    <p class="text-muted small mb-2" style="font-size: 0.75rem;">คำที่ถูกกล่าวถึงบ่อยจะแสดงด้วยขนาดตัวอักษรที่ใหญ่ขึ้น</p>
+                    <h6 class="fw-bold text-dark mb-2"><i class="bi bi-cloud-fill text-info"></i> 📊 คลาวด์คำสำคัญในบทสะท้อนคิด แยกตามคำถามแต่ละข้อ (Reflection Keywords)</h6>
+                    <p class="text-muted small mb-2" style="font-size: 0.75rem;">แสดงเฉพาะคำที่เกี่ยวข้องกับปัญหา/เกณฑ์การเขียน และคำที่พบบ่อยจะมีขนาดใหญ่ขึ้น</p>
                     <div class="word-cloud" id="reflectionTrendsContainer"></div>
                   </div>
                   <!-- ขั้นส่งเสริมการเรียนรู้ (Enabling): ขอบเขตการเรียนรู้เพิ่มเติมที่แนะนำ -->
                   <div class="card border-0 p-3 mb-4 rounded-4" id="reflectionSuggestPanel" style="display: none; background: linear-gradient(135deg,#fff7ed,#ffedd5);">
                     <h6 class="fw-bold text-dark mb-1"><i class="bi bi-lightbulb-fill text-warning"></i> ขั้นส่งเสริมการเรียนรู้ (Enabling): ขอบเขตการเรียนรู้เพิ่มเติมที่แนะนำ</h6>
                     <p class="text-muted small mb-3" style="font-size: 0.75rem;">แนะนำจากประเด็นที่นักเรียนสะท้อนถึงบ่อยที่สุด เพื่อต่อยอดสู่การเรียนรู้ขั้นถัดไป</p>
-                    <div id="reflectionSuggestContainer" class="row g-2"></div>
+                    <div id="reflectionSuggestContainer"></div>
                   </div>
                   <div class="row g-3" id="gridReflection">
                     <div class="text-center py-5 text-muted">กำลังโหลดรายงานสะท้อนคิดการเรียนรู้...</div>
@@ -568,8 +573,8 @@ $role = $sessionUser['role'];
 
                 <!-- Tab 4: ผลรายบุคคล (แสดงข้อมูลครบทุกคนในที่เดียว) -->
                 <div class="tab-pane fade" id="pill-individual" role="tabpanel" aria-labelledby="pill-individual-tab">
-                  <p class="text-muted small mb-3"><i class="bi bi-info-circle"></i> แสดงผลรายบุคคลของนักเรียนทุกคนที่มีข้อมูลไว้ในที่เดียว คลิกที่ชื่อเพื่อขยายดูรายละเอียดทั้งหมด (อุปสรรค + ตรวจสอบตนเอง + สะท้อนคิด) โดยไม่ต้องสลับไปแท็บอื่น</p>
-                  <div class="accordion" id="gridIndividual">
+                  <p class="text-muted small mb-3"><i class="bi bi-info-circle"></i> ตารางผลรายบุคคลของนักเรียนทุกคนที่มีข้อมูล คลิกที่แถวเพื่อขยายดูรายละเอียดทั้งหมด (อุปสรรค + ตรวจสอบตนเอง + สะท้อนคิด) โดยไม่ต้องสลับไปแท็บอื่น</p>
+                  <div id="gridIndividual" class="table-responsive">
                     <div class="text-center py-5 text-muted">กำลังโหลดผลรายบุคคล...</div>
                   </div>
                 </div>
@@ -736,51 +741,43 @@ $role = $sessionUser['role'];
     });
   }
 
-  // ฟังก์ชันวิเคราะห์คีย์เวิร์ด/แนวโน้มคำสำคัญในบทสะท้อนและอุปสรรคการเขียน
+  // คำสำคัญที่ "สื่อถึงปัญหา/ทักษะการเขียนตามเกณฑ์" เท่านั้น (คัดมาแล้ว ไม่นับคำทั่วไป)
+  // เลือกไม่ให้ซ้อนทับกันเป็น substring เพื่อไม่ให้ค่าความถี่บวมเกินจริง
+  const PROBLEM_KEYWORDS = [
+    // ด้านเนื้อหาสาระ
+    'ประเด็น', 'ใจความ', 'แก่นเรื่อง', 'เนื้อหา', 'สาระ',
+    'ขยายความ', 'เหตุผล', 'ตัวอย่าง', 'รายละเอียด',
+    // ด้านองค์ประกอบและการลำดับ
+    'โครงเรื่อง', 'โครงสร้าง', 'องค์ประกอบ', 'คำนำ', 'สรุป', 'ย่อหน้า', 'ลำดับ', 'เชื่อมโยง', 'เรียบเรียง',
+    // ด้านสำนวนภาษา
+    'ประโยค', 'ไวยากรณ์', 'คำศัพท์', 'คำเชื่อม', 'ระดับภาษา', 'ภาษาพูด', 'สำนวน', 'คำซ้ำ', 'เลือกใช้คำ',
+    // ด้านอักขรวิธีและกลไกการเขียน
+    'สะกด', 'เว้นวรรค', 'วรรคตอน', 'เครื่องหมาย', 'ลายมือ', 'เรียบร้อย', 'สะอาด',
+    // คำที่บ่งชี้ว่าเป็นปัญหา/อุปสรรคโดยตรง
+    'ปัญหา', 'อุปสรรค', 'ยาก', 'สับสน', 'ผิดพลาด', 'ไม่เข้าใจ', 'กังวล', 'เวลา'
+  ];
+
+  // วิเคราะห์คำสำคัญ: นับเฉพาะคำที่คัดไว้ (substring) ไม่นับคำทั่วไปที่ไม่สื่อถึงปัญหา
+  // จึงทำให้ Word Cloud แสดงเฉพาะคำที่เกี่ยวข้องกับปัญหา/เกณฑ์การเขียนจริง
   function analyzeKeywords(texts) {
-    // กำหนดคำสำคัญเป้าหมายที่เกี่ยวข้องกับการเขียนและเกณฑ์ประเมิน
-    const targetKeywords = [
-      'คำเชื่อม', 'คำสะกด', 'สะกดผิด', 'ประโยค', 'คำศัพท์', 'ระดับภาษา', 'โครงเรื่อง', 
-      'เนื้อหา', 'เวลา', 'การลำดับ', 'ขยายความ', 'เหตุผล', 'ย่อหน้า', 'เว้นวรรค', 
-      'เรียงความ', 'แก้ไข', 'วรรคตอน', 'คำซ้ำ', 'กังวล', 'ร่างแรก', 'ปรับปรุง'
-    ];
-    
     const counts = {};
-    targetKeywords.forEach(kw => counts[kw] = 0);
-    
-    // คำทั่วไปที่จะคัดออก (Stop words)
-    const stopWords = ['และ', 'หรือ', 'แต่', 'ที่', 'ซึ่ง', 'อัน', 'ใน', 'การ', 'ความ', 'ให้', 'ได้', 'มี', 'เป็น', 'จะ', 'ของ', 'กับ', 'เพื่อ', 'ไป', 'มา', 'นี้', 'นั้น', 'แล้ว', 'ก็', 'เลย', 'คือ', 'ได้แก่', 'เช่น', 'มาก', 'มาก ๆ', 'เพราะ', 'คน'];
-    
-    texts.forEach(text => {
+    PROBLEM_KEYWORDS.forEach(kw => counts[kw] = 0);
+
+    (texts || []).forEach(text => {
       if (!text) return;
       const lowerText = text.toLowerCase();
-      
-      // 1. นับคำเฉพาะที่เรากำหนด
-      targetKeywords.forEach(kw => {
-        const regex = new RegExp(kw, 'g');
-        const matches = lowerText.match(regex);
-        if (matches) {
-          counts[kw] += matches.length;
-        }
-      });
-      
-      // 2. ตัดและแยกคำทั่วไปด้วยช่องว่างหรือเครื่องหมายวรรคตอนเพิ่มเติม
-      const words = lowerText.split(/[\s,\.\?\!\(\)\[\]\{\}\-\+\*\/\\_:;]+/);
-      words.forEach(w => {
-        const trimmed = w.trim();
-        if (['__proto__', 'constructor', 'toString', 'valueOf', 'toLocaleString'].includes(trimmed)) return;
-        if (trimmed.length > 2 && !stopWords.includes(trimmed) && !targetKeywords.includes(trimmed)) {
-          counts[trimmed] = (counts[trimmed] || 0) + 1;
-        }
+      PROBLEM_KEYWORDS.forEach(kw => {
+        let idx = lowerText.indexOf(kw), n = 0;
+        while (idx !== -1) { n++; idx = lowerText.indexOf(kw, idx + kw.length); }
+        if (n > 0) counts[kw] += n;
       });
     });
-    
-    // เรียงลำดับคำที่ถูกกล่าวถึงมากที่สุดและเลือกเฉพาะคำที่มีการกล่าวถึงจริงๆ
+
     return Object.keys(counts)
       .map(key => ({ keyword: key, count: counts[key] }))
       .filter(item => item.count > 0)
       .sort((a, b) => b.count - a.count)
-      .slice(0, 20);
+      .slice(0, 25);
   }
 
   // แผนที่เกณฑ์ → ขอบเขตการเรียนรู้ที่แนะนำ (ใช้สร้างข้อเสนอแนะขั้น Enabling)
@@ -800,21 +797,44 @@ $role = $sessionUser['role'];
 
   // แผนที่คำสำคัญ → ขอบเขตการเรียนรู้ (ใช้แปลงคีย์เวิร์ดในบทสะท้อนคิดเป็นข้อเสนอแนะ)
   const keywordToLearningArea = {
-    'คำเชื่อม': criteriaToLearningArea['3_2'],
-    'คำสะกด': criteriaToLearningArea['4_1'],
-    'สะกดผิด': criteriaToLearningArea['4_1'],
-    'ประโยค': criteriaToLearningArea['3_1'],
-    'คำศัพท์': criteriaToLearningArea['3_2'],
-    'ระดับภาษา': criteriaToLearningArea['3_3'],
-    'โครงเรื่อง': criteriaToLearningArea['2_2'],
+    // ด้านเนื้อหาสาระ
+    'ประเด็น': criteriaToLearningArea['1_1'],
+    'ใจความ': criteriaToLearningArea['1_1'],
     'เนื้อหา': criteriaToLearningArea['1_1'],
-    'การลำดับ': criteriaToLearningArea['2_2'],
+    'สาระ': criteriaToLearningArea['1_1'],
+    'แก่นเรื่อง': criteriaToLearningArea['1_2'],
     'ขยายความ': criteriaToLearningArea['1_3'],
     'เหตุผล': criteriaToLearningArea['1_3'],
+    'ตัวอย่าง': criteriaToLearningArea['1_3'],
+    'รายละเอียด': criteriaToLearningArea['1_3'],
+    // ด้านองค์ประกอบและการลำดับ
+    'องค์ประกอบ': criteriaToLearningArea['2_1'],
+    'โครงสร้าง': criteriaToLearningArea['2_1'],
+    'คำนำ': criteriaToLearningArea['2_1'],
+    'สรุป': criteriaToLearningArea['2_1'],
     'ย่อหน้า': criteriaToLearningArea['2_1'],
+    'โครงเรื่อง': criteriaToLearningArea['2_2'],
+    'ลำดับ': criteriaToLearningArea['2_2'],
+    'เชื่อมโยง': criteriaToLearningArea['2_2'],
+    'เรียบเรียง': criteriaToLearningArea['2_2'],
+    // ด้านสำนวนภาษา
+    'ประโยค': criteriaToLearningArea['3_1'],
+    'ไวยากรณ์': criteriaToLearningArea['3_1'],
+    'คำศัพท์': criteriaToLearningArea['3_2'],
+    'คำเชื่อม': criteriaToLearningArea['3_2'],
+    'สำนวน': criteriaToLearningArea['3_2'],
+    'คำซ้ำ': criteriaToLearningArea['3_2'],
+    'เลือกใช้คำ': criteriaToLearningArea['3_2'],
+    'ระดับภาษา': criteriaToLearningArea['3_3'],
+    'ภาษาพูด': criteriaToLearningArea['3_3'],
+    // ด้านอักขรวิธีและกลไกการเขียน
+    'สะกด': criteriaToLearningArea['4_1'],
     'เว้นวรรค': criteriaToLearningArea['4_2'],
     'วรรคตอน': criteriaToLearningArea['4_2'],
-    'คำซ้ำ': criteriaToLearningArea['3_2']
+    'เครื่องหมาย': criteriaToLearningArea['4_2'],
+    'ลายมือ': criteriaToLearningArea['4_3'],
+    'เรียบร้อย': criteriaToLearningArea['4_3'],
+    'สะอาด': criteriaToLearningArea['4_3']
   };
 
   // สร้าง Word Cloud: คำที่พบบ่อยจะมีขนาดตัวอักษรใหญ่ขึ้น
@@ -838,25 +858,96 @@ $role = $sessionUser['role'];
     container.innerHTML = html;
   }
 
-  // สร้างการ์ดข้อเสนอแนะขอบเขตการเรียนรู้เพิ่มเติม (ขั้น Enabling)
-  function renderSuggestions(panel, container, items) {
-    if (!panel || !container) return;
-    if (!items || items.length === 0) { panel.style.display = 'none'; container.innerHTML = ''; return; }
+  // ป้ายกำกับคำถามของบทสะท้อนคิด (ใช้แยกคลาวด์คำสำคัญเป็นบล็อกตามคำถาม)
+  const REFLECTION_FIELD_LABELS = {
+    'content_structure':  '1. ด้านเนื้อหาสาระและองค์ประกอบ',
+    'language_mechanics': '2. ด้านการใช้สำนวนภาษาและอักขรวิธี',
+    'feedback_applied':   '3. การนำข้อเสนอแนะไปปรับปรุงงาน',
+    'future_goals':       '4. การประยุกต์ใช้และเป้าหมายในอนาคต'
+  };
+
+  // แสดงคลาวด์คำสำคัญของบทสะท้อนคิดโดยแยกเป็นบล็อกตามคำถามแต่ละข้อ
+  // byField = { content_structure: [{keyword,count}], ... } — คืน true หากมีข้อมูลอย่างน้อยหนึ่งบล็อก
+  function renderReflectionCloudByField(container, byField) {
+    if (!container) return false;
+    let anyData = false;
     let html = '';
-    items.forEach((it, idx) => {
+    Object.keys(REFLECTION_FIELD_LABELS).forEach(key => {
+      const kws = (byField && byField[key]) ? byField[key] : [];
+      if (kws.length > 0) anyData = true;
       html += `
         <div class="col-md-6 col-12">
-          <div class="p-3 rounded-3 shadow-sm suggest-item h-100">
-            <div class="d-flex align-items-start gap-2">
-              <span class="badge bg-warning text-dark rounded-pill flex-shrink-0">${idx + 1}</span>
-              <div>
-                <div class="fw-bold text-dark small mb-1">${it.area}</div>
-                <div class="text-muted" style="font-size: 0.75rem;">${it.reason}</div>
-              </div>
-            </div>
+          <div class="p-3 bg-white rounded-3 shadow-sm h-100 border">
+            <div class="fw-bold small text-info-emphasis mb-2 border-bottom pb-1">${REFLECTION_FIELD_LABELS[key]}</div>
+            <div class="word-cloud" data-field="${key}"></div>
           </div>
         </div>`;
     });
+    container.className = 'row g-3';
+    container.innerHTML = html;
+    Object.keys(REFLECTION_FIELD_LABELS).forEach(key => {
+      const el = container.querySelector(`.word-cloud[data-field="${key}"]`);
+      const kws = (byField && byField[key]) ? byField[key] : [];
+      if (kws.length > 0) renderWordCloud(el, kws, 'reflection');
+      else if (el) el.innerHTML = '<span class="text-muted small">- ยังไม่มีคำสำคัญ -</span>';
+    });
+    return anyData;
+  }
+
+  // สร้างบทวิเคราะห์ (narrative) สรุปภาพรวมของข้อมูลในแต่ละด้าน
+  // items ต้องเรียงจากสำคัญมากไปน้อยแล้ว และมีฟิลด์ label, count, unit
+  function buildEnablingNarrative(kind, items, totalStudents) {
+    if (!items || items.length === 0) return '';
+    const lead = (kind === 'obstacle')
+      ? 'จากการวิเคราะห์แบบบันทึกอุปสรรคการเขียนของนักเรียนทั้งชั้น'
+      : (kind === 'checklist')
+        ? 'จากผลการประเมินตนเองของนักเรียน (Self-Assessment)'
+        : 'จากบทสะท้อนการเรียนรู้ของนักเรียน';
+    const top = items.slice(0, 3).map(it => `“${it.label}” (${it.count} ${it.unit})`);
+    let body = `${lead} พบว่าประเด็นที่ปรากฏเด่นชัดที่สุดคือ ${top[0]}`;
+    if (top.length > 1) body += ` รองลงมาได้แก่ ${top.slice(1).join(' และ ')}`;
+    body += ' ';
+    if (kind === 'obstacle') {
+      body += 'สะท้อนว่านักเรียนจำนวนไม่น้อยยังติดขัดในทักษะกลุ่มเดียวกันนี้ ครูจึงควรออกแบบกิจกรรมในขั้นส่งเสริมการเรียนรู้ (Enabling) ที่มุ่งแก้ปัญหาดังกล่าวเป็นลำดับแรก เพื่อลดช่องว่างก่อนเข้าสู่การเขียนอิสระ';
+    } else if (kind === 'checklist') {
+      body += 'สะท้อนว่าเกณฑ์เหล่านี้เป็นจุดที่นักเรียนประเมินว่าตนเองยังทำได้ไม่เต็มที่ ควรได้รับการฝึกซ้ำและให้ข้อมูลย้อนกลับอย่างใกล้ชิดในขั้น Enabling';
+    } else {
+      body += 'สะท้อนว่าเป็นประเด็นที่นักเรียนให้ความสำคัญหรือยังกังวลอยู่ ครูสามารถต่อยอดเป็นหัวข้อเสริมในขั้น Enabling เพื่อเชื่อมสิ่งที่นักเรียนสะท้อนไปสู่การพัฒนาขั้นถัดไป';
+    }
+    body += ' โดยเรียงลำดับความสำคัญจากมากไปน้อยดังนี้:';
+    return body;
+  }
+
+  // สร้างข้อเสนอแนะขอบเขตการเรียนรู้เพิ่มเติม (ขั้น Enabling)
+  // แสดง "บทวิเคราะห์" ก่อน แล้วจึงแจกแจงเป็นข้อ เรียงจากจำเป็นมากที่สุดไปน้อยที่สุด
+  function renderEnablingSuggestions(panel, container, narrative, items) {
+    if (!panel || !container) return;
+    if (!items || items.length === 0) { panel.style.display = 'none'; container.innerHTML = ''; return; }
+    const priorityLabel = (i) => (i === 0) ? 'จำเป็นเร่งด่วนที่สุด' : (i <= 2 ? 'สำคัญมาก' : 'ควรเสริม');
+    const priorityClass = (i) => (i === 0) ? 'bg-danger' : (i <= 2 ? 'bg-warning text-dark' : 'bg-secondary');
+
+    let html = '';
+    // 1) บทวิเคราะห์เชิงบรรยาย
+    if (narrative) {
+      html += `<div class="p-3 mb-3 bg-white rounded-3 shadow-sm border-start border-4 border-warning">
+                 <div class="fw-bold text-dark small mb-1"><i class="bi bi-journal-richtext text-warning"></i> บทวิเคราะห์ภาพรวม</div>
+                 <p class="mb-0 small text-dark" style="line-height: 1.75;">${narrative}</p>
+               </div>`;
+    }
+    // 2) แจกแจงเป็นข้อ เรียงตามลำดับความสำคัญ
+    html += '<ol class="list-group list-group-numbered">';
+    items.forEach((it, i) => {
+      html += `
+        <li class="list-group-item d-flex justify-content-between align-items-start border-0 bg-transparent px-0 py-1">
+          <div class="ms-2 me-auto">
+            <div class="fw-bold text-dark small">${it.area}</div>
+            <div class="text-muted" style="font-size: 0.75rem;">${it.reason}</div>
+          </div>
+          <span class="badge ${priorityClass(i)} rounded-pill flex-shrink-0">${priorityLabel(i)}</span>
+        </li>`;
+    });
+    html += '</ol>';
+
     container.innerHTML = html;
     panel.style.display = 'block';
   }
@@ -1185,6 +1276,7 @@ $role = $sessionUser['role'];
 
           const allObstaclesTexts = [];
           const allReflectionTexts = [];
+          const reflectionTextsByField = { content_structure: [], language_mechanics: [], feedback_applied: [], future_goals: [] };
 
           // ข้อมูลสำหรับข้อเสนอแนะขั้น Enabling
           const obstacleCounts = {}; // key เกณฑ์ → จำนวนนักเรียนที่พบอุปสรรค
@@ -1310,6 +1402,7 @@ $role = $sessionUser['role'];
                   topicStudentCount++;
                   countReflectionStudentsSet.add(student.student_id);
                   allReflectionTexts.push(val);
+                  if (reflectionTextsByField[f.key]) reflectionTextsByField[f.key].push(val);
 
                   topicStudentsHtml += `
                     <div class="border-bottom pb-2 mb-2">
@@ -1414,45 +1507,57 @@ $role = $sessionUser['role'];
                 <span class="badge ${hasChecklist ? 'bg-success' : 'bg-light text-muted border'} rounded-pill">ตรวจสอบตนเอง</span>
                 <span class="badge ${hasReflection ? 'bg-info' : 'bg-light text-muted border'} rounded-pill">สะท้อนคิด</span>`;
 
+              // แถวสรุป (คลิกเพื่อขยาย) + แถวรายละเอียดที่ซ่อนไว้
               individualHtml += `
-                <div class="accordion-item border rounded-3 mb-2 overflow-hidden">
-                  <h2 class="accordion-header" id="indivHead${sIdx}">
-                    <button class="accordion-button collapsed py-2 px-3 fw-bold small bg-white text-dark shadow-none" type="button" data-bs-toggle="collapse" data-bs-target="#indivBody${sIdx}" aria-expanded="false" aria-controls="indivBody${sIdx}">
-                      <span class="me-2"><i class="bi bi-person-circle text-primary"></i> ${student.student_id} - ${student.student_name}</span>
-                      <span class="d-none d-md-inline-flex gap-1">${statusBadges}</span>
-                    </button>
-                  </h2>
-                  <div id="indivBody${sIdx}" class="accordion-collapse collapse" aria-labelledby="indivHead${sIdx}" data-bs-parent="#gridIndividual">
-                    <div class="accordion-body p-3">
-                      <h6 class="fw-bold text-danger-emphasis"><i class="bi bi-exclamation-octagon"></i> 1. อุปสรรคและแผนการแก้ปัญหา</h6>
-                      ${obSection}
-                      <h6 class="fw-bold text-success-emphasis mt-3"><i class="bi bi-patch-check"></i> 2. การตรวจสอบตนเอง</h6>
-                      ${chkSection}
-                      <h6 class="fw-bold text-info-emphasis mt-3"><i class="bi bi-lightbulb"></i> 3. การสะท้อนการเรียนรู้</h6>
-                      ${refSection}
-                      <div class="text-end mt-3">
-                        <a href="javascript:void(0)" onclick="viewStudentDetails('${student.student_id}')" class="btn btn-sm btn-outline-primary rounded-pill"><i class="bi bi-folder2-open"></i> เปิดแฟ้มเต็ม (รวมประเมินเพื่อน)</a>
+                <tr class="indiv-row" data-bs-toggle="collapse" data-bs-target="#indivDetail${sIdx}" role="button" aria-expanded="false" style="cursor: pointer;">
+                  <td class="fw-bold text-primary small">${student.student_id}</td>
+                  <td class="small text-dark">${student.student_name}</td>
+                  <td class="text-nowrap">${statusBadges}</td>
+                  <td class="text-end"><i class="bi bi-chevron-down indiv-caret text-secondary"></i></td>
+                </tr>
+                <tr class="indiv-detail-row">
+                  <td colspan="4" class="p-0 border-0">
+                    <div id="indivDetail${sIdx}" class="collapse" data-bs-parent="#gridIndividual">
+                      <div class="p-3 border-start border-4 border-primary" style="background-color: #f8fafc;">
+                        <h6 class="fw-bold text-danger-emphasis"><i class="bi bi-exclamation-octagon"></i> 1. อุปสรรคและแผนการแก้ปัญหา</h6>
+                        ${obSection}
+                        <h6 class="fw-bold text-success-emphasis mt-3"><i class="bi bi-patch-check"></i> 2. การตรวจสอบตนเอง</h6>
+                        ${chkSection}
+                        <h6 class="fw-bold text-info-emphasis mt-3"><i class="bi bi-lightbulb"></i> 3. การสะท้อนการเรียนรู้</h6>
+                        ${refSection}
+                        <div class="text-end mt-3">
+                          <a href="javascript:void(0)" onclick="viewStudentDetails('${student.student_id}')" class="btn btn-sm btn-outline-primary rounded-pill"><i class="bi bi-folder2-open"></i> เปิดแฟ้มเต็ม (รวมประเมินเพื่อน)</a>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>`;
+                  </td>
+                </tr>`;
             });
           }
 
           // 4. วิเคราะห์คำสำคัญ (Keyword Analytics) — เรียก API ก่อน ถ้าไม่สำเร็จค่อย fallback ฝั่ง client
           let obstacleKeywords = [];
           let reflectionKeywords = [];
+          let reflectionByField = null;
           try {
             const kwRes = await (await fetch(`api.php?action=get_reflection_keywords&_t=${new Date().getTime()}`)).json();
             if (kwRes.success) {
               obstacleKeywords = kwRes.obstacles || [];
               reflectionKeywords = kwRes.reflections || [];
+              reflectionByField = kwRes.reflections_by_field || null;
             }
           } catch (e) {
             console.warn('ใช้การวิเคราะห์คำสำคัญฝั่ง client แทน:', e);
           }
           if (obstacleKeywords.length === 0) obstacleKeywords = analyzeKeywords(allObstaclesTexts);
           if (reflectionKeywords.length === 0) reflectionKeywords = analyzeKeywords(allReflectionTexts);
+          // fallback: สร้างคำสำคัญแยกตามคำถามฝั่ง client หาก API ไม่ส่งมา
+          if (!reflectionByField) {
+            reflectionByField = {};
+            Object.keys(reflectionTextsByField).forEach(k => {
+              reflectionByField[k] = analyzeKeywords(reflectionTextsByField[k]);
+            });
+          }
 
           // แสดง Word Cloud อุปสรรคการเขียน (คำที่พบบ่อยจะใหญ่ขึ้น)
           const obstaclesTrendsPanel = document.getElementById('obstaclesTrendsPanel');
@@ -1464,26 +1569,30 @@ $role = $sessionUser['role'];
             obstaclesTrendsPanel.style.display = 'none';
           }
 
-          // แสดง Word Cloud บทสะท้อนคิด
+          // แสดง Word Cloud บทสะท้อนคิด — แยกเป็นบล็อกตามคำถามแต่ละข้อ
           const reflectionTrendsPanel = document.getElementById('reflectionTrendsPanel');
           const reflectionTrendsContainer = document.getElementById('reflectionTrendsContainer');
-          if (reflectionKeywords.length > 0) {
-            reflectionTrendsPanel.style.display = 'block';
-            renderWordCloud(reflectionTrendsContainer, reflectionKeywords, 'reflection');
-          } else {
-            reflectionTrendsPanel.style.display = 'none';
-          }
+          const hasReflectionKw = renderReflectionCloudByField(reflectionTrendsContainer, reflectionByField);
+          reflectionTrendsPanel.style.display = hasReflectionKw ? 'block' : 'none';
 
-          // 5. ข้อเสนอแนะขอบเขตการเรียนรู้เพิ่มเติม (ขั้น Enabling)
+          // 5. ข้อเสนอแนะขอบเขตการเรียนรู้เพิ่มเติม (ขั้น Enabling) — บทวิเคราะห์ + แจกแจงตามลำดับความสำคัญ
           // 5.1 จากอุปสรรค → เกณฑ์ที่นักเรียนพบปัญหามากที่สุด
           const obstacleSuggestItems = Object.keys(obstacleCounts)
             .sort((a, b) => obstacleCounts[b] - obstacleCounts[a])
             .slice(0, 6)
             .map(key => ({
               area: criteriaToLearningArea[key] || criteriaLabelMap[key],
+              label: criteriaLabelMap[key],
+              count: obstacleCounts[key],
+              unit: 'คน',
               reason: `มีนักเรียน ${obstacleCounts[key]} คนระบุว่าพบอุปสรรคในเกณฑ์ “${criteriaLabelMap[key]}”`
             }));
-          renderSuggestions(document.getElementById('obstaclesSuggestPanel'), document.getElementById('obstaclesSuggestContainer'), obstacleSuggestItems);
+          renderEnablingSuggestions(
+            document.getElementById('obstaclesSuggestPanel'),
+            document.getElementById('obstaclesSuggestContainer'),
+            buildEnablingNarrative('obstacle', obstacleSuggestItems),
+            obstacleSuggestItems
+          );
 
           // 5.2 จากการตรวจสอบตนเอง → เกณฑ์ที่ยังอ่อนที่สุด
           const checklistSuggestItems = Object.keys(checklistWeak)
@@ -1491,9 +1600,17 @@ $role = $sessionUser['role'];
             .slice(0, 6)
             .map(key => ({
               area: criteriaToLearningArea[key] || criteriaLabelMap[key],
+              label: criteriaLabelMap[key],
+              count: checklistWeak[key],
+              unit: 'คน',
               reason: `มีนักเรียน ${checklistWeak[key]} คนประเมินตนเองว่ายัง “ทำได้บางส่วน/ต้องปรับปรุง” ในเกณฑ์ “${criteriaLabelMap[key]}”`
             }));
-          renderSuggestions(document.getElementById('checklistSuggestPanel'), document.getElementById('checklistSuggestContainer'), checklistSuggestItems);
+          renderEnablingSuggestions(
+            document.getElementById('checklistSuggestPanel'),
+            document.getElementById('checklistSuggestContainer'),
+            buildEnablingNarrative('checklist', checklistSuggestItems),
+            checklistSuggestItems
+          );
 
           // 5.3 จากบทสะท้อนคิด → แปลงคำสำคัญเป็นขอบเขตการเรียนรู้ (ตัดซ้ำ)
           const seenRefAreas = new Set();
@@ -1502,10 +1619,22 @@ $role = $sessionUser['role'];
             const area = keywordToLearningArea[item.keyword];
             if (area && !seenRefAreas.has(area)) {
               seenRefAreas.add(area);
-              reflectionSuggestItems.push({ area, reason: `นักเรียนกล่าวถึง “${item.keyword}” ${item.count} ครั้งในบทสะท้อนคิด` });
+              reflectionSuggestItems.push({
+                area,
+                label: item.keyword,
+                count: item.count,
+                unit: 'ครั้ง',
+                reason: `นักเรียนกล่าวถึง “${item.keyword}” ${item.count} ครั้งในบทสะท้อนคิด`
+              });
             }
           });
-          renderSuggestions(document.getElementById('reflectionSuggestPanel'), document.getElementById('reflectionSuggestContainer'), reflectionSuggestItems.slice(0, 6));
+          const reflectionSuggestTop = reflectionSuggestItems.slice(0, 6);
+          renderEnablingSuggestions(
+            document.getElementById('reflectionSuggestPanel'),
+            document.getElementById('reflectionSuggestContainer'),
+            buildEnablingNarrative('reflection', reflectionSuggestTop),
+            reflectionSuggestTop
+          );
 
           // อัปเดตจำนวนนักเรียนในแต่ละกิจกรรมมอนิเตอร์ย่อย (ปุ่มแท็บ)
           document.getElementById('countObstacles').textContent = countObstaclesStudentsSet.size;
@@ -1519,7 +1648,21 @@ $role = $sessionUser['role'];
           gridChecklist.innerHTML = checklistHtml || '<div class="text-center py-5 text-muted">ยังไม่มีข้อมูลการตรวจสอบตนเองในกิจกรรมนี้</div>';
           gridReflection.innerHTML = reflectionHtml || '<div class="text-center py-5 text-muted">ยังไม่มีข้อมูลการสะท้อนคิดการเรียนรู้ในกิจกรรมนี้</div>';
           const gridIndividual = document.getElementById('gridIndividual');
-          if (gridIndividual) gridIndividual.innerHTML = individualHtml || '<div class="text-center py-5 text-muted">ยังไม่มีข้อมูลผลรายบุคคล</div>';
+          if (gridIndividual) {
+            gridIndividual.innerHTML = individualHtml
+              ? `<table class="table table-hover align-middle mb-0">
+                   <thead class="table-light">
+                     <tr>
+                       <th style="width: 15%;">รหัส</th>
+                       <th>ชื่อ-สกุล</th>
+                       <th style="width: 38%;">สถานะข้อมูล</th>
+                       <th class="text-end" style="width: 10%;">รายละเอียด</th>
+                     </tr>
+                   </thead>
+                   <tbody>${individualHtml}</tbody>
+                 </table>`
+              : '<div class="text-center py-5 text-muted">ยังไม่มีข้อมูลผลรายบุคคล</div>';
+          }
           if (!res.success) {
             console.error("API error:", res.error || "Unknown error");
             alert("เกิดข้อผิดพลาดในการโหลดข้อมูลห้องเรียน: " + (res.error || "Unknown API error"));
