@@ -460,6 +460,34 @@ $role = $sessionUser['role'];
                 max-height: 150px;
                 overflow-y: auto;
               }
+              /* Word Cloud: คำที่พบบ่อยจะมีขนาดใหญ่ขึ้น */
+              .word-cloud {
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+                justify-content: center;
+                gap: 0.4rem 0.85rem;
+                padding: 0.5rem 0.25rem;
+              }
+              .wc-item {
+                display: inline-flex;
+                align-items: baseline;
+                gap: 0.2rem;
+                line-height: 1.1;
+                font-weight: 700;
+                transition: transform 0.15s ease;
+                cursor: default;
+              }
+              .wc-item:hover { transform: scale(1.08); }
+              .wc-item .wc-count {
+                font-size: 0.7rem;
+                font-weight: 600;
+                opacity: 0.65;
+              }
+              .suggest-item {
+                border-left: 4px solid #f59e0b;
+                background: #ffffff;
+              }
             </style>
 
             <div class="mb-4">
@@ -479,15 +507,27 @@ $role = $sessionUser['role'];
                     💡 3. การสะท้อนคิดการเรียนรู้ (<span id="countReflection">0</span> คน)
                   </button>
                 </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link sub-tab-btn" id="pill-individual-tab" data-bs-toggle="pill" data-bs-target="#pill-individual" type="button" role="tab" aria-controls="pill-individual" aria-selected="false">
+                    👤 4. ผลรายบุคคล (<span id="countIndividual">0</span> คน)
+                  </button>
+                </li>
               </ul>
 
               <div class="tab-content" id="monitoringTabContent">
                 <!-- Tab 1: อุปสรรคการเขียน -->
                 <div class="tab-pane fade show active" id="pill-obstacles" role="tabpanel" aria-labelledby="pill-obstacles-tab">
-                  <!-- Keyword trends panel -->
+                  <!-- Keyword word cloud (คำที่พบบ่อยจะใหญ่ขึ้น) -->
                   <div class="card border-0 bg-light p-3 mb-4 rounded-4" id="obstaclesTrendsPanel" style="display: none;">
-                    <h6 class="fw-bold text-dark mb-2"><i class="bi bi-graph-up-arrow text-danger"></i> 📊 คำสำคัญที่เป็นประเด็นบ่อยในห้องเรียน (Obstacle Keywords)</h6>
-                    <div class="row g-2" id="obstaclesTrendsContainer"></div>
+                    <h6 class="fw-bold text-dark mb-2"><i class="bi bi-cloud-fill text-danger"></i> 📊 คลาวด์คำสำคัญที่เป็นอุปสรรคบ่อยในห้องเรียน (Obstacle Keywords)</h6>
+                    <p class="text-muted small mb-2" style="font-size: 0.75rem;">คำที่ถูกกล่าวถึงบ่อยจะแสดงด้วยขนาดตัวอักษรที่ใหญ่ขึ้น</p>
+                    <div class="word-cloud" id="obstaclesTrendsContainer"></div>
+                  </div>
+                  <!-- ขั้นส่งเสริมการเรียนรู้ (Enabling): ขอบเขตการเรียนรู้เพิ่มเติมที่แนะนำ -->
+                  <div class="card border-0 p-3 mb-4 rounded-4" id="obstaclesSuggestPanel" style="display: none; background: linear-gradient(135deg,#fff7ed,#ffedd5);">
+                    <h6 class="fw-bold text-dark mb-1"><i class="bi bi-lightbulb-fill text-warning"></i> ขั้นส่งเสริมการเรียนรู้ (Enabling): ขอบเขตการเรียนรู้เพิ่มเติมที่แนะนำ</h6>
+                    <p class="text-muted small mb-3" style="font-size: 0.75rem;">แนะนำจากอุปสรรคที่นักเรียนพบบ่อยที่สุด เพื่อออกแบบกิจกรรมเสริมให้ตรงจุด</p>
+                    <div id="obstaclesSuggestContainer" class="row g-2"></div>
                   </div>
                   <div class="row g-3" id="gridObstacles">
                     <div class="text-center py-5 text-muted">กำลังโหลดรายงานอุปสรรคการเขียน...</div>
@@ -496,6 +536,12 @@ $role = $sessionUser['role'];
 
                 <!-- Tab 2: ตรวจสอบตนเอง -->
                 <div class="tab-pane fade" id="pill-checklist" role="tabpanel" aria-labelledby="pill-checklist-tab">
+                  <!-- ขั้นส่งเสริมการเรียนรู้ (Enabling): ขอบเขตการเรียนรู้เพิ่มเติมที่แนะนำ -->
+                  <div class="card border-0 p-3 mb-4 rounded-4" id="checklistSuggestPanel" style="display: none; background: linear-gradient(135deg,#fff7ed,#ffedd5);">
+                    <h6 class="fw-bold text-dark mb-1"><i class="bi bi-lightbulb-fill text-warning"></i> ขั้นส่งเสริมการเรียนรู้ (Enabling): ขอบเขตการเรียนรู้เพิ่มเติมที่แนะนำ</h6>
+                    <p class="text-muted small mb-3" style="font-size: 0.75rem;">แนะนำจากเกณฑ์ที่นักเรียนประเมินตนเองว่ายัง "ต้องปรับปรุง" หรือ "ทำได้บางส่วน" มากที่สุด</p>
+                    <div id="checklistSuggestContainer" class="row g-2"></div>
+                  </div>
                   <div class="row g-3" id="gridChecklist">
                     <div class="text-center py-5 text-muted">กำลังโหลดรายงานการตรวจสอบตนเอง...</div>
                   </div>
@@ -503,13 +549,28 @@ $role = $sessionUser['role'];
 
                 <!-- Tab 3: สะท้อนคิด -->
                 <div class="tab-pane fade" id="pill-reflection" role="tabpanel" aria-labelledby="pill-reflection-tab">
-                  <!-- Keyword trends panel -->
+                  <!-- Keyword word cloud (คำที่พบบ่อยจะใหญ่ขึ้น) -->
                   <div class="card border-0 bg-light p-3 mb-4 rounded-4" id="reflectionTrendsPanel" style="display: none;">
-                    <h6 class="fw-bold text-dark mb-2"><i class="bi bi-graph-up-arrow text-info"></i> 📊 หัวข้อสำคัญในบทสะท้อนคิด (Reflection Keywords)</h6>
-                    <div class="row g-2" id="reflectionTrendsContainer"></div>
+                    <h6 class="fw-bold text-dark mb-2"><i class="bi bi-cloud-fill text-info"></i> 📊 คลาวด์คำสำคัญในบทสะท้อนคิด (Reflection Keywords)</h6>
+                    <p class="text-muted small mb-2" style="font-size: 0.75rem;">คำที่ถูกกล่าวถึงบ่อยจะแสดงด้วยขนาดตัวอักษรที่ใหญ่ขึ้น</p>
+                    <div class="word-cloud" id="reflectionTrendsContainer"></div>
+                  </div>
+                  <!-- ขั้นส่งเสริมการเรียนรู้ (Enabling): ขอบเขตการเรียนรู้เพิ่มเติมที่แนะนำ -->
+                  <div class="card border-0 p-3 mb-4 rounded-4" id="reflectionSuggestPanel" style="display: none; background: linear-gradient(135deg,#fff7ed,#ffedd5);">
+                    <h6 class="fw-bold text-dark mb-1"><i class="bi bi-lightbulb-fill text-warning"></i> ขั้นส่งเสริมการเรียนรู้ (Enabling): ขอบเขตการเรียนรู้เพิ่มเติมที่แนะนำ</h6>
+                    <p class="text-muted small mb-3" style="font-size: 0.75rem;">แนะนำจากประเด็นที่นักเรียนสะท้อนถึงบ่อยที่สุด เพื่อต่อยอดสู่การเรียนรู้ขั้นถัดไป</p>
+                    <div id="reflectionSuggestContainer" class="row g-2"></div>
                   </div>
                   <div class="row g-3" id="gridReflection">
                     <div class="text-center py-5 text-muted">กำลังโหลดรายงานสะท้อนคิดการเรียนรู้...</div>
+                  </div>
+                </div>
+
+                <!-- Tab 4: ผลรายบุคคล (แสดงข้อมูลครบทุกคนในที่เดียว) -->
+                <div class="tab-pane fade" id="pill-individual" role="tabpanel" aria-labelledby="pill-individual-tab">
+                  <p class="text-muted small mb-3"><i class="bi bi-info-circle"></i> แสดงผลรายบุคคลของนักเรียนทุกคนที่มีข้อมูลไว้ในที่เดียว คลิกที่ชื่อเพื่อขยายดูรายละเอียดทั้งหมด (อุปสรรค + ตรวจสอบตนเอง + สะท้อนคิด) โดยไม่ต้องสลับไปแท็บอื่น</p>
+                  <div class="accordion" id="gridIndividual">
+                    <div class="text-center py-5 text-muted">กำลังโหลดผลรายบุคคล...</div>
                   </div>
                 </div>
               </div>
@@ -719,7 +780,85 @@ $role = $sessionUser['role'];
       .map(key => ({ keyword: key, count: counts[key] }))
       .filter(item => item.count > 0)
       .sort((a, b) => b.count - a.count)
-      .slice(0, 8);
+      .slice(0, 20);
+  }
+
+  // แผนที่เกณฑ์ → ขอบเขตการเรียนรู้ที่แนะนำ (ใช้สร้างข้อเสนอแนะขั้น Enabling)
+  const criteriaToLearningArea = {
+    '1_1': 'ฝึกอ่านวิเคราะห์ขอบเขตหัวข้อและการเขียนให้ตรงประเด็น',
+    '1_2': 'ฝึกกำหนดแก่นเรื่องและประโยคใจความสำคัญ (Thesis Statement)',
+    '1_3': 'ฝึกการขยายความด้วยเหตุผลและตัวอย่างสนับสนุน',
+    '2_1': 'ทบทวนโครงสร้างเรียงความ 3 ส่วน (คำนำ–เนื้อเรื่อง–สรุป)',
+    '2_2': 'ฝึกวางโครงเรื่องและลำดับความคิดอย่างเป็นระบบ',
+    '3_1': 'ทบทวนหลักไวยากรณ์และการสร้างประโยคที่หลากหลาย',
+    '3_2': 'ฝึกการเลือกใช้คำและคำเชื่อมให้เหมาะสม',
+    '3_3': 'ฝึกการใช้ระดับภาษาให้เหมาะกับงานเขียนทางการ',
+    '4_1': 'ฝึกการสะกดคำให้ถูกต้องตามพจนานุกรม',
+    '4_2': 'ทบทวนหลักการเว้นวรรคตอน',
+    '4_3': 'เน้นความสะอาดเรียบร้อยและการจัดหน้ากระดาษ'
+  };
+
+  // แผนที่คำสำคัญ → ขอบเขตการเรียนรู้ (ใช้แปลงคีย์เวิร์ดในบทสะท้อนคิดเป็นข้อเสนอแนะ)
+  const keywordToLearningArea = {
+    'คำเชื่อม': criteriaToLearningArea['3_2'],
+    'คำสะกด': criteriaToLearningArea['4_1'],
+    'สะกดผิด': criteriaToLearningArea['4_1'],
+    'ประโยค': criteriaToLearningArea['3_1'],
+    'คำศัพท์': criteriaToLearningArea['3_2'],
+    'ระดับภาษา': criteriaToLearningArea['3_3'],
+    'โครงเรื่อง': criteriaToLearningArea['2_2'],
+    'เนื้อหา': criteriaToLearningArea['1_1'],
+    'การลำดับ': criteriaToLearningArea['2_2'],
+    'ขยายความ': criteriaToLearningArea['1_3'],
+    'เหตุผล': criteriaToLearningArea['1_3'],
+    'ย่อหน้า': criteriaToLearningArea['2_1'],
+    'เว้นวรรค': criteriaToLearningArea['4_2'],
+    'วรรคตอน': criteriaToLearningArea['4_2'],
+    'คำซ้ำ': criteriaToLearningArea['3_2']
+  };
+
+  // สร้าง Word Cloud: คำที่พบบ่อยจะมีขนาดตัวอักษรใหญ่ขึ้น
+  function renderWordCloud(container, keywords, kind) {
+    if (!container) return;
+    if (!keywords || keywords.length === 0) { container.innerHTML = '<span class="text-muted small">- ยังไม่มีข้อมูลคำสำคัญ -</span>'; return; }
+    const counts = keywords.map(k => k.count);
+    const max = Math.max(...counts);
+    const min = Math.min(...counts);
+    const minSize = 0.9, maxSize = 2.3;
+    const palette = (kind === 'obstacle')
+      ? ['#b91c1c', '#dc2626', '#ea580c', '#d97706']
+      : ['#0e7490', '#0891b2', '#0284c7', '#2563eb'];
+    let html = '';
+    keywords.forEach((item, i) => {
+      const ratio = (max === min) ? 1 : (item.count - min) / (max - min);
+      const size = (minSize + ratio * (maxSize - minSize)).toFixed(2);
+      const color = palette[i % palette.length];
+      html += `<span class="wc-item" style="font-size:${size}rem; color:${color};" title="พบ ${item.count} ครั้ง">${item.keyword}<span class="wc-count">${item.count}</span></span>`;
+    });
+    container.innerHTML = html;
+  }
+
+  // สร้างการ์ดข้อเสนอแนะขอบเขตการเรียนรู้เพิ่มเติม (ขั้น Enabling)
+  function renderSuggestions(panel, container, items) {
+    if (!panel || !container) return;
+    if (!items || items.length === 0) { panel.style.display = 'none'; container.innerHTML = ''; return; }
+    let html = '';
+    items.forEach((it, idx) => {
+      html += `
+        <div class="col-md-6 col-12">
+          <div class="p-3 rounded-3 shadow-sm suggest-item h-100">
+            <div class="d-flex align-items-start gap-2">
+              <span class="badge bg-warning text-dark rounded-pill flex-shrink-0">${idx + 1}</span>
+              <div>
+                <div class="fw-bold text-dark small mb-1">${it.area}</div>
+                <div class="text-muted" style="font-size: 0.75rem;">${it.reason}</div>
+              </div>
+            </div>
+          </div>
+        </div>`;
+    });
+    container.innerHTML = html;
+    panel.style.display = 'block';
   }
 
   // ==========================================
@@ -1047,6 +1186,14 @@ $role = $sessionUser['role'];
           const allObstaclesTexts = [];
           const allReflectionTexts = [];
 
+          // ข้อมูลสำหรับข้อเสนอแนะขั้น Enabling
+          const obstacleCounts = {}; // key เกณฑ์ → จำนวนนักเรียนที่พบอุปสรรค
+          const checklistWeak = {};  // key เกณฑ์ → จำนวนนักเรียนที่ยังต้องปรับปรุง/ทำได้บางส่วน
+
+          // ผลรายบุคคล (แสดงครบทุกคนในที่เดียว)
+          let individualHtml = '';
+          let countIndividualStudentsSet = new Set();
+
           if (res.students_details && res.students_details.length > 0) {
             // 1. หมวดอุปสรรคการเขียน (จัดกลุ่มตาม 11 เกณฑ์)
             Object.keys(criteriaLabelMap).forEach(key => {
@@ -1076,6 +1223,7 @@ $role = $sessionUser['role'];
               });
 
               if (topicStudentCount > 0) {
+                obstacleCounts[key] = topicStudentCount;
                 obstaclesHtml += `
                   <div class="col-lg-6 col-md-12 mb-3">
                     <div class="card h-100 border border-light shadow-sm rounded-4">
@@ -1113,6 +1261,8 @@ $role = $sessionUser['role'];
 
               const totalTopicChecklists = completeList.length + partialList.length + improveList.length;
               if (totalTopicChecklists > 0) {
+                const weakCount = partialList.length + improveList.length;
+                if (weakCount > 0) checklistWeak[key] = weakCount;
                 checklistHtml += `
                   <div class="col-lg-6 col-md-12 mb-3">
                     <div class="card h-100 border border-light shadow-sm rounded-4">
@@ -1190,63 +1340,186 @@ $role = $sessionUser['role'];
                 `;
               }
             });
+
+            // 4b. ผลรายบุคคล — รวมข้อมูลทั้งหมดของนักเรียนแต่ละคนไว้ในแอคคอร์เดียนเดียว
+            const chkBadge = (val) => {
+              if (val === 'ครบถ้วน') return '<span class="badge bg-success rounded-pill">ครบถ้วน</span>';
+              if (val === 'บางส่วน') return '<span class="badge bg-warning text-dark rounded-pill">บางส่วน</span>';
+              if (val === 'ต้องปรับปรุง') return '<span class="badge bg-danger rounded-pill">ต้องปรับปรุง</span>';
+              return '<span class="badge bg-light text-muted border rounded-pill">-</span>';
+            };
+            const esc = (s) => (s == null ? '' : String(s).replace(/</g, '&lt;').replace(/>/g, '&gt;'));
+
+            res.students_details.forEach((student, sIdx) => {
+              // ตรวจว่ามีข้อมูลอย่างน้อยหนึ่งประเภทหรือไม่
+              let hasObstacle = false, hasChecklist = false, hasReflection = false;
+              Object.keys(criteriaLabelMap).forEach(key => {
+                if ((student[`prob_${key}`] && student[`prob_${key}`].trim() !== '') ||
+                    (student[`sol_${key}`] && student[`sol_${key}`].trim() !== '')) hasObstacle = true;
+                if (student[`check_${key}`] && student[`check_${key}`].trim() !== '') hasChecklist = true;
+              });
+              ['content_structure', 'language_mechanics', 'feedback_applied', 'future_goals'].forEach(f => {
+                if (student[f] && student[f].trim() !== '') hasReflection = true;
+              });
+              if (!hasObstacle && !hasChecklist && !hasReflection) return;
+              countIndividualStudentsSet.add(student.student_id);
+
+              // ส่วนอุปสรรค
+              let obRows = '';
+              Object.keys(criteriaLabelMap).forEach(key => {
+                const p = student[`prob_${key}`] ? student[`prob_${key}`].trim() : '';
+                const s = student[`sol_${key}`] ? student[`sol_${key}`].trim() : '';
+                if (p !== '' || s !== '') {
+                  obRows += `<tr><td class="fw-bold text-dark small">${criteriaLabelMap[key]}</td><td class="small text-danger">${esc(p) || '-'}</td><td class="small text-success">${esc(s) || '-'}</td></tr>`;
+                }
+              });
+              const obSection = obRows
+                ? `<div class="table-responsive"><table class="table table-sm table-bordered align-middle mb-0"><thead class="table-danger"><tr><th style="width:25%">เกณฑ์</th><th style="width:38%">อุปสรรค</th><th style="width:37%">แผนแก้ปัญหา</th></tr></thead><tbody>${obRows}</tbody></table></div>`
+                : '<p class="text-muted small mb-0">- ยังไม่มีการบันทึกอุปสรรคการเขียน -</p>';
+
+              // ส่วนตรวจสอบตนเอง
+              let chkItems = '';
+              Object.keys(criteriaLabelMap).forEach(key => {
+                const val = student[`check_${key}`];
+                if (val && val.trim() !== '') {
+                  chkItems += `<li class="list-group-item d-flex justify-content-between align-items-center py-1 px-2"><span class="small">${criteriaLabelMap[key]}</span>${chkBadge(val)}</li>`;
+                }
+              });
+              const chkNotes = student.checklist_notes && student.checklist_notes.trim() !== '' ? `<div class="mt-2 p-2 bg-light rounded small text-muted"><strong>บันทึกเพิ่มเติม:</strong> ${esc(student.checklist_notes)}</div>` : '';
+              const chkSection = chkItems
+                ? `<ul class="list-group list-group-flush border rounded">${chkItems}</ul>${chkNotes}`
+                : '<p class="text-muted small mb-0">- ยังไม่มีการตรวจสอบตนเอง -</p>';
+
+              // ส่วนสะท้อนคิด
+              const refMap = [
+                ['content_structure', 'ด้านเนื้อหาสาระและองค์ประกอบ'],
+                ['language_mechanics', 'ด้านการใช้สำนวนภาษาและอักขรวิธี'],
+                ['feedback_applied', 'การนำข้อเสนอแนะไปปรับปรุงงาน'],
+                ['future_goals', 'การประยุกต์ใช้และเป้าหมายในอนาคต']
+              ];
+              let refItems = '';
+              refMap.forEach(([f, label]) => {
+                const v = student[f] ? student[f].trim() : '';
+                if (v !== '') {
+                  refItems += `<div class="col-md-6 col-12"><div class="p-2 bg-light rounded-3 h-100"><strong class="text-secondary small d-block">${label}</strong><span class="small text-dark">${esc(v)}</span></div></div>`;
+                }
+              });
+              const refSection = refItems
+                ? `<div class="row g-2">${refItems}</div>`
+                : '<p class="text-muted small mb-0">- ยังไม่มีบทสะท้อนคิด -</p>';
+
+              // ป้ายสถานะย่อ
+              const statusBadges = `
+                <span class="badge ${hasObstacle ? 'bg-danger' : 'bg-light text-muted border'} rounded-pill">อุปสรรค</span>
+                <span class="badge ${hasChecklist ? 'bg-success' : 'bg-light text-muted border'} rounded-pill">ตรวจสอบตนเอง</span>
+                <span class="badge ${hasReflection ? 'bg-info' : 'bg-light text-muted border'} rounded-pill">สะท้อนคิด</span>`;
+
+              individualHtml += `
+                <div class="accordion-item border rounded-3 mb-2 overflow-hidden">
+                  <h2 class="accordion-header" id="indivHead${sIdx}">
+                    <button class="accordion-button collapsed py-2 px-3 fw-bold small bg-white text-dark shadow-none" type="button" data-bs-toggle="collapse" data-bs-target="#indivBody${sIdx}" aria-expanded="false" aria-controls="indivBody${sIdx}">
+                      <span class="me-2"><i class="bi bi-person-circle text-primary"></i> ${student.student_id} - ${student.student_name}</span>
+                      <span class="d-none d-md-inline-flex gap-1">${statusBadges}</span>
+                    </button>
+                  </h2>
+                  <div id="indivBody${sIdx}" class="accordion-collapse collapse" aria-labelledby="indivHead${sIdx}" data-bs-parent="#gridIndividual">
+                    <div class="accordion-body p-3">
+                      <h6 class="fw-bold text-danger-emphasis"><i class="bi bi-exclamation-octagon"></i> 1. อุปสรรคและแผนการแก้ปัญหา</h6>
+                      ${obSection}
+                      <h6 class="fw-bold text-success-emphasis mt-3"><i class="bi bi-patch-check"></i> 2. การตรวจสอบตนเอง</h6>
+                      ${chkSection}
+                      <h6 class="fw-bold text-info-emphasis mt-3"><i class="bi bi-lightbulb"></i> 3. การสะท้อนการเรียนรู้</h6>
+                      ${refSection}
+                      <div class="text-end mt-3">
+                        <a href="javascript:void(0)" onclick="viewStudentDetails('${student.student_id}')" class="btn btn-sm btn-outline-primary rounded-pill"><i class="bi bi-folder2-open"></i> เปิดแฟ้มเต็ม (รวมประเมินเพื่อน)</a>
+                      </div>
+                    </div>
+                  </div>
+                </div>`;
+            });
           }
 
-          // 4. วิเคราะห์คำสำคัญยอดนิยมเชิงคุณภาพ (Keyword Analytics)
-          const obstacleKeywords = analyzeKeywords(allObstaclesTexts);
-          const reflectionKeywords = analyzeKeywords(allReflectionTexts);
+          // 4. วิเคราะห์คำสำคัญ (Keyword Analytics) — เรียก API ก่อน ถ้าไม่สำเร็จค่อย fallback ฝั่ง client
+          let obstacleKeywords = [];
+          let reflectionKeywords = [];
+          try {
+            const kwRes = await (await fetch(`api.php?action=get_reflection_keywords&_t=${new Date().getTime()}`)).json();
+            if (kwRes.success) {
+              obstacleKeywords = kwRes.obstacles || [];
+              reflectionKeywords = kwRes.reflections || [];
+            }
+          } catch (e) {
+            console.warn('ใช้การวิเคราะห์คำสำคัญฝั่ง client แทน:', e);
+          }
+          if (obstacleKeywords.length === 0) obstacleKeywords = analyzeKeywords(allObstaclesTexts);
+          if (reflectionKeywords.length === 0) reflectionKeywords = analyzeKeywords(allReflectionTexts);
 
-          // อัปเดตการแสดงผลเทรนด์อุปสรรคการเขียน
+          // แสดง Word Cloud อุปสรรคการเขียน (คำที่พบบ่อยจะใหญ่ขึ้น)
           const obstaclesTrendsPanel = document.getElementById('obstaclesTrendsPanel');
           const obstaclesTrendsContainer = document.getElementById('obstaclesTrendsContainer');
           if (obstacleKeywords.length > 0) {
             obstaclesTrendsPanel.style.display = 'block';
-            let trendHtml = '';
-            obstacleKeywords.forEach(item => {
-              trendHtml += `
-                <div class="col-md-3 col-sm-6 col-12">
-                  <div class="p-2 border rounded bg-white text-center shadow-sm h-100 d-flex flex-column justify-content-center align-items-center">
-                    <span class="badge bg-danger-subtle text-danger mb-1 fw-bold fs-6">${item.keyword}</span>
-                    <div class="small text-muted" style="font-size: 0.75rem;">พบประเด็นนี้ <strong class="text-danger">${item.count}</strong> ครั้ง</div>
-                  </div>
-                </div>
-              `;
-            });
-            obstaclesTrendsContainer.innerHTML = trendHtml;
+            renderWordCloud(obstaclesTrendsContainer, obstacleKeywords, 'obstacle');
           } else {
             obstaclesTrendsPanel.style.display = 'none';
           }
 
-          // อัปเดตการแสดงผลเทรนด์บันทึกสะท้อนคิด
+          // แสดง Word Cloud บทสะท้อนคิด
           const reflectionTrendsPanel = document.getElementById('reflectionTrendsPanel');
           const reflectionTrendsContainer = document.getElementById('reflectionTrendsContainer');
           if (reflectionKeywords.length > 0) {
             reflectionTrendsPanel.style.display = 'block';
-            let trendHtml = '';
-            reflectionKeywords.forEach(item => {
-              trendHtml += `
-                <div class="col-md-3 col-sm-6 col-12">
-                  <div class="p-2 border rounded bg-white text-center shadow-sm h-100 d-flex flex-column justify-content-center align-items-center">
-                    <span class="badge bg-info-subtle text-info mb-1 fw-bold fs-6">${item.keyword}</span>
-                    <div class="small text-muted" style="font-size: 0.75rem;">กล่าวถึงในห้องเรียน <strong class="text-info">${item.count}</strong> ครั้ง</div>
-                  </div>
-                </div>
-              `;
-            });
-            reflectionTrendsContainer.innerHTML = trendHtml;
+            renderWordCloud(reflectionTrendsContainer, reflectionKeywords, 'reflection');
           } else {
             reflectionTrendsPanel.style.display = 'none';
           }
+
+          // 5. ข้อเสนอแนะขอบเขตการเรียนรู้เพิ่มเติม (ขั้น Enabling)
+          // 5.1 จากอุปสรรค → เกณฑ์ที่นักเรียนพบปัญหามากที่สุด
+          const obstacleSuggestItems = Object.keys(obstacleCounts)
+            .sort((a, b) => obstacleCounts[b] - obstacleCounts[a])
+            .slice(0, 6)
+            .map(key => ({
+              area: criteriaToLearningArea[key] || criteriaLabelMap[key],
+              reason: `มีนักเรียน ${obstacleCounts[key]} คนระบุว่าพบอุปสรรคในเกณฑ์ “${criteriaLabelMap[key]}”`
+            }));
+          renderSuggestions(document.getElementById('obstaclesSuggestPanel'), document.getElementById('obstaclesSuggestContainer'), obstacleSuggestItems);
+
+          // 5.2 จากการตรวจสอบตนเอง → เกณฑ์ที่ยังอ่อนที่สุด
+          const checklistSuggestItems = Object.keys(checklistWeak)
+            .sort((a, b) => checklistWeak[b] - checklistWeak[a])
+            .slice(0, 6)
+            .map(key => ({
+              area: criteriaToLearningArea[key] || criteriaLabelMap[key],
+              reason: `มีนักเรียน ${checklistWeak[key]} คนประเมินตนเองว่ายัง “ทำได้บางส่วน/ต้องปรับปรุง” ในเกณฑ์ “${criteriaLabelMap[key]}”`
+            }));
+          renderSuggestions(document.getElementById('checklistSuggestPanel'), document.getElementById('checklistSuggestContainer'), checklistSuggestItems);
+
+          // 5.3 จากบทสะท้อนคิด → แปลงคำสำคัญเป็นขอบเขตการเรียนรู้ (ตัดซ้ำ)
+          const seenRefAreas = new Set();
+          const reflectionSuggestItems = [];
+          reflectionKeywords.forEach(item => {
+            const area = keywordToLearningArea[item.keyword];
+            if (area && !seenRefAreas.has(area)) {
+              seenRefAreas.add(area);
+              reflectionSuggestItems.push({ area, reason: `นักเรียนกล่าวถึง “${item.keyword}” ${item.count} ครั้งในบทสะท้อนคิด` });
+            }
+          });
+          renderSuggestions(document.getElementById('reflectionSuggestPanel'), document.getElementById('reflectionSuggestContainer'), reflectionSuggestItems.slice(0, 6));
 
           // อัปเดตจำนวนนักเรียนในแต่ละกิจกรรมมอนิเตอร์ย่อย (ปุ่มแท็บ)
           document.getElementById('countObstacles').textContent = countObstaclesStudentsSet.size;
           document.getElementById('countChecklist').textContent = countChecklistStudentsSet.size;
           document.getElementById('countReflection').textContent = countReflectionStudentsSet.size;
+          const countIndivEl = document.getElementById('countIndividual');
+          if (countIndivEl) countIndivEl.textContent = countIndividualStudentsSet.size;
 
           // แสดงข้อความตกหล่นหรือสถานะว่าง
           gridObstacles.innerHTML = obstaclesHtml || '<div class="text-center py-5 text-muted">ยังไม่มีข้อมูลอุปสรรคการเขียนในกิจกรรมนี้</div>';
           gridChecklist.innerHTML = checklistHtml || '<div class="text-center py-5 text-muted">ยังไม่มีข้อมูลการตรวจสอบตนเองในกิจกรรมนี้</div>';
           gridReflection.innerHTML = reflectionHtml || '<div class="text-center py-5 text-muted">ยังไม่มีข้อมูลการสะท้อนคิดการเรียนรู้ในกิจกรรมนี้</div>';
+          const gridIndividual = document.getElementById('gridIndividual');
+          if (gridIndividual) gridIndividual.innerHTML = individualHtml || '<div class="text-center py-5 text-muted">ยังไม่มีข้อมูลผลรายบุคคล</div>';
           if (!res.success) {
             console.error("API error:", res.error || "Unknown error");
             alert("เกิดข้อผิดพลาดในการโหลดข้อมูลห้องเรียน: " + (res.error || "Unknown API error"));

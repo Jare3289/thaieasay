@@ -113,10 +113,33 @@ require_once 'header.php';
       <div class="card border-0 rounded-3 p-4 mb-4" style="background-color: var(--light-blue);">
         <div class="row align-items-end">
           <div class="col-md-8 col-sm-12">
-            <label for="targetStudentSelect" class="form-label fw-bold text-secondary small text-uppercase tracking-wider">เลือกนักเรียนที่เป็นเป้าหมายผู้ถูกประเมิน <span class="text-danger">*</span></label>
-            <select id="targetStudentSelect" required class="form-select form-select-lg border-2 rounded-3 cursor-pointer fw-semibold text-dark">
-              <option value="" disabled selected>-- เลือกรายชื่อนักเรียน --</option>
-            </select>
+            <?php if ($mode_param === 'teacher' || $mode_param === 'peer'): ?>
+            <!-- เลือกกลุ่มด้วยปุ่ม (ต้องเลือกกลุ่มก่อนจึงจะระบุรหัสนักเรียนได้) — เครื่องหมาย * อยู่ด้านบนสุด -->
+            <div class="mb-3">
+              <label class="form-label fw-bold text-secondary small text-uppercase tracking-wider d-block mb-2">
+                เลือกกลุ่ม (รายชื่อจะแสดงเฉพาะกลุ่มที่เลือก) <?php if ($mode_param === 'teacher'): ?><span class="text-danger">*</span><?php endif; ?>
+              </label>
+              <div id="groupFilterButtons" class="d-flex flex-wrap gap-2">
+                <?php if ($mode_param === 'peer'): ?>
+                <button type="button" class="btn btn-outline-secondary rounded-3 fw-bold group-btn active" data-group="">ทุกกลุ่ม</button>
+                <?php endif; ?>
+                <button type="button" class="btn btn-outline-primary rounded-3 fw-bold group-btn" data-group="กลุ่มทดลอง">🧪 กลุ่มทดลอง</button>
+                <button type="button" class="btn btn-outline-primary rounded-3 fw-bold group-btn" data-group="กลุ่มตัวอย่าง">📋 กลุ่มตัวอย่าง</button>
+              </div>
+              <input type="hidden" id="groupFilterValue" value="">
+            </div>
+            <?php endif; ?>
+
+            <!-- ระบุรหัสนักเรียนเป้าหมาย แล้วข้อมูลจะปรากฏขึ้น -->
+            <label for="targetStudentInput" class="form-label fw-bold text-secondary small text-uppercase tracking-wider">ระบุรหัสนักเรียนที่เป็นเป้าหมายผู้ถูกประเมิน <span class="text-danger">*</span></label>
+            <div class="input-group input-group-lg">
+              <span class="input-group-text bg-white border-2"><i class="bi bi-person-vcard text-primary"></i></span>
+              <input type="text" id="targetStudentInput" list="targetStudentOptions" autocomplete="off" required class="form-control border-2 fw-semibold text-dark" placeholder="พิมพ์รหัสนักเรียนที่ต้องการประเมิน แล้วกด แสดงข้อมูล">
+              <button type="button" id="loadStudentBtn" class="btn btn-primary fw-bold px-4"><i class="bi bi-search"></i> แสดงข้อมูล</button>
+            </div>
+            <datalist id="targetStudentOptions"></datalist>
+            <div id="targetStudentResolved" class="mt-2 small fw-bold text-success d-none"></div>
+            <div id="targetStudentError" class="mt-2 small fw-bold text-danger d-none"></div>
             <?php if ($mode_param === 'self'): ?>
             <p id="selfEvalNotice" class="mt-2 text-primary small fw-bold mb-0">
               <i class="bi bi-info-circle-fill"></i> ระบบจำกัดการเลือกเฉพาะข้อมูลของคุณเนื่องจากกำลังทำโหมด "ตนเองประเมิน"
@@ -124,27 +147,11 @@ require_once 'header.php';
             <?php endif; ?>
             <?php if ($mode_param === 'peer'): ?>
             <p id="peerLockNotice" class="mt-2 text-success small fw-bold mb-0 d-none">
-              <i class="bi bi-lock-fill"></i> ระบบได้จับคู่ผู้ถูกประเมินให้คุณโดยคุณครูแล้ว (ล็อกอัตโนมัติ) ไม่ต้องเลือกเอง
+              <i class="bi bi-lock-fill"></i> ระบบได้จับคู่ผู้ถูกประเมินให้คุณโดยคุณครูแล้ว (ล็อกอัตโนมัติ) ไม่ต้องระบุเอง
             </p>
             <p id="peerFallbackNotice" class="mt-2 text-danger small fw-bold mb-0 d-none">
-              <i class="bi bi-exclamation-triangle-fill"></i> ยังไม่มีการจับคู่สำหรับรอบนี้ กรุณาเลือกรายชื่อเพื่อนที่ต้องการประเมินจากรายการด้านบนด้วยตนเอง
+              <i class="bi bi-exclamation-triangle-fill"></i> ยังไม่มีการจับคู่สำหรับรอบนี้ กรุณาระบุรหัสเพื่อนที่ต้องการประเมินด้วยตนเอง
             </p>
-            <?php endif; ?>
-            <?php if ($mode_param === 'teacher' || $mode_param === 'peer'): ?>
-            <div class="mt-2">
-              <label for="groupFilterSelect" class="form-label small fw-bold text-secondary mb-1">
-                เลือกกลุ่ม (รายชื่อจะแสดงเฉพาะกลุ่มที่เลือก) <?php if ($mode_param === 'teacher'): ?><span class="text-danger">*</span><?php endif; ?>
-              </label>
-              <select id="groupFilterSelect" class="form-select form-select-sm" style="max-width: 320px;">
-                <?php if ($mode_param === 'teacher'): ?>
-                <option value="" selected>-- กรุณาเลือกกลุ่มก่อน --</option>
-                <?php else: ?>
-                <option value="">ทุกกลุ่ม</option>
-                <?php endif; ?>
-                <option value="กลุ่มทดลอง">กลุ่มทดลอง</option>
-                <option value="กลุ่มตัวอย่าง">กลุ่มตัวอย่าง</option>
-              </select>
-            </div>
             <?php endif; ?>
             <?php if ($mode_param === 'expert'): ?>
             <p class="mt-2 text-primary small fw-bold mb-0">
@@ -427,11 +434,23 @@ require_once 'header.php';
   // โหมดครูต้องเลือกกลุ่มก่อนเสมอ รายชื่อจึงจะแสดง (แยกกลุ่มไม่ให้ปนกัน)
   function groupRequired() { return modeParam === 'teacher'; }
 
+  // ค่ากลุ่มที่เลือกจากปุ่ม (อ่านจากปุ่มที่ active เพื่อให้คงค่าแม้ form.reset())
+  function getGroupValue() {
+    const active = document.querySelector('#groupFilterButtons .group-btn.active');
+    if (active) return active.dataset.group || '';
+    const el = document.getElementById('groupFilterValue');
+    return el ? el.value : '';
+  }
+  // รหัสนักเรียนเป้าหมายที่ผู้ใช้พิมพ์
+  function getTargetId() {
+    const el = document.getElementById('targetStudentInput');
+    return el ? el.value.trim() : '';
+  }
+
   // โหลดรายชื่อนักเรียนจาก API
   async function loadStudents() {
     try {
-      const gf = document.getElementById('groupFilterSelect');
-      const gval = gf ? gf.value : '';
+      const gval = getGroupValue();
       // ครูยังไม่เลือกกลุ่ม → ยังไม่โหลดรายชื่อ (บังคับเลือกกลุ่มก่อน)
       if (groupRequired() && !gval) { studentDB = {}; return; }
 
@@ -453,25 +472,61 @@ require_once 'header.php';
     }
   }
 
-  // เติมรายชื่อนักเรียนลงใน Dropdown
-  function populateStudentSelect() {
-    const select = document.getElementById('targetStudentSelect');
-    const gf = document.getElementById('groupFilterSelect');
-
-    // ครูยังไม่เลือกกลุ่ม → แจ้งให้เลือกกลุ่มก่อน ยังไม่แสดงรายชื่อ
-    if (groupRequired() && (!gf || !gf.value)) {
-      select.innerHTML = '<option value="" disabled selected>-- กรุณาเลือกกลุ่มก่อน --</option>';
-      return;
-    }
-
-    select.innerHTML = '<option value="" disabled selected>-- เลือกรายชื่อนักเรียน --</option>';
+  // เติมรายชื่อนักเรียนลงใน datalist (ช่วยแนะนำรหัสขณะพิมพ์)
+  function populateStudentDatalist() {
+    const dl = document.getElementById('targetStudentOptions');
+    if (!dl) return;
+    dl.innerHTML = '';
+    // ครูยังไม่เลือกกลุ่ม → ยังไม่มีรายชื่อให้แนะนำ
+    if (groupRequired() && !getGroupValue()) return;
     const sortedKeys = Object.keys(studentDB).sort();
     sortedKeys.forEach(id => {
       const option = document.createElement('option');
       option.value = id;
-      option.textContent = `${id} - ${studentDB[id]}`;
-      select.appendChild(option);
+      option.label = `${id} - ${studentDB[id]}`;
+      dl.appendChild(option);
     });
+  }
+
+  // ปิด/เปิดการใช้งานส่วนรูบริกให้จางลงเมื่อยังไม่มีเป้าหมาย
+  function dimRubric() {
+    const rubricCont = document.getElementById('rubricContainer');
+    const progressCont = document.getElementById('progressContainer');
+    if (rubricCont) rubricCont.classList.add('opacity-60', 'pointer-events-none');
+    if (progressCont) progressCont.classList.add('d-none');
+  }
+
+  // ตรวจสอบรหัสนักเรียนที่พิมพ์ แล้วโหลดข้อมูล (ข้อมูลจะปรากฏเมื่อรหัสถูกต้อง)
+  function resolveTargetStudent() {
+    const id = getTargetId();
+    const resolvedEl = document.getElementById('targetStudentResolved');
+    const errEl = document.getElementById('targetStudentError');
+    if (resolvedEl) resolvedEl.classList.add('d-none');
+    if (errEl) errEl.classList.add('d-none');
+
+    if (!id) {
+      if (errEl) { errEl.textContent = '⚠️ กรุณาพิมพ์รหัสนักเรียนก่อน'; errEl.classList.remove('d-none'); }
+      dimRubric();
+      return;
+    }
+    // ครูต้องเลือกกลุ่มก่อน
+    if (groupRequired() && !getGroupValue()) {
+      if (errEl) { errEl.textContent = '⚠️ กรุณาเลือกกลุ่มก่อนระบุรหัสนักเรียน'; errEl.classList.remove('d-none'); }
+      dimRubric();
+      return;
+    }
+    // รหัสไม่พบในกลุ่มที่เลือก
+    if (!studentDB[id]) {
+      if (errEl) { errEl.textContent = '⚠️ ไม่พบรหัสนักเรียนนี้ในกลุ่มที่เลือก กรุณาตรวจสอบรหัสอีกครั้ง'; errEl.classList.remove('d-none'); }
+      dimRubric();
+      return;
+    }
+    // พบแล้ว → แสดงชื่อและโหลดเกณฑ์/ข้อมูลเดิม
+    if (resolvedEl) {
+      resolvedEl.textContent = `✓ ผู้ถูกประเมิน: ${id} - ${studentDB[id]}`;
+      resolvedEl.classList.remove('d-none');
+    }
+    checkExistingEvaluation(id);
   }
 
   // สร้างคาร์ดรูบริก
@@ -564,7 +619,8 @@ require_once 'header.php';
     
     rubricCont.classList.remove('opacity-60', 'pointer-events-none');
     document.getElementById('evalForm').reset();
-    document.getElementById('targetStudentSelect').value = studentId;
+    const tInput = document.getElementById('targetStudentInput');
+    if (tInput) tInput.value = studentId;
     if(progressCont) progressCont.classList.remove('d-none');
     calculateRealTimeFormScore(); // รีเซ็ต
 
@@ -710,37 +766,51 @@ require_once 'header.php';
     return { total, levelText };
   }
 
-  // การเปลี่ยนตัวเลือกผู้ถูกประเมิน
-  function handleTargetOrPhaseChange() {
-    const studentSelect = document.getElementById('targetStudentSelect');
-    const id = studentSelect.value;
-    if (id) {
-      checkExistingEvaluation(id);
+  // การระบุรหัสผู้ถูกประเมิน → กดปุ่ม "แสดงข้อมูล" หรือกด Enter เพื่อโหลดข้อมูล
+  (function bindTargetInput() {
+    const btn = document.getElementById('loadStudentBtn');
+    const input = document.getElementById('targetStudentInput');
+    if (btn) btn.addEventListener('click', resolveTargetStudent);
+    if (input) {
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); resolveTargetStudent(); }
+      });
+      // เลือกจากรายการแนะนำ (datalist) ให้โหลดข้อมูลทันที
+      input.addEventListener('change', () => {
+        if (studentDB[getTargetId()]) resolveTargetStudent();
+      });
     }
-  }
-  document.getElementById('targetStudentSelect').addEventListener('change', handleTargetOrPhaseChange);
+  })();
 
-  // เปลี่ยนตัวกรองกลุ่ม → โหลดรายชื่อใหม่แล้วรีเซ็ตการเลือกเป้าหมาย
+  // เลือกกลุ่มด้วยปุ่ม → โหลดรายชื่อใหม่แล้วรีเซ็ตการระบุรหัสเป้าหมาย
   (function bindGroupFilter() {
-    const gf = document.getElementById('groupFilterSelect');
-    if (!gf) return;
-    gf.addEventListener('change', async () => {
-      await loadStudents();
-      populateStudentSelect();
-      const tSelect = document.getElementById('targetStudentSelect');
-      const phase = document.getElementById('selectedTestPhase') ? document.getElementById('selectedTestPhase').value : '';
-      // โหมดเพื่อน: ถ้าเลือกรอบแล้ว ให้ดึงคู่ที่ล็อกไว้ใหม่ตามรายชื่อที่กรอง
-      if (modeParam === 'peer' && phase) {
-        applyPeerPairing(phase);
-        return;
-      }
-      // โหมดอื่น: รีเซ็ตการเลือกเป้าหมาย
-      tSelect.value = "";
-      tSelect.disabled = false;
-      const rubricCont = document.getElementById('rubricContainer');
-      const progressCont = document.getElementById('progressContainer');
-      if (rubricCont) rubricCont.classList.add('opacity-60', 'pointer-events-none');
-      if (progressCont) progressCont.classList.add('d-none');
+    const btns = document.querySelectorAll('#groupFilterButtons .group-btn');
+    if (!btns.length) return;
+    btns.forEach(btn => {
+      btn.addEventListener('click', async () => {
+        btns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const hidden = document.getElementById('groupFilterValue');
+        if (hidden) hidden.value = btn.dataset.group || '';
+
+        await loadStudents();
+        populateStudentDatalist();
+
+        const phase = document.getElementById('selectedTestPhase') ? document.getElementById('selectedTestPhase').value : '';
+        // โหมดเพื่อน: ถ้าเลือกรอบแล้ว ให้ดึงคู่ที่ล็อกไว้ใหม่ตามรายชื่อที่กรอง
+        if (modeParam === 'peer' && phase) {
+          applyPeerPairing(phase);
+          return;
+        }
+        // โหมดอื่น: รีเซ็ตการระบุรหัสเป้าหมาย
+        const tInput = document.getElementById('targetStudentInput');
+        if (tInput) { tInput.value = ''; tInput.disabled = false; }
+        const resolvedEl = document.getElementById('targetStudentResolved');
+        const errEl = document.getElementById('targetStudentError');
+        if (resolvedEl) resolvedEl.classList.add('d-none');
+        if (errEl) errEl.classList.add('d-none');
+        dimRubric();
+      });
     });
   })();
 
@@ -781,15 +851,17 @@ require_once 'header.php';
       return;
     }
 
-    // reload existing if student already selected
-    const id = document.getElementById('targetStudentSelect').value;
-    if (id) checkExistingEvaluation(id);
+    // reload existing if student already specified
+    const id = getTargetId();
+    if (id && studentDB[id]) checkExistingEvaluation(id);
   }
 
   // ดึงคู่ประเมินเพื่อนที่ครูจับไว้ตามรอบ แล้วตั้งเป็นค่า default ที่ล็อกไว้
   // ถ้าไม่มีคู่สำหรับรอบนั้น → fallback กลับไปใช้ dropdown เดิมพร้อมข้อความเตือน
   async function applyPeerPairing(phase) {
-    const tSelect = document.getElementById('targetStudentSelect');
+    const tInput = document.getElementById('targetStudentInput');
+    const loadBtn = document.getElementById('loadStudentBtn');
+    const resolvedEl = document.getElementById('targetStudentResolved');
     const lockNotice = document.getElementById('peerLockNotice');
     const fallbackNotice = document.getElementById('peerFallbackNotice');
     if (lockNotice) lockNotice.classList.add('d-none');
@@ -798,25 +870,25 @@ require_once 'header.php';
     try {
       const res = await (await fetch(`api.php?action=get_my_peer_partner&round=${phase}&_t=${Date.now()}`)).json();
       if (res.success && res.partner && studentDB[res.partner]) {
-        // มีคู่ → ตั้งค่าและล็อกช่องเลือก
-        tSelect.value = res.partner;
-        tSelect.disabled = true;
+        // มีคู่ → ตั้งค่าและล็อกช่องระบุรหัส
+        if (tInput) { tInput.value = res.partner; tInput.disabled = true; }
+        if (loadBtn) loadBtn.disabled = true;
+        if (resolvedEl) { resolvedEl.textContent = `✓ ผู้ถูกประเมิน: ${res.partner} - ${studentDB[res.partner]}`; resolvedEl.classList.remove('d-none'); }
         if (lockNotice) lockNotice.classList.remove('d-none');
         checkExistingEvaluation(res.partner);
       } else {
-        // ไม่มีคู่ → เปิด dropdown ให้เลือกเองพร้อมข้อความเตือน (fallback)
-        tSelect.disabled = false;
-        tSelect.value = "";
+        // ไม่มีคู่ → เปิดช่องให้ระบุรหัสเองพร้อมข้อความเตือน (fallback)
+        if (tInput) { tInput.disabled = false; tInput.value = ''; }
+        if (loadBtn) loadBtn.disabled = false;
+        if (resolvedEl) resolvedEl.classList.add('d-none');
         if (fallbackNotice) fallbackNotice.classList.remove('d-none');
-        const rubricCont = document.getElementById('rubricContainer');
-        const progressCont = document.getElementById('progressContainer');
-        if (rubricCont) rubricCont.classList.add('opacity-60', 'pointer-events-none');
-        if (progressCont) progressCont.classList.add('d-none');
+        dimRubric();
       }
     } catch (err) {
       console.error('ไม่สามารถโหลดคู่ประเมินเพื่อนได้:', err);
-      // เผื่อ error ให้ fallback เป็น dropdown เดิม
-      tSelect.disabled = false;
+      // เผื่อ error ให้ fallback เป็นช่องระบุรหัสเดิม
+      if (tInput) tInput.disabled = false;
+      if (loadBtn) loadBtn.disabled = false;
       if (fallbackNotice) fallbackNotice.classList.remove('d-none');
     }
   }
@@ -831,10 +903,9 @@ require_once 'header.php';
   document.getElementById('evalForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     
-    const tSelect = document.getElementById('targetStudentSelect');
-    const studentId = tSelect.value;
-    if(!studentId) {
-      showToast("กรุณาเลือกรายชื่อนักเรียนก่อนส่งผลคะแนน", "error");
+    const studentId = getTargetId();
+    if(!studentId || !studentDB[studentId]) {
+      showToast("กรุณาระบุรหัสนักเรียนที่ถูกต้องก่อนส่งผลคะแนน", "error");
       return;
     }
     const studentName = studentDB[studentId];
@@ -885,13 +956,18 @@ require_once 'header.php';
       const res = await response.json();
       
       if(res.success) {
-        window.location.href = 'success.php';
+        // อยู่ที่หน้าประเมินเดิม (ไม่ redirect ไปหน้าอื่น) แล้วโหลดข้อมูลที่บันทึกกลับมาให้เป็นโหมดแก้ไข
+        showToast("บันทึกผลการประเมินเรียบร้อยแล้ว ✓ (คุณยังอยู่ที่หน้าประเมินเดิม)", "success");
+        btn.innerHTML = originalText;
+        checkExistingEvaluation(studentId);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
         showToast("เกิดข้อผิดพลาดในการบันทึกข้อมูล: " + res.error, "error");
+        btn.disabled = false;
+        btn.innerHTML = originalText;
       }
     } catch (err) {
       showToast("ไม่สามารถเชื่อมต่อฐานข้อมูลปลายทางได้", "error");
-    } finally {
       btn.disabled = false;
       btn.innerHTML = originalText;
     }
@@ -900,22 +976,25 @@ require_once 'header.php';
   // ทำการทำงานเริ่มต้นแบบเงียบ
   (async function init() {
     await loadStudents();
-    populateStudentSelect();
+    populateStudentDatalist();
     buildRubric();
 
-    const tSelect = document.getElementById('targetStudentSelect');
-    const rubricCont = document.getElementById('rubricContainer');
-    const progressCont = document.getElementById('progressContainer');
+    const tInput = document.getElementById('targetStudentInput');
+    const loadBtn = document.getElementById('loadStudentBtn');
+    const resolvedEl = document.getElementById('targetStudentResolved');
 
     if (modeParam === 'self') {
-      tSelect.value = currentUser.id;
-      tSelect.disabled = true;
+      // โหมดประเมินตนเอง → ล็อกรหัสเป็นของตนเองและโหลดข้อมูลทันที
+      if (tInput) { tInput.value = currentUser.id; tInput.disabled = true; }
+      if (loadBtn) loadBtn.disabled = true;
+      if (resolvedEl && studentDB[currentUser.id]) {
+        resolvedEl.textContent = `✓ ผู้ถูกประเมิน: ${currentUser.id} - ${studentDB[currentUser.id]}`;
+        resolvedEl.classList.remove('d-none');
+      }
       checkExistingEvaluation(currentUser.id);
     } else {
-      tSelect.value = "";
-      tSelect.disabled = false;
-      rubricCont.classList.add('opacity-60', 'pointer-events-none');
-      if (progressCont) progressCont.classList.add('d-none');
+      if (tInput) { tInput.value = ''; tInput.disabled = false; }
+      dimRubric();
     }
   })();
 </script>
