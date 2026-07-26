@@ -1164,6 +1164,78 @@ try {
             ]);
             break;
 
+        // API วิเคราะห์คำสำคัญ (Keyword Frequency) สำหรับทำ Word Cloud ในหน้าครู
+        // คืนความถี่ของคำที่พบบ่อยในแบบบันทึกอุปสรรคการเขียนและบทสะท้อนคิด
+        case 'get_reflection_keywords':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'ต้องเป็นคุณครูเพื่อเข้าถึงข้อมูลนี้']);
+                exit;
+            }
+
+            $targetKeywords = ['คำเชื่อม', 'คำสะกด', 'สะกดผิด', 'ประโยค', 'คำศัพท์', 'ระดับภาษา', 'โครงเรื่อง',
+                'เนื้อหา', 'เวลา', 'การลำดับ', 'ขยายความ', 'เหตุผล', 'ย่อหน้า', 'เว้นวรรค',
+                'เรียงความ', 'แก้ไข', 'วรรคตอน', 'คำซ้ำ', 'กังวล', 'ร่างแรก', 'ปรับปรุง'];
+            $stopWords = ['และ', 'หรือ', 'แต่', 'ที่', 'ซึ่ง', 'อัน', 'ใน', 'การ', 'ความ', 'ให้', 'ได้', 'มี',
+                'เป็น', 'จะ', 'ของ', 'กับ', 'เพื่อ', 'ไป', 'มา', 'นี้', 'นั้น', 'แล้ว', 'ก็', 'เลย', 'คือ',
+                'ได้แก่', 'เช่น', 'มาก', 'เพราะ', 'คน'];
+
+            $analyzeKw = function ($texts) use ($targetKeywords, $stopWords) {
+                $counts = [];
+                foreach ($targetKeywords as $kw) { $counts[$kw] = 0; }
+                foreach ($texts as $text) {
+                    if (!$text) continue;
+                    $lower = mb_strtolower($text, 'UTF-8');
+                    // 1) นับคำเป้าหมายแบบ substring
+                    foreach ($targetKeywords as $kw) {
+                        $counts[$kw] += mb_substr_count($lower, $kw);
+                    }
+                    // 2) แยกคำทั่วไปด้วยช่องว่าง/เครื่องหมายวรรคตอน
+                    $tokens = preg_split('/[\s,\.\?\!\(\)\[\]\{\}\-\+\*\/\\\\_:;"\']+/u', $lower, -1, PREG_SPLIT_NO_EMPTY);
+                    foreach ($tokens as $t) {
+                        $t = trim($t);
+                        if ($t === '' || mb_strlen($t, 'UTF-8') <= 2) continue;
+                        if (in_array($t, $stopWords, true) || in_array($t, $targetKeywords, true)) continue;
+                        $counts[$t] = ($counts[$t] ?? 0) + 1;
+                    }
+                }
+                $arr = [];
+                foreach ($counts as $k => $v) {
+                    if ($v > 0) $arr[] = ['keyword' => $k, 'count' => $v];
+                }
+                usort($arr, function ($a, $b) { return $b['count'] - $a['count']; });
+                return array_slice($arr, 0, 25);
+            };
+
+            // รวมข้อความจากแบบบันทึกอุปสรรค (prob_/sol_) ทุกด้าน
+            $obTexts = [];
+            $probCols = ['prob_1_1','sol_1_1','prob_1_2','sol_1_2','prob_1_3','sol_1_3',
+                'prob_2_1','sol_2_1','prob_2_2','sol_2_2',
+                'prob_3_1','sol_3_1','prob_3_2','sol_3_2','prob_3_3','sol_3_3',
+                'prob_4_1','sol_4_1','prob_4_2','sol_4_2','prob_4_3','sol_4_3'];
+            $probRows = $pdo->query('SELECT * FROM writing_problems')->fetchAll();
+            foreach ($probRows as $r) {
+                foreach ($probCols as $c) {
+                    if (!empty($r[$c]) && trim($r[$c]) !== '') $obTexts[] = $r[$c];
+                }
+            }
+
+            // รวมข้อความจากบทสะท้อนคิดทั้ง 4 ด้าน
+            $refTexts = [];
+            $refCols = ['content_structure', 'language_mechanics', 'feedback_applied', 'future_goals'];
+            $refRows = $pdo->query('SELECT content_structure, language_mechanics, feedback_applied, future_goals FROM learning_reflections')->fetchAll();
+            foreach ($refRows as $r) {
+                foreach ($refCols as $c) {
+                    if (!empty($r[$c]) && trim($r[$c]) !== '') $refTexts[] = $r[$c];
+                }
+            }
+
+            echo json_encode([
+                'success'     => true,
+                'obstacles'   => $analyzeKw($obTexts),
+                'reflections' => $analyzeKw($refTexts)
+            ]);
+            break;
+
         // N. ดึงข้อมูลบันทึกการสะท้อนการเรียนรู้ (Learning Reflection)
         case 'get_reflection_data':
             $studentId = isset($_GET['studentId']) ? trim($_GET['studentId']) : '';
