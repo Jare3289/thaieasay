@@ -139,29 +139,32 @@ $genAt = date('d/m/Y H:i');
   .form { page-break-after: always; }
   .form:last-child { page-break-after: auto; }
 
-  .form-title { text-align: center; font-size: 26px; font-weight: 700; margin: 0 0 10px; }
-  .info { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: 20px; margin-bottom: 6px; }
+  .form-title { text-align: center; font-size: 28px; font-weight: 700; margin: 0 0 12px; }
+  .info { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: 19px; margin-bottom: 6px; }
   .info .lead { white-space: nowrap; }
-  .topic { font-size: 20px; margin: 4px 0 2px; display: flex; align-items: baseline; gap: 6px; }
+  .topic { font-size: 19px; margin: 4px 0 2px; display: flex; align-items: baseline; gap: 6px; }
   .topic .lead { white-space: nowrap; font-weight: 700; }
-  .meta { font-size: 15px; color: #444; margin: 2px 0 10px; }
+  .meta { font-size: 15px; color: #444; margin: 2px 0 8px; }
   /* ช่องเติมข้อความแบบเส้นประ */
   .fill { flex: 1; min-width: 60px; border-bottom: 1px dotted #000; padding: 0 6px 2px; }
   .fill.name { flex: 3; }
   .fill.room { flex: 1; text-align: center; }
-  .fill.no   { flex: 1; text-align: center; }
+  .fill.sid  { flex: 1.4; text-align: center; }
 
-  /* พื้นที่เนื้อความบนเส้นบรรทัด (เหมือนกระดาษมีเส้น) */
+  /* พื้นที่เนื้อความ — ไม่มีเส้นบรรทัด มีเลขบรรทัดทุก 5 บรรทัดที่ขอบซ้าย */
   .content {
-    margin-top: 10px;
-    font-size: 22px;
-    line-height: 40px;
-    background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 39px, #b9c0cc 39px, #b9c0cc 40px);
-    background-position: 0 2px;
+    position: relative;
+    margin-top: 8px;
+    padding-left: 2.8em;   /* เว้นที่สำหรับเลขบรรทัด */
+    font-size: 20px;
+    line-height: 30px;     /* ต้องตรงกับ LH ในสคริปต์ด้านล่าง */
   }
   .content .para { margin: 0; text-indent: 2.5em; text-align: justify; }
+  .content .lnum {
+    position: absolute; left: 0; width: 2.1em; text-align: right;
+    color: #9aa1ac; font-size: 14px; font-family: "Tahoma", sans-serif;
+  }
   .no-content { color: #888; font-style: italic; text-indent: 0; }
-  .stamp { text-align: right; color: #888; font-size: 13px; margin-top: 8px; font-family: "Tahoma", sans-serif; }
   .empty { text-align: center; padding: 60px 20px; color: #94a3b8; font-family: "Tahoma", sans-serif; }
 
   @media print {
@@ -191,14 +194,14 @@ $genAt = date('d/m/Y H:i');
       <div class="form">
         <h1 class="form-title">แบบเขียนเรียงความ</h1>
         <div class="info">
-          <span class="lead">ชื่อ</span><span class="fill name"><?php echo $h($e['student_name']); ?></span>
-          <span class="lead">ชั้น</span><span class="fill room"><?php echo $h($room); ?></span>
-          <span class="lead">เลขที่</span><span class="fill no"></span>
+          <span class="lead">ชื่อ-สกุล</span><span class="fill name"><?php echo $h($e['student_name']); ?></span>
+          <span class="lead">ห้อง</span><span class="fill room"><?php echo $h($room); ?></span>
+          <span class="lead">รหัสนักเรียน</span><span class="fill sid"><?php echo $h($e['student_id']); ?></span>
         </div>
         <div class="topic">
           <span class="lead">หัวข้อ :</span><span class="fill"><?php echo $h($e['essay_title']); ?></span>
         </div>
-        <div class="meta">รอบการประเมิน: <?php echo $h($phaseText); ?><?php if ($grp !== ''): ?> · กลุ่ม: <?php echo $h($grp); ?><?php endif; ?><?php if ($room !== ''): ?> · ห้อง <?php echo $h($room); ?><?php endif; ?></div>
+        <div class="meta">รอบการประเมิน: <?php echo $h($phaseText); ?><?php if ($grp !== ''): ?> · กลุ่ม: <?php echo $h($grp); ?><?php endif; ?></div>
         <div class="content"><?php echo essayParagraphs($e['essay_content'] ?? '', $h); ?></div>
       </div>
       <?php endforeach; ?>
@@ -206,8 +209,28 @@ $genAt = date('d/m/Y H:i');
   </div>
 
   <script>
+    // สร้างเลขบรรทัดทุก 5 บรรทัด (5, 10, 15, ...) ที่ขอบซ้ายของเนื้อความ
+    // คำนวณจำนวนบรรทัดจริงหลังจัดหน้าเสร็จ แล้ววางตัวเลขตามระยะบรรทัด (LH)
+    function addLineNumbers() {
+      var LH = 30; // ต้องตรงกับ line-height ของ .content ใน CSS
+      var boxes = document.querySelectorAll('.content');
+      for (var b = 0; b < boxes.length; b++) {
+        var box = boxes[b];
+        var lines = Math.round(box.clientHeight / LH);
+        for (var i = 5; i <= lines; i += 5) {
+          var s = document.createElement('span');
+          s.className = 'lnum';
+          s.textContent = i;
+          s.style.top = ((i - 1) * LH) + 'px';
+          box.appendChild(s);
+        }
+      }
+    }
     // เอกสารนี้ไม่มีทรัพยากรภายนอก จึงพร้อมพิมพ์ได้ทันที
-    window.addEventListener('load', function () { setTimeout(function () { window.print(); }, 200); });
+    window.addEventListener('load', function () {
+      addLineNumbers();
+      setTimeout(function () { window.print(); }, 200);
+    });
   </script>
 </body>
 </html>
