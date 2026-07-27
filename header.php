@@ -34,6 +34,11 @@ $sessionUser = isset($_SESSION['user']) ? $_SESSION['user'] : null;
         <span>📝</span> ระบบประเมินเรียงความอัจฉริยะ
       </a>
       <div id="navUserArea" class="<?php echo $sessionUser ? 'd-flex' : 'd-none'; ?> align-items-center gap-3">
+        <?php if ($sessionUser && in_array($sessionUser['role'], ['teacher', 'expert'])): ?>
+        <a href="essay_viewer.php" class="btn btn-light btn-sm fw-bold px-3 d-flex align-items-center gap-1" title="ดูเรียงความนักเรียนทุกคน แยกกลุ่มทดลอง/กลุ่มตัวอย่าง">
+          <i class="bi bi-pencil-square"></i> <span class="d-none d-md-inline">เรียงความนักเรียน</span>
+        </a>
+        <?php endif; ?>
         <div class="bg-white bg-opacity-10 text-white border border-white border-opacity-10 px-3 py-1.5 rounded text-sm">
           <span class="text-white-50">ผู้ใช้ระบบ:</span> <span id="navUserName" class="fw-bold"><?php echo $sessionUser ? htmlspecialchars($sessionUser['name']) : ''; ?></span>
         </div>

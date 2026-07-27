@@ -1,0 +1,384 @@
+<?php
+$page_title = 'เรียงความนักเรียน (Essay Viewer) - ระบบประเมินเรียงความอัจฉริยะ';
+require_once 'auth_helper.php';
+require_login(); // ต้องล็อกอินก่อนเข้าหน้านี้
+
+// เฉพาะครูและผู้เชี่ยวชาญเท่านั้นที่ดูเรียงความของนักเรียนทุกคนได้ (ให้สอดคล้องกับ api.php?action=get_all_essays)
+if (!isset($_SESSION['user']) || !in_array($_SESSION['user']['role'], ['teacher', 'expert'])) {
+    header('Location: index.php');
+    exit;
+}
+
+require_once 'header.php';
+?>
+
+<div id="view-essay-viewer" class="text-start">
+  <div class="mb-3">
+    <a href="index.php" class="btn btn-link text-decoration-none text-secondary fw-bold p-0">
+      <i class="bi bi-arrow-left-short"></i> กลับหน้าเมนูหลัก
+    </a>
+  </div>
+
+  <!-- ส่วนหัว -->
+  <div class="bg-primary text-white p-4 rounded-4 shadow-sm mb-4 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3" style="background: linear-gradient(135deg, var(--primary-navy) 0%, var(--secondary-blue) 100%) !important;">
+    <div>
+      <h4 class="fw-bold mb-1"><i class="bi bi-pencil-square me-2"></i>เรียงความนักเรียน (Essay Viewer)</h4>
+      <p class="mb-0 text-white-50 small">อ่านเนื้อหาเรียงความที่นักเรียนพิมพ์ส่งได้จากทุกห้องเรียนและทุกรอบการประเมิน เพื่อประกอบการตรวจให้คะแนนและการวิเคราะห์เชิงคุณภาพ</p>
+    </div>
+    <a href="dashboard.php" class="btn btn-light fw-bold px-3 rounded-pill text-nowrap shadow-sm">
+      <i class="bi bi-speedometer2 me-1"></i> ไปแดชบอร์ด
+    </a>
+  </div>
+
+  <div class="card border-0 shadow-sm rounded-4 bg-white mb-4 overflow-hidden">
+    <div class="card-body p-4">
+
+      <!-- แท็บแยกกลุ่มทดลอง / กลุ่มตัวอย่าง -->
+      <ul class="nav nav-pills gap-2 bg-light p-2 rounded-3 border mb-4 flex-wrap" id="essayGroupTab" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active fw-bold text-dark px-4 py-2 rounded-3" data-group="all" onclick="setEssayGroup(this)" type="button">
+            <i class="bi bi-collection me-1"></i> ทั้งหมด
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link fw-bold text-dark px-4 py-2 rounded-3" data-group="กลุ่มทดลอง" onclick="setEssayGroup(this)" type="button">
+            <i class="bi bi-flask me-1"></i> กลุ่มทดลอง
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link fw-bold text-dark px-4 py-2 rounded-3" data-group="กลุ่มตัวอย่าง" onclick="setEssayGroup(this)" type="button">
+            <i class="bi bi-people me-1"></i> กลุ่มตัวอย่าง
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link fw-bold text-dark px-4 py-2 rounded-3" data-group="__none__" onclick="setEssayGroup(this)" type="button">
+            <i class="bi bi-question-circle me-1"></i> ยังไม่ระบุกลุ่ม
+          </button>
+        </li>
+      </ul>
+
+      <!-- แถบตัวกรอง -->
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
+        <p class="text-muted small mb-0">แสดงเรียงความของนักเรียนทุกคน — เลือกกรองตามกลุ่ม ห้องเรียน หรือรอบการประเมินได้ตามต้องการ</p>
+        <div class="d-flex gap-2 flex-wrap align-items-center">
+          <select id="essayClassroomFilter" onchange="filterEssayViewer()" class="form-select form-select-sm border-2 rounded-pill" style="width:auto;">
+            <option value="all">ทุกห้องเรียน</option>
+          </select>
+          <select id="essayPhaseFilter" onchange="filterEssayViewer()" class="form-select form-select-sm border-2 rounded-pill" style="width:auto;">
+            <option value="all">ทุกรอบ</option>
+            <option value="pretest">ก่อนเรียน</option>
+            <option value="task1">ภารงาน หน่วยที่ 1</option>
+            <option value="task2">ภารงาน หน่วยที่ 2</option>
+            <option value="posttest">หลังเรียน</option>
+          </select>
+          <input type="text" id="essaySearchInput" onkeyup="filterEssayViewer()" class="form-control form-control-sm border-2 rounded-pill" placeholder="ค้นหาชื่อ รหัส หรือเนื้อหา..." style="width:220px;">
+          <button class="btn btn-outline-primary btn-sm rounded-pill px-3" onclick="exportEssaysCSV()">
+            <i class="bi bi-download me-1"></i>ส่งออก CSV
+          </button>
+        </div>
+      </div>
+
+      <!-- แถบสรุปตัวเลข -->
+      <div class="row g-3 mb-4" id="essaySummaryRow">
+        <div class="col-md-3 col-6">
+          <div class="card border-0 rounded-3 p-3 text-center bg-light">
+            <div class="fs-4 fw-bold text-primary" id="essayStatTotal">-</div>
+            <div class="text-muted small">ส่งเรียงความแล้ว</div>
+          </div>
+        </div>
+        <div class="col-md-3 col-6">
+          <div class="card border-0 rounded-3 p-3 text-center bg-light">
+            <div class="fs-4 fw-bold text-success" id="essayStatAvgWords">-</div>
+            <div class="text-muted small">เฉลี่ย คำ/ชิ้น</div>
+          </div>
+        </div>
+        <div class="col-md-3 col-6">
+          <div class="card border-0 rounded-3 p-3 text-center bg-light">
+            <div class="fs-4 fw-bold text-warning" id="essayStatMaxWords">-</div>
+            <div class="text-muted small">มากสุด (คำ)</div>
+          </div>
+        </div>
+        <div class="col-md-3 col-6">
+          <div class="card border-0 rounded-3 p-3 text-center bg-light">
+            <div class="fs-4 fw-bold text-danger" id="essayStatMinWords">-</div>
+            <div class="text-muted small">น้อยสุด (คำ)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- การ์ดเรียงความ -->
+      <div id="essayViewerContainer" style="max-height:640px; overflow-y:auto;">
+        <div class="text-center text-muted py-5">
+          <i class="bi bi-hourglass-split fs-3 d-block mb-2"></i>กำลังโหลดเรียงความ...
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ========== Essay Viewer (หน้ารวมทุกห้องเรียน) ==========
+  let allEssaysCache = null;
+  let currentEssayGroup = 'all'; // all | กลุ่มทดลอง | กลุ่มตัวอย่าง | __none__
+
+  // สลับแท็บกลุ่มทดลอง/กลุ่มตัวอย่าง
+  function setEssayGroup(btn) {
+    currentEssayGroup = btn.getAttribute('data-group') || 'all';
+    document.querySelectorAll('#essayGroupTab .nav-link').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    filterEssayViewer();
+  }
+
+  const essayGroupBadge = {
+    'กลุ่มทดลอง':   'bg-primary',
+    'กลุ่มตัวอย่าง': 'bg-warning text-dark'
+  };
+
+  const essayPhaseLabels = {
+    pretest:  'ก่อนเรียน (Pretest)',
+    task1:    'ภารงาน หน่วยที่ 1',
+    task2:    'ภารงาน หน่วยที่ 2',
+    posttest: 'หลังเรียน (Posttest)'
+  };
+  const essayPhaseBadgeClass = {
+    pretest: 'bg-primary',
+    task1: 'bg-success',
+    task2: 'bg-warning text-dark',
+    posttest: 'bg-danger'
+  };
+
+  async function loadEssayViewer() {
+    const container = document.getElementById('essayViewerContainer');
+    container.innerHTML = '<div class="text-center py-5 text-muted"><span class="spinner-border spinner-border-sm me-2"></span>กำลังโหลดเรียงความ...</div>';
+    try {
+      const res = await fetch('api.php?action=get_all_essays');
+      const data = await res.json();
+      if (data.success) {
+        allEssaysCache = data.essays || [];
+        populateClassroomFilter(allEssaysCache);
+        renderEssayViewer(allEssaysCache);
+      } else {
+        container.innerHTML = `<div class="text-center py-5 text-danger fw-bold">เกิดข้อผิดพลาด: ${data.error || 'ไม่สามารถโหลดข้อมูลได้'}</div>`;
+      }
+    } catch(err) {
+      container.innerHTML = '<div class="text-center py-5 text-danger fw-bold">ไม่สามารถโหลดข้อมูลได้</div>';
+    }
+  }
+
+  // เติมรายการห้องเรียนที่มีอยู่จริงลงในตัวกรอง (เรียงตามชื่อห้อง)
+  function populateClassroomFilter(essays) {
+    const sel = document.getElementById('essayClassroomFilter');
+    if (!sel) return;
+    const rooms = [...new Set(essays.map(e => (e.classroom || '').trim()).filter(r => r !== ''))]
+      .sort((a, b) => a.localeCompare(b, 'th', { numeric: true }));
+    // เก็บค่าเดิมไว้ (ถ้ามี) แล้วสร้างรายการใหม่
+    const current = sel.value;
+    sel.innerHTML = '<option value="all">ทุกห้องเรียน</option>' +
+      rooms.map(r => `<option value="${r.replace(/"/g,'&quot;')}">ห้อง ${r}</option>`).join('');
+    if (current && [...sel.options].some(o => o.value === current)) sel.value = current;
+  }
+
+  function filterEssayViewer() {
+    if (!allEssaysCache) return;
+    renderEssayViewer(allEssaysCache);
+  }
+
+  function formatEssayHTML(contentStr) {
+    if (!contentStr) return '<em class="text-muted">ไม่มีเนื้อหาเรียงความ</em>';
+    try {
+      const obj = JSON.parse(contentStr);
+      if (obj && typeof obj === 'object' && obj.introduction !== undefined) {
+        let html = '';
+        if (obj.introduction) {
+          html += `
+            <div class="mb-3">
+              <span class="badge bg-primary bg-opacity-10 text-primary fw-bold mb-1"><i class="bi bi-pencil-fill me-1"></i>ส่วนคำนำ (Introduction)</span>
+              <div class="p-3 bg-white rounded-3 border text-dark" style="white-space:pre-wrap; line-height:1.7;">${obj.introduction.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+            </div>`;
+        }
+        if (obj.body && Array.isArray(obj.body)) {
+          obj.body.forEach((paraText, i) => {
+            if (paraText) {
+              html += `
+                <div class="mb-3">
+                  <span class="badge bg-success bg-opacity-10 text-success fw-bold mb-1"><i class="bi bi-book-fill me-1"></i>ส่วนเนื้อเรื่อง ย่อหน้าที่ ${i+1} (Body Paragraph)</span>
+                  <div class="p-3 bg-white rounded-3 border text-dark" style="white-space:pre-wrap; line-height:1.7;">${paraText.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+                </div>`;
+            }
+          });
+        }
+        if (obj.conclusion) {
+          html += `
+            <div class="mb-0">
+              <span class="badge bg-danger bg-opacity-10 text-danger fw-bold mb-1"><i class="bi bi-award-fill me-1"></i>ส่วนสรุป (Conclusion)</span>
+              <div class="p-3 bg-white rounded-3 border text-dark" style="white-space:pre-wrap; line-height:1.7;">${obj.conclusion.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+            </div>`;
+        }
+        return html;
+      }
+    } catch(e) {}
+    return `<div class="p-3 bg-white rounded-3 border text-dark" style="white-space:pre-wrap; line-height:1.7;">${contentStr.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`;
+  }
+
+  function getEssaySearchableText(e) {
+    let searchableText = e.essay_content || '';
+    try {
+      const obj = JSON.parse(e.essay_content);
+      if (obj && typeof obj === 'object' && obj.introduction !== undefined) {
+        searchableText = (obj.introduction || '') + ' ' + (obj.body ? obj.body.join(' ') : '') + ' ' + (obj.conclusion || '');
+      }
+    } catch(err) {}
+    return searchableText;
+  }
+
+  function applyEssayFilters(essays) {
+    const classroomFilter = (document.getElementById('essayClassroomFilter') || {}).value || 'all';
+    const phaseFilter     = (document.getElementById('essayPhaseFilter') || {}).value || 'all';
+    const query           = ((document.getElementById('essaySearchInput') || {}).value || '').toLowerCase().trim();
+
+    return essays.filter(e => {
+      const grp = (e.student_group || '').trim();
+      if (currentEssayGroup === '__none__') { if (grp !== '') return false; }
+      else if (currentEssayGroup !== 'all' && grp !== currentEssayGroup) return false;
+      if (classroomFilter !== 'all' && (e.classroom || '').trim() !== classroomFilter) return false;
+      if (phaseFilter !== 'all' && e.essay_phase !== phaseFilter) return false;
+      if (query) {
+        const combined = ((e.student_name || '') + ' ' + (e.student_id || '') + ' ' + (e.essay_title || '') + ' ' + getEssaySearchableText(e)).toLowerCase();
+        if (!combined.includes(query)) return false;
+      }
+      return true;
+    });
+  }
+
+  function renderEssayViewer(essays) {
+    const container = document.getElementById('essayViewerContainer');
+    const filtered  = applyEssayFilters(essays);
+
+    // อัปเดตแถบสรุปตัวเลข
+    const total    = filtered.length;
+    const words    = filtered.map(e => parseInt(e.word_count || 0));
+    const avgWords = total > 0 ? Math.round(words.reduce((a,b)=>a+b,0)/total) : 0;
+    const maxWords = total > 0 ? Math.max(...words) : 0;
+    const minWords = total > 0 ? Math.min(...words) : 0;
+
+    const setEl = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val.toLocaleString('th-TH'); };
+    setEl('essayStatTotal', total);
+    setEl('essayStatAvgWords', avgWords);
+    setEl('essayStatMaxWords', maxWords);
+    setEl('essayStatMinWords', minWords);
+
+    if (filtered.length === 0) {
+      container.innerHTML = '<div class="text-center py-5 text-muted"><i class="bi bi-inbox fs-3 d-block mb-2"></i>ไม่พบเรียงความที่ตรงกับเงื่อนไข</div>';
+      return;
+    }
+
+    container.innerHTML = filtered.map(e => {
+      let previewText = '';
+      try {
+        const obj = JSON.parse(e.essay_content);
+        if (obj && typeof obj === 'object' && obj.introduction !== undefined) {
+          const firstBody = (obj.body && obj.body[0]) ? obj.body[0] : '';
+          previewText = `[คำนำ] ${obj.introduction || ''}\n[เนื้อเรื่อง] ${firstBody}...`;
+        } else {
+          previewText = e.essay_content || '';
+        }
+      } catch(err) {
+        previewText = e.essay_content || '';
+      }
+
+      const previewTrunc = previewText.substring(0, 300).trim();
+      const hasMore      = previewText.length > 300;
+      const dt           = new Date(e.updated_at || e.created_at);
+      const dateStr      = dt.toLocaleString('th-TH', { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+      const badgeClass   = essayPhaseBadgeClass[e.essay_phase] || 'bg-secondary';
+      const phaseLabel   = essayPhaseLabels[e.essay_phase] || e.essay_phase;
+      const wordCount    = parseInt(e.word_count || 0).toLocaleString('th-TH');
+      const room         = (e.classroom || '').trim();
+      const grp          = (e.student_group || '').trim();
+      const grpBadgeCls  = essayGroupBadge[grp] || 'bg-secondary';
+      const essayId      = `essay_${e.student_id}_${e.essay_phase}`;
+      const formattedHTML = formatEssayHTML(e.essay_content);
+
+      return `
+        <div class="card border-0 rounded-3 mb-3 shadow-sm" style="border-left: 4px solid #0d7377 !important;">
+          <div class="card-body p-3">
+            <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-2">
+              <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span class="badge ${badgeClass} px-2 py-1 small">${phaseLabel}</span>
+                ${grp ? `<span class="badge ${grpBadgeCls} px-2 py-1 small">${grp}</span>` : ''}
+                ${room ? `<span class="badge bg-info-subtle text-info-emphasis px-2 py-1 small"><i class="bi bi-door-open me-1"></i>ห้อง ${room}</span>` : ''}
+                <span class="fw-bold text-dark">${e.student_name} <span class="text-muted fw-normal small">(${e.student_id})</span></span>
+                ${e.essay_title ? `<span class="text-secondary small fst-italic">— ${e.essay_title}</span>` : ''}
+              </div>
+              <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-primary-subtle text-primary rounded-pill px-2 py-1 small">
+                  <i class="bi bi-fonts me-1"></i>${wordCount} คำ
+                </span>
+                <button class="btn btn-outline-primary btn-sm rounded-pill px-3 py-1 small" style="font-size:0.75rem;"
+                  onclick="document.getElementById('${essayId}').classList.toggle('d-none')">
+                  <i class="bi bi-eye me-1"></i>เปิดดูเต็มยศ
+                </button>
+              </div>
+            </div>
+
+            <!-- ตัวอย่างเนื้อหา -->
+            <div class="text-secondary small mb-2 text-start" style="white-space:pre-wrap; line-height:1.6; background:#f8f9fa; padding:10px; border-radius:6px; max-height:100px; overflow:hidden;">
+              ${previewTrunc.replace(/</g,'&lt;').replace(/>/g,'&gt;')}${hasMore ? '...' : ''}
+            </div>
+
+            <!-- เนื้อหาเต็ม (ซ่อนไว้ก่อน) -->
+            <div id="${essayId}" class="d-none text-dark small mt-3 p-3 bg-light rounded-3" style="font-family:'Sarabun',sans-serif; background-color: #fffdf9 !important; border: 1px solid #f0e6c8 !important;">
+              ${formattedHTML}
+            </div>
+
+            <div class="text-muted text-start mt-2" style="font-size:0.72rem;">
+              <i class="bi bi-clock me-1"></i>บันทึกล่าสุด: ${dateStr}
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function exportEssaysCSV() {
+    if (!allEssaysCache) { showToast('กรุณาโหลดข้อมูลก่อน', 'error'); return; }
+    const filtered = applyEssayFilters(allEssaysCache);
+    if (filtered.length === 0) { showToast('ไม่มีเรียงความที่ตรงกับเงื่อนไขให้ส่งออก', 'error'); return; }
+
+    const esc = s => '"' + (s||'').replace(/"/g,'""').replace(/\n/g,' ') + '"';
+    let csv = '﻿' + 'รหัสนักเรียน,ชื่อ-สกุล,ห้องเรียน,กลุ่ม,รอบการประเมิน,ชื่อเรื่อง,จำนวนคำ,ส่วนคำนำ (Introduction),ส่วนเนื้อเรื่อง (Body),ส่วนสรุป (Conclusion),วันที่บันทึก\n';
+    filtered.forEach(e => {
+      const dt = new Date(e.updated_at||e.created_at).toLocaleString('th-TH');
+      let intro = '';
+      let bodyText = '';
+      let conc = '';
+      try {
+        const obj = JSON.parse(e.essay_content);
+        if (obj && typeof obj === 'object' && obj.introduction !== undefined) {
+          intro = obj.introduction || '';
+          bodyText = obj.body ? obj.body.join('\n\n') : '';
+          conc = obj.conclusion || '';
+        } else {
+          intro = e.essay_content || '';
+        }
+      } catch(err) {
+        intro = e.essay_content || '';
+      }
+      csv += [esc(e.student_id), esc(e.student_name), esc(e.classroom), esc(e.student_group), esc(essayPhaseLabels[e.essay_phase]||e.essay_phase),
+              esc(e.essay_title), e.word_count, esc(intro), esc(bodyText), esc(conc), esc(dt)].join(',') + '\n';
+    });
+
+    const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'student_essays.csv';
+    link.click();
+  }
+
+  // --- เริ่มรันอัตโนมัติ ---
+  loadEssayViewer();
+</script>
+
+<?php
+require_once 'footer.php';
+?>

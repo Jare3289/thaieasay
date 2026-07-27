@@ -200,6 +200,16 @@ require_once 'header.php';
         <span class="text-primary text-center fw-bold small mt-3 d-block">เปิดหน้าฟอร์มประเมิน &rarr;</span>
       </a>
     </div>
+    <div class="col-md-5 col-sm-12">
+      <a href="essay_viewer.php" class="btn menu-card w-100 py-5 text-decoration-none">
+        <div class="text-center w-100">
+          <div class="fs-1 mb-3">📝</div>
+          <h4 class="fw-bold text-dark mb-2">เรียงความนักเรียน (Essay Viewer)</h4>
+          <p class="text-muted small font-light">อ่านเนื้อหาเรียงความของนักเรียนทุกคน แยกกลุ่มทดลอง/กลุ่มตัวอย่าง ทุกห้องเรียน และทุกรอบการประเมิน</p>
+        </div>
+        <span class="text-primary text-center fw-bold small mt-3 d-block">เปิดหน้าดูเรียงความ &rarr;</span>
+      </a>
+    </div>
   </div>
   <?php else: ?>
   <!-- แผงสำหรับคุณครู (Teacher Menu) -->
@@ -262,6 +272,16 @@ require_once 'header.php';
           <p class="text-muted small font-light">ค่าความสอดคล้องผู้ตรวจ (ICC), Paired t-test และการวิเคราะห์เชิงคุณภาพของกลุ่มทดลอง (ห้อง 606)</p>
         </div>
         <span class="text-primary text-center fw-bold small mt-3 d-block">เปิดหน้าวิเคราะห์สถิติ &rarr;</span>
+      </a>
+    </div>
+    <div class="col-md-4 col-sm-12">
+      <a href="essay_viewer.php" class="btn menu-card w-100 py-5 text-decoration-none">
+        <div class="text-center w-100">
+          <div class="fs-1 mb-3">📝</div>
+          <h4 class="fw-bold text-dark mb-2">เรียงความนักเรียน (Essay Viewer)</h4>
+          <p class="text-muted small font-light">อ่านเนื้อหาเรียงความที่นักเรียนพิมพ์ส่งของทุกคน ทุกห้องเรียน และทุกรอบการประเมิน พร้อมค้นหาและส่งออก CSV</p>
+        </div>
+        <span class="text-primary text-center fw-bold small mt-3 d-block">เปิดหน้าดูเรียงความ &rarr;</span>
       </a>
     </div>
   </div>
