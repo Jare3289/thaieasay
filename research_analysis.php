@@ -576,6 +576,15 @@ require_once 'header.php';
     return { icc, n, k, grand, SSR, SSC, SSE, SST, MSR, MSC, MSE, denom };
   }
 
+  // แปลงคะแนนรวม (เต็ม 60) เป็นระดับคุณภาพ — ใช้เกณฑ์เดียวกับหน้าฟอร์มประเมิน
+  function getScoreLevel(total) {
+    if (total >= 49) return { text: 'ดีมาก', css: 'text-success' };
+    if (total >= 37) return { text: 'ดี', css: 'text-primary' };
+    if (total >= 25) return { text: 'ปานกลาง', css: 'text-warning' };
+    if (total >= 13) return { text: 'พอใช้', css: 'text-warning' };
+    return { text: 'ต้องปรับปรุง', css: 'text-danger' };
+  }
+
   // แสดงรายละเอียดการคำนวณ ICC (ค่าที่แทนในสูตร) ของคะแนนรวม
   function renderIccFormula(d) {
     const el = document.getElementById('iccFormulaPanel');
@@ -680,7 +689,8 @@ require_once 'header.php';
     // อัปเดตข้อความสรุปจำนวนผู้ตรวจ/นักเรียน
     const raterSummaryEl = document.getElementById('iccRaterSummary');
     if (raterSummaryEl) {
-      raterSummaryEl.innerHTML = `ผู้ตรวจ <strong>3 คน</strong> (ครูผู้สอน + ผู้เชี่ยวชาญ 2 ท่าน) · นักเรียนที่ถูกตรวจครบทั้ง 3 คน = <strong>${triples.length} คน</strong> · คะแนนเต็ม 60`;
+      raterSummaryEl.innerHTML = `ผู้ตรวจ <strong>3 คน</strong> (ครูผู้สอน + ผู้เชี่ยวชาญ 2 ท่าน) · นักเรียนที่ถูกตรวจครบทั้ง 3 คน = <strong>${triples.length} คน</strong> · คะแนนเต็ม 60`
+        + `<br><span style="font-size:.75rem;">เกณฑ์ระดับ: ≥49 ดีมาก · ≥37 ดี · ≥25 ปานกลาง · ≥13 พอใช้ · ต่ำกว่านั้น ต้องปรับปรุง</span>`;
     }
 
     // ตารางคะแนนผู้ตรวจ 3 คน รายบุคคล + ICC ท้ายตาราง
@@ -695,6 +705,8 @@ require_once 'header.php';
         const range = Math.max(a, b, c) - Math.min(a, b, c);
         const rangeCls = range >= 10 ? 'text-danger fw-bold' : (range >= 5 ? 'text-warning' : 'text-success');
         const detId = `iccdet_${idx}`;
+        const lvA = getScoreLevel(a), lvB = getScoreLevel(b), lvC = getScoreLevel(c), lvM = getScoreLevel(mean);
+        const cell = (val, lv) => `${val.toFixed(1)}<div class="small ${lv.css}" style="font-size:.68rem;line-height:1;">${lv.text}</div>`;
 
         // ตารางย่อยรายด้าน: 4 ด้าน × ผู้ตรวจ 3 คน + พิสัยของแต่ละด้าน
         const dimRows = dimList.map(d => {
@@ -719,10 +731,10 @@ require_once 'header.php';
             <button class="btn btn-link btn-sm p-0 ms-1 text-decoration-none align-baseline" style="font-size:.72rem;"
               onclick="document.getElementById('${detId}').classList.toggle('d-none')"><i class="bi bi-list-nested"></i> รายด้าน</button>
           </td>
-          <td class="text-center fw-semibold">${a.toFixed(1)}</td>
-          <td class="text-center fw-semibold">${b.toFixed(1)}</td>
-          <td class="text-center fw-semibold">${c.toFixed(1)}</td>
-          <td class="text-center fw-bold text-primary">${mean.toFixed(2)}</td>
+          <td class="text-center fw-semibold">${cell(a, lvA)}</td>
+          <td class="text-center fw-semibold">${cell(b, lvB)}</td>
+          <td class="text-center fw-semibold">${cell(c, lvC)}</td>
+          <td class="text-center fw-bold text-primary">${mean.toFixed(2)}<div class="small ${lvM.css}" style="font-size:.68rem;line-height:1;">${lvM.text}</div></td>
           <td class="text-center ${rangeCls}">${range.toFixed(1)}</td>
         </tr>
         <tr id="${detId}" class="d-none">
