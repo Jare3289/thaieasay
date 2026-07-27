@@ -472,8 +472,11 @@ require_once 'header.php';
       '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' +
       '<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">' +
       '<style>' + css + '</style></head><body>' + cover + cards +
-      '<script>window.onload=function(){var go=function(){window.focus();window.print();};' +
-      'if(document.fonts&&document.fonts.ready){document.fonts.ready.then(function(){setTimeout(go,250);});}else{setTimeout(go,700);}};<\/script>' +
+      '<script>var __printed=false;function __go(){if(__printed)return;__printed=true;window.focus();window.print();}' +
+      // เส้นทางปกติ: พิมพ์หลังฟอนต์พร้อม เพื่อให้ตัวอักษรไทยคมชัด
+      'if(document.fonts&&document.fonts.ready){document.fonts.ready.then(function(){setTimeout(__go,150);});}' +
+      // ตัวสำรองแบบมีเพดานเวลา: พิมพ์ให้เสมอแม้ Google Fonts จะโดนบล็อกหรือโหลดค้าง (ออฟไลน์/เน็ตจำกัด)
+      'setTimeout(__go,1200);<\/script>' +
       '</body></html>';
 
     const w = window.open('', '_blank');
