@@ -686,22 +686,55 @@ require_once 'header.php';
     // ตารางคะแนนผู้ตรวจ 3 คน รายบุคคล + ICC ท้ายตาราง
     const stBody = document.getElementById('iccStudentTableBody');
     if (stBody) {
-      let sh = triples.map(tr => {
+      const dimList = dims.slice(1); // 4 ด้าน (ไม่รวมคะแนนรวม)
+      let sh = triples.map((tr, idx) => {
         const a = Number(tr.evals[0].total_score);
         const b = Number(tr.evals[1].total_score);
         const c = Number(tr.evals[2].total_score);
         const mean  = (a + b + c) / 3;
         const range = Math.max(a, b, c) - Math.min(a, b, c);
         const rangeCls = range >= 10 ? 'text-danger fw-bold' : (range >= 5 ? 'text-warning' : 'text-success');
+        const detId = `iccdet_${idx}`;
+
+        // ตารางย่อยรายด้าน: 4 ด้าน × ผู้ตรวจ 3 คน + พิสัยของแต่ละด้าน
+        const dimRows = dimList.map(d => {
+          const x = Number(d.get(tr.evals[0]));
+          const y = Number(d.get(tr.evals[1]));
+          const z = Number(d.get(tr.evals[2]));
+          const r = Math.max(x, y, z) - Math.min(x, y, z);
+          const rc = r >= 4 ? 'text-danger fw-bold' : (r >= 2 ? 'text-warning' : 'text-success');
+          return `<tr>
+            <td class="text-start">${escapeHtml(d.name)}</td>
+            <td class="text-center">${x.toFixed(1)}</td>
+            <td class="text-center">${y.toFixed(1)}</td>
+            <td class="text-center">${z.toFixed(1)}</td>
+            <td class="text-center ${rc}">${r.toFixed(1)}</td>
+          </tr>`;
+        }).join('');
+
         return `
         <tr>
-          <td class="font-mono">${tr.sid}</td>
-          <td>${tr.name}</td>
+          <td class="font-mono">${escapeHtml(tr.sid)}</td>
+          <td>${escapeHtml(tr.name)}
+            <button class="btn btn-link btn-sm p-0 ms-1 text-decoration-none align-baseline" style="font-size:.72rem;"
+              onclick="document.getElementById('${detId}').classList.toggle('d-none')"><i class="bi bi-list-nested"></i> รายด้าน</button>
+          </td>
           <td class="text-center fw-semibold">${a.toFixed(1)}</td>
           <td class="text-center fw-semibold">${b.toFixed(1)}</td>
           <td class="text-center fw-semibold">${c.toFixed(1)}</td>
           <td class="text-center fw-bold text-primary">${mean.toFixed(2)}</td>
           <td class="text-center ${rangeCls}">${range.toFixed(1)}</td>
+        </tr>
+        <tr id="${detId}" class="d-none">
+          <td colspan="7" class="bg-light p-2">
+            <div class="fw-bold small mb-1 text-secondary"><i class="bi bi-search me-1"></i>คะแนนรายด้านของผู้ตรวจแต่ละคน — ${escapeHtml(tr.name)}</div>
+            <table class="table table-sm table-bordered mb-0 small bg-white">
+              <thead class="table-light">
+                <tr><th class="text-start">ด้าน</th><th class="text-center">ครูผู้สอน</th><th class="text-center">ผู้เชี่ยวชาญ 1</th><th class="text-center">ผู้เชี่ยวชาญ 2</th><th class="text-center">พิสัย</th></tr>
+              </thead>
+              <tbody>${dimRows}</tbody>
+            </table>
+          </td>
         </tr>`; }).join('');
       sh += `
         <tr class="table-primary fw-bold">
