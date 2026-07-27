@@ -176,9 +176,14 @@ require_once 'header.php';
         </div>
       <!-- ส่วนแสดงผลเรียงความที่นักเรียนพิมพ์ส่งไว้ (ถ้ามี) -->
       <div id="studentEssayPanel" class="card border-0 shadow-sm rounded-4 p-4 mb-4 d-none" style="background-color: #fffdf0; border: 1px solid #e7e5e4 !important;">
-        <div class="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2">
+        <div class="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2 flex-wrap gap-2">
           <h6 class="fw-bold text-dark mb-0"><i class="bi bi-file-earmark-text text-primary me-2"></i>เนื้อหาเรียงความที่นักเรียนบันทึกไว้ (Student Essay Content)</h6>
-          <span class="badge bg-primary-subtle text-primary rounded-pill px-3 py-1 font-mono small" id="essayPanelWordCount">0 คำ</span>
+          <div class="d-flex align-items-center gap-2">
+            <button type="button" id="essaySpeakBtn" class="btn btn-outline-primary btn-sm rounded-pill px-3" onclick="toggleEssaySpeech()">
+              <i class="bi bi-volume-up-fill me-1"></i>อ่านออกเสียง
+            </button>
+            <span class="badge bg-primary-subtle text-primary rounded-pill px-3 py-1 font-mono small" id="essayPanelWordCount">0 คำ</span>
+          </div>
         </div>
         <div class="mb-2 small">
           <span class="text-secondary fw-bold">ชื่อเรื่อง: </span>
@@ -724,7 +729,8 @@ require_once 'header.php';
     const countEl = document.getElementById('essayPanelWordCount');
     
     if (!panel) return;
-    
+    stopEssaySpeech(); // หยุดการอ่านออกเสียงของเรียงความเดิมก่อนโหลดใหม่
+
     if (!studentId) {
       panel.classList.add('d-none');
       return;
@@ -747,6 +753,57 @@ require_once 'header.php';
       panel.classList.add('d-none');
     }
   }
+
+  // ========== อ่านเรียงความออกเสียง (Text-to-Speech ด้วย Web Speech API ของเบราว์เซอร์) ==========
+  function resetSpeakBtn() {
+    const btn = document.getElementById('essaySpeakBtn');
+    if (btn) btn.innerHTML = '<i class="bi bi-volume-up-fill me-1"></i>อ่านออกเสียง';
+  }
+
+  function stopEssaySpeech() {
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    resetSpeakBtn();
+  }
+
+  function pickThaiVoice() {
+    const voices = window.speechSynthesis.getVoices() || [];
+    return voices.find(v => v.lang === 'th-TH') || voices.find(v => (v.lang || '').toLowerCase().startsWith('th')) || null;
+  }
+
+  function toggleEssaySpeech() {
+    if (!('speechSynthesis' in window)) {
+      showToast('เบราว์เซอร์นี้ไม่รองรับการอ่านออกเสียง', 'error');
+      return;
+    }
+    const synth = window.speechSynthesis;
+    // ถ้ากำลังอ่านอยู่ ให้กดซ้ำเพื่อหยุด
+    if (synth.speaking || synth.pending) { stopEssaySpeech(); return; }
+
+    const contentEl = document.getElementById('essayPanelContent');
+    const text = contentEl ? (contentEl.innerText || contentEl.textContent || '').trim() : '';
+    if (!text) { showToast('ไม่มีเนื้อหาให้อ่าน', 'error'); return; }
+
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = 'th-TH';
+    utter.rate = 0.95;
+    const voice = pickThaiVoice();
+    if (voice) utter.voice = voice;
+
+    const btn = document.getElementById('essaySpeakBtn');
+    utter.onstart = () => { if (btn) btn.innerHTML = '<i class="bi bi-stop-circle-fill me-1"></i>หยุดอ่าน'; };
+    utter.onend = resetSpeakBtn;
+    utter.onerror = resetSpeakBtn;
+    synth.speak(utter);
+  }
+
+  // รายชื่อเสียง (voices) อาจโหลดแบบ async — เผื่อไว้ให้ getVoices พร้อมใช้
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.onvoiceschanged = function () { /* trigger voice list load */ };
+  }
+  // หยุดอ่านเมื่อออกจากหน้า
+  window.addEventListener('beforeunload', function () {
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+  });
 
   // คำนวณหาผลรวมของคะแนนตามเกณฑ์สูตรคำนวณ
   function calculateHiddenScore() {
