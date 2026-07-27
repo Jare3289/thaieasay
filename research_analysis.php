@@ -1329,7 +1329,7 @@ require_once 'header.php';
       return;
     }
 
-    container.innerHTML = filtered.map(e => {
+    container.innerHTML = filtered.map((e, idx) => {
       let previewText = '';
       try {
         const obj = JSON.parse(e.essay_content);
@@ -1353,8 +1353,8 @@ require_once 'header.php';
       const studentName  = escapeHtml(e.student_name);
       const studentId    = escapeHtml(e.student_id);
       const essayTitle   = escapeHtml(e.essay_title);
-      // id/onclick ต้องเป็นสตริงปลอดภัย จึงคัดเฉพาะอักขระที่อนุญาต ไม่ให้ข้อมูลนักเรียนแทรกโค้ดได้
-      const essayId      = `essay_${e.student_id}_${e.essay_phase}`.replace(/[^a-zA-Z0-9_]/g, '-');
+      // ใช้ลำดับที่ (index) ของรายการที่แสดง เป็น id — ปลอดภัยและไม่ชนกัน แม้รหัส/รอบจะมีอักขระพิเศษ
+      const essayId      = `essay_${idx}`;
       const formattedHTML = formatEssayHTML(e.essay_content);
 
       return `

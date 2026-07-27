@@ -72,6 +72,9 @@ require_once 'header.php';
             <option value="posttest">หลังเรียน</option>
           </select>
           <input type="text" id="essaySearchInput" onkeyup="filterEssayViewer()" class="form-control form-control-sm border-2 rounded-pill" placeholder="ค้นหาชื่อ รหัส หรือเนื้อหา..." style="width:220px;">
+          <button class="btn btn-danger btn-sm rounded-pill px-3" onclick="exportEssaysPDF()">
+            <i class="bi bi-file-earmark-pdf me-1"></i>จัดทำเอกสาร PDF
+          </button>
           <button class="btn btn-outline-primary btn-sm rounded-pill px-3" onclick="exportEssaysCSV()">
             <i class="bi bi-download me-1"></i>ส่งออก CSV
           </button>
@@ -282,7 +285,7 @@ require_once 'header.php';
       return;
     }
 
-    container.innerHTML = filtered.map(e => {
+    container.innerHTML = filtered.map((e, idx) => {
       let previewText = '';
       try {
         const obj = JSON.parse(e.essay_content);
@@ -311,8 +314,8 @@ require_once 'header.php';
       const essayTitle   = escapeHtml(e.essay_title);
       const roomSafe     = escapeHtml(room);
       const grpSafe      = escapeHtml(grp);
-      // id/onclick ต้องเป็นสตริงปลอดภัย จึงคัดเฉพาะอักขระที่อนุญาต ไม่ให้ข้อมูลนักเรียนแทรกโค้ดได้
-      const essayId      = `essay_${e.student_id}_${e.essay_phase}`.replace(/[^a-zA-Z0-9_]/g, '-');
+      // ใช้ลำดับที่ (index) ของรายการที่แสดง เป็น id — ปลอดภัยและไม่ชนกัน แม้รหัส/รอบจะมีอักขระพิเศษ
+      const essayId      = `essay_${idx}`;
       const formattedHTML = formatEssayHTML(e.essay_content);
 
       return `
@@ -354,6 +357,130 @@ require_once 'header.php';
         </div>
       `;
     }).join('');
+  }
+
+  // สร้างบล็อกเนื้อหาเรียงความสำหรับเอกสาร PDF พร้อมป้ายกำกับ คำนำ/เนื้อเรื่อง/สรุป (ใช้ inline style เพราะเปิดในหน้าต่างแยก)
+  function buildEssayPrintSections(contentStr) {
+    const wrap = (cls, label, text) =>
+      '<div class="sec ' + cls + '"><span class="lbl">' + label + '</span>' +
+      '<div class="txt">' + escapeHtml(text) + '</div></div>';
+    try {
+      const obj = JSON.parse(contentStr);
+      if (obj && typeof obj === 'object' && obj.introduction !== undefined) {
+        let html = '';
+        if (obj.introduction) html += wrap('intro', '✍️ ส่วนคำนำ (Introduction)', obj.introduction);
+        if (Array.isArray(obj.body)) {
+          obj.body.forEach((p, i) => { if (p) html += wrap('body', '📖 ส่วนเนื้อเรื่อง ย่อหน้าที่ ' + (i + 1) + ' (Body)', p); });
+        }
+        if (obj.conclusion) html += wrap('concl', '🏁 ส่วนสรุป (Conclusion)', obj.conclusion);
+        return html || '<div class="no-content">ไม่มีเนื้อหาเรียงความ</div>';
+      }
+    } catch (e) {}
+    if (contentStr && contentStr.trim()) return wrap('body', '📝 เนื้อหาเรียงความ', contentStr);
+    return '<div class="no-content">ไม่มีเนื้อหาเรียงความ</div>';
+  }
+
+  // จัดทำเอกสาร PDF ของเรียงความที่กรองอยู่ โดยเปิดหน้าพร้อมพิมพ์ให้ผู้ใช้ "บันทึกเป็น PDF" ผ่านเบราว์เซอร์
+  // (วิธีนี้รองรับฟอนต์ไทยได้สมบูรณ์และไม่ต้องพึ่งไลบรารีฝั่งเซิร์ฟเวอร์บนโฮสต์ฟรี)
+  function exportEssaysPDF() {
+    if (!allEssaysCache) { showToast('กรุณาโหลดข้อมูลก่อน', 'error'); return; }
+    const filtered = applyEssayFilters(allEssaysCache);
+    if (filtered.length === 0) { showToast('ไม่มีเรียงความที่ตรงกับเงื่อนไขให้จัดทำเอกสาร', 'error'); return; }
+
+    // บริบทของตัวกรองปัจจุบัน สำหรับแสดงบนหน้าปก
+    const groupLabel = currentEssayGroup === 'all' ? 'ทุกกลุ่ม'
+                     : currentEssayGroup === '__none__' ? 'ยังไม่ระบุกลุ่ม'
+                     : currentEssayGroup;
+    const roomSel  = (document.getElementById('essayClassroomFilter') || {}).value || 'all';
+    const roomLbl  = roomSel === 'all' ? 'ทุกห้องเรียน' : ('ห้อง ' + roomSel);
+    const phaseSel = (document.getElementById('essayPhaseFilter') || {}).value || 'all';
+    const phaseLbl = phaseSel === 'all' ? 'ทุกรอบการประเมิน' : (essayPhaseLabels[phaseSel] || phaseSel);
+    const nowStr   = new Date().toLocaleString('th-TH', { dateStyle: 'long', timeStyle: 'short' });
+
+    const cards = filtered.map((e, idx) => {
+      const phaseLabel = escapeHtml(essayPhaseLabels[e.essay_phase] || e.essay_phase);
+      const room = (e.classroom || '').trim();
+      const grp  = (e.student_group || '').trim();
+      const dt   = new Date(e.updated_at || e.created_at);
+      const dateStr = isNaN(dt) ? '-' : dt.toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
+      const wordCount = parseInt(e.word_count || 0).toLocaleString('th-TH');
+      const tags = [
+        '<span class="tag t-phase">' + phaseLabel + '</span>',
+        grp  ? '<span class="tag t-grp">' + escapeHtml(grp) + '</span>' : '',
+        room ? '<span class="tag t-room">ห้อง ' + escapeHtml(room) + '</span>' : '',
+        '<span class="tag t-word">' + wordCount + ' คำ</span>'
+      ].join('');
+      return (
+        '<article class="essay">' +
+          '<div class="essay-head">' +
+            '<div class="name">' + (idx + 1) + '. ' + escapeHtml(e.student_name) +
+              ' <span class="sid">(' + escapeHtml(e.student_id) + ')</span></div>' +
+            (e.essay_title ? '<div class="title">เรื่อง: ' + escapeHtml(e.essay_title) + '</div>' : '') +
+            '<div class="tags">' + tags + '</div>' +
+          '</div>' +
+          buildEssayPrintSections(e.essay_content) +
+          '<div class="stamp">บันทึกล่าสุด: ' + dateStr + '</div>' +
+        '</article>'
+      );
+    }).join('');
+
+    const css =
+      '@page { size: A4; margin: 18mm 15mm; }' +
+      '* { box-sizing: border-box; }' +
+      'html,body { margin:0; padding:0; }' +
+      'body { font-family:"Sarabun","TH Sarabun New",sans-serif; color:#1f2937; line-height:1.75; font-size:15px; -webkit-print-color-adjust:exact; print-color-adjust:exact; }' +
+      '.cover { text-align:center; padding:60px 20px 28px; border-bottom:4px double #0d3b66; margin-bottom:28px; page-break-after:always; }' +
+      '.cover .emblem { font-size:52px; }' +
+      '.cover h1 { font-size:28px; margin:12px 0 6px; color:#0d3b66; }' +
+      '.cover .subtitle { color:#475569; font-size:15px; margin-bottom:18px; }' +
+      '.cover .chips span { display:inline-block; margin:5px; padding:6px 16px; border-radius:999px; background:#eef2ff; color:#0d3b66; font-weight:700; font-size:13px; }' +
+      '.cover .gen { margin-top:22px; color:#64748b; font-size:13px; }' +
+      '.essay { page-break-before:always; page-break-inside:auto; margin-bottom:10px; }' +
+      '.essay-head { background:linear-gradient(135deg,#0d3b66,#1d6fb8); color:#fff; padding:14px 18px; border-radius:10px; margin-bottom:16px; }' +
+      '.essay-head .name { font-size:19px; font-weight:700; }' +
+      '.essay-head .name .sid { font-weight:400; opacity:.85; font-size:15px; }' +
+      '.essay-head .title { font-size:14px; opacity:.95; margin-top:3px; font-style:italic; }' +
+      '.essay-head .tags { margin-top:10px; }' +
+      '.tag { display:inline-block; padding:3px 12px; border-radius:999px; font-size:12px; font-weight:700; margin:3px 6px 0 0; background:rgba(255,255,255,.18); }' +
+      '.sec { margin-bottom:14px; padding:12px 16px; border-radius:10px; border-left:6px solid #cbd5e1; background:#f8fafc; page-break-inside:avoid; }' +
+      '.sec .lbl { display:block; font-weight:700; font-size:13px; margin-bottom:7px; letter-spacing:.3px; }' +
+      '.sec .txt { white-space:pre-wrap; text-align:justify; }' +
+      '.sec.intro { border-left-color:#2563eb; background:#eff6ff; } .sec.intro .lbl { color:#2563eb; }' +
+      '.sec.body  { border-left-color:#059669; background:#ecfdf5; } .sec.body .lbl { color:#059669; }' +
+      '.sec.concl { border-left-color:#dc2626; background:#fef2f2; } .sec.concl .lbl { color:#dc2626; }' +
+      '.no-content { color:#94a3b8; font-style:italic; }' +
+      '.stamp { text-align:right; color:#94a3b8; font-size:11px; margin-top:8px; }';
+
+    const cover =
+      '<div class="cover">' +
+        '<div class="emblem">📝</div>' +
+        '<h1>รวมเรียงความนักเรียน</h1>' +
+        '<div class="subtitle">ระบบประเมินความสามารถในการเขียนเรียงความ</div>' +
+        '<div class="chips">' +
+          '<span>กลุ่ม: ' + escapeHtml(groupLabel) + '</span>' +
+          '<span>' + escapeHtml(roomLbl) + '</span>' +
+          '<span>' + escapeHtml(phaseLbl) + '</span>' +
+          '<span>รวม ' + filtered.length.toLocaleString('th-TH') + ' ชิ้น</span>' +
+        '</div>' +
+        '<div class="gen">จัดทำเอกสารเมื่อ ' + escapeHtml(nowStr) + '</div>' +
+      '</div>';
+
+    const html =
+      '<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8">' +
+      '<title>รวมเรียงความนักเรียน</title>' +
+      '<link rel="preconnect" href="https://fonts.googleapis.com">' +
+      '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' +
+      '<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">' +
+      '<style>' + css + '</style></head><body>' + cover + cards +
+      '<script>window.onload=function(){var go=function(){window.focus();window.print();};' +
+      'if(document.fonts&&document.fonts.ready){document.fonts.ready.then(function(){setTimeout(go,250);});}else{setTimeout(go,700);}};<\/script>' +
+      '</body></html>';
+
+    const w = window.open('', '_blank');
+    if (!w) { showToast('เบราว์เซอร์บล็อกป๊อปอัป กรุณาอนุญาตป๊อปอัปของเว็บนี้แล้วลองใหม่', 'error'); return; }
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
   }
 
   function exportEssaysCSV() {
