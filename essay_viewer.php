@@ -287,24 +287,8 @@ require_once 'header.php';
       return;
     }
 
+    // แสดงเป็นรายการเรียงกันแบบกระชับ (ไม่มีตัวอย่างข้อความ) — กดเพื่อดูเต็ม หรือพิมพ์ PDF ได้
     container.innerHTML = filtered.map((e, idx) => {
-      let previewText = '';
-      try {
-        const obj = JSON.parse(e.essay_content);
-        if (obj && typeof obj === 'object' && obj.introduction !== undefined) {
-          const firstBody = (obj.body && obj.body[0]) ? obj.body[0] : '';
-          previewText = `[คำนำ] ${obj.introduction || ''}\n[เนื้อเรื่อง] ${firstBody}...`;
-        } else {
-          previewText = e.essay_content || '';
-        }
-      } catch(err) {
-        previewText = e.essay_content || '';
-      }
-
-      const previewTrunc = previewText.substring(0, 300).trim();
-      const hasMore      = previewText.length > 300;
-      const dt           = new Date(e.updated_at || e.created_at);
-      const dateStr      = dt.toLocaleString('th-TH', { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
       const badgeClass   = essayPhaseBadgeClass[e.essay_phase] || 'bg-secondary';
       const phaseLabel   = escapeHtml(essayPhaseLabels[e.essay_phase] || e.essay_phase);
       const wordCount    = parseInt(e.word_count || 0).toLocaleString('th-TH');
@@ -321,44 +305,31 @@ require_once 'header.php';
       const formattedHTML = formatEssayHTML(e.essay_content);
 
       return `
-        <div class="card border-0 rounded-3 mb-3 shadow-sm" style="border-left: 4px solid #0d7377 !important;">
-          <div class="card-body p-3">
-            <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-2">
-              <div class="d-flex align-items-center gap-2 flex-wrap">
-                <span class="badge ${badgeClass} px-2 py-1 small">${phaseLabel}</span>
-                ${grp ? `<span class="badge ${grpBadgeCls} px-2 py-1 small">${grpSafe}</span>` : ''}
-                ${room ? `<span class="badge bg-info-subtle text-info-emphasis px-2 py-1 small"><i class="bi bi-door-open me-1"></i>ห้อง ${roomSafe}</span>` : ''}
-                <span class="fw-bold text-dark">${studentName} <span class="text-muted fw-normal small">(${studentId})</span></span>
-                ${e.essay_title ? `<span class="text-secondary small fst-italic">— ${essayTitle}</span>` : ''}
-              </div>
-              <div class="d-flex align-items-center gap-2">
-                <span class="badge bg-primary-subtle text-primary rounded-pill px-2 py-1 small">
-                  <i class="bi bi-fonts me-1"></i>${wordCount} คำ
-                </span>
-                <button class="btn btn-outline-primary btn-sm rounded-pill px-3 py-1 small" style="font-size:0.75rem;"
-                  onclick="document.getElementById('${essayId}').classList.toggle('d-none')">
-                  <i class="bi bi-eye me-1"></i>เปิดดูเต็มยศ
-                </button>
-                <button class="btn btn-outline-danger btn-sm rounded-pill px-3 py-1 small" style="font-size:0.75rem;"
-                  onclick="openPrintOne(${idx})">
-                  <i class="bi bi-file-earmark-pdf me-1"></i>พิมพ์ PDF
-                </button>
-              </div>
+        <div class="border rounded-3 mb-2 bg-white">
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 px-3 py-2">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <span class="text-muted small" style="width:26px;">${idx + 1}.</span>
+              <span class="badge ${badgeClass} px-2 py-1 small">${phaseLabel}</span>
+              ${grp ? `<span class="badge ${grpBadgeCls} px-2 py-1 small">${grpSafe}</span>` : ''}
+              ${room ? `<span class="badge bg-info-subtle text-info-emphasis px-2 py-1 small">ห้อง ${roomSafe}</span>` : ''}
+              <span class="fw-bold text-dark">${studentName} <span class="text-muted fw-normal small">(${studentId})</span></span>
+              ${e.essay_title ? `<span class="text-secondary small fst-italic d-none d-md-inline">— ${essayTitle}</span>` : ''}
             </div>
-
-            <!-- ตัวอย่างเนื้อหา -->
-            <div class="text-secondary small mb-2 text-start" style="white-space:pre-wrap; line-height:1.6; background:#f8f9fa; padding:10px; border-radius:6px; max-height:100px; overflow:hidden;">
-              ${previewTrunc.replace(/</g,'&lt;').replace(/>/g,'&gt;')}${hasMore ? '...' : ''}
+            <div class="d-flex align-items-center gap-2">
+              <span class="badge bg-primary-subtle text-primary rounded-pill px-2 py-1 small">${wordCount} คำ</span>
+              <button class="btn btn-outline-primary btn-sm rounded-pill px-3 py-1 small" style="font-size:0.75rem;"
+                onclick="document.getElementById('${essayId}').classList.toggle('d-none')">
+                <i class="bi bi-eye me-1"></i>ดูเนื้อหา
+              </button>
+              <button class="btn btn-outline-danger btn-sm rounded-pill px-3 py-1 small" style="font-size:0.75rem;"
+                onclick="openPrintOne(${idx})">
+                <i class="bi bi-file-earmark-pdf me-1"></i>พิมพ์ PDF
+              </button>
             </div>
-
-            <!-- เนื้อหาเต็ม (ซ่อนไว้ก่อน) -->
-            <div id="${essayId}" class="d-none text-dark small mt-3 p-3 bg-light rounded-3" style="font-family:'Sarabun',sans-serif; background-color: #fffdf9 !important; border: 1px solid #f0e6c8 !important;">
-              ${formattedHTML}
-            </div>
-
-            <div class="text-muted text-start mt-2" style="font-size:0.72rem;">
-              <i class="bi bi-clock me-1"></i>บันทึกล่าสุด: ${dateStr}
-            </div>
+          </div>
+          <!-- เนื้อหาเต็ม (ซ่อนไว้ก่อน กดปุ่ม "ดูเนื้อหา" เพื่อแสดง) -->
+          <div id="${essayId}" class="d-none text-dark small mx-3 mb-3 p-3 bg-light rounded-3" style="font-family:'Sarabun',sans-serif; background-color: #fffdf9 !important; border: 1px solid #f0e6c8 !important;">
+            ${formattedHTML}
           </div>
         </div>
       `;
