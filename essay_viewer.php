@@ -468,15 +468,17 @@ require_once 'header.php';
     const html =
       '<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8">' +
       '<title>รวมเรียงความนักเรียน</title>' +
+      // สคริปต์นี้ต้องอยู่ "ก่อน" <link rel="stylesheet"> เสมอ — ถ้าอยู่หลัง เบราว์เซอร์จะหน่วงการรัน
+      // จนกว่า stylesheet ก่อนหน้าจะโหลดเสร็จ ทำให้ timer สำรองไม่เริ่มนับเมื่อฟอนต์โดนบล็อก/ค้าง
+      '<script>var __printed=false;function __go(){if(__printed)return;__printed=true;window.focus();window.print();}' +
+      // ตัวสำรองแบบมีเพดานเวลา: เริ่มนับทันที พิมพ์ให้เสมอแม้ Google Fonts จะโดนบล็อกหรือโหลดค้าง (ออฟไลน์/เน็ตจำกัด)
+      'setTimeout(__go,1200);' +
+      // เส้นทางปกติ: ถ้าฟอนต์พร้อมก่อนกำหนด ให้พิมพ์เร็วขึ้นเพื่อให้ตัวอักษรไทยคมชัด
+      'if(document.fonts&&document.fonts.ready){document.fonts.ready.then(function(){setTimeout(__go,150);});}<\/script>' +
       '<link rel="preconnect" href="https://fonts.googleapis.com">' +
       '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' +
       '<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">' +
       '<style>' + css + '</style></head><body>' + cover + cards +
-      '<script>var __printed=false;function __go(){if(__printed)return;__printed=true;window.focus();window.print();}' +
-      // เส้นทางปกติ: พิมพ์หลังฟอนต์พร้อม เพื่อให้ตัวอักษรไทยคมชัด
-      'if(document.fonts&&document.fonts.ready){document.fonts.ready.then(function(){setTimeout(__go,150);});}' +
-      // ตัวสำรองแบบมีเพดานเวลา: พิมพ์ให้เสมอแม้ Google Fonts จะโดนบล็อกหรือโหลดค้าง (ออฟไลน์/เน็ตจำกัด)
-      'setTimeout(__go,1200);<\/script>' +
       '</body></html>';
 
     const w = window.open('', '_blank');
