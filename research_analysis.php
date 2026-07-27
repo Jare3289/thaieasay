@@ -1241,6 +1241,16 @@ require_once 'header.php';
     renderEssayViewer(allEssaysCache);
   }
 
+  // แปลงอักขระพิเศษของ HTML เพื่อกันสคริปต์ฝังในข้อมูลที่นักเรียนกรอก (ชื่อเรื่อง/ชื่อ ฯลฯ)
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   function formatEssayHTML(contentStr) {
     if (!contentStr) return '<em class="text-muted">ไม่มีเนื้อหาเรียงความ</em>';
     try {
@@ -1338,9 +1348,13 @@ require_once 'header.php';
       const dt           = new Date(e.updated_at || e.created_at);
       const dateStr      = dt.toLocaleString('th-TH', { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
       const badgeClass   = essayPhaseBadgeClass[e.essay_phase] || 'bg-secondary';
-      const phaseLabel   = essayPhaseLabels[e.essay_phase] || e.essay_phase;
+      const phaseLabel   = escapeHtml(essayPhaseLabels[e.essay_phase] || e.essay_phase);
       const wordCount    = parseInt(e.word_count || 0).toLocaleString('th-TH');
-      const essayId      = `essay_${e.student_id}_${e.essay_phase}`;
+      const studentName  = escapeHtml(e.student_name);
+      const studentId    = escapeHtml(e.student_id);
+      const essayTitle   = escapeHtml(e.essay_title);
+      // id/onclick ต้องเป็นสตริงปลอดภัย จึงคัดเฉพาะอักขระที่อนุญาต ไม่ให้ข้อมูลนักเรียนแทรกโค้ดได้
+      const essayId      = `essay_${e.student_id}_${e.essay_phase}`.replace(/[^a-zA-Z0-9_]/g, '-');
       const formattedHTML = formatEssayHTML(e.essay_content);
 
       return `
@@ -1349,8 +1363,8 @@ require_once 'header.php';
             <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-2">
               <div class="d-flex align-items-center gap-2 flex-wrap">
                 <span class="badge ${badgeClass} px-2 py-1 small">${phaseLabel}</span>
-                <span class="fw-bold text-dark">${e.student_name} <span class="text-muted fw-normal small">(${e.student_id})</span></span>
-                ${e.essay_title ? `<span class="text-secondary small fst-italic">— ${e.essay_title}</span>` : ''}
+                <span class="fw-bold text-dark">${studentName} <span class="text-muted fw-normal small">(${studentId})</span></span>
+                ${e.essay_title ? `<span class="text-secondary small fst-italic">— ${essayTitle}</span>` : ''}
               </div>
               <div class="d-flex align-items-center gap-2">
                 <span class="badge bg-primary-subtle text-primary rounded-pill px-2 py-1 small">
@@ -1396,7 +1410,13 @@ require_once 'header.php';
       return true;
     });
 
-    const esc = s => '"' + (s||'').replace(/"/g,'""').replace(/\n/g,' ') + '"';
+    // ป้องกัน CSV formula injection: ค่าที่ขึ้นต้นด้วย = + - @ (หรือ tab/CR) อาจถูกโปรแกรมตารางตีความเป็นสูตร
+    // จึงเติมเครื่องหมาย ' นำหน้าเพื่อบังคับให้เป็นข้อความล้วนก่อนครอบด้วยเครื่องหมายคำพูด
+    const esc = s => {
+      let v = (s == null ? '' : String(s));
+      if (/^[=+\-@\t\r]/.test(v)) v = "'" + v;
+      return '"' + v.replace(/"/g,'""').replace(/\n/g,' ') + '"';
+    };
     let csv = '﻿' + 'รหัสนักเรียน,ชื่อ-สกุล,รอบการประเมิน,ชื่อเรื่อง,จำนวนคำ,ส่วนคำนำ (Introduction),ส่วนเนื้อเรื่อง (Body),ส่วนสรุป (Conclusion),วันที่บันทึก\n';
     filtered.forEach(e => {
       const dt = new Date(e.updated_at||e.created_at).toLocaleString('th-TH');
