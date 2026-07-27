@@ -287,33 +287,27 @@ require_once 'header.php';
       return;
     }
 
-    // แสดงเป็นรายการเรียงกันแบบกระชับ (ไม่มีตัวอย่างข้อความ) — กดเพื่อดูเต็ม หรือพิมพ์ PDF ได้
-    container.innerHTML = filtered.map((e, idx) => {
-      const badgeClass   = essayPhaseBadgeClass[e.essay_phase] || 'bg-secondary';
-      const phaseLabel   = escapeHtml(essayPhaseLabels[e.essay_phase] || e.essay_phase);
+    // สร้างแถวรายการหนึ่งคน (ไม่มีตัวอย่างข้อความ ไม่มีหัวข้อ) — กดดูเนื้อหา หรือพิมพ์ PDF ได้
+    const buildRow = (e, idx) => {
       const wordCount    = parseInt(e.word_count || 0).toLocaleString('th-TH');
       const room         = (e.classroom || '').trim();
       const grp          = (e.student_group || '').trim();
       const grpBadgeCls  = essayGroupBadge[grp] || 'bg-secondary';
       const studentName  = escapeHtml(e.student_name);
       const studentId    = escapeHtml(e.student_id);
-      const essayTitle   = escapeHtml(e.essay_title);
       const roomSafe     = escapeHtml(room);
       const grpSafe      = escapeHtml(grp);
       // ใช้ลำดับที่ (index) ของรายการที่แสดง เป็น id — ปลอดภัยและไม่ชนกัน แม้รหัส/รอบจะมีอักขระพิเศษ
       const essayId      = `essay_${idx}`;
       const formattedHTML = formatEssayHTML(e.essay_content);
-
       return `
         <div class="border rounded-3 mb-2 bg-white">
           <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 px-3 py-2">
             <div class="d-flex align-items-center gap-2 flex-wrap">
               <span class="text-muted small" style="width:26px;">${idx + 1}.</span>
-              <span class="badge ${badgeClass} px-2 py-1 small">${phaseLabel}</span>
               ${grp ? `<span class="badge ${grpBadgeCls} px-2 py-1 small">${grpSafe}</span>` : ''}
               ${room ? `<span class="badge bg-info-subtle text-info-emphasis px-2 py-1 small">ห้อง ${roomSafe}</span>` : ''}
               <span class="fw-bold text-dark">${studentName} <span class="text-muted fw-normal small">(${studentId})</span></span>
-              ${e.essay_title ? `<span class="text-secondary small fst-italic d-none d-md-inline">— ${essayTitle}</span>` : ''}
             </div>
             <div class="d-flex align-items-center gap-2">
               <span class="badge bg-primary-subtle text-primary rounded-pill px-2 py-1 small">${wordCount} คำ</span>
@@ -327,13 +321,33 @@ require_once 'header.php';
               </button>
             </div>
           </div>
-          <!-- เนื้อหาเต็ม (ซ่อนไว้ก่อน กดปุ่ม "ดูเนื้อหา" เพื่อแสดง) -->
           <div id="${essayId}" class="d-none text-dark small mx-3 mb-3 p-3 bg-light rounded-3" style="font-family:'Sarabun',sans-serif; background-color: #fffdf9 !important; border: 1px solid #f0e6c8 !important;">
             ${formattedHTML}
           </div>
-        </div>
-      `;
-    }).join('');
+        </div>`;
+    };
+
+    // จัดกลุ่มตามรอบการประเมิน แล้วแสดงเป็นหัวข้อแยกกลุ่ม: ก่อนเรียน → หน่วย 1 → หน่วย 2 → หลังเรียน
+    const phaseOrder = ['pretest', 'task1', 'task2', 'posttest'];
+    const groups = {};
+    filtered.forEach(e => { (groups[e.essay_phase] = groups[e.essay_phase] || []).push(e); });
+    const phases = phaseOrder.filter(p => groups[p] && groups[p].length);
+    Object.keys(groups).forEach(p => { if (!phaseOrder.includes(p)) phases.push(p); });
+
+    const ordered = [];
+    let html = '';
+    phases.forEach(p => {
+      const list  = groups[p];
+      const label = escapeHtml(essayPhaseLabels[p] || p);
+      const cls   = essayPhaseBadgeClass[p] || 'bg-secondary';
+      html += `<div class="d-flex align-items-center gap-2 mt-4 mb-2 pb-1 border-bottom border-2">
+                 <span class="badge ${cls} fs-6 px-3 py-2">${label}</span>
+                 <span class="text-muted small">${list.length.toLocaleString('th-TH')} คน</span>
+               </div>`;
+      list.forEach(e => { const idx = ordered.length; ordered.push(e); html += buildRow(e, idx); });
+    });
+    renderedEssays = ordered; // ให้ openPrintOne อ้างอิงตาม index ที่แสดงจริง (ตามการจัดกลุ่ม)
+    container.innerHTML = html;
   }
 
   // เปิดหน้าเอกสารพิมพ์ (essay_print.php) แบบรวมตามตัวกรองปัจจุบัน
