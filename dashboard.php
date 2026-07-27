@@ -173,9 +173,14 @@ require_once 'header.php';
           <h6 class="fw-bold text-dark mb-1"><i class="bi bi-gear-wide-connected text-warning"></i> ระบบวิเคราะห์ทางสถิติเพื่อการทำวิจัยและตรวจสอบคุณภาพเกณฑ์ประเมิน</h6>
           <p class="text-muted small mb-0">ค่าความสอดคล้องผู้ตรวจ 3 คน (ICC), Paired t-test, ศูนย์วิเคราะห์เชิงคุณภาพ และเรียงความนักเรียน — แยกเป็นหน้าเฉพาะเพื่อความชัดเจน (กลุ่มทดลอง: ห้อง 606)</p>
         </div>
-        <a href="research_analysis.php" class="btn btn-primary fw-bold px-4 rounded-pill text-nowrap">
-          <i class="bi bi-box-arrow-up-right me-1"></i> เปิดหน้าวิเคราะห์สถิติงานวิจัย
-        </a>
+        <div class="d-flex flex-column flex-sm-row gap-2">
+          <a href="essay_viewer.php" class="btn btn-outline-danger fw-bold px-4 rounded-pill text-nowrap">
+            <i class="bi bi-pencil-square me-1"></i> ดูเรียงความนักเรียนทุกคน
+          </a>
+          <a href="research_analysis.php" class="btn btn-primary fw-bold px-4 rounded-pill text-nowrap">
+            <i class="bi bi-box-arrow-up-right me-1"></i> เปิดหน้าวิเคราะห์สถิติงานวิจัย
+          </a>
+        </div>
       </div>
     </div>
   </div>

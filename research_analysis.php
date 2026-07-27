@@ -343,7 +343,8 @@ require_once 'header.php';
           <!-- Controls row -->
           <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
             <div>
-              <p class="text-muted small mb-0">ตรวจสอบเนื้อหาเรียงความที่นักเรียนพิมพ์ส่งเพื่อประกอบการวิเคราะห์เชิงคุณภาพ</p>
+              <p class="text-muted small mb-0">ตรวจสอบเนื้อหาเรียงความที่นักเรียนพิมพ์ส่งเพื่อประกอบการวิเคราะห์เชิงคุณภาพ (เฉพาะกลุ่มทดลอง ห้อง 606)</p>
+              <a href="essay_viewer.php" class="small fw-bold text-danger text-decoration-none"><i class="bi bi-box-arrow-up-right me-1"></i>ดูเรียงความของนักเรียนทุกคน ทุกห้อง แยกกลุ่มทดลอง/กลุ่มตัวอย่าง</a>
             </div>
             <div class="d-flex gap-2 flex-wrap align-items-center">
               <select id="essayPhaseFilter" onchange="filterEssayViewer()" class="form-select form-select-sm border-2 rounded-pill" style="width:auto;">

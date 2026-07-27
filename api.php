@@ -1363,10 +1363,10 @@ try {
                 exit;
             }
             $stmt = $pdo->query('
-                SELECT se.*, s.student_name
+                SELECT se.*, s.student_name, s.classroom, s.student_group
                 FROM student_essays se
                 JOIN students s ON se.student_id = s.student_id
-                ORDER BY se.essay_phase ASC, s.student_id ASC
+                ORDER BY s.classroom ASC, se.essay_phase ASC, s.student_id ASC
             ');
             $essays = $stmt->fetchAll();
             // apply formatNamePrefix
