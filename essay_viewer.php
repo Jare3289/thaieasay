@@ -122,6 +122,7 @@ require_once 'header.php';
 <script>
   // ========== Essay Viewer (หน้ารวมทุกห้องเรียน) ==========
   let allEssaysCache = null;
+  let renderedEssays = []; // ชุดเรียงความที่กำลังแสดง (ตามตัวกรอง) — ใช้อ้างอิงตอนกดพิมพ์รายคน
   let currentEssayGroup = 'all'; // all | กลุ่มทดลอง | กลุ่มตัวอย่าง | __none__
 
   // สลับแท็บกลุ่มทดลอง/กลุ่มตัวอย่าง
@@ -266,6 +267,7 @@ require_once 'header.php';
   function renderEssayViewer(essays) {
     const container = document.getElementById('essayViewerContainer');
     const filtered  = applyEssayFilters(essays);
+    renderedEssays  = filtered; // เก็บไว้ให้ปุ่มพิมพ์รายคน (openPrintOne) อ้างอิงด้วย index เดียวกัน
 
     // อัปเดตแถบสรุปตัวเลข
     const total    = filtered.length;

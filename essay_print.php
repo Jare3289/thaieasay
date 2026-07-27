@@ -30,7 +30,7 @@ $isSingle   = ($oneStudent !== '');
 
 // สร้างคำสั่ง SQL ตามตัวกรอง
 $sql = 'SELECT se.*, s.student_name, s.classroom, s.student_group
-        FROM student_essays se JOIN students s ON se.student_id = s.student_id';
+        FROM student_essays se LEFT JOIN students s ON se.student_id = s.student_id';
 $conds = [];
 $params = [];
 if ($isSingle) {
@@ -152,7 +152,7 @@ $docTitle   = $isSingle ? 'เรียงความนักเรียน' 
   }
   .toolbar .hint { font-size: 13px; opacity: .9; font-weight: 400; }
   .page { max-width: 800px; margin: 0 auto; padding: 16px; }
-  .cover { text-align: center; padding: 48px 20px 24px; border-bottom: 4px double #0d3b66; margin-bottom: 24px; }
+  .cover { text-align: center; padding: 48px 20px 24px; border-bottom: 4px double #0d3b66; margin-bottom: 24px; page-break-after: always; }
   .cover .emblem { font-size: 48px; }
   .cover h1 { font-size: 26px; margin: 10px 0 6px; color: #0d3b66; }
   .cover .subtitle { color: #475569; font-size: 15px; margin-bottom: 16px; }
