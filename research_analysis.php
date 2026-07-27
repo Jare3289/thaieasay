@@ -146,7 +146,8 @@ require_once 'header.php';
           <div class="row mt-3">
             <div class="col-12">
               <div class="card border-0 rounded-3 p-3 bg-white shadow-sm border-start border-3 border-info">
-                <h6 class="fw-bold text-dark mb-3"><i class="bi bi-people-fill text-info"></i> คะแนนผู้ตรวจ 3 คน รายบุคคล (เฉพาะห้อง 606)</h6>
+                <h6 class="fw-bold text-dark mb-1"><i class="bi bi-people-fill text-info"></i> คะแนนผู้ตรวจ 3 คน รายบุคคล (เฉพาะห้อง 606)</h6>
+                <p class="text-muted small mb-3" id="iccRaterSummary">ผู้ตรวจ 3 คน (ครูผู้สอน + ผู้เชี่ยวชาญ 2 ท่าน) — คะแนนเต็ม 60</p>
                 <div class="table-responsive" style="max-height: 360px; overflow-y: auto;">
                   <table class="table table-sm table-hover align-middle mb-0 small">
                     <thead class="table-light text-secondary">
@@ -156,10 +157,12 @@ require_once 'header.php';
                         <th class="text-center text-nowrap">ครูผู้สอน</th>
                         <th class="text-center text-nowrap">ผู้เชี่ยวชาญ 1</th>
                         <th class="text-center text-nowrap">ผู้เชี่ยวชาญ 2</th>
+                        <th class="text-center text-nowrap">เฉลี่ย</th>
+                        <th class="text-center text-nowrap">พิสัย (สูงสุด−ต่ำสุด)</th>
                       </tr>
                     </thead>
                     <tbody id="iccStudentTableBody">
-                      <tr><td colspan="5" class="text-center py-4 text-muted">รอประมวลผลข้อมูล...</td></tr>
+                      <tr><td colspan="7" class="text-center py-4 text-muted">รอประมวลผลข้อมูล...</td></tr>
                     </tbody>
                   </table>
                 </div>
@@ -172,6 +175,18 @@ require_once 'header.php';
             <div class="col-12">
               <div id="pearsonReportParagraph" class="card border-0 rounded-3 p-3 text-secondary small bg-light border-start border-3 border-secondary" style="line-height: 1.6;">
                 <em>กำลังรอผลสัมประสิทธิ์ความสอดคล้อง...</em>
+              </div>
+            </div>
+          </div>
+
+          <!-- แผงแสดงค่าที่แทนในสูตร ICC (ของคะแนนรวม) -->
+          <div class="row mt-3">
+            <div class="col-12">
+              <div class="card border-0 rounded-3 p-3 bg-white shadow-sm border-start border-3 border-primary">
+                <h6 class="fw-bold text-dark mb-3"><i class="bi bi-calculator text-primary"></i> การคำนวณค่า ICC — แสดงค่าที่แทนในสูตร (คะแนนรวม)</h6>
+                <div id="iccFormulaPanel" class="small text-secondary">
+                  <em>รอประมวลผลข้อมูล...</em>
+                </div>
               </div>
             </div>
           </div>
@@ -556,7 +571,50 @@ require_once 'header.php';
     const MSE = SSE / ((n - 1) * (k - 1));
     const denom = MSR + (k - 1) * MSE + (k / n) * (MSC - MSE);
     if (denom === 0) return null;
-    return (MSR - MSE) / denom;
+    const icc = (MSR - MSE) / denom;
+    // คืนค่ากลางทั้งหมด เพื่อนำไปแสดง "ค่าที่แทนในสูตร" ให้เห็นชัด
+    return { icc, n, k, grand, SSR, SSC, SSE, SST, MSR, MSC, MSE, denom };
+  }
+
+  // แสดงรายละเอียดการคำนวณ ICC (ค่าที่แทนในสูตร) ของคะแนนรวม
+  function renderIccFormula(d) {
+    const el = document.getElementById('iccFormulaPanel');
+    if (!el) return;
+    if (!d) {
+      el.innerHTML = '<em class="text-muted">ยังมีข้อมูลไม่พอสำหรับคำนวณ — ต้องมีนักเรียนห้อง 606 ที่ผู้ตรวจครบ 3 คน อย่างน้อย 2 คน</em>';
+      return;
+    }
+    const n = d.n, k = d.k;
+    const f2 = x => Number(x).toFixed(2);
+    const f3 = x => Number(x).toFixed(3);
+    const f4 = x => Number(x).toFixed(4);
+    const dfR = n - 1, dfC = k - 1, dfE = (n - 1) * (k - 1);
+    const num = d.MSR - d.MSE;
+    el.innerHTML = `
+      <div class="row g-2 mb-3">
+        <div class="col-6 col-md-3"><div class="border rounded-2 p-2 text-center bg-light"><div class="text-muted" style="font-size:.75rem;">จำนวนนักเรียน (n)</div><div class="fs-5 fw-bold text-dark">${n}</div></div></div>
+        <div class="col-6 col-md-3"><div class="border rounded-2 p-2 text-center bg-light"><div class="text-muted" style="font-size:.75rem;">จำนวนผู้ตรวจ (k)</div><div class="fs-5 fw-bold text-dark">${k}</div></div></div>
+        <div class="col-6 col-md-3"><div class="border rounded-2 p-2 text-center bg-light"><div class="text-muted" style="font-size:.75rem;">ค่าเฉลี่ยรวม (Grand mean)</div><div class="fs-5 fw-bold text-dark">${f2(d.grand)}</div></div></div>
+        <div class="col-6 col-md-3"><div class="border rounded-2 p-2 text-center bg-light"><div class="text-muted" style="font-size:.75rem;">ผลลัพธ์ ICC(2,1)</div><div class="fs-5 fw-bold text-primary">${f4(d.icc)}</div></div></div>
+      </div>
+      <div class="table-responsive mb-3">
+        <table class="table table-sm table-bordered text-center align-middle mb-0">
+          <thead class="table-light"><tr><th class="text-start">แหล่งความแปรปรวน</th><th>Sum of Squares (SS)</th><th>df</th><th>Mean Square (MS)</th></tr></thead>
+          <tbody>
+            <tr><td class="text-start">ระหว่างนักเรียน (Rows)</td><td>${f2(d.SSR)}</td><td>n−1 = ${dfR}</td><td class="fw-bold">MSR = ${f3(d.MSR)}</td></tr>
+            <tr><td class="text-start">ระหว่างผู้ตรวจ (Columns)</td><td>${f2(d.SSC)}</td><td>k−1 = ${dfC}</td><td class="fw-bold">MSC = ${f3(d.MSC)}</td></tr>
+            <tr><td class="text-start">ความคลาดเคลื่อน (Error)</td><td>${f2(d.SSE)}</td><td>(n−1)(k−1) = ${dfE}</td><td class="fw-bold">MSE = ${f3(d.MSE)}</td></tr>
+            <tr class="table-light"><td class="text-start fw-bold">รวม (Total)</td><td>${f2(d.SST)}</td><td>${n * k - 1}</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="p-3 rounded-3" style="background:#eff6ff; line-height:2;">
+        <div class="fw-bold text-dark mb-1">สูตร ICC(2,1) — two-way random effects, absolute agreement, single rater</div>
+        <div class="font-mono">ICC = (MSR − MSE) / [ MSR + (k−1)·MSE + (k/n)·(MSC − MSE) ]</div>
+        <div class="font-mono">= ( ${f3(d.MSR)} − ${f3(d.MSE)} ) / [ ${f3(d.MSR)} + (${k}−1)·${f3(d.MSE)} + (${k}/${n})·( ${f3(d.MSC)} − ${f3(d.MSE)} ) ]</div>
+        <div class="font-mono">= ${f3(num)} / ${f3(d.denom)} = <span class="fw-bold text-primary">${f4(d.icc)}</span></div>
+      </div>
+    `;
   }
 
   function calculateICCReliability(triples) {
@@ -574,6 +632,9 @@ require_once 'header.php';
       if (p) p.innerHTML = `<h6 class="fw-bold text-dark mb-2"><i class="bi bi-file-earmark-text text-primary"></i> บทวิเคราะห์ค่าความสอดคล้องผู้ตรวจ (ICC)</h6><p class="mb-0 text-muted">ยังมีข้อมูลไม่พอสำหรับคำนวณ ICC — ต้องมีนักเรียนห้อง 606 ที่ผู้ตรวจครบ 3 คนอย่างน้อย 2 คน</p>`;
       setKpiValue('kpiIccOverall', 'N/A');
       setKpiBadge('kpiIccBadge', 'ข้อมูลไม่พอ', 'bg-secondary');
+      const rs = document.getElementById('iccRaterSummary');
+      if (rs) rs.innerHTML = 'ผู้ตรวจ 3 คน (ครูผู้สอน + ผู้เชี่ยวชาญ 2 ท่าน) — ยังมีนักเรียนที่ถูกตรวจครบไม่พอ';
+      renderIccFormula(null);
       return;
     }
 
@@ -588,7 +649,8 @@ require_once 'header.php';
 
     // ภาพรวม = คะแนนรวม
     const totalMatrix = triples.map(tr => tr.evals.map(dims[0].get));
-    const overallICC = computeICC(totalMatrix);
+    const overallDetail = computeICC(totalMatrix);
+    const overallICC = overallDetail ? overallDetail.icc : null;
     overallEl.textContent = overallICC !== null ? overallICC.toFixed(4) : "N/A";
     const overallInterp = getICCInterpretation(overallICC);
     interpEl.textContent = overallInterp.text;
@@ -600,7 +662,8 @@ require_once 'header.php';
     const iccVals = [];
     dims.forEach(d => {
       const m = triples.map(tr => tr.evals.map(d.get));
-      const icc = computeICC(m);
+      const det = computeICC(m);
+      const icc = det ? det.icc : null;
       if (icc !== null) iccVals.push(icc);
       const interp = getICCInterpretation(icc);
       html += `
@@ -614,24 +677,42 @@ require_once 'header.php';
     });
     tableBody.innerHTML = html;
 
+    // อัปเดตข้อความสรุปจำนวนผู้ตรวจ/นักเรียน
+    const raterSummaryEl = document.getElementById('iccRaterSummary');
+    if (raterSummaryEl) {
+      raterSummaryEl.innerHTML = `ผู้ตรวจ <strong>3 คน</strong> (ครูผู้สอน + ผู้เชี่ยวชาญ 2 ท่าน) · นักเรียนที่ถูกตรวจครบทั้ง 3 คน = <strong>${triples.length} คน</strong> · คะแนนเต็ม 60`;
+    }
+
     // ตารางคะแนนผู้ตรวจ 3 คน รายบุคคล + ICC ท้ายตาราง
     const stBody = document.getElementById('iccStudentTableBody');
     if (stBody) {
-      let sh = triples.map(tr => `
+      let sh = triples.map(tr => {
+        const a = Number(tr.evals[0].total_score);
+        const b = Number(tr.evals[1].total_score);
+        const c = Number(tr.evals[2].total_score);
+        const mean  = (a + b + c) / 3;
+        const range = Math.max(a, b, c) - Math.min(a, b, c);
+        const rangeCls = range >= 10 ? 'text-danger fw-bold' : (range >= 5 ? 'text-warning' : 'text-success');
+        return `
         <tr>
           <td class="font-mono">${tr.sid}</td>
           <td>${tr.name}</td>
-          <td class="text-center fw-semibold">${Number(tr.evals[0].total_score).toFixed(1)}</td>
-          <td class="text-center fw-semibold">${Number(tr.evals[1].total_score).toFixed(1)}</td>
-          <td class="text-center fw-semibold">${Number(tr.evals[2].total_score).toFixed(1)}</td>
-        </tr>`).join('');
+          <td class="text-center fw-semibold">${a.toFixed(1)}</td>
+          <td class="text-center fw-semibold">${b.toFixed(1)}</td>
+          <td class="text-center fw-semibold">${c.toFixed(1)}</td>
+          <td class="text-center fw-bold text-primary">${mean.toFixed(2)}</td>
+          <td class="text-center ${rangeCls}">${range.toFixed(1)}</td>
+        </tr>`; }).join('');
       sh += `
         <tr class="table-primary fw-bold">
-          <td colspan="2" class="text-end">ค่า ICC ภาพรวม (คะแนนรวม) →</td>
-          <td colspan="3" class="text-center">${overallICC !== null ? overallICC.toFixed(4) : 'N/A'} <span class="badge ${overallInterp.css} ms-1">${overallInterp.text.split(' (')[0]}</span></td>
+          <td colspan="5" class="text-end">ค่า ICC ภาพรวม (คะแนนรวม) →</td>
+          <td colspan="2" class="text-center">${overallICC !== null ? overallICC.toFixed(4) : 'N/A'} <span class="badge ${overallInterp.css} ms-1">${overallInterp.text.split(' (')[0]}</span></td>
         </tr>`;
       stBody.innerHTML = sh;
     }
+
+    // แผงแสดง "ค่าที่แทนในสูตร ICC" ของคะแนนรวม
+    renderIccFormula(overallDetail);
 
     const paragraphEl = document.getElementById('pearsonReportParagraph');
     if (paragraphEl) {
