@@ -146,7 +146,7 @@ require_once 'header.php';
           <div class="row mt-3">
             <div class="col-12">
               <div class="card border-0 rounded-3 p-3 bg-white shadow-sm border-start border-3 border-info">
-                <h6 class="fw-bold text-dark mb-1"><i class="bi bi-people-fill text-info"></i> คะแนนผู้ตรวจ 3 คน รายบุคคล (เฉพาะห้อง 606) — แยกรายด้าน</h6>
+                <h6 class="fw-bold text-dark mb-1"><i class="bi bi-people-fill text-info"></i> คะแนนผู้ตรวจ 3 คน รายบุคคล (เฉพาะห้อง 606) — แยกรายข้อประเมิน (11 ข้อ)</h6>
                 <p class="text-muted small mb-2" id="iccRaterSummary">ผู้ตรวจ 3 คน (ครูผู้สอน + ผู้เชี่ยวชาญ 2 ท่าน) — คะแนนเต็ม 60</p>
                 <div class="d-flex flex-wrap gap-2 small mb-3">
                   <span class="badge rounded-pill bg-success bg-opacity-10 text-success border border-success border-opacity-25">ดีมาก</span>
@@ -589,6 +589,16 @@ require_once 'header.php';
     return { text: 'ต้องปรับปรุง', badge: 'bg-danger' };
   }
 
+  // ระดับที่ผู้ตรวจเลือก "รายข้อ" — คะแนนรายข้อ = ระดับ(0-4) × ตัวคูณ ดังนั้น ระดับ = score/max×4 พอดี
+  function getRubricLevel(score, max) {
+    const lv = max > 0 ? Math.round((score / max) * 4) : 0;
+    if (lv >= 4) return { text: 'ดีมาก', badge: 'bg-success' };
+    if (lv === 3) return { text: 'ดี', badge: 'bg-info text-dark' };
+    if (lv === 2) return { text: 'ปานกลาง', badge: 'bg-warning text-dark' };
+    if (lv === 1) return { text: 'พอใช้', badge: 'bg-warning text-dark' };
+    return { text: 'ต้องปรับปรุง', badge: 'bg-danger' };
+  }
+
   // แสดงรายละเอียดการคำนวณ ICC (ค่าที่แทนในสูตร) ของคะแนนรวม
   function renderIccFormula(d) {
     const el = document.getElementById('iccFormulaPanel');
@@ -703,29 +713,67 @@ require_once 'header.php';
     const stCards = document.getElementById('iccStudentCards');
     if (stCards) {
       const raters = ['ครูผู้สอน', 'ผู้เชี่ยวชาญ 1', 'ผู้เชี่ยวชาญ 2'];
-      const dimList = dims.slice(1); // 4 ด้าน (ไม่รวมคะแนนรวม)
+      // โครงสร้างรายข้อประเมิน (11 ข้อ) จัดกลุ่มตาม 4 ด้าน — ชื่อและคะแนนเต็มตรงตามเกณฑ์การประเมิน
+      const itemGroups = [
+        { domain: '1) ด้านเนื้อหาสาระ', max: 27, items: [
+          { no: '1.1', name: 'ความตรงประเด็น', max: 12, key: 'score_1_1' },
+          { no: '1.2', name: 'แก่นเรื่องชัดเจน', max: 6, key: 'score_1_2' },
+          { no: '1.3', name: 'การขยายความและเหตุผล', max: 9, key: 'score_1_3' },
+        ]},
+        { domain: '2) ด้านองค์ประกอบและการลำดับ', max: 12, items: [
+          { no: '2.1', name: 'ความครบถ้วนขององค์ประกอบ', max: 8, key: 'score_2_1' },
+          { no: '2.2', name: 'การลำดับประเด็นเป็นระบบ', max: 4, key: 'score_2_2' },
+        ]},
+        { domain: '3) ด้านการใช้สำนวนภาษา', max: 15, items: [
+          { no: '3.1', name: 'การใช้ประโยคถูกต้อง', max: 4, key: 'score_3_1' },
+          { no: '3.2', name: 'การเลือกใช้คำ', max: 6, key: 'score_3_2' },
+          { no: '3.3', name: 'ระดับภาษาเหมาะสม', max: 5, key: 'score_3_3' },
+        ]},
+        { domain: '4) ด้านอักขรวิธีและกลไกการเขียน', max: 6, items: [
+          { no: '4.1', name: 'การสะกดคำถูกต้อง', max: 2, key: 'score_4_1' },
+          { no: '4.2', name: 'การเว้นวรรค', max: 2, key: 'score_4_2' },
+          { no: '4.3', name: 'ความเรียบร้อย', max: 2, key: 'score_4_3' },
+        ]},
+      ];
 
-      // ช่องแสดงคะแนน + ระดับ (badge สี) ของผู้ตรวจ 1 คน ในด้านหนึ่ง
-      const scoreCell = (score, max) => {
-        const lv = getDomainLevel(score, max);
-        return `<td class="text-center">
-          <div class="fw-bold text-dark" style="font-size:.95rem;">${score.toFixed(1)}<span class="text-muted fw-normal" style="font-size:.72rem;">/${max}</span></div>
-          <span class="badge ${lv.badge}" style="font-size:.66rem;">${lv.text}</span>
+      // ช่องแสดงคะแนน + ระดับ (badge สี) ของผู้ตรวจ 1 คน
+      const scoreCell = (score, max, lv) => `<td class="text-center">
+          <div class="fw-bold text-dark" style="font-size:.9rem;">${score.toFixed(1)}<span class="text-muted fw-normal" style="font-size:.7rem;">/${max}</span></div>
+          <span class="badge ${lv.badge}" style="font-size:.63rem;">${lv.text}</span>
         </td>`;
+
+      // ช่องพิสัย (สูงสุด−ต่ำสุด) พร้อมระบายสีเตือนเมื่อผู้ตรวจให้คะแนนต่างกันมาก
+      const rangeCell = (vals, hi, mid) => {
+        const range = Math.max(...vals) - Math.min(...vals);
+        const rc = range >= hi ? 'text-danger fw-bold' : (range >= mid ? 'text-warning-emphasis' : 'text-success');
+        return `<td class="text-center ${rc}">${range.toFixed(1)}</td>`;
       };
 
       const cardsHtml = triples.map(tr => {
-        // แถวรายด้าน: 4 ด้าน + คะแนนรวม (แถวท้าย)
-        const bodyRows = dimList.map(d => {
-          const vals = tr.evals.map(e => Number(d.get(e)));
-          const range = Math.max(...vals) - Math.min(...vals);
-          const rc = range >= 4 ? 'text-danger fw-bold' : (range >= 2 ? 'text-warning-emphasis' : 'text-success');
-          return `<tr>
-            <td class="text-start fw-semibold text-dark" style="min-width:170px;">${escapeHtml(d.name)}
-              <span class="text-muted fw-normal d-block" style="font-size:.68rem;">คะแนนเต็ม ${d.max}</span></td>
-            ${vals.map(v => scoreCell(v, d.max)).join('')}
-            <td class="text-center ${rc}">${range.toFixed(1)}</td>
+        // แถวรายข้อ (11 ข้อ) จัดกลุ่มตาม 4 ด้าน + คะแนนรวมรายด้าน
+        const bodyRows = itemGroups.map(g => {
+          const header = `<tr class="table-secondary">
+            <td class="text-start fw-bold text-dark" colspan="5">${escapeHtml(g.domain)}
+              <span class="fw-normal text-muted" style="font-size:.7rem;">(คะแนนเต็ม ${g.max})</span></td>
           </tr>`;
+          const itemRows = g.items.map(it => {
+            const vals = tr.evals.map(e => Number(e[it.key]));
+            return `<tr>
+              <td class="text-start" style="padding-left:1.1rem;">
+                <span class="text-muted font-mono" style="font-size:.72rem;">${it.no}</span> ${escapeHtml(it.name)}
+                <span class="text-muted d-block" style="font-size:.65rem;padding-left:1.55rem;">คะแนนเต็ม ${it.max}</span></td>
+              ${vals.map(v => scoreCell(v, it.max, getRubricLevel(v, it.max))).join('')}
+              ${rangeCell(vals, it.max * 0.5, it.max * 0.25)}
+            </tr>`;
+          }).join('');
+          // รวมคะแนนรายด้าน
+          const dvals = tr.evals.map(e => g.items.reduce((s, it) => s + Number(e[it.key]), 0));
+          const subRow = `<tr class="fw-semibold" style="background:#eef2f7;">
+            <td class="text-start" style="padding-left:1.1rem;">รวมด้าน</td>
+            ${dvals.map(v => scoreCell(v, g.max, getDomainLevel(v, g.max))).join('')}
+            ${rangeCell(dvals, 4, 2)}
+          </tr>`;
+          return header + itemRows + subRow;
         }).join('');
 
         // แถวคะแนนรวม
@@ -734,9 +782,9 @@ require_once 'header.php';
         const totalRange = Math.max(...totals) - Math.min(...totals);
         const trCls = totalRange >= 10 ? 'text-danger fw-bold' : (totalRange >= 5 ? 'text-warning-emphasis' : 'text-success');
         const meanLv = getDomainLevel(mean, 60);
-        const totalRow = `<tr class="table-light">
-          <td class="text-start fw-bold text-dark">คะแนนรวม <span class="text-muted fw-normal d-block" style="font-size:.68rem;">คะแนนเต็ม 60</span></td>
-          ${totals.map(v => scoreCell(v, 60)).join('')}
+        const totalRow = `<tr class="table-primary fw-bold">
+          <td class="text-start text-dark">คะแนนรวม 4 ด้าน <span class="fw-normal d-block" style="font-size:.68rem;">คะแนนเต็ม 60</span></td>
+          ${totals.map(v => scoreCell(v, 60, getDomainLevel(v, 60))).join('')}
           <td class="text-center ${trCls}">${totalRange.toFixed(1)}</td>
         </tr>`;
 
@@ -753,7 +801,7 @@ require_once 'header.php';
             <table class="table table-sm table-bordered align-middle mb-0 small text-center">
               <thead class="table-light text-secondary">
                 <tr>
-                  <th class="text-start">ด้านการประเมิน</th>
+                  <th class="text-start">ด้าน / ข้อประเมิน</th>
                   <th>${raters[0]}</th>
                   <th>${raters[1]}</th>
                   <th>${raters[2]}</th>
