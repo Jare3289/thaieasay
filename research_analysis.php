@@ -142,29 +142,22 @@ require_once 'header.php';
             </div>
           </div>
 
-          <!-- ตารางคะแนนผู้ตรวจ 3 คน รายบุคคล (ห้อง 606) + ICC ท้ายตาราง -->
+          <!-- คะแนนผู้ตรวจ 3 คน รายบุคคล (ห้อง 606) — แยกรายด้าน + ระดับที่ผู้ตรวจเลือก -->
           <div class="row mt-3">
             <div class="col-12">
               <div class="card border-0 rounded-3 p-3 bg-white shadow-sm border-start border-3 border-info">
-                <h6 class="fw-bold text-dark mb-1"><i class="bi bi-people-fill text-info"></i> คะแนนผู้ตรวจ 3 คน รายบุคคล (เฉพาะห้อง 606)</h6>
-                <p class="text-muted small mb-3" id="iccRaterSummary">ผู้ตรวจ 3 คน (ครูผู้สอน + ผู้เชี่ยวชาญ 2 ท่าน) — คะแนนเต็ม 60</p>
-                <div class="table-responsive" style="max-height: 360px; overflow-y: auto;">
-                  <table class="table table-sm table-hover align-middle mb-0 small">
-                    <thead class="table-light text-secondary">
-                      <tr>
-                        <th class="text-nowrap">รหัส</th>
-                        <th class="text-nowrap">ชื่อ-สกุล</th>
-                        <th class="text-center text-nowrap">ครูผู้สอน</th>
-                        <th class="text-center text-nowrap">ผู้เชี่ยวชาญ 1</th>
-                        <th class="text-center text-nowrap">ผู้เชี่ยวชาญ 2</th>
-                        <th class="text-center text-nowrap">เฉลี่ย</th>
-                        <th class="text-center text-nowrap">พิสัย (สูงสุด−ต่ำสุด)</th>
-                      </tr>
-                    </thead>
-                    <tbody id="iccStudentTableBody">
-                      <tr><td colspan="7" class="text-center py-4 text-muted">รอประมวลผลข้อมูล...</td></tr>
-                    </tbody>
-                  </table>
+                <h6 class="fw-bold text-dark mb-1"><i class="bi bi-people-fill text-info"></i> คะแนนผู้ตรวจ 3 คน รายบุคคล (เฉพาะห้อง 606) — แยกรายด้าน</h6>
+                <p class="text-muted small mb-2" id="iccRaterSummary">ผู้ตรวจ 3 คน (ครูผู้สอน + ผู้เชี่ยวชาญ 2 ท่าน) — คะแนนเต็ม 60</p>
+                <div class="d-flex flex-wrap gap-2 small mb-3">
+                  <span class="badge rounded-pill bg-success bg-opacity-10 text-success border border-success border-opacity-25">ดีมาก</span>
+                  <span class="badge rounded-pill bg-info bg-opacity-10 text-info border border-info border-opacity-25">ดี</span>
+                  <span class="badge rounded-pill bg-warning bg-opacity-10 text-warning-emphasis border border-warning border-opacity-25">ปานกลาง</span>
+                  <span class="badge rounded-pill bg-warning bg-opacity-10 text-warning-emphasis border border-warning border-opacity-25">พอใช้</span>
+                  <span class="badge rounded-pill bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25">ต้องปรับปรุง</span>
+                  <span class="text-muted ms-auto align-self-center"><i class="bi bi-info-circle"></i> แต่ละช่องแสดง <strong>คะแนน</strong> และ <strong>ระดับที่ผู้ตรวจเลือก</strong></span>
+                </div>
+                <div id="iccStudentCards" style="max-height: 620px; overflow-y: auto;">
+                  <div class="text-center py-4 text-muted">รอประมวลผลข้อมูล...</div>
                 </div>
               </div>
             </div>
@@ -585,6 +578,17 @@ require_once 'header.php';
     return { text: 'ต้องปรับปรุง', css: 'text-danger' };
   }
 
+  // แปลง "คะแนน/คะแนนเต็ม" ของแต่ละด้าน เป็นระดับที่ผู้ตรวจเลือก (อิงเกณฑ์เดียวกับคะแนนรวม โดยเทียบเป็นสัดส่วน)
+  // คืนค่าคลาส badge เพื่อระบายสีระดับให้ดูง่าย
+  function getDomainLevel(score, max) {
+    const ratio = max > 0 ? score / max : 0;
+    if (ratio >= 49 / 60) return { text: 'ดีมาก', badge: 'bg-success' };
+    if (ratio >= 37 / 60) return { text: 'ดี', badge: 'bg-info text-dark' };
+    if (ratio >= 25 / 60) return { text: 'ปานกลาง', badge: 'bg-warning text-dark' };
+    if (ratio >= 13 / 60) return { text: 'พอใช้', badge: 'bg-warning text-dark' };
+    return { text: 'ต้องปรับปรุง', badge: 'bg-danger' };
+  }
+
   // แสดงรายละเอียดการคำนวณ ICC (ค่าที่แทนในสูตร) ของคะแนนรวม
   function renderIccFormula(d) {
     const el = document.getElementById('iccFormulaPanel');
@@ -643,17 +647,19 @@ require_once 'header.php';
       setKpiBadge('kpiIccBadge', 'ข้อมูลไม่พอ', 'bg-secondary');
       const rs = document.getElementById('iccRaterSummary');
       if (rs) rs.innerHTML = 'ผู้ตรวจ 3 คน (ครูผู้สอน + ผู้เชี่ยวชาญ 2 ท่าน) — ยังมีนักเรียนที่ถูกตรวจครบไม่พอ';
+      const sc = document.getElementById('iccStudentCards');
+      if (sc) sc.innerHTML = `<div class="text-center py-4 text-muted">ต้องการข้อมูลนักเรียน<strong>ห้อง 606</strong> ที่ครูผู้สอน + ผู้เชี่ยวชาญ 2 คน ตรวจครบ อย่างน้อย 2 คน</div>`;
       renderIccFormula(null);
       return;
     }
 
-    // มิติคะแนน: รวม + 4 ด้าน
+    // มิติคะแนน: รวม + 4 ด้าน (ชื่อด้านตรงตามเกณฑ์การประเมิน + คะแนนเต็มรายด้าน)
     const dims = [
-      { name: 'คะแนนรวม (Total 60)', get: e => Number(e.total_score) },
-      { name: 'ด้านเนื้อหา (Content)', get: e => Number(e.score_1_1) + Number(e.score_1_2) + Number(e.score_1_3) },
-      { name: 'ด้านโครงสร้าง (Structure)', get: e => Number(e.score_2_1) + Number(e.score_2_2) },
-      { name: 'ด้านการใช้ภาษา (Language)', get: e => Number(e.score_3_1) + Number(e.score_3_2) + Number(e.score_3_3) },
-      { name: 'ด้านอักขรวิธี (Mechanics)', get: e => Number(e.score_4_1) + Number(e.score_4_2) + Number(e.score_4_3) }
+      { name: 'คะแนนรวม', max: 60, get: e => Number(e.total_score) },
+      { name: '1) ด้านเนื้อหาสาระ', max: 27, get: e => Number(e.score_1_1) + Number(e.score_1_2) + Number(e.score_1_3) },
+      { name: '2) ด้านองค์ประกอบและการลำดับ', max: 12, get: e => Number(e.score_2_1) + Number(e.score_2_2) },
+      { name: '3) ด้านการใช้สำนวนภาษา', max: 15, get: e => Number(e.score_3_1) + Number(e.score_3_2) + Number(e.score_3_3) },
+      { name: '4) ด้านอักขรวิธีและกลไกการเขียน', max: 6, get: e => Number(e.score_4_1) + Number(e.score_4_2) + Number(e.score_4_3) }
     ];
 
     // ภาพรวม = คะแนนรวม
@@ -693,67 +699,82 @@ require_once 'header.php';
         + `<br><span style="font-size:.75rem;">เกณฑ์ระดับ: ≥49 ดีมาก · ≥37 ดี · ≥25 ปานกลาง · ≥13 พอใช้ · ต่ำกว่านั้น ต้องปรับปรุง</span>`;
     }
 
-    // ตารางคะแนนผู้ตรวจ 3 คน รายบุคคล + ICC ท้ายตาราง
-    const stBody = document.getElementById('iccStudentTableBody');
-    if (stBody) {
+    // การ์ดคะแนนผู้ตรวจ 3 คน รายบุคคล — แยกรายด้าน แสดงคะแนน + ระดับที่ผู้ตรวจแต่ละคนเลือก
+    const stCards = document.getElementById('iccStudentCards');
+    if (stCards) {
+      const raters = ['ครูผู้สอน', 'ผู้เชี่ยวชาญ 1', 'ผู้เชี่ยวชาญ 2'];
       const dimList = dims.slice(1); // 4 ด้าน (ไม่รวมคะแนนรวม)
-      let sh = triples.map((tr, idx) => {
-        const a = Number(tr.evals[0].total_score);
-        const b = Number(tr.evals[1].total_score);
-        const c = Number(tr.evals[2].total_score);
-        const mean  = (a + b + c) / 3;
-        const range = Math.max(a, b, c) - Math.min(a, b, c);
-        const rangeCls = range >= 10 ? 'text-danger fw-bold' : (range >= 5 ? 'text-warning' : 'text-success');
-        const detId = `iccdet_${idx}`;
-        const lvA = getScoreLevel(a), lvB = getScoreLevel(b), lvC = getScoreLevel(c), lvM = getScoreLevel(mean);
-        const cell = (val, lv) => `${val.toFixed(1)}<div class="small ${lv.css}" style="font-size:.68rem;line-height:1;">${lv.text}</div>`;
 
-        // ตารางย่อยรายด้าน: 4 ด้าน × ผู้ตรวจ 3 คน + พิสัยของแต่ละด้าน
-        const dimRows = dimList.map(d => {
-          const x = Number(d.get(tr.evals[0]));
-          const y = Number(d.get(tr.evals[1]));
-          const z = Number(d.get(tr.evals[2]));
-          const r = Math.max(x, y, z) - Math.min(x, y, z);
-          const rc = r >= 4 ? 'text-danger fw-bold' : (r >= 2 ? 'text-warning' : 'text-success');
+      // ช่องแสดงคะแนน + ระดับ (badge สี) ของผู้ตรวจ 1 คน ในด้านหนึ่ง
+      const scoreCell = (score, max) => {
+        const lv = getDomainLevel(score, max);
+        return `<td class="text-center">
+          <div class="fw-bold text-dark" style="font-size:.95rem;">${score.toFixed(1)}<span class="text-muted fw-normal" style="font-size:.72rem;">/${max}</span></div>
+          <span class="badge ${lv.badge}" style="font-size:.66rem;">${lv.text}</span>
+        </td>`;
+      };
+
+      const cardsHtml = triples.map(tr => {
+        // แถวรายด้าน: 4 ด้าน + คะแนนรวม (แถวท้าย)
+        const bodyRows = dimList.map(d => {
+          const vals = tr.evals.map(e => Number(d.get(e)));
+          const range = Math.max(...vals) - Math.min(...vals);
+          const rc = range >= 4 ? 'text-danger fw-bold' : (range >= 2 ? 'text-warning-emphasis' : 'text-success');
           return `<tr>
-            <td class="text-start">${escapeHtml(d.name)}</td>
-            <td class="text-center">${x.toFixed(1)}</td>
-            <td class="text-center">${y.toFixed(1)}</td>
-            <td class="text-center">${z.toFixed(1)}</td>
-            <td class="text-center ${rc}">${r.toFixed(1)}</td>
+            <td class="text-start fw-semibold text-dark" style="min-width:170px;">${escapeHtml(d.name)}
+              <span class="text-muted fw-normal d-block" style="font-size:.68rem;">คะแนนเต็ม ${d.max}</span></td>
+            ${vals.map(v => scoreCell(v, d.max)).join('')}
+            <td class="text-center ${rc}">${range.toFixed(1)}</td>
           </tr>`;
         }).join('');
 
-        return `
-        <tr>
-          <td class="font-mono">${escapeHtml(tr.sid)}</td>
-          <td>${escapeHtml(tr.name)}
-            <button class="btn btn-link btn-sm p-0 ms-1 text-decoration-none align-baseline" style="font-size:.72rem;"
-              onclick="document.getElementById('${detId}').classList.toggle('d-none')"><i class="bi bi-list-nested"></i> รายด้าน</button>
-          </td>
-          <td class="text-center fw-semibold">${cell(a, lvA)}</td>
-          <td class="text-center fw-semibold">${cell(b, lvB)}</td>
-          <td class="text-center fw-semibold">${cell(c, lvC)}</td>
-          <td class="text-center fw-bold text-primary">${mean.toFixed(2)}<div class="small ${lvM.css}" style="font-size:.68rem;line-height:1;">${lvM.text}</div></td>
-          <td class="text-center ${rangeCls}">${range.toFixed(1)}</td>
-        </tr>
-        <tr id="${detId}" class="d-none">
-          <td colspan="7" class="bg-light p-2">
-            <div class="fw-bold small mb-1 text-secondary"><i class="bi bi-search me-1"></i>คะแนนรายด้านของผู้ตรวจแต่ละคน — ${escapeHtml(tr.name)}</div>
-            <table class="table table-sm table-bordered mb-0 small bg-white">
-              <thead class="table-light">
-                <tr><th class="text-start">ด้าน</th><th class="text-center">ครูผู้สอน</th><th class="text-center">ผู้เชี่ยวชาญ 1</th><th class="text-center">ผู้เชี่ยวชาญ 2</th><th class="text-center">พิสัย</th></tr>
-              </thead>
-              <tbody>${dimRows}</tbody>
-            </table>
-          </td>
-        </tr>`; }).join('');
-      sh += `
-        <tr class="table-primary fw-bold">
-          <td colspan="5" class="text-end">ค่า ICC ภาพรวม (คะแนนรวม) →</td>
-          <td colspan="2" class="text-center">${overallICC !== null ? overallICC.toFixed(4) : 'N/A'} <span class="badge ${overallInterp.css} ms-1">${overallInterp.text.split(' (')[0]}</span></td>
+        // แถวคะแนนรวม
+        const totals = tr.evals.map(e => Number(e.total_score));
+        const mean  = totals.reduce((a, b) => a + b, 0) / totals.length;
+        const totalRange = Math.max(...totals) - Math.min(...totals);
+        const trCls = totalRange >= 10 ? 'text-danger fw-bold' : (totalRange >= 5 ? 'text-warning-emphasis' : 'text-success');
+        const meanLv = getDomainLevel(mean, 60);
+        const totalRow = `<tr class="table-light">
+          <td class="text-start fw-bold text-dark">คะแนนรวม <span class="text-muted fw-normal d-block" style="font-size:.68rem;">คะแนนเต็ม 60</span></td>
+          ${totals.map(v => scoreCell(v, 60)).join('')}
+          <td class="text-center ${trCls}">${totalRange.toFixed(1)}</td>
         </tr>`;
-      stBody.innerHTML = sh;
+
+        return `
+        <div class="border rounded-3 mb-3 overflow-hidden">
+          <div class="d-flex flex-wrap align-items-center gap-2 px-3 py-2 bg-info bg-opacity-10 border-bottom">
+            <span class="badge bg-info text-dark font-mono">${escapeHtml(tr.sid)}</span>
+            <span class="fw-bold text-dark">${escapeHtml(tr.name)}</span>
+            <span class="ms-auto small text-secondary">คะแนนรวมเฉลี่ย 3 คน:
+              <strong class="text-primary" style="font-size:1rem;">${mean.toFixed(1)}</strong>/60
+              <span class="badge ${meanLv.badge} ms-1">${meanLv.text}</span></span>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm table-bordered align-middle mb-0 small text-center">
+              <thead class="table-light text-secondary">
+                <tr>
+                  <th class="text-start">ด้านการประเมิน</th>
+                  <th>${raters[0]}</th>
+                  <th>${raters[1]}</th>
+                  <th>${raters[2]}</th>
+                  <th class="text-nowrap">พิสัย<br><span class="fw-normal" style="font-size:.66rem;">สูงสุด−ต่ำสุด</span></th>
+                </tr>
+              </thead>
+              <tbody>${bodyRows}${totalRow}</tbody>
+            </table>
+          </div>
+        </div>`;
+      }).join('');
+
+      const iccBanner = `
+        <div class="alert alert-primary border-0 rounded-3 d-flex flex-wrap align-items-center gap-2 py-2 px-3 mb-0 small">
+          <i class="bi bi-people-fill"></i>
+          <span class="fw-semibold">ค่า ICC ภาพรวม (คะแนนรวม) ของผู้ตรวจ 3 คน =</span>
+          <span class="fw-bold" style="font-size:1.05rem;">${overallICC !== null ? overallICC.toFixed(4) : 'N/A'}</span>
+          <span class="badge ${overallInterp.css}">${overallInterp.text.split(' (')[0]}</span>
+        </div>`;
+
+      stCards.innerHTML = cardsHtml + iccBanner;
     }
 
     // แผงแสดง "ค่าที่แทนในสูตร ICC" ของคะแนนรวม
