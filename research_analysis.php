@@ -148,13 +148,20 @@ require_once 'header.php';
               <div class="card border-0 rounded-3 p-3 bg-white shadow-sm border-start border-3 border-info">
                 <h6 class="fw-bold text-dark mb-1"><i class="bi bi-people-fill text-info"></i> คะแนนผู้ตรวจ 3 คน รายบุคคล (เฉพาะห้อง 606) — แยกรายข้อประเมิน (11 ข้อ)</h6>
                 <p class="text-muted small mb-2" id="iccRaterSummary">ผู้ตรวจ 3 คน (ครูผู้สอน + ผู้เชี่ยวชาญ 2 ท่าน) — คะแนนเต็ม 60</p>
-                <div class="d-flex flex-wrap gap-2 small mb-3">
-                  <span class="badge rounded-pill bg-success bg-opacity-10 text-success border border-success border-opacity-25">ดีมาก</span>
-                  <span class="badge rounded-pill bg-info bg-opacity-10 text-info border border-info border-opacity-25">ดี</span>
-                  <span class="badge rounded-pill bg-warning bg-opacity-10 text-warning-emphasis border border-warning border-opacity-25">ปานกลาง</span>
-                  <span class="badge rounded-pill bg-warning bg-opacity-10 text-warning-emphasis border border-warning border-opacity-25">พอใช้</span>
-                  <span class="badge rounded-pill bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25">ต้องปรับปรุง</span>
-                  <span class="text-muted ms-auto align-self-center"><i class="bi bi-info-circle"></i> แต่ละช่องแสดง <strong>คะแนน</strong> และ <strong>ระดับที่ผู้ตรวจเลือก</strong></span>
+                <div class="alert alert-light border rounded-3 py-2 px-3 small mb-3">
+                  <div class="d-flex flex-wrap align-items-center gap-3">
+                    <span class="d-inline-flex align-items-center gap-1">
+                      <span class="badge bg-info text-dark" style="font-size:.66rem;">ดี</span>
+                      <span><strong>แถวรายข้อ (11 ข้อ)</strong> = <strong>ระดับที่ผู้ตรวจเลือกจริง</strong></span>
+                    </span>
+                    <span class="d-inline-flex align-items-center gap-1">
+                      <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle" style="font-size:.66rem;">≈ ดี</span>
+                      <span>แถว <strong>รวมด้าน / คะแนนรวม</strong> = แถบระดับ<strong>เทียบเกณฑ์ที่คำนวณจากคะแนน</strong> (ไม่ใช่ระดับที่ผู้ตรวจเลือก)</span>
+                    </span>
+                  </div>
+                  <div class="text-muted mt-1" style="font-size:.72rem;">
+                    <i class="bi bi-info-circle"></i> ระบบบันทึกระดับที่ผู้ตรวจเลือกไว้ราย 11 ข้อเท่านั้น — ระดับรวมด้าน/รวมทั้งฉบับเป็นการจัดแถบตามสัดส่วนคะแนน (≥81.6% ดีมาก · ≥61.6% ดี · ≥41.6% ปานกลาง · ≥21.6% พอใช้)
+                  </div>
                 </div>
                 <div id="iccStudentCards" style="max-height: 620px; overflow-y: auto;">
                   <div class="text-center py-4 text-muted">รอประมวลผลข้อมูล...</div>
@@ -580,13 +587,15 @@ require_once 'header.php';
 
   // แปลง "คะแนน/คะแนนเต็ม" ของแต่ละด้าน เป็นระดับที่ผู้ตรวจเลือก (อิงเกณฑ์เดียวกับคะแนนรวม โดยเทียบเป็นสัดส่วน)
   // คืนค่าคลาส badge เพื่อระบายสีระดับให้ดูง่าย
+  // แถบระดับ "เทียบเกณฑ์" ที่คำนวณจากคะแนนรวม/รายด้าน (ไม่ใช่ระดับที่ผู้ตรวจเลือกเอง)
+  // ใช้สไตล์ outline (soft) เพื่อแยกให้ชัดจากระดับที่ผู้ตรวจเลือกรายข้อ
   function getDomainLevel(score, max) {
     const ratio = max > 0 ? score / max : 0;
-    if (ratio >= 49 / 60) return { text: 'ดีมาก', badge: 'bg-success' };
-    if (ratio >= 37 / 60) return { text: 'ดี', badge: 'bg-info text-dark' };
-    if (ratio >= 25 / 60) return { text: 'ปานกลาง', badge: 'bg-warning text-dark' };
-    if (ratio >= 13 / 60) return { text: 'พอใช้', badge: 'bg-warning text-dark' };
-    return { text: 'ต้องปรับปรุง', badge: 'bg-danger' };
+    if (ratio >= 49 / 60) return { text: 'ดีมาก', badge: 'bg-success', soft: 'bg-success-subtle text-success-emphasis border border-success-subtle' };
+    if (ratio >= 37 / 60) return { text: 'ดี', badge: 'bg-info text-dark', soft: 'bg-info-subtle text-info-emphasis border border-info-subtle' };
+    if (ratio >= 25 / 60) return { text: 'ปานกลาง', badge: 'bg-warning text-dark', soft: 'bg-warning-subtle text-warning-emphasis border border-warning-subtle' };
+    if (ratio >= 13 / 60) return { text: 'พอใช้', badge: 'bg-warning text-dark', soft: 'bg-warning-subtle text-warning-emphasis border border-warning-subtle' };
+    return { text: 'ต้องปรับปรุง', badge: 'bg-danger', soft: 'bg-danger-subtle text-danger-emphasis border border-danger-subtle' };
   }
 
   // ระดับที่ผู้ตรวจเลือก "รายข้อ" — คะแนนรายข้อ = ระดับ(0-4) × ตัวคูณ ดังนั้น ระดับ = score/max×4 พอดี
@@ -736,10 +745,16 @@ require_once 'header.php';
         ]},
       ];
 
-      // ช่องแสดงคะแนน + ระดับ (badge สี) ของผู้ตรวจ 1 คน
+      // ช่องแสดงคะแนน + "ระดับที่ผู้ตรวจเลือก" รายข้อ (badge ทึบ — เป็นระดับที่ผู้ตรวจเลือกจริง)
       const scoreCell = (score, max, lv) => `<td class="text-center">
           <div class="fw-bold text-dark" style="font-size:.9rem;">${score.toFixed(1)}<span class="text-muted fw-normal" style="font-size:.7rem;">/${max}</span></div>
           <span class="badge ${lv.badge}" style="font-size:.63rem;">${lv.text}</span>
+        </td>`;
+
+      // ช่องแสดงคะแนนรวมด้าน/รวมทั้งหมด + "แถบระดับเทียบเกณฑ์" (badge outline + ≈ — เป็นค่าที่คำนวณ ไม่ใช่ระดับที่ผู้ตรวจเลือก)
+      const bandCell = (score, max, lv) => `<td class="text-center">
+          <div class="fw-bold text-dark" style="font-size:.9rem;">${score.toFixed(1)}<span class="text-muted fw-normal" style="font-size:.7rem;">/${max}</span></div>
+          <span class="badge ${lv.soft}" style="font-size:.63rem;" title="แถบระดับที่คำนวณจากคะแนน — ไม่ใช่ระดับที่ผู้ตรวจเลือกรายข้อ">≈ ${lv.text}</span>
         </td>`;
 
       // ช่องพิสัย (สูงสุด−ต่ำสุด) พร้อมระบายสีเตือนเมื่อผู้ตรวจให้คะแนนต่างกันมาก
@@ -769,8 +784,8 @@ require_once 'header.php';
           // รวมคะแนนรายด้าน
           const dvals = tr.evals.map(e => g.items.reduce((s, it) => s + Number(e[it.key]), 0));
           const subRow = `<tr class="fw-semibold" style="background:#eef2f7;">
-            <td class="text-start" style="padding-left:1.1rem;">รวมด้าน</td>
-            ${dvals.map(v => scoreCell(v, g.max, getDomainLevel(v, g.max))).join('')}
+            <td class="text-start" style="padding-left:1.1rem;">รวมด้าน <span class="text-muted fw-normal" style="font-size:.65rem;">(ระดับ = เทียบเกณฑ์)</span></td>
+            ${dvals.map(v => bandCell(v, g.max, getDomainLevel(v, g.max))).join('')}
             ${rangeCell(dvals, 4, 2)}
           </tr>`;
           return header + itemRows + subRow;
@@ -783,8 +798,8 @@ require_once 'header.php';
         const trCls = totalRange >= 10 ? 'text-danger fw-bold' : (totalRange >= 5 ? 'text-warning-emphasis' : 'text-success');
         const meanLv = getDomainLevel(mean, 60);
         const totalRow = `<tr class="table-primary fw-bold">
-          <td class="text-start text-dark">คะแนนรวม 4 ด้าน <span class="fw-normal d-block" style="font-size:.68rem;">คะแนนเต็ม 60</span></td>
-          ${totals.map(v => scoreCell(v, 60, getDomainLevel(v, 60))).join('')}
+          <td class="text-start text-dark">คะแนนรวม 4 ด้าน <span class="fw-normal d-block" style="font-size:.68rem;">คะแนนเต็ม 60 · ระดับ = เทียบเกณฑ์</span></td>
+          ${totals.map(v => bandCell(v, 60, getDomainLevel(v, 60))).join('')}
           <td class="text-center ${trCls}">${totalRange.toFixed(1)}</td>
         </tr>`;
 
@@ -795,7 +810,7 @@ require_once 'header.php';
             <span class="fw-bold text-dark">${escapeHtml(tr.name)}</span>
             <span class="ms-auto small text-secondary">คะแนนรวมเฉลี่ย 3 คน:
               <strong class="text-primary" style="font-size:1rem;">${mean.toFixed(1)}</strong>/60
-              <span class="badge ${meanLv.badge} ms-1">${meanLv.text}</span></span>
+              <span class="badge ${meanLv.soft} ms-1" title="แถบระดับที่คำนวณจากคะแนน — ไม่ใช่ระดับที่ผู้ตรวจเลือก">≈ ${meanLv.text}</span></span>
           </div>
           <div class="table-responsive">
             <table class="table table-sm table-bordered align-middle mb-0 small text-center">
