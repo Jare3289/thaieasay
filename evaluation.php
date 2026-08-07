@@ -109,11 +109,6 @@ require_once 'header.php';
 
     <form id="evalForm" class="p-4">
       <input type="hidden" id="selectedTestPhase" value="<?php echo ($sessionUser['role'] === 'expert') ? 'task1' : ''; ?>">
-
-      <!-- แบ่ง 2 คอลัมน์: ซ้าย = แบบประเมิน, ขวา = เนื้อหาเรียงความ (คอลัมน์ขวาแสดงเมื่อมีเรียงความเท่านั้น) -->
-      <div class="row g-4">
-        <!-- คอลัมน์ซ้าย: แบบประเมิน -->
-        <div id="evalFormCol" class="col-12">
       <!-- ข้อมูลนักเรียนเป้าหมายที่ได้รับการประเมิน -->
       <div class="card border-0 rounded-3 p-4 mb-4" style="background-color: var(--light-blue);">
         <div class="row align-items-end">
@@ -270,28 +265,24 @@ require_once 'header.php';
           </button>
         </div>
       </div>
-        </div><!-- /คอลัมน์ซ้าย (แบบประเมิน) -->
-
-        <!-- คอลัมน์ขวา: เนื้อหาเรียงความที่นักเรียนบันทึกไว้ (แสดงเมื่อมีเรียงความเท่านั้น) -->
-        <div id="essayCol" class="col-lg-5 d-none">
-          <div id="studentEssayPanel" class="card border-0 shadow-sm rounded-4 essay-sticky" style="overflow: hidden; border: 1px solid #e7e5e4 !important;">
-            <div class="d-flex align-items-center justify-content-between gap-2 px-4 py-3 border-bottom" style="background-color: #fffdf0;">
-              <h6 class="fw-bold text-dark mb-0"><i class="bi bi-file-earmark-text text-primary me-2"></i>เนื้อหาเรียงความที่นักเรียนบันทึกไว้ (Student Essay Content)</h6>
-              <span class="badge bg-primary-subtle text-primary rounded-pill px-3 py-1 font-mono small flex-shrink-0" id="essayPanelWordCount">0 คำ</span>
-            </div>
-            <div class="essay-doc-scroll">
-              <div class="essay-sheet">
-                <h1 class="essay-doc-title" id="essayPanelTitle">—</h1>
-                <div class="essay-doc-content" id="essayPanelContent">
-                  <!-- เนื้อหาเรียงความ -->
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div><!-- /row 2 คอลัมน์ -->
     </form>
   </div>
+
+  <!-- ส่วนเนื้อหาเรียงความ: แยกออกจาก evalSection เป็น section ลอย (fixed) ฝั่งขวา ติดตามหน้าจอเสมอเวลาเลื่อน -->
+  <aside id="essayFloating" class="card border-0 shadow-lg rounded-4 d-none" style="overflow: hidden; border: 1px solid #e7e5e4 !important;">
+    <div class="d-flex align-items-center justify-content-between gap-2 px-3 py-3 border-bottom" style="background-color: #fffdf0;">
+      <h6 class="fw-bold text-dark mb-0 small"><i class="bi bi-file-earmark-text text-primary me-1"></i>เนื้อหาเรียงความที่นักเรียนบันทึกไว้ (Student Essay Content)</h6>
+      <span class="badge bg-primary-subtle text-primary rounded-pill px-2 py-1 font-mono small flex-shrink-0" id="essayPanelWordCount">0 คำ</span>
+    </div>
+    <div class="essay-doc-scroll">
+      <div class="essay-sheet">
+        <h1 class="essay-doc-title" id="essayPanelTitle">—</h1>
+        <div class="essay-doc-content" id="essayPanelContent">
+          <!-- เนื้อหาเรียงความ -->
+        </div>
+      </div>
+    </div>
+  </aside>
 </div>
 
 <style>
@@ -305,38 +296,50 @@ require_once 'header.php';
   min-height: 130px;
 }
 
-/* กล่องเนื้อหาเรียงความฝั่งขวา — ติดตามการเลื่อน (sticky) และแสดงแบบเอกสารเรียงความ (เหมือน essay_print.php) */
-.essay-sticky { position: sticky; top: 1rem; }
+/* ส่วนเนื้อหาเรียงความ — แยกเป็น section ลอย (fixed) ฝั่งขวา ติดตามหน้าจอเสมอเวลาเลื่อน (แสดงแบบเอกสารเหมือน essay_print.php) */
+#essayFloating {
+  background: #ffffff;
+  margin-top: 1.5rem;   /* จอเล็ก/กลาง: แสดงเป็นบล็อกปกติใต้แบบประเมิน */
+}
 .essay-doc-scroll {
-  max-height: calc(100vh - 130px);
+  max-height: 70vh;
   overflow-y: auto;
   background: #ffffff;
 }
-@media (max-width: 991.98px) {
-  .essay-sticky { position: static; }
-  .essay-doc-scroll { max-height: 60vh; }
+/* จอใหญ่ (xl ขึ้นไป): ลอยติดขอบขวาของหน้าจอ ตามการเลื่อนเสมอ และเว้นที่ฝั่งขวาไม่ให้ทับแบบประเมิน */
+@media (min-width: 1200px) {
+  #essayFloating {
+    position: fixed;
+    top: 84px;
+    right: 24px;
+    width: 370px;
+    max-width: 34vw;
+    margin-top: 0;
+    z-index: 1019;
+  }
+  .essay-doc-scroll { max-height: calc(100vh - 120px); }
+  #view-evaluation.essay-open { padding-right: 410px; }
 }
 .essay-sheet {
-  max-width: 720px;
   margin: 0 auto;
-  padding: 28px 30px 34px;
+  padding: 20px 22px 26px;
   background: #ffffff;
   color: #1a1a1a;
   font-family: "TH Sarabun New", "Sarabun", "Leelawadee UI", "Tahoma", sans-serif;
 }
 .essay-doc-title {
   text-align: center;
-  font-size: 1.6rem;
+  font-size: 1.35rem;
   font-weight: 700;
   line-height: 1.4;
   color: #0d3b66;
-  margin: 0 0 1.1rem;
-  padding-bottom: 0.6rem;
+  margin: 0 0 0.8rem;
+  padding-bottom: 0.5rem;
   border-bottom: 1px solid #e7e5e4;
 }
 .essay-doc-content {
-  font-size: 1.25rem;
-  line-height: 1.9;
+  font-size: 1.15rem;
+  line-height: 1.85;
   text-align: justify;
 }
 .essay-doc-content .essay-para {
@@ -767,13 +770,13 @@ require_once 'header.php';
     return paras.map(p => `<p class="essay-para">${nl2brSafe(p)}</p>`).join('');
   }
 
-  // แสดง/ซ่อนคอลัมน์เรียงความฝั่งขวา และปรับความกว้างคอลัมน์แบบประเมินฝั่งซ้ายให้เหมาะสม
-  // มีเรียงความ → ซ้าย 7 ส่วน + ขวา 5 ส่วน (2 คอลัมน์) | ไม่มีเรียงความ → แบบประเมินเต็มความกว้างตามเดิม
+  // แสดง/ซ่อน section เรียงความแบบลอย (fixed) ฝั่งขวา และเว้นที่ฝั่งขวาของแบบประเมินไม่ให้ถูกทับ
+  // มีเรียงความ → แสดงกล่องลอยฝั่งขวา ติดตามหน้าจอเสมอ | ไม่มีเรียงความ → ซ่อน และแบบประเมินเต็มความกว้างตามเดิม
   function toggleEssayColumn(show) {
-    const essayCol = document.getElementById('essayCol');
-    const formCol = document.getElementById('evalFormCol');
-    if (essayCol) essayCol.classList.toggle('d-none', !show);
-    if (formCol) formCol.className = show ? 'col-lg-7' : 'col-12';
+    const essay = document.getElementById('essayFloating');
+    const view = document.getElementById('view-evaluation');
+    if (essay) essay.classList.toggle('d-none', !show);
+    if (view) view.classList.toggle('essay-open', show);
   }
 
   async function fetchStudentEssayForEvaluation(studentId, testPhase) {
