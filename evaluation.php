@@ -26,6 +26,10 @@ if ($mode_param === 'self') {
 require_once 'header.php';
 ?>
 
+<?php /* ปิด container หลักจาก header.php เพื่อใช้เลย์เอาต์เต็มความกว้างจอ (ซ้าย = แบบประเมิน / ขวา = เรียงความ) */ ?>
+</div>
+
+<div class="eval-fullwidth px-3 px-xl-4 my-4 flex-grow-1">
 <div id="view-evaluation" class="text-start">
   <div class="mb-3">
     <a href="index.php" class="btn btn-link text-decoration-none text-secondary fw-bold p-0">
@@ -268,17 +272,17 @@ require_once 'header.php';
     </form>
   </div>
 
-  <!-- ส่วนเนื้อหาเรียงความ: แยกออกจาก evalSection เป็น section ลอย (fixed) ฝั่งขวา ติดตามหน้าจอเสมอเวลาเลื่อน -->
-  <aside id="essayFloating" class="card border-0 shadow-lg rounded-4 d-none" style="overflow: hidden; border: 1px solid #e7e5e4 !important;">
-    <div class="d-flex align-items-center justify-content-between gap-2 px-3 py-3 border-bottom" style="background-color: #fffdf0;">
-      <h6 class="fw-bold text-dark mb-0 small"><i class="bi bi-file-earmark-text text-primary me-1"></i>เนื้อหาเรียงความที่นักเรียนบันทึกไว้ (Student Essay Content)</h6>
-      <span class="badge bg-primary-subtle text-primary rounded-pill px-2 py-1 font-mono small flex-shrink-0" id="essayPanelWordCount">0 คำ</span>
+  <!-- ส่วนเนื้อหาเรียงความ: แยกออกจาก evalSection เป็น section ลอย (fixed) ฝั่งขวา เต็มครึ่งจอ ติดตามหน้าจอเสมอเวลาเลื่อน -->
+  <aside id="essayFloating" class="card border-0 shadow-lg d-none" style="overflow: hidden; border: 1px solid #e7e5e4 !important;">
+    <div class="d-flex align-items-center justify-content-between gap-2 px-4 py-3 border-bottom" style="background-color: #fffdf0;">
+      <h6 class="fw-bold text-dark mb-0"><i class="bi bi-file-earmark-text text-primary me-2"></i>เนื้อหาเรียงความที่นักเรียนบันทึกไว้ (Student Essay Content)</h6>
+      <span class="badge bg-primary-subtle text-primary rounded-pill px-3 py-1 font-mono small flex-shrink-0" id="essayPanelWordCount">0 คำ</span>
     </div>
     <div class="essay-doc-scroll">
       <div class="essay-sheet">
         <h1 class="essay-doc-title" id="essayPanelTitle">—</h1>
         <div class="essay-doc-content" id="essayPanelContent">
-          <!-- เนื้อหาเรียงความ -->
+          <!-- เนื้อหาเรียงความ (พร้อมเส้นบรรทัดและเลขบรรทัด) -->
         </div>
       </div>
     </div>
@@ -296,7 +300,10 @@ require_once 'header.php';
   min-height: 130px;
 }
 
-/* ส่วนเนื้อหาเรียงความ — แยกเป็น section ลอย (fixed) ฝั่งขวา ติดตามหน้าจอเสมอเวลาเลื่อน (แสดงแบบเอกสารเหมือน essay_print.php) */
+/* ใช้เลย์เอาต์เต็มความกว้างจอสำหรับหน้าประเมิน */
+.eval-fullwidth { width: 100%; }
+
+/* ส่วนเนื้อหาเรียงความ — section ลอย (fixed) ฝั่งขวา เต็มครึ่งจอ ติดตามหน้าจอเสมอเวลาเลื่อน (แสดงแบบเอกสารเหมือน essay_print.php) */
 #essayFloating {
   background: #ffffff;
   margin-top: 1.5rem;   /* จอเล็ก/กลาง: แสดงเป็นบล็อกปกติใต้แบบประเมิน */
@@ -306,45 +313,65 @@ require_once 'header.php';
   overflow-y: auto;
   background: #ffffff;
 }
-/* จอใหญ่ (xl ขึ้นไป): ลอยติดขอบขวาของหน้าจอ ตามการเลื่อนเสมอ และเว้นที่ฝั่งขวาไม่ให้ทับแบบประเมิน */
-@media (min-width: 1200px) {
+/* จอใหญ่ (lg ขึ้นไป): แบ่งครึ่งจอ ซ้าย = แบบประเมิน / ขวา = เรียงความ (ลอยติดขอบขวา ตามการเลื่อนเสมอ) ให้กว้างเท่า ๆ กัน */
+@media (min-width: 992px) {
   #essayFloating {
     position: fixed;
-    top: 84px;
-    right: 24px;
-    width: 370px;
-    max-width: 34vw;
+    top: 66px;
+    right: 0;
+    width: 50vw;
+    height: calc(100vh - 66px);
     margin-top: 0;
     z-index: 1019;
+    border-radius: 0;
+    border-left: 3px solid var(--primary-navy, #0d3b66) !important;
   }
-  .essay-doc-scroll { max-height: calc(100vh - 120px); }
-  #view-evaluation.essay-open { padding-right: 410px; }
+  .essay-doc-scroll { max-height: calc(100vh - 66px - 62px); }
+  /* เว้นครึ่งขวาไว้ให้กล่องเรียงความ แบบประเมินจึงกว้างเท่ากันในครึ่งซ้าย */
+  #view-evaluation.essay-open { padding-right: calc(50vw + 1.5rem); }
 }
 .essay-sheet {
+  max-width: 820px;
   margin: 0 auto;
-  padding: 20px 22px 26px;
+  padding: 26px 30px 34px;
   background: #ffffff;
   color: #1a1a1a;
   font-family: "TH Sarabun New", "Sarabun", "Leelawadee UI", "Tahoma", sans-serif;
 }
 .essay-doc-title {
   text-align: center;
-  font-size: 1.35rem;
+  font-size: 1.7rem;
   font-weight: 700;
   line-height: 1.4;
   color: #0d3b66;
-  margin: 0 0 0.8rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid #e7e5e4;
+  margin: 0 0 1rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 2px solid #e7e5e4;
 }
+/* เนื้อความแบบกระดาษมีเส้นบรรทัด (ruled paper) + เว้นที่ซ้ายสำหรับเลขบรรทัด */
 .essay-doc-content {
-  font-size: 1.15rem;
-  line-height: 1.85;
+  position: relative;
+  padding-left: 2.8em;
+  font-size: 1.35rem;
+  line-height: 36px;          /* ต้องตรงกับ LH ในสคริปต์สร้างเลขบรรทัด */
   text-align: justify;
+  background-image: linear-gradient(to bottom, transparent 0, transparent 35px, #e3e7ec 35px, #e3e7ec 36px);
+  background-size: 100% 36px;
+  background-position: 0 0;
 }
 .essay-doc-content .essay-para {
-  margin: 0 0 0.5rem;
+  margin: 0;
   text-indent: 2.5em;
+}
+.essay-doc-content .lnum {
+  position: absolute;
+  left: 0;
+  width: 2.1em;
+  text-align: right;
+  color: #9aa1ac;
+  font-size: 0.9rem;
+  font-family: "Tahoma", sans-serif;
+  user-select: none;
 }
 .essay-doc-content .no-content {
   color: #888;
@@ -352,6 +379,7 @@ require_once 'header.php';
   text-indent: 0;
   text-align: center;
   padding: 2rem 0;
+  background: none;
 }
 </style>
 
@@ -770,6 +798,33 @@ require_once 'header.php';
     return paras.map(p => `<p class="essay-para">${nl2brSafe(p)}</p>`).join('');
   }
 
+  // สร้างเลขบรรทัดทุก 5 บรรทัด (5, 10, 15, ...) ที่ขอบซ้ายของเนื้อความ ให้ตรงกับเส้นบรรทัดของกระดาษ
+  // คำนวณจำนวนบรรทัดจริงหลังจัดหน้าเสร็จ แล้ววางตัวเลขตามระยะบรรทัด (LH) — วิธีเดียวกับ essay_print.php
+  function addEssayLineNumbers() {
+    const box = document.getElementById('essayPanelContent');
+    if (!box) return;
+    box.querySelectorAll('.lnum').forEach(el => el.remove());
+    if (box.querySelector('.no-content')) return; // ไม่มีเนื้อหา → ไม่ต้องใส่เลขบรรทัด
+    const LH = parseFloat(getComputedStyle(box).lineHeight) || 36; // ต้องตรงกับ line-height ของ .essay-doc-content
+    const lines = Math.round(box.clientHeight / LH);
+    for (let i = 5; i <= lines; i += 5) {
+      const s = document.createElement('span');
+      s.className = 'lnum';
+      s.textContent = i;
+      s.style.top = ((i - 1) * LH) + 'px';
+      box.appendChild(s);
+    }
+  }
+
+  // คำนวณเลขบรรทัดใหม่เมื่อปรับขนาดหน้าจอ (ความกว้างเปลี่ยน จำนวนบรรทัดเปลี่ยน)
+  let essayLnumTimer = null;
+  window.addEventListener('resize', () => {
+    const essay = document.getElementById('essayFloating');
+    if (!essay || essay.classList.contains('d-none')) return;
+    clearTimeout(essayLnumTimer);
+    essayLnumTimer = setTimeout(addEssayLineNumbers, 150);
+  });
+
   // แสดง/ซ่อน section เรียงความแบบลอย (fixed) ฝั่งขวา และเว้นที่ฝั่งขวาของแบบประเมินไม่ให้ถูกทับ
   // มีเรียงความ → แสดงกล่องลอยฝั่งขวา ติดตามหน้าจอเสมอ | ไม่มีเรียงความ → ซ่อน และแบบประเมินเต็มความกว้างตามเดิม
   function toggleEssayColumn(show) {
@@ -799,6 +854,8 @@ require_once 'header.php';
         contentEl.innerHTML = formatEssayHTML(data.data.essay_content);
         countEl.textContent = `${data.data.word_count || 0} คำ`;
         toggleEssayColumn(true);
+        // รอให้จัดหน้าเสร็จก่อนคำนวณ/วางเลขบรรทัด (กล่องเพิ่งแสดง)
+        requestAnimationFrame(() => requestAnimationFrame(addEssayLineNumbers));
       } else {
         toggleEssayColumn(false);
       }
