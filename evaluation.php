@@ -26,10 +26,6 @@ if ($mode_param === 'self') {
 require_once 'header.php';
 ?>
 
-<?php /* ปิด container หลักจาก header.php เพื่อแยกส่วนแบบประเมินกับส่วนเรียงความออกจากกันเป็นคนละ container */ ?>
-</div>
-
-<div class="container my-4 flex-grow-1">
 <div id="view-evaluation" class="text-start">
   <div class="mb-3">
     <a href="index.php" class="btn btn-link text-decoration-none text-secondary fw-bold p-0">
@@ -113,6 +109,11 @@ require_once 'header.php';
 
     <form id="evalForm" class="p-4">
       <input type="hidden" id="selectedTestPhase" value="<?php echo ($sessionUser['role'] === 'expert') ? 'task1' : ''; ?>">
+
+      <!-- แบ่ง 2 คอลัมน์: ซ้าย = แบบประเมิน, ขวา = เนื้อหาเรียงความ (คอลัมน์ขวาแสดงเมื่อมีเรียงความเท่านั้น) -->
+      <div class="row g-4">
+        <!-- คอลัมน์ซ้าย: แบบประเมิน -->
+        <div id="evalFormCol" class="col-12">
       <!-- ข้อมูลนักเรียนเป้าหมายที่ได้รับการประเมิน -->
       <div class="card border-0 rounded-3 p-4 mb-4" style="background-color: var(--light-blue);">
         <div class="row align-items-end">
@@ -269,27 +270,29 @@ require_once 'header.php';
           </button>
         </div>
       </div>
+        </div><!-- /คอลัมน์ซ้าย (แบบประเมิน) -->
+
+        <!-- คอลัมน์ขวา: เนื้อหาเรียงความที่นักเรียนบันทึกไว้ (แสดงเมื่อมีเรียงความเท่านั้น) -->
+        <div id="essayCol" class="col-lg-5 d-none">
+          <div id="studentEssayPanel" class="card border-0 shadow-sm rounded-4 essay-sticky" style="overflow: hidden; border: 1px solid #e7e5e4 !important;">
+            <div class="d-flex align-items-center justify-content-between gap-2 px-4 py-3 border-bottom" style="background-color: #fffdf0;">
+              <h6 class="fw-bold text-dark mb-0"><i class="bi bi-file-earmark-text text-primary me-2"></i>เนื้อหาเรียงความที่นักเรียนบันทึกไว้ (Student Essay Content)</h6>
+              <span class="badge bg-primary-subtle text-primary rounded-pill px-3 py-1 font-mono small flex-shrink-0" id="essayPanelWordCount">0 คำ</span>
+            </div>
+            <div class="essay-doc-scroll">
+              <div class="essay-sheet">
+                <h1 class="essay-doc-title" id="essayPanelTitle">—</h1>
+                <div class="essay-doc-content" id="essayPanelContent">
+                  <!-- เนื้อหาเรียงความ -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div><!-- /row 2 คอลัมน์ -->
     </form>
   </div>
 </div>
-</div><!-- ปิด container ของส่วนแบบประเมิน (view-evaluation) -->
-
-<!-- ส่วนเนื้อหาเรียงความที่นักเรียนบันทึกไว้ — แยกเป็นอีก container ต่างหาก (ซ่อนไว้เมื่อยังไม่มีเรียงความ) -->
-<div class="container my-4 flex-grow-1 d-none" id="essayContainer">
-  <div id="studentEssayPanel" class="card border-0 shadow-sm rounded-4" style="overflow: hidden; border: 1px solid #e7e5e4 !important;">
-    <div class="d-flex align-items-center justify-content-between gap-2 px-4 py-3 border-bottom" style="background-color: #fffdf0;">
-      <h6 class="fw-bold text-dark mb-0"><i class="bi bi-file-earmark-text text-primary me-2"></i>เนื้อหาเรียงความที่นักเรียนบันทึกไว้ (Student Essay Content)</h6>
-      <span class="badge bg-primary-subtle text-primary rounded-pill px-3 py-1 font-mono small flex-shrink-0" id="essayPanelWordCount">0 คำ</span>
-    </div>
-    <div class="essay-doc-scroll">
-      <div class="essay-sheet">
-        <h1 class="essay-doc-title" id="essayPanelTitle">—</h1>
-        <div class="essay-doc-content" id="essayPanelContent">
-          <!-- เนื้อหาเรียงความ -->
-        </div>
-      </div>
-    </div>
-  </div>
 
 <style>
 .phase-btn:hover, .phase-btn.active {
@@ -302,9 +305,16 @@ require_once 'header.php';
   min-height: 130px;
 }
 
-/* กล่องเนื้อหาเรียงความ — แสดงเป็นเอกสารเรียงความ (เหมือน essay_print.php) */
+/* กล่องเนื้อหาเรียงความฝั่งขวา — ติดตามการเลื่อน (sticky) และแสดงแบบเอกสารเรียงความ (เหมือน essay_print.php) */
+.essay-sticky { position: sticky; top: 1rem; }
 .essay-doc-scroll {
+  max-height: calc(100vh - 130px);
+  overflow-y: auto;
   background: #ffffff;
+}
+@media (max-width: 991.98px) {
+  .essay-sticky { position: static; }
+  .essay-doc-scroll { max-height: 60vh; }
 }
 .essay-sheet {
   max-width: 720px;
@@ -757,18 +767,23 @@ require_once 'header.php';
     return paras.map(p => `<p class="essay-para">${nl2brSafe(p)}</p>`).join('');
   }
 
+  // แสดง/ซ่อนคอลัมน์เรียงความฝั่งขวา และปรับความกว้างคอลัมน์แบบประเมินฝั่งซ้ายให้เหมาะสม
+  // มีเรียงความ → ซ้าย 7 ส่วน + ขวา 5 ส่วน (2 คอลัมน์) | ไม่มีเรียงความ → แบบประเมินเต็มความกว้างตามเดิม
+  function toggleEssayColumn(show) {
+    const essayCol = document.getElementById('essayCol');
+    const formCol = document.getElementById('evalFormCol');
+    if (essayCol) essayCol.classList.toggle('d-none', !show);
+    if (formCol) formCol.className = show ? 'col-lg-7' : 'col-12';
+  }
+
   async function fetchStudentEssayForEvaluation(studentId, testPhase) {
-    // container แยกต่างหากของเนื้อหาเรียงความ (ซ่อน/แสดงทั้ง container เมื่อมี/ไม่มีเรียงความ)
-    const container = document.getElementById('essayContainer');
     const titleEl = document.getElementById('essayPanelTitle');
     const contentEl = document.getElementById('essayPanelContent');
     const countEl = document.getElementById('essayPanelWordCount');
 
-    if (!container) return;
-
-    // ไม่มีรหัสนักเรียน หรือเด็กไม่ได้บันทึกเรียงความ → ซ่อน container เรียงความ คงเหลือเฉพาะ view-evaluation ตามเดิม
+    // ไม่มีรหัสนักเรียน หรือเด็กไม่ได้บันทึกเรียงความ → ซ่อนคอลัมน์เรียงความ คงเหลือเฉพาะแบบประเมินเต็มความกว้าง
     if (!studentId) {
-      container.classList.add('d-none');
+      toggleEssayColumn(false);
       return;
     }
 
@@ -780,13 +795,13 @@ require_once 'header.php';
         titleEl.textContent = data.data.essay_title || 'ไม่มีชื่อเรื่อง';
         contentEl.innerHTML = formatEssayHTML(data.data.essay_content);
         countEl.textContent = `${data.data.word_count || 0} คำ`;
-        container.classList.remove('d-none');
+        toggleEssayColumn(true);
       } else {
-        container.classList.add('d-none');
+        toggleEssayColumn(false);
       }
     } catch (err) {
       console.error("Error fetching student essay for evaluation:", err);
-      container.classList.add('d-none');
+      toggleEssayColumn(false);
     }
   }
 
