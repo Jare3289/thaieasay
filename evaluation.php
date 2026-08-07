@@ -174,20 +174,30 @@ require_once 'header.php';
             <span id="loadOldDataStatus" class="badge fs-7 p-2.5 rounded-pill d-none"></span>
           </div>
         </div>
-      <!-- ส่วนแสดงผลเรียงความที่นักเรียนพิมพ์ส่งไว้ (ถ้ามี) -->
-      <div id="studentEssayPanel" class="card border-0 shadow-sm rounded-4 p-4 mb-4 d-none" style="background-color: #fffdf0; border: 1px solid #e7e5e4 !important;">
-        <div class="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2">
-          <h6 class="fw-bold text-dark mb-0"><i class="bi bi-file-earmark-text text-primary me-2"></i>เนื้อหาเรียงความที่นักเรียนบันทึกไว้ (Student Essay Content)</h6>
-          <span class="badge bg-primary-subtle text-primary rounded-pill px-3 py-1 font-mono small" id="essayPanelWordCount">0 คำ</span>
-        </div>
-        <div class="mb-2 small">
-          <span class="text-secondary fw-bold">ชื่อเรื่อง: </span>
-          <span id="essayPanelTitle" class="fw-bold text-dark">—</span>
-        </div>
-        <div class="p-3 bg-white rounded-3 border text-dark" id="essayPanelContent" style="white-space: pre-wrap; line-height: 1.8; font-family: 'Sarabun', sans-serif; font-size: 1rem; max-height: 250px; overflow-y: auto;">
-          <!-- เนื้อหาเรียงความ -->
-        </div>
       </div>
+
+      <!-- แบ่งเป็น 2 คอลัมน์: ซ้าย = แบบประเมิน, ขวา = เนื้อหาเรียงความของนักเรียน -->
+      <div class="row g-4">
+        <!-- คอลัมน์ขวา: เนื้อหาเรียงความที่นักเรียนบันทึกไว้ (แสดงเหมือนเอกสารเรียงความใน essay_print) -->
+        <div class="col-lg-5 order-lg-2">
+          <div id="studentEssayPanel" class="card border-0 shadow-sm rounded-4 d-none essay-sticky" style="overflow: hidden; border: 1px solid #e7e5e4 !important;">
+            <div class="d-flex align-items-center justify-content-between gap-2 px-4 py-3 border-bottom" style="background-color: #fffdf0;">
+              <h6 class="fw-bold text-dark mb-0"><i class="bi bi-file-earmark-text text-primary me-2"></i>เนื้อหาเรียงความที่นักเรียนบันทึกไว้ (Student Essay Content)</h6>
+              <span class="badge bg-primary-subtle text-primary rounded-pill px-3 py-1 font-mono small flex-shrink-0" id="essayPanelWordCount">0 คำ</span>
+            </div>
+            <div class="essay-doc-scroll">
+              <div class="essay-sheet">
+                <h1 class="essay-doc-title" id="essayPanelTitle">—</h1>
+                <div class="essay-doc-content" id="essayPanelContent">
+                  <!-- เนื้อหาเรียงความ -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- คอลัมน์ซ้าย: แบบประเมิน (รูบริก) -->
+        <div class="col-lg-7 order-lg-1">
 
       <!-- คำชี้แจงและหมายเหตุประกอบการใช้เกณฑ์ -->
       <div class="card border-0 rounded-3 p-4 mb-4" style="background-color: #fafaf9; border: 1px solid #e7e5e4 !important;">
@@ -278,6 +288,9 @@ require_once 'header.php';
           </button>
         </div>
       </div>
+
+        </div><!-- /คอลัมน์ซ้าย (แบบประเมิน) -->
+      </div><!-- /row 2 คอลัมน์ -->
     </form>
   </div>
 </div>
@@ -290,6 +303,52 @@ require_once 'header.php';
 .phase-btn {
   transition: all 0.2s ease;
   min-height: 130px;
+}
+
+/* กล่องเรียงความฝั่งขวา — จัดวางให้ติดตามเมื่อเลื่อนดูรูบริก และแสดงเนื้อหาแบบเอกสารเรียงความ (เหมือน essay_print.php) */
+.essay-sticky { position: sticky; top: 1rem; }
+.essay-doc-scroll {
+  max-height: calc(100vh - 130px);
+  overflow-y: auto;
+  background: #ffffff;
+}
+.essay-sheet {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 28px 30px 34px;
+  background: #ffffff;
+  color: #1a1a1a;
+  font-family: "TH Sarabun New", "Sarabun", "Leelawadee UI", "Tahoma", sans-serif;
+}
+.essay-doc-title {
+  text-align: center;
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.4;
+  color: #0d3b66;
+  margin: 0 0 1.1rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid #e7e5e4;
+}
+.essay-doc-content {
+  font-size: 1.25rem;
+  line-height: 1.9;
+  text-align: justify;
+}
+.essay-doc-content .essay-para {
+  margin: 0 0 0.5rem;
+  text-indent: 2.5em;
+}
+.essay-doc-content .no-content {
+  color: #888;
+  font-style: italic;
+  text-indent: 0;
+  text-align: center;
+  padding: 2rem 0;
+}
+@media (max-width: 991.98px) {
+  .essay-sticky { position: static; }
+  .essay-doc-scroll { max-height: 60vh; }
 }
 </style>
 
@@ -680,41 +739,32 @@ require_once 'header.php';
     }
   }
 
+  // แปลงเนื้อหาเรียงความให้แสดงเป็นย่อหน้าเรียงความล้วน (คล้ายเอกสารใน essay_print.php)
+  // ไม่มีกล่องสีหรือป้ายกำกับส่วน เพื่อให้ผู้ประเมินอ่านได้เหมือนเรียงความจริง
+  function escapeHTML(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function nl2brSafe(s) {
+    return escapeHTML(s).replace(/\n/g, '<br>');
+  }
   function formatEssayHTML(contentStr) {
-    if (!contentStr) return '<em class="text-muted">ไม่มีเนื้อหาเรียงความ</em>';
-    try {
-      const obj = JSON.parse(contentStr);
-      if (obj && typeof obj === 'object' && obj.introduction !== undefined) {
-        let html = '';
-        if (obj.introduction) {
-          html += `
-            <div class="mb-3">
-              <span class="badge bg-primary bg-opacity-10 text-primary fw-bold mb-1"><i class="bi bi-pencil-fill me-1"></i>ส่วนคำนำ (Introduction)</span>
-              <div class="p-2.5 bg-light rounded-3 text-dark style-sarabun" style="white-space:pre-wrap; line-height:1.7;">${obj.introduction.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
-            </div>`;
+    const paras = [];
+    if (contentStr) {
+      let parsed = null;
+      try { parsed = JSON.parse(contentStr); } catch (e) { parsed = null; }
+      if (parsed && typeof parsed === 'object' && parsed.introduction !== undefined) {
+        if (parsed.introduction && parsed.introduction.trim()) paras.push(parsed.introduction);
+        if (Array.isArray(parsed.body)) {
+          parsed.body.forEach(p => { if (p && p.trim()) paras.push(p); });
         }
-        if (obj.body && Array.isArray(obj.body)) {
-          obj.body.forEach((paraText, i) => {
-            if (paraText) {
-              html += `
-                <div class="mb-3">
-                  <span class="badge bg-success bg-opacity-10 text-success fw-bold mb-1"><i class="bi bi-book-fill me-1"></i>ส่วนเนื้อเรื่อง ย่อหน้าที่ ${i+1} (Body Paragraph)</span>
-                  <div class="p-2.5 bg-light rounded-3 text-dark style-sarabun" style="white-space:pre-wrap; line-height:1.7;">${paraText.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
-                </div>`;
-            }
-          });
-        }
-        if (obj.conclusion) {
-          html += `
-            <div class="mb-0">
-              <span class="badge bg-danger bg-opacity-10 text-danger fw-bold mb-1"><i class="bi bi-award-fill me-1"></i>ส่วนสรุป (Conclusion)</span>
-              <div class="p-2.5 bg-light rounded-3 text-dark style-sarabun" style="white-space:pre-wrap; line-height:1.7;">${obj.conclusion.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
-            </div>`;
-        }
-        return html;
+        if (parsed.conclusion && parsed.conclusion.trim()) paras.push(parsed.conclusion);
+      } else {
+        // ข้อความล้วน — แยกย่อหน้าด้วยการเว้นบรรทัด
+        String(contentStr).split(/\n{2,}/).forEach(p => { if (p.trim()) paras.push(p); });
       }
-    } catch(e) {}
-    return `<div class="p-2.5 bg-light rounded-3 text-dark style-sarabun" style="white-space:pre-wrap; line-height:1.7;">${contentStr.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`;
+    }
+    if (!paras.length) return '<div class="no-content">— ยังไม่มีเนื้อหาเรียงความ —</div>';
+    return paras.map(p => `<p class="essay-para">${nl2brSafe(p)}</p>`).join('');
   }
 
   async function fetchStudentEssayForEvaluation(studentId, testPhase) {
