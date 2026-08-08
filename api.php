@@ -1377,9 +1377,16 @@ try {
             }
             $studentId  = isset($_GET['studentId'])  ? trim($_GET['studentId'])  : $_SESSION['user']['id'];
             $essayPhase = isset($_GET['essay_phase']) ? trim($_GET['essay_phase']) : 'task1';
-            $stmt = $pdo->prepare('SELECT * FROM student_essays WHERE student_id = ? AND essay_phase = ?');
+            // ดึงข้อมูลเจ้าของผลงาน (ชื่อ/ชั้น) มาด้วย เพื่อแสดงหัวกระดาษแบบข้อสอบ
+            $stmt = $pdo->prepare('
+                SELECT se.*, s.student_name, s.classroom
+                FROM student_essays se
+                LEFT JOIN students s ON se.student_id = s.student_id
+                WHERE se.student_id = ? AND se.essay_phase = ?
+            ');
             $stmt->execute([$studentId, $essayPhase]);
             $row = $stmt->fetch();
+            if ($row && isset($row['student_name'])) { $row['student_name'] = formatNamePrefix($row['student_name']); }
             echo json_encode(['success' => true, 'found' => (bool)$row, 'data' => $row ?: null]);
             break;
 
