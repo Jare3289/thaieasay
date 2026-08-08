@@ -27,6 +27,31 @@ $sessionUser = isset($_SESSION['user']) ? $_SESSION['user'] : null;
 </head>
 <body class="d-flex flex-column min-vh-100">
 
+  <!-- ตัวจัดการกลุ่มการวิจัยแบบใช้ร่วมกันทุกหน้าครู (จำค่าที่เลือกไว้ข้ามหน้าไว้ที่ localStorage) -->
+  <script>
+    window.TEG = (function () {
+      var KEY = 'thaieasay_teacher_group';
+      var DEFAULT_GROUP = 'กลุ่มตัวอย่าง'; // ค่าเริ่มต้นของทั้งระบบตามที่กำหนด
+      var GROUPS = ['กลุ่มทดลอง', 'กลุ่มตัวอย่าง']; // กลุ่มจริงที่มีในระบบ ('all' = ทุกกลุ่มรวมกัน)
+      function get() {
+        try {
+          var v = localStorage.getItem(KEY);
+          if (v === null || v === undefined || v === '') return DEFAULT_GROUP;
+          return v;
+        } catch (e) { return DEFAULT_GROUP; }
+      }
+      function set(v) {
+        try { localStorage.setItem(KEY, (v === null || v === undefined) ? 'all' : v); } catch (e) {}
+      }
+      // แปลงค่าที่เก็บ → ค่าที่หน้าเว็บใช้เป็น "ตัวกรองกลุ่ม" (all → '' หมายถึงไม่กรอง)
+      function filterValue() { var g = get(); return (g === 'all') ? '' : g; }
+      // พารามิเตอร์ต่อ URL สำหรับ API (ส่งเฉพาะเมื่อเจาะจงกลุ่ม)
+      function param() { var g = filterValue(); return g ? ('&group=' + encodeURIComponent(g)) : ''; }
+      return { get: get, set: set, filterValue: filterValue, param: param, KEY: KEY, DEFAULT_GROUP: DEFAULT_GROUP, GROUPS: GROUPS };
+    })();
+  </script>
+
+
   <!-- Navbar ส่วนหัวหลักของสถาบัน (น้ำเงินกรมท่า-หลวงเป็นทางการ) -->
   <nav class="navbar navbar-dark navbar-academic sticky-top shadow">
     <div class="container py-1">

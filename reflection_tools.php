@@ -398,8 +398,18 @@ $role = $sessionUser['role'];
         <div class="tab-content" id="teacherTabContent">
           <!-- 1. แดชบอร์ดภาพรวมกิจกรรมห้องเรียน -->
           <div class="tab-pane fade show active" id="summary" role="tabpanel" aria-labelledby="summary-tab">
-            <h5 class="fw-bold text-dark mb-4">สถานะการทำงานสะท้อนการประเมินเชิงลึกของนักเรียน</h5>
-            
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-4">
+              <h5 class="fw-bold text-dark mb-0">สถานะการทำงานสะท้อนการประเมินเชิงลึกของนักเรียน</h5>
+              <div class="input-group input-group-sm" style="width: auto;">
+                <span class="input-group-text bg-white text-secondary border-end-0"><i class="bi bi-people-fill"></i> แยกกลุ่ม</span>
+                <select id="reflectionGroupFilter" onchange="onReflectionGroupChange()" class="form-select bg-white border-start-0 fw-bold text-primary">
+                  <option value="all">ทุกกลุ่มรวมกัน</option>
+                  <option value="กลุ่มทดลอง">กลุ่มทดลอง</option>
+                  <option value="กลุ่มตัวอย่าง">กลุ่มตัวอย่าง</option>
+                </select>
+              </div>
+            </div>
+
             <div class="row g-4 mb-4">
               <!-- การส่งงานในแต่ละกิจกรรม -->
               <div class="col-md-3 col-sm-6">
@@ -1237,7 +1247,8 @@ $role = $sessionUser['role'];
     // 1. ดึงภาพรวมสถิติชั้นเรียน
     loadTeacherDashboardSummary = async function() {
       try {
-        const response = await fetch(`api.php?action=get_reflection_summary&_t=${new Date().getTime()}`);
+        const groupParam = (window.TEG ? TEG.param() : '');
+        const response = await fetch(`api.php?action=get_reflection_summary${groupParam}&_t=${new Date().getTime()}`);
         const res = await response.json();
         if (res.success) {
           const stats = res.stats;
@@ -1852,8 +1863,18 @@ $role = $sessionUser['role'];
       }
     });
 
+    // เปลี่ยนกลุ่มการวิจัย → จำค่าไว้ให้ทุกหน้าครูใช้ร่วมกัน แล้วโหลดภาพรวมใหม่
+    window.onReflectionGroupChange = function() {
+      const sel = document.getElementById('reflectionGroupFilter');
+      if (sel && window.TEG) TEG.set(sel.value);
+      loadTeacherDashboardSummary();
+    };
+
     // เรียกใช้ตอนเริ่มต้นสำหรับคุณครู
     document.addEventListener('DOMContentLoaded', async () => {
+      // ตั้งตัวกรองกลุ่มจากค่าที่จำไว้ร่วมกันทุกหน้า (ค่าเริ่มต้น = กลุ่มตัวอย่าง)
+      const gsel = document.getElementById('reflectionGroupFilter');
+      if (gsel && window.TEG) gsel.value = TEG.get();
       await loadStudents();
       await loadTeacherDashboardSummary();
     });

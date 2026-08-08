@@ -186,7 +186,11 @@ require_once 'header.php';
 
   document.getElementById('roundSelect').addEventListener('change', loadPairs);
   document.getElementById('classroomSelect').addEventListener('change', renderTable);
-  document.getElementById('groupSelect').addEventListener('change', renderTable);
+  document.getElementById('groupSelect').addEventListener('change', function () {
+    // จำค่ากลุ่มไว้ให้ทุกหน้าครูใช้ร่วมกัน
+    if (window.TEG) TEG.set(this.value === '' ? 'all' : this.value);
+    renderTable();
+  });
 
   document.getElementById('btnClear').addEventListener('click', () => {
     if (!confirm('ล้างการจับคู่ทั้งหมดของรอบนี้ในตาราง (ยังไม่บันทึกจนกว่าจะกดปุ่มบันทึก) ใช่หรือไม่?')) return;
@@ -232,6 +236,9 @@ require_once 'header.php';
   });
 
   (async function init() {
+    // ตั้งตัวกรองกลุ่มจากค่าที่จำไว้ร่วมกันทุกหน้า (ค่าเริ่มต้น = กลุ่มตัวอย่าง)
+    const gs = document.getElementById('groupSelect');
+    if (gs && window.TEG) gs.value = TEG.filterValue();
     await loadStudents();
     await loadPairs();
   })();

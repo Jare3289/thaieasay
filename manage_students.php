@@ -112,12 +112,20 @@ require_once 'header.php';
   async function loadStudents() {
     try {
       const res = await (await fetch('api.php?action=get_students_full&_t=' + Date.now())).json();
-      if (res.success) { allStudents = res.students; renderStudentTable(); }
+      if (res.success) {
+        allStudents = res.students;
+        // ตั้งตัวกรองกลุ่มจากค่าที่จำไว้ร่วมกันทุกหน้า (ค่าเริ่มต้น = กลุ่มตัวอย่าง)
+        const gf = document.getElementById('groupFilter');
+        if (gf && window.TEG) gf.value = TEG.filterValue();
+        renderStudentTable();
+      }
     } catch (e) { console.error(e); }
   }
 
   function renderStudentTable() {
     const filter = document.getElementById('groupFilter').value;
+    // จำค่ากลุ่มที่เลือกไว้ให้หน้าอื่นใช้ต่อ (เว้น "ยังไม่ระบุกลุ่ม" ซึ่งเป็นมุมมองเฉพาะหน้านี้)
+    if (window.TEG) TEG.set((filter === 'กลุ่มทดลอง' || filter === 'กลุ่มตัวอย่าง') ? filter : 'all');
     const tbody = document.getElementById('studentTableBody');
     let list = allStudents;
     if (filter === '__none__') list = allStudents.filter(s => !s.student_group);

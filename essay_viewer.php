@@ -125,12 +125,28 @@ require_once 'header.php';
   let renderedEssays = []; // ชุดเรียงความที่กำลังแสดง (ตามตัวกรอง) — ใช้อ้างอิงตอนกดพิมพ์รายคน
   let currentEssayGroup = 'all'; // all | กลุ่มทดลอง | กลุ่มตัวอย่าง | __none__
 
+  const IS_TEACHER = <?php echo ($_SESSION['user']['role'] === 'teacher') ? 'true' : 'false'; ?>;
+
   // สลับแท็บกลุ่มทดลอง/กลุ่มตัวอย่าง
   function setEssayGroup(btn) {
     currentEssayGroup = btn.getAttribute('data-group') || 'all';
+    // ครู: จำค่ากลุ่มไว้ให้ทุกหน้าครูใช้ร่วมกัน (ยกเว้น "ยังไม่ระบุกลุ่ม" ซึ่งเป็นมุมมองเฉพาะหน้านี้)
+    if (IS_TEACHER && window.TEG && currentEssayGroup !== '__none__') TEG.set(currentEssayGroup);
     document.querySelectorAll('#essayGroupTab .nav-link').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     filterEssayViewer();
+  }
+
+  // ตั้งกลุ่มเริ่มต้นจากค่าที่จำไว้ร่วมกันทุกหน้า (เฉพาะครู; ค่าเริ่มต้น = กลุ่มตัวอย่าง)
+  function initEssayGroupFromStore() {
+    if (!IS_TEACHER || !window.TEG) return;
+    const want = TEG.get();
+    const btn = document.querySelector(`#essayGroupTab .nav-link[data-group="${want}"]`);
+    if (btn) {
+      currentEssayGroup = want;
+      document.querySelectorAll('#essayGroupTab .nav-link').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
   }
 
   const essayGroupBadge = {
@@ -418,6 +434,7 @@ require_once 'header.php';
   }
 
   // --- เริ่มรันอัตโนมัติ ---
+  initEssayGroupFromStore();
   loadEssayViewer();
 </script>
 

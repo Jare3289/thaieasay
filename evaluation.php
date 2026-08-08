@@ -909,6 +909,8 @@ require_once 'header.php';
         btn.classList.add('active');
         const hidden = document.getElementById('groupFilterValue');
         if (hidden) hidden.value = btn.dataset.group || '';
+        // โหมดครู: จำค่ากลุ่มไว้ให้ทุกหน้าครูใช้ร่วมกัน
+        if (modeParam === 'teacher' && window.TEG) TEG.set((btn.dataset.group || '') === '' ? 'all' : btn.dataset.group);
 
         await loadStudents();
         populateStudentDatalist();
@@ -1092,6 +1094,20 @@ require_once 'header.php';
 
   // ทำการทำงานเริ่มต้นแบบเงียบ
   (async function init() {
+    // โหมดครู: ตั้งกลุ่มเริ่มต้นจากค่าที่จำไว้ร่วมกันทุกหน้า (ค่าเริ่มต้น = กลุ่มตัวอย่าง)
+    if (modeParam === 'teacher' && window.TEG) {
+      const want = TEG.filterValue();
+      const gBtns = document.querySelectorAll('#groupFilterButtons .group-btn');
+      let matched = null;
+      gBtns.forEach(b => { if ((b.dataset.group || '') === want) matched = b; });
+      if (matched) {
+        gBtns.forEach(b => b.classList.remove('active'));
+        matched.classList.add('active');
+        const hidden = document.getElementById('groupFilterValue');
+        if (hidden) hidden.value = want;
+      }
+    }
+
     await loadStudents();
     populateStudentDatalist();
     buildRubric();
