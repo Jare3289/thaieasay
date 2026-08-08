@@ -1100,37 +1100,63 @@ try {
             break;
 
         case 'get_reflection_summary':
-            $total_students_res = $pdo->query('SELECT COUNT(*) FROM students')->fetchColumn();
-            
-            $prob_count = $pdo->query('SELECT COUNT(*) FROM writing_problems')->fetchColumn();
-            $chk_count = $pdo->query('SELECT COUNT(*) FROM self_checklists')->fetchColumn();
-            $peer_count = $pdo->query('SELECT COUNT(DISTINCT student_id) FROM peer_reviews')->fetchColumn();
-            $ref_count = $pdo->query('SELECT COUNT(*) FROM learning_reflections')->fetchColumn();
-            
+            // ตัวกรองกลุ่มการวิจัย (ทดลอง/ตัวอย่าง) — ถ้าไม่ส่งมา = รวมทุกกลุ่ม
+            $refGroup = isset($_GET['group']) ? trim($_GET['group']) : '';
+            $hasRefGroup = ($refGroup !== '');
+
+            // ตัวช่วยสร้างเงื่อนไข WHERE ตามกลุ่มบนตาราง students ที่ระบุ alias
+            $grpWhere = function($alias) use ($hasRefGroup) {
+                return $hasRefGroup ? (" WHERE {$alias}.student_group = ?") : '';
+            };
+            $grpParam = $hasRefGroup ? [$refGroup] : [];
+
+            $stmt = $pdo->prepare('SELECT COUNT(*) FROM students s' . $grpWhere('s'));
+            $stmt->execute($grpParam);
+            $total_students_res = $stmt->fetchColumn();
+
+            $stmt = $pdo->prepare('SELECT COUNT(*) FROM writing_problems wp JOIN students s ON wp.student_id = s.student_id' . $grpWhere('s'));
+            $stmt->execute($grpParam);
+            $prob_count = $stmt->fetchColumn();
+
+            $stmt = $pdo->prepare('SELECT COUNT(*) FROM self_checklists chk JOIN students s ON chk.student_id = s.student_id' . $grpWhere('s'));
+            $stmt->execute($grpParam);
+            $chk_count = $stmt->fetchColumn();
+
+            $stmt = $pdo->prepare('SELECT COUNT(DISTINCT pr.student_id) FROM peer_reviews pr JOIN students s ON pr.student_id = s.student_id' . $grpWhere('s'));
+            $stmt->execute($grpParam);
+            $peer_count = $stmt->fetchColumn();
+
+            $stmt = $pdo->prepare('SELECT COUNT(*) FROM learning_reflections lr JOIN students s ON lr.student_id = s.student_id' . $grpWhere('s'));
+            $stmt->execute($grpParam);
+            $ref_count = $stmt->fetchColumn();
+
             // ปัญหาล่าสุด
-            $stmt_probs = $pdo->query('
-                SELECT wp.*, s.student_name 
+            $stmt_probs = $pdo->prepare('
+                SELECT wp.*, s.student_name
                 FROM writing_problems wp
-                JOIN students s ON wp.student_id = s.student_id
+                JOIN students s ON wp.student_id = s.student_id' . $grpWhere('s') . '
                 ORDER BY wp.created_at DESC LIMIT 5
             ');
+            $stmt_probs->execute($grpParam);
             $recent_problems = $stmt_probs->fetchAll();
-            
+
             // รีวิวล่าสุด
-            $stmt_peers = $pdo->query('
-                SELECT pr.*, s.student_name, r.student_name AS reviewer_name 
+            $stmt_peers = $pdo->prepare('
+                SELECT pr.*, s.student_name, r.student_name AS reviewer_name
                 FROM peer_reviews pr
                 JOIN students s ON pr.student_id = s.student_id
-                JOIN students r ON pr.reviewer_id = r.student_id
+                JOIN students r ON pr.reviewer_id = r.student_id' . $grpWhere('s') . '
                 ORDER BY pr.created_at DESC LIMIT 5
             ');
+            $stmt_peers->execute($grpParam);
             $recent_peers = $stmt_peers->fetchAll();
 
             // ข้อมูลของนักเรียนทุกคนสำหรับภาพรวมชั้นเรียน
-            $stmt_all = $pdo->query('
-                SELECT 
-                    s.student_id, 
+            $stmt_all = $pdo->prepare('
+                SELECT
+                    s.student_id,
                     s.student_name,
+                    s.student_group,
                     wp.prob_1_1, wp.sol_1_1, wp.prob_1_2, wp.sol_1_2, wp.prob_1_3, wp.sol_1_3,
                     wp.prob_2_1, wp.sol_2_1, wp.prob_2_2, wp.sol_2_2,
                     wp.prob_3_1, wp.sol_3_1, wp.prob_3_2, wp.sol_3_2, wp.prob_3_3, wp.sol_3_3,
@@ -1144,11 +1170,12 @@ try {
                 FROM students s
                 LEFT JOIN writing_problems wp ON s.student_id = wp.student_id
                 LEFT JOIN self_checklists chk ON s.student_id = chk.student_id
-                LEFT JOIN learning_reflections ref ON s.student_id = ref.student_id
+                LEFT JOIN learning_reflections ref ON s.student_id = ref.student_id' . $grpWhere('s') . '
                 ORDER BY s.student_id ASC
             ');
+            $stmt_all->execute($grpParam);
             $students_details = $stmt_all->fetchAll();
-            
+
             echo json_encode([
                 'success' => true,
                 'stats' => [

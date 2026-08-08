@@ -74,8 +74,8 @@ require_once 'header.php';
               </div>
             </div>
             <div class="col-md-6 col-sm-12 text-center">
-              <span class="small fw-bold text-secondary mb-2 d-block">2. ค่าเฉลี่ยของชั้นเรียนคิดเป็นร้อยละแยกตามมิติหลัก (เต็ม 100%)</span>
-              <div style="position: relative; height: 260px;" class="w-100">
+              <span class="small fw-bold text-secondary mb-2 d-block">2. ค่าเฉลี่ยของชั้นเรียนคิดเป็นร้อยละแยกตามมิติหลักและเกณฑ์ย่อย (เต็ม 100%)</span>
+              <div style="position: relative; height: 340px;" class="w-100">
                 <canvas id="classDimensionAveragesChart"></canvas>
               </div>
             </div>
@@ -384,11 +384,19 @@ require_once 'header.php';
     return (studentGroupDB[id] || '') === currentGroupFilter;
   }
 
-  // เปลี่ยนกลุ่มที่แสดง (ทั้งหมด/กลุ่มทดลอง/กลุ่มตัวอย่าง) แล้ววาดรายงานใหม่
+  // เปลี่ยนกลุ่มที่แสดง (ทั้งหมด/กลุ่มทดลอง/กลุ่มตัวอย่าง) แล้ววาดรายงานใหม่ + จำค่าข้ามหน้า
   function switchGroupFilter() {
     const sel = document.getElementById('dashboardGroupFilter');
     currentGroupFilter = sel ? sel.value : 'all';
+    if (window.TEG) TEG.set(currentGroupFilter); // จำค่าไว้ให้ทุกหน้าครูใช้ร่วมกัน
     if (classroomResearchData) processDashboardData();
+  }
+
+  // ตั้งค่าตัวเลือกกลุ่มเริ่มต้นจากค่าที่จำไว้ (ค่าเริ่มต้นทั้งระบบ = กลุ่มตัวอย่าง)
+  function initGroupFilterFromStore() {
+    currentGroupFilter = window.TEG ? TEG.get() : 'all';
+    const sel = document.getElementById('dashboardGroupFilter');
+    if (sel) sel.value = currentGroupFilter;
   }
 
   const criteriaMap = {
@@ -916,7 +924,7 @@ require_once 'header.php';
     document.getElementById('statCompletion').textContent = completionPercentage + "%";
 
     drawClassQualityDistribution(qualityCounts);
-    drawClassDimensionAverages(dimensionSums, evaluatedStdsCount);
+    drawClassDimensionAverages(dimensionSums, evaluatedStdsCount, subCriteriaSums);
     drawClassroomDimensionLines({ success: true, data: data });
     generateResearchInsights(subCriteriaSums, evaluatedStdsCount, totalRegistered, totalSumScores, totalScoredCount, activeEvaluationSetCount);
   }
@@ -1034,31 +1042,87 @@ require_once 'header.php';
     });
   }
 
-  function drawClassDimensionAverages(sums, count) {
+  function drawClassDimensionAverages(sums, count, subSums) {
     const canvas = document.getElementById('classDimensionAveragesChart');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (classDimensionChartInstance) classDimensionChartInstance.destroy();
-    
-    const avgContent = count > 0 ? (sums.content / count) : 0;
-    const avgStructure = count > 0 ? (sums.structure / count) : 0;
-    const avgLanguage = count > 0 ? (sums.language / count) : 0;
-    const avgMechanics = count > 0 ? (sums.mechanics / count) : 0;
-    
-    const pctContent = ((avgContent / 27) * 100).toFixed(2);
-    const pctStructure = ((avgStructure / 12) * 100).toFixed(2);
-    const pctLanguage = ((avgLanguage / 15) * 100).toFixed(2);
-    const pctMechanics = ((avgMechanics / 6) * 100).toFixed(2);
-    
+
+    subSums = subSums || {};
+
+    // โครงสร้างข้อมูล: แต่ละมิติหลัก (แท่งเข้ม) ตามด้วยเกณฑ์ย่อยของมิตินั้น (แท่งอ่อน)
+    // เพื่อให้เห็นทั้งภาพรวมรายด้านและรายละเอียดแต่ละเกณฑ์ย่อยในกราฟเดียว
+    const groups = [
+      {
+        main: { label: 'เนื้อหา (27)', value: sums.content, max: 27 },
+        solid: '#2563eb', soft: 'rgba(37, 99, 235, 0.40)',
+        subs: [
+          { key: '1.1', label: '1.1 ตรงประเด็น (12)', max: 12 },
+          { key: '1.2', label: '1.2 แก่นเรื่อง (6)', max: 6 },
+          { key: '1.3', label: '1.3 ขยายความ (9)', max: 9 }
+        ]
+      },
+      {
+        main: { label: 'โครงสร้าง (12)', value: sums.structure, max: 12 },
+        solid: '#8b5cf6', soft: 'rgba(139, 92, 246, 0.40)',
+        subs: [
+          { key: '2.1', label: '2.1 องค์ประกอบครบ (8)', max: 8 },
+          { key: '2.2', label: '2.2 ลำดับประเด็น (4)', max: 4 }
+        ]
+      },
+      {
+        main: { label: 'ภาษา (15)', value: sums.language, max: 15 },
+        solid: '#f59e0b', soft: 'rgba(245, 158, 11, 0.40)',
+        subs: [
+          { key: '3.1', label: '3.1 ประโยคถูกต้อง (4)', max: 4 },
+          { key: '3.2', label: '3.2 เลือกใช้คำ (6)', max: 6 },
+          { key: '3.3', label: '3.3 ระดับภาษา (5)', max: 5 }
+        ]
+      },
+      {
+        main: { label: 'อักขรวิธี (6)', value: sums.mechanics, max: 6 },
+        solid: '#10b981', soft: 'rgba(16, 185, 129, 0.40)',
+        subs: [
+          { key: '4.1', label: '4.1 สะกดคำ (2)', max: 2 },
+          { key: '4.2', label: '4.2 เว้นวรรค (2)', max: 2 },
+          { key: '4.3', label: '4.3 เรียบร้อย (2)', max: 2 }
+        ]
+      }
+    ];
+
+    const labels = [];
+    const dataPct = [];
+    const bgColors = [];
+    const borderColors = [];
+    const meta = []; // เก็บ {avg, max, isMain} ไว้ใช้ใน tooltip
+
+    groups.forEach(g => {
+      const mainAvg = count > 0 ? (Number(g.main.value || 0) / count) : 0;
+      labels.push('▎' + g.main.label);
+      dataPct.push(parseFloat(((mainAvg / g.main.max) * 100).toFixed(2)));
+      bgColors.push(g.solid);
+      borderColors.push(g.solid);
+      meta.push({ avg: mainAvg, max: g.main.max, isMain: true });
+
+      g.subs.forEach(sub => {
+        const subAvg = count > 0 ? (Number(subSums[sub.key] || 0) / count) : 0;
+        labels.push(sub.label);
+        dataPct.push(parseFloat(((subAvg / sub.max) * 100).toFixed(2)));
+        bgColors.push(g.soft);
+        borderColors.push(g.solid);
+        meta.push({ avg: subAvg, max: sub.max, isMain: false });
+      });
+    });
+
     classDimensionChartInstance = new Chart(ctx, {
       type: 'bar',
       data: {
-        labels: ['1. เนื้อหา (เต็ม 27)', '2. โครงสร้าง (เต็ม 12)', '3. ภาษา (เต็ม 15)', '4. อักขรวิธี (เต็ม 6)'],
+        labels: labels,
         datasets: [{
           label: 'ร้อยละคะแนนเฉลี่ย',
-          data: [pctContent, pctStructure, pctLanguage, pctMechanics],
-          backgroundColor: ['rgba(37, 99, 235, 0.85)', 'rgba(139, 92, 246, 0.85)', 'rgba(245, 158, 11, 0.85)', 'rgba(16, 185, 129, 0.85)'],
-          borderColor: ['#2563eb', '#8b5cf6', '#f59e0b', '#10b981'],
+          data: dataPct,
+          backgroundColor: bgColors,
+          borderColor: borderColors,
           borderWidth: 1.5
         }]
       },
@@ -1071,12 +1135,10 @@ require_once 'header.php';
             callbacks: {
               label: function(context) {
                 const val = context.parsed.y;
-                let rawStr = '';
-                if (context.dataIndex === 0) rawStr = ` (${(val/100*27).toFixed(2)}/27 คะแนน)`;
-                else if (context.dataIndex === 1) rawStr = ` (${(val/100*12).toFixed(2)}/12 คะแนน)`;
-                else if (context.dataIndex === 2) rawStr = ` (${(val/100*15).toFixed(2)}/15 คะแนน)`;
-                else if (context.dataIndex === 3) rawStr = ` (${(val/100*6).toFixed(2)}/6 คะแนน)`;
-                return `คิดเป็นร้อยละ: ${val}%${rawStr}`;
+                const m = meta[context.dataIndex] || {};
+                const rawStr = (m.max ? ` (${(m.avg || 0).toFixed(2)}/${m.max} คะแนน)` : '');
+                const tag = m.isMain ? 'มิติหลัก' : 'เกณฑ์ย่อย';
+                return `[${tag}] คิดเป็นร้อยละ: ${val}%${rawStr}`;
               }
             }
           }
@@ -1088,7 +1150,14 @@ require_once 'header.php';
             ticks: { stepSize: 20 },
             title: { display: true, text: 'ค่าร้อยละของคะแนนเต็ม (%)', font: { family: 'Google Sans', size: 10, weight: 'bold' } }
           },
-          x: { ticks: { font: { family: 'Google Sans', size: 10 } } }
+          x: {
+            ticks: {
+              font: { family: 'Google Sans', size: 8 },
+              maxRotation: 90,
+              minRotation: 55,
+              autoSkip: false
+            }
+          }
         }
       }
     });
@@ -1964,10 +2033,11 @@ require_once 'header.php';
   // --- เริ่มรันอัตโนมัติ ---
   (async function init() {
     await loadStudents();
-    
+
     // ตรวจสอบบทบาทผู้ใช้
     const userRole = "<?php echo $sessionUser['role']; ?>";
     if (userRole === 'teacher') {
+      initGroupFilterFromStore(); // ดึงกลุ่มที่จำไว้มาตั้งเป็นค่าเริ่มต้น
       loadTeacherOverview();
     } else {
       // สำหรับนักเรียน ให้ดึงรายงานของตนเองทันที
