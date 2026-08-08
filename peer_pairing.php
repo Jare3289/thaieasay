@@ -235,6 +235,13 @@ require_once 'header.php';
     } catch (err) { showToast('เกิดข้อผิดพลาด: ' + err.message, 'error'); }
   });
 
+  // ปุ่มเลือกกลุ่มบน navbar เปลี่ยน → อัปเดตตัวกรองและตารางทันที (ไม่ต้องรีเฟรช)
+  window.onTEGChange = function() {
+    const gs = document.getElementById('groupSelect');
+    if (gs && window.TEG) gs.value = TEG.filterValue();
+    renderTable();
+  };
+
   (async function init() {
     // ตั้งตัวกรองกลุ่มจากค่าที่จำไว้ร่วมกันทุกหน้า (ค่าเริ่มต้น = กลุ่มตัวอย่าง)
     const gs = document.getElementById('groupSelect');

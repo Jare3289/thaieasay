@@ -400,14 +400,7 @@ $role = $sessionUser['role'];
           <div class="tab-pane fade show active" id="summary" role="tabpanel" aria-labelledby="summary-tab">
             <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-4">
               <h5 class="fw-bold text-dark mb-0">สถานะการทำงานสะท้อนการประเมินเชิงลึกของนักเรียน</h5>
-              <div class="input-group input-group-sm" style="width: auto;">
-                <span class="input-group-text bg-white text-secondary border-end-0"><i class="bi bi-people-fill"></i> แยกกลุ่ม</span>
-                <select id="reflectionGroupFilter" onchange="onReflectionGroupChange()" class="form-select bg-white border-start-0 fw-bold text-primary">
-                  <option value="all">ทุกกลุ่มรวมกัน</option>
-                  <option value="กลุ่มทดลอง">กลุ่มทดลอง</option>
-                  <option value="กลุ่มตัวอย่าง">กลุ่มตัวอย่าง</option>
-                </select>
-              </div>
+              <span class="badge bg-primary-subtle text-primary-emphasis fw-bold" id="reflectionGroupBadge">—</span>
             </div>
 
             <div class="row g-4 mb-4">
@@ -1248,6 +1241,8 @@ $role = $sessionUser['role'];
     loadTeacherDashboardSummary = async function() {
       try {
         const groupParam = (window.TEG ? TEG.param() : '');
+        const gBadge = document.getElementById('reflectionGroupBadge');
+        if (gBadge && window.TEG) gBadge.textContent = (TEG.get() === 'all') ? 'ทุกกลุ่มรวมกัน' : TEG.get();
         const response = await fetch(`api.php?action=get_reflection_summary${groupParam}&_t=${new Date().getTime()}`);
         const res = await response.json();
         if (res.success) {
@@ -1863,18 +1858,13 @@ $role = $sessionUser['role'];
       }
     });
 
-    // เปลี่ยนกลุ่มการวิจัย → จำค่าไว้ให้ทุกหน้าครูใช้ร่วมกัน แล้วโหลดภาพรวมใหม่
-    window.onReflectionGroupChange = function() {
-      const sel = document.getElementById('reflectionGroupFilter');
-      if (sel && window.TEG) TEG.set(sel.value);
+    // ปุ่มเลือกกลุ่มบน navbar เปลี่ยน → โหลดภาพรวมของกลุ่มใหม่ (ไม่ต้องรีเฟรชหน้า)
+    window.onTEGChange = function() {
       loadTeacherDashboardSummary();
     };
 
     // เรียกใช้ตอนเริ่มต้นสำหรับคุณครู
     document.addEventListener('DOMContentLoaded', async () => {
-      // ตั้งตัวกรองกลุ่มจากค่าที่จำไว้ร่วมกันทุกหน้า (ค่าเริ่มต้น = กลุ่มตัวอย่าง)
-      const gsel = document.getElementById('reflectionGroupFilter');
-      if (gsel && window.TEG) gsel.value = TEG.get();
       await loadStudents();
       await loadTeacherDashboardSummary();
     });
