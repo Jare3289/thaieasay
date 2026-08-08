@@ -346,27 +346,27 @@ require_once 'header.php';
   border: 1px solid #dfe3e8;
   font-family: "TH Sarabun New", "Sarabun", "Leelawadee UI", "Tahoma", sans-serif;
 }
-/* ชื่อแบบวัด (หัวกระดาษบนสุด) — 20px */
+/* ชื่อแบบวัด (หัวกระดาษบนสุด) — 22px */
 .essay-doc-formtitle {
   text-align: center;
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
   color: #0d3b66;
   margin: 0 0 0.3rem;
 }
-/* ชื่อเรื่อง — 18px */
+/* ชื่อเรื่อง — 20px */
 .essay-doc-title {
   text-align: center;
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 700;
   line-height: 1.35;
   color: #1a1a1a;
   margin: 0 0 0.4rem;
 }
-/* บรรทัดเจ้าของผลงาน: ชื่อ / ชั้น / รหัสประจำตัวนักเรียน — 16px */
+/* บรรทัดเจ้าของผลงาน: ชื่อ / ชั้น / รหัสประจำตัวนักเรียน — 18px */
 .essay-doc-author {
   text-align: center;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   color: #444;
   margin: 0 0 1rem;
@@ -379,7 +379,7 @@ require_once 'header.php';
   position: relative;
   padding-left: 2.8em;
   padding-right: 2.6em;        /* เว้นที่ริมขวาไว้ให้ป้ายบอกส่วน (คำนำ/เนื้อเรื่อง/สรุป) แบบไม่กระทบเนื้อหา */
-  font-size: 18px;             /* เล็กลงจากเดิมเพื่อให้อ่านสบายและเหมือน A4 */
+  font-size: 20px;             /* ขนาดเนื้อหาบนกระดาษ A4 */
   line-height: 36px;          /* ต้องตรงกับ LH ในสคริปต์สร้างเลขบรรทัด */
   text-align: justify;
   background-image: linear-gradient(to bottom, transparent 0, transparent 35px, #e3e7ec 35px, #e3e7ec 36px);
