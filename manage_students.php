@@ -227,6 +227,13 @@ require_once 'header.php';
     } catch (err) { showToast('เกิดข้อผิดพลาด: ' + err.message, 'error'); }
   }
 
+  // ปุ่มเลือกกลุ่มบน navbar เปลี่ยน → อัปเดตตัวกรองและตารางทันที (ไม่ต้องรีเฟรช)
+  window.onTEGChange = function() {
+    const gf = document.getElementById('groupFilter');
+    if (gf && window.TEG) gf.value = TEG.filterValue();
+    renderStudentTable();
+  };
+
   document.addEventListener('DOMContentLoaded', loadStudents);
 </script>
 

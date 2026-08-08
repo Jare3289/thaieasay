@@ -899,6 +899,30 @@ require_once 'header.php';
     }
   })();
 
+  // ปุ่มเลือกกลุ่มบน navbar เปลี่ยน (เฉพาะโหมดครู) → ซิงก์ปุ่มกลุ่มในหน้าและโหลดรายชื่อใหม่
+  window.onTEGChange = async function() {
+    if (modeParam !== 'teacher' || !window.TEG) return; // โหมดอื่นไม่ยุ่งกับกลุ่ม
+    const want = TEG.filterValue();
+    const gBtns = document.querySelectorAll('#groupFilterButtons .group-btn');
+    let matched = null;
+    gBtns.forEach(b => { if ((b.dataset.group || '') === want) matched = b; });
+    if (matched) {
+      gBtns.forEach(b => b.classList.remove('active'));
+      matched.classList.add('active');
+      const hidden = document.getElementById('groupFilterValue');
+      if (hidden) hidden.value = want;
+    }
+    await loadStudents();
+    populateStudentDatalist();
+    // รีเซ็ตการระบุรหัสเป้าหมายเพราะรายชื่ออาจเปลี่ยนกลุ่ม
+    const tInput = document.getElementById('targetStudentInput');
+    if (tInput && modeParam !== 'self') { tInput.value = ''; tInput.disabled = false; }
+    const resolvedEl = document.getElementById('targetStudentResolved');
+    const errEl = document.getElementById('targetStudentError');
+    if (resolvedEl) resolvedEl.classList.add('d-none');
+    if (errEl) errEl.classList.add('d-none');
+  };
+
   // เลือกกลุ่มด้วยปุ่ม → โหลดรายชื่อใหม่แล้วรีเซ็ตการระบุรหัสเป้าหมาย
   (function bindGroupFilter() {
     const btns = document.querySelectorAll('#groupFilterButtons .group-btn');

@@ -433,6 +433,12 @@ require_once 'header.php';
     link.click();
   }
 
+  // ปุ่มเลือกกลุ่มบน navbar เปลี่ยน → อัปเดตแท็บกลุ่มและกรองรายการทันที (เฉพาะครู)
+  window.onTEGChange = function() {
+    initEssayGroupFromStore();
+    filterEssayViewer();
+  };
+
   // --- เริ่มรันอัตโนมัติ ---
   initEssayGroupFromStore();
   loadEssayViewer();

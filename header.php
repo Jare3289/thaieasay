@@ -49,6 +49,32 @@ $sessionUser = isset($_SESSION['user']) ? $_SESSION['user'] : null;
       function param() { var g = filterValue(); return g ? ('&group=' + encodeURIComponent(g)) : ''; }
       return { get: get, set: set, filterValue: filterValue, param: param, KEY: KEY, DEFAULT_GROUP: DEFAULT_GROUP, GROUPS: GROUPS };
     })();
+
+    // ทาสีปุ่มกลุ่มบน navbar ให้ตรงกับกลุ่มที่เลือกอยู่ (ปุ่มที่ active = พื้นทึบ)
+    function tegPaintNavButtons() {
+      var cur = window.TEG ? TEG.get() : 'all';
+      document.querySelectorAll('#navGroupFilter [data-group]').forEach(function (b) {
+        var on = (b.getAttribute('data-group') === cur);
+        b.classList.toggle('active', on);
+        b.classList.toggle('btn-light', on);
+        b.classList.toggle('text-primary', on);
+        b.classList.toggle('btn-outline-light', !on);
+      });
+    }
+
+    // กดปุ่มเลือกกลุ่มบน navbar → จำค่า + สั่งหน้าปัจจุบันวาดใหม่ (ถ้าไม่มี hook ให้รีเฟรช)
+    function tegNavSelect(btn) {
+      var g = btn.getAttribute('data-group') || 'all';
+      if (window.TEG) TEG.set(g);
+      tegPaintNavButtons();
+      if (typeof window.onTEGChange === 'function') {
+        window.onTEGChange();
+      } else {
+        location.reload();
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', tegPaintNavButtons);
   </script>
 
 
@@ -59,10 +85,13 @@ $sessionUser = isset($_SESSION['user']) ? $_SESSION['user'] : null;
         <span>📝</span> ระบบประเมินเรียงความอัจฉริยะ
       </a>
       <div id="navUserArea" class="<?php echo $sessionUser ? 'd-flex' : 'd-none'; ?> align-items-center gap-3">
-        <?php if ($sessionUser && in_array($sessionUser['role'], ['teacher', 'expert'])): ?>
-        <a href="essay_viewer.php" class="btn btn-light btn-sm fw-bold px-3 d-flex align-items-center gap-1" title="ดูเรียงความนักเรียนทุกคน แยกกลุ่มทดลอง/กลุ่มตัวอย่าง">
-          <i class="bi bi-pencil-square"></i> <span class="d-none d-md-inline">เรียงความนักเรียน</span>
-        </a>
+        <?php if ($sessionUser && $sessionUser['role'] === 'teacher'): ?>
+        <!-- ตัวเลือกกลุ่มการวิจัยแบบปุ่ม (จุดควบคุมเดียวของทั้งระบบ ใช้ร่วมทุกหน้าครู) -->
+        <div id="navGroupFilter" class="btn-group btn-group-sm" role="group" aria-label="เลือกกลุ่มการวิจัย" title="เลือกกลุ่มการวิจัย — ใช้ร่วมกันทุกหน้า">
+          <button type="button" class="btn btn-outline-light fw-bold px-3" data-group="all" onclick="tegNavSelect(this)">ทุกกลุ่ม</button>
+          <button type="button" class="btn btn-outline-light fw-bold px-3" data-group="กลุ่มทดลอง" onclick="tegNavSelect(this)">🧪 กลุ่มทดลอง</button>
+          <button type="button" class="btn btn-outline-light fw-bold px-3" data-group="กลุ่มตัวอย่าง" onclick="tegNavSelect(this)">📋 กลุ่มตัวอย่าง</button>
+        </div>
         <?php endif; ?>
         <div class="bg-white bg-opacity-10 text-white border border-white border-opacity-10 px-3 py-1.5 rounded text-sm">
           <span class="text-white-50">ผู้ใช้ระบบ:</span> <span id="navUserName" class="fw-bold"><?php echo $sessionUser ? htmlspecialchars($sessionUser['name']) : ''; ?></span>

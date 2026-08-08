@@ -49,20 +49,10 @@ require_once 'header.php';
     <!-- รายงานกราฟสถิติเพื่อการวิจัยชั้นเรียน (Classroom Research Charts) -->
     <div class="card border-0 shadow-sm rounded-4 bg-white mb-4 overflow-hidden">
       <div class="card-header bg-light d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 py-3">
-        <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-pie-chart-fill text-primary"></i> รายงานสถิติภาพรวมเพื่อการทำวิจัยวิชาการ (Research Statistical Analysis)</h6>
-        <div class="d-flex align-items-center gap-2">
-          <div class="input-group input-group-sm" style="width: auto;">
-            <span class="input-group-text bg-white text-secondary border-end-0"><i class="bi bi-people-fill"></i> แยกกลุ่ม</span>
-            <select id="dashboardGroupFilter" onchange="switchGroupFilter()" class="form-select bg-white border-start-0 fw-bold text-primary">
-              <option value="all" selected>ทุกกลุ่มรวมกัน</option>
-              <option value="กลุ่มทดลอง">กลุ่มทดลอง</option>
-              <option value="กลุ่มตัวอย่าง">กลุ่มตัวอย่าง</option>
-            </select>
-          </div>
-          <button class="btn btn-sm btn-outline-secondary fw-bold rounded-pill px-3 text-nowrap" type="button" data-bs-toggle="collapse" data-bs-target="#researchChartsCollapse" aria-expanded="true" aria-controls="researchChartsCollapse">
-            แสดง/ซ่อน
-          </button>
-        </div>
+        <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-pie-chart-fill text-primary"></i> รายงานสถิติภาพรวมเพื่อการทำวิจัยวิชาการ (Research Statistical Analysis) <span class="badge bg-primary-subtle text-primary-emphasis fw-bold ms-1" id="dashGroupBadge">—</span></h6>
+        <button class="btn btn-sm btn-outline-secondary fw-bold rounded-pill px-3 text-nowrap" type="button" data-bs-toggle="collapse" data-bs-target="#researchChartsCollapse" aria-expanded="true" aria-controls="researchChartsCollapse">
+          แสดง/ซ่อน
+        </button>
       </div>
       <div class="collapse show" id="researchChartsCollapse">
         <div class="card-body">
@@ -79,11 +69,22 @@ require_once 'header.php';
                 <canvas id="classDimensionAveragesChart"></canvas>
               </div>
             </div>
-            <!-- กราฟแมงมุมคะแนนเฉลี่ยรายบุคคลแยกตามรายด้าน (1 นักเรียน = 1 รูปใย) -->
-            <div class="col-12 text-center mt-4 border-top pt-4">
-              <span class="small fw-bold text-secondary mb-2 d-block">3. กราฟแมงมุมวิเคราะห์รูปแบบคะแนนเฉลี่ยของผู้เรียนแต่ละคนแยกตามรายด้าน (1 นักเรียน = 1 รูปใยแมงมุม)</span>
-              <div style="position: relative; height: 460px;" class="w-100">
-                <canvas id="classDimensionLinesChart"></canvas>
+            <!-- กราฟแมงมุมคะแนนเฉลี่ยรายบุคคลแยกตามรายด้าน (1 นักเรียน = 1 รูปใย) — แยก 2 กราฟ: ภารงาน และ ก่อน/หลังเรียน -->
+            <div class="col-12 mt-4 border-top pt-4">
+              <span class="small fw-bold text-secondary mb-3 d-block text-center">3. กราฟแมงมุมวิเคราะห์รูปแบบคะแนนเฉลี่ยของผู้เรียนแต่ละคนแยกตามรายด้าน (1 นักเรียน = 1 รูปใยแมงมุม)</span>
+              <div class="row g-4">
+                <div class="col-lg-6 col-12 text-center">
+                  <span class="small fw-bold text-primary-emphasis mb-2 d-block"><i class="bi bi-clipboard-check"></i> 3.1 ภารงานในหน่วยเรียน (Task 1 + Task 2)</span>
+                  <div style="position: relative; height: 440px;" class="w-100">
+                    <canvas id="classDimensionSpiderTask"></canvas>
+                  </div>
+                </div>
+                <div class="col-lg-6 col-12 text-center">
+                  <span class="small fw-bold text-success-emphasis mb-2 d-block"><i class="bi bi-arrow-left-right"></i> 3.2 ก่อนเรียน–หลังเรียน (Pretest / Posttest โดยครู)</span>
+                  <div style="position: relative; height: 440px;" class="w-100">
+                    <canvas id="classDimensionSpiderPrePost"></canvas>
+                  </div>
+                </div>
               </div>
             </div>
             <!-- บทวิเคราะห์และข้อเสนอแนะเชิงลึกเพื่อการทำวิจัยชั้นเรียน (Research Insights Panel) -->
@@ -369,7 +370,8 @@ require_once 'header.php';
   let individualRadarChartInstance = null;
   let classQualityChartInstance = null;
   let classDimensionChartInstance = null;
-  let classDimensionLinesChartInstance = null;
+  // อินสแตนซ์กราฟแมงมุมรายบุคคล 2 กราฟ: ภารงาน และ ก่อน/หลังเรียน
+  let spiderChartInstances = { task: null, prepost: null };
   let classroomResearchData = null;
   let currentResearchPhase = 'task1';
   let currentDashboardViewMode = 'task1';
@@ -384,20 +386,24 @@ require_once 'header.php';
     return (studentGroupDB[id] || '') === currentGroupFilter;
   }
 
-  // เปลี่ยนกลุ่มที่แสดง (ทั้งหมด/กลุ่มทดลอง/กลุ่มตัวอย่าง) แล้ววาดรายงานใหม่ + จำค่าข้ามหน้า
-  function switchGroupFilter() {
-    const sel = document.getElementById('dashboardGroupFilter');
-    currentGroupFilter = sel ? sel.value : 'all';
-    if (window.TEG) TEG.set(currentGroupFilter); // จำค่าไว้ให้ทุกหน้าครูใช้ร่วมกัน
-    if (classroomResearchData) processDashboardData();
+  // อัปเดตป้ายบอกกลุ่มที่กำลังแสดงบนหัวการ์ดรายงาน
+  function updateGroupBadge() {
+    const badge = document.getElementById('dashGroupBadge');
+    if (badge) badge.textContent = (currentGroupFilter === 'all') ? 'ทุกกลุ่มรวมกัน' : currentGroupFilter;
   }
 
-  // ตั้งค่าตัวเลือกกลุ่มเริ่มต้นจากค่าที่จำไว้ (ค่าเริ่มต้นทั้งระบบ = กลุ่มตัวอย่าง)
+  // ตั้งค่ากลุ่มเริ่มต้นจากค่าที่จำไว้ร่วมกันทุกหน้า (ค่าเริ่มต้นทั้งระบบ = กลุ่มตัวอย่าง)
   function initGroupFilterFromStore() {
     currentGroupFilter = window.TEG ? TEG.get() : 'all';
-    const sel = document.getElementById('dashboardGroupFilter');
-    if (sel) sel.value = currentGroupFilter;
+    updateGroupBadge();
   }
+
+  // ถูกเรียกจากปุ่มเลือกกลุ่มบน navbar (จุดควบคุมเดียว) เมื่อกลุ่มเปลี่ยน
+  window.onTEGChange = function() {
+    currentGroupFilter = window.TEG ? TEG.get() : 'all';
+    updateGroupBadge();
+    if (classroomResearchData) processDashboardData();
+  };
 
   const criteriaMap = {
     '1.1': { name: '1.1 ความตรงประเด็น (คะแนนเต็ม 12)', mult: 3 },
@@ -735,6 +741,38 @@ require_once 'header.php';
     }
 
     renderCustomTeacherOverview(summaryData);
+
+    // กราฟแมงมุมรายบุคคล 2 กราฟ — ไม่ขึ้นกับโหมดตาราง แสดงทั้ง "ภารงาน" และ "ก่อน/หลังเรียน" เสมอ
+    const taskDimMap = buildDimMapFromEvals(studentEvals, 'task');
+    const prepostDimMap = buildDimMapFromEvals(studentEvals, 'prepost');
+    drawDimensionSpider(taskDimMap, 'classDimensionSpiderTask', 'task');
+    drawDimensionSpider(prepostDimMap, 'classDimensionSpiderPrePost', 'prepost');
+  }
+
+  // สร้างแผนที่คะแนนเฉลี่ยรายด้านต่อคน สำหรับกราฟแมงมุม
+  //  - mode 'task'    : รวมการประเมิน Task 1 + Task 2 จากผู้ประเมินทุกฝ่าย แล้วเฉลี่ย
+  //  - mode 'prepost' : ใช้คะแนนครูประเมิน เลือกหลังเรียนก่อน ถ้าไม่มีจึงใช้ก่อนเรียน
+  function buildDimMapFromEvals(studentEvals, mode) {
+    const map = {};
+    const subKeys = ['1_1','1_2','1_3','2_1','2_2','3_1','3_2','3_3','4_1','4_2','4_3'];
+    Object.keys(studentEvals).forEach(id => {
+      let evs = [];
+      if (mode === 'task') {
+        evs = (studentEvals[id]['task1'] || []).concat(studentEvals[id]['task2'] || []);
+      } else {
+        const post = (studentEvals[id]['posttest'] || []).find(e => e.evaluator_type === 'teacher');
+        const pre = (studentEvals[id]['pretest'] || []).find(e => e.evaluator_type === 'teacher');
+        const chosen = post || pre;
+        evs = chosen ? [chosen] : [];
+      }
+      const rec = { count: evs.length };
+      const sums = {};
+      subKeys.forEach(k => sums[k] = 0);
+      evs.forEach(e => { subKeys.forEach(k => { sums[k] += Number(e['score_' + k] || 0); }); });
+      subKeys.forEach(k => { rec['avg_' + k] = evs.length > 0 ? (sums[k] / evs.length) : 0; });
+      map[id] = rec;
+    });
+    return map;
   }
 
   function renderCustomTeacherOverview(data) {
@@ -925,7 +963,6 @@ require_once 'header.php';
 
     drawClassQualityDistribution(qualityCounts);
     drawClassDimensionAverages(dimensionSums, evaluatedStdsCount, subCriteriaSums);
-    drawClassroomDimensionLines({ success: true, data: data });
     generateResearchInsights(subCriteriaSums, evaluatedStdsCount, totalRegistered, totalSumScores, totalScoredCount, activeEvaluationSetCount);
   }
 
@@ -1163,20 +1200,24 @@ require_once 'header.php';
     });
   }
 
-  function drawClassroomDimensionLines(res) {
-    const canvas = document.getElementById('classDimensionLinesChart');
+  // วาดกราฟแมงมุมรายบุคคล (ใช้ร่วมกันทั้งกราฟ "ภารงาน" และ "ก่อน/หลังเรียน")
+  //  dataMap  = { id: {count, avg_1_1..avg_4_3} }
+  //  canvasId = id ของ <canvas>
+  //  key      = 'task' | 'prepost' เพื่อเก็บอินสแตนซ์แยกกัน
+  function drawDimensionSpider(dataMap, canvasId, key) {
+    const canvas = document.getElementById(canvasId);
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    if (classDimensionLinesChartInstance) classDimensionLinesChartInstance.destroy();
-    
+    if (spiderChartInstances[key]) spiderChartInstances[key].destroy();
+
     const datasets = [];
     // กรองเฉพาะนักเรียนในกลุ่มที่เลือกให้ตรงกับตารางและกราฟอื่น
     const sortedKeys = Object.keys(studentDB).sort().filter(passesGroupFilter);
 
     let lineCount = 0;
     sortedKeys.forEach(id => {
-      const studentData = res.data && res.data[id] ? res.data[id] : null;
-      // กราฟนี้จะวาดเส้นแสดงคะแนนเฉลี่ยรายบุคคล ทันทีที่มีการประเมินอย่างน้อย 1 รายการ โดยไม่ต้องรอครบ 3 มิติ (ตนเอง/เพื่อน/ครู)
+      const studentData = dataMap && dataMap[id] ? dataMap[id] : null;
+      // วาดรูปใยแมงมุมของนักเรียนทันทีที่มีการประเมินอย่างน้อย 1 รายการในหมวดนี้
       if (studentData && studentData.count > 0) {
         const pct11 = (parseFloat(studentData.avg_1_1) / 12) * 100;
         const pct12 = (parseFloat(studentData.avg_1_2) / 6) * 100;
@@ -1227,7 +1268,7 @@ require_once 'header.php';
       }
     });
     
-    classDimensionLinesChartInstance = new Chart(ctx, {
+    spiderChartInstances[key] = new Chart(ctx, {
       type: 'radar',
       data: {
         labels: [
@@ -1275,11 +1316,11 @@ require_once 'header.php';
                 else if (context.dataIndex === 9) rawStr = ` (${(val/100*2).toFixed(2)}/2 คะแนน)`;
                 else if (context.dataIndex === 10) rawStr = ` (${(val/100*2).toFixed(2)}/2 คะแนน)`;
                 
-                // ค้นหาจำนวนรายการประเมินที่ส่งแล้ว
+                // ค้นหาจำนวนรายการประเมินที่นำมาเฉลี่ยในหมวดนี้
                 const studentId = studentInfo.split(' - ')[0];
-                const studentData = res.data && res.data[studentId] ? res.data[studentId] : null;
-                const countStr = studentData ? ` [ประเมินแล้ว ${studentData.count}/3 รายการ]` : '';
-                
+                const studentData = dataMap && dataMap[studentId] ? dataMap[studentId] : null;
+                const countStr = studentData ? ` [ประเมิน ${studentData.count} รายการ]` : '';
+
                 return `${studentInfo}: ${val}%${rawStr}${countStr}`;
               }
             }
