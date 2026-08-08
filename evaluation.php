@@ -117,16 +117,14 @@ require_once 'header.php';
       <div class="card border-0 rounded-3 p-4 mb-4" style="background-color: var(--light-blue);">
         <div class="row align-items-end">
           <div class="col-md-8 col-sm-12">
-            <?php if ($mode_param === 'teacher' || $mode_param === 'peer'): ?>
-            <!-- เลือกกลุ่มด้วยปุ่ม (ต้องเลือกกลุ่มก่อนจึงจะระบุรหัสนักเรียนได้) — เครื่องหมาย * อยู่ด้านบนสุด -->
+            <?php if ($mode_param === 'peer'): ?>
+            <!-- โหมดเพื่อนประเมิน (นักเรียน): เลือกกลุ่มด้วยปุ่มในฟอร์ม เพราะนักเรียนไม่มีปุ่มกลุ่มบน navbar -->
             <div class="mb-3">
               <label class="form-label fw-bold text-secondary small text-uppercase tracking-wider d-block mb-2">
-                เลือกกลุ่ม (รายชื่อจะแสดงเฉพาะกลุ่มที่เลือก) <?php if ($mode_param === 'teacher'): ?><span class="text-danger">*</span><?php endif; ?>
+                เลือกกลุ่ม (รายชื่อจะแสดงเฉพาะกลุ่มที่เลือก)
               </label>
               <div id="groupFilterButtons" class="d-flex flex-wrap gap-2">
-                <?php if ($mode_param === 'peer'): ?>
                 <button type="button" class="btn btn-outline-secondary rounded-3 fw-bold group-btn active" data-group="">ทุกกลุ่ม</button>
-                <?php endif; ?>
                 <button type="button" class="btn btn-outline-primary rounded-3 fw-bold group-btn" data-group="กลุ่มทดลอง">🧪 กลุ่มทดลอง</button>
                 <button type="button" class="btn btn-outline-primary rounded-3 fw-bold group-btn" data-group="กลุ่มตัวอย่าง">📋 กลุ่มตัวอย่าง</button>
               </div>
@@ -134,14 +132,22 @@ require_once 'header.php';
             </div>
             <?php endif; ?>
 
-            <!-- ระบุรหัสนักเรียนเป้าหมาย แล้วข้อมูลจะปรากฏขึ้น -->
-            <label for="targetStudentInput" class="form-label fw-bold text-secondary small text-uppercase tracking-wider">ระบุรหัสนักเรียนที่เป็นเป้าหมายผู้ถูกประเมิน <span class="text-danger">*</span></label>
-            <div class="input-group input-group-lg">
-              <span class="input-group-text bg-white border-2"><i class="bi bi-person-vcard text-primary"></i></span>
-              <input type="text" id="targetStudentInput" list="targetStudentOptions" autocomplete="off" required class="form-control border-2 fw-semibold text-dark" placeholder="พิมพ์รหัสนักเรียนที่ต้องการประเมิน แล้วกด แสดงข้อมูล">
-              <button type="button" id="loadStudentBtn" class="btn btn-primary fw-bold px-4"><i class="bi bi-search"></i> แสดงข้อมูล</button>
+            <!-- ระบุรหัสหรือชื่อนักเรียนเป้าหมาย แล้วข้อมูลจะปรากฏขึ้น -->
+            <label for="targetStudentInput" class="form-label fw-bold text-secondary small text-uppercase tracking-wider">ระบุรหัสหรือชื่อนักเรียนที่เป็นเป้าหมายผู้ถูกประเมิน <span class="text-danger">*</span></label>
+            <div class="input-group input-group-lg shadow-sm">
+              <span class="input-group-text bg-white border-2 border-end-0"><i class="bi bi-search text-primary"></i></span>
+              <select id="targetStudentSelect" class="form-select border-2 border-start-0 border-end-0 fw-semibold text-dark">
+                <option value="">— เลือกนักเรียนจากรายการ (รหัส — ชื่อ) —</option>
+              </select>
+              <button type="button" id="loadStudentBtn" class="btn btn-primary fw-bold px-4"><i class="bi bi-box-arrow-in-down me-1"></i> แสดงข้อมูล</button>
             </div>
-            <datalist id="targetStudentOptions"></datalist>
+            <div class="mt-2">
+              <div class="input-group input-group-sm" style="max-width: 420px;">
+                <span class="input-group-text bg-light text-secondary border-end-0"><i class="bi bi-keyboard"></i></span>
+                <input type="text" id="targetStudentInput" list="targetStudentOptions" autocomplete="off" class="form-control border-start-0" placeholder="หรือพิมพ์ค้นหาด้วยรหัส หรือ ชื่อนักเรียน...">
+              </div>
+              <datalist id="targetStudentOptions"></datalist>
+            </div>
             <div id="targetStudentResolved" class="mt-2 small fw-bold text-success d-none"></div>
             <div id="targetStudentError" class="mt-2 small fw-bold text-danger d-none"></div>
             <?php if ($mode_param === 'self'): ?>
@@ -521,20 +527,48 @@ require_once 'header.php';
     }
   ];
 
-  // โหมดครูต้องเลือกกลุ่มก่อนเสมอ รายชื่อจึงจะแสดง (แยกกลุ่มไม่ให้ปนกัน)
-  function groupRequired() { return modeParam === 'teacher'; }
+  // ไม่บังคับเลือกกลุ่มในฟอร์มอีกต่อไป — โหมดครูควบคุมกลุ่มจากปุ่มบน navbar (จุดเดียวของทั้งระบบ)
+  function groupRequired() { return false; }
 
-  // ค่ากลุ่มที่เลือกจากปุ่ม (อ่านจากปุ่มที่ active เพื่อให้คงค่าแม้ form.reset())
+  // ค่ากลุ่มที่ใช้กรองรายชื่อ
+  //  - โหมดครู: ใช้กลุ่มที่เลือกจากปุ่มบน navbar (ค่ากลาง TEG)
+  //  - โหมดเพื่อน (นักเรียน): ใช้ปุ่มเลือกกลุ่มในฟอร์ม
   function getGroupValue() {
+    if (modeParam === 'teacher') return (window.TEG ? TEG.filterValue() : '');
     const active = document.querySelector('#groupFilterButtons .group-btn.active');
     if (active) return active.dataset.group || '';
     const el = document.getElementById('groupFilterValue');
     return el ? el.value : '';
   }
-  // รหัสนักเรียนเป้าหมายที่ผู้ใช้พิมพ์
+  // แปลงข้อความที่พิมพ์ (รหัส / "รหัส - ชื่อ" / ชื่อ) → รหัสนักเรียนที่ตรงกัน (ค้นได้ทั้งรหัสและชื่อ)
+  function resolveStudentId(raw) {
+    const q = (raw || '').trim();
+    if (!q) return '';
+    if (studentDB[q]) return q;                          // ตรงรหัสพอดี
+    const prefix = q.split(' - ')[0].trim();             // รูปแบบ "รหัส - ชื่อ" จากรายการแนะนำ
+    if (studentDB[prefix]) return prefix;
+    const lower = q.toLowerCase();
+    const exact = Object.keys(studentDB).filter(id => (studentDB[id] || '').toLowerCase() === lower);
+    if (exact.length === 1) return exact[0];             // ชื่อตรงทั้งหมดและมีคนเดียว
+    const partial = Object.keys(studentDB).filter(id => (studentDB[id] || '').toLowerCase().includes(lower));
+    if (partial.length === 1) return partial[0];         // ชื่อบางส่วนและเหลือผลเดียว
+    return '';
+  }
+
+  // รหัสนักเรียนเป้าหมาย — เอาจาก dropdown ก่อน ถ้าไม่มีจึงตีความจากช่องค้นหา (รหัส/ชื่อ)
   function getTargetId() {
+    const sel = document.getElementById('targetStudentSelect');
+    if (sel && sel.value && studentDB[sel.value]) return sel.value;
     const el = document.getElementById('targetStudentInput');
-    return el ? el.value.trim() : '';
+    return resolveStudentId(el ? el.value : '');
+  }
+
+  // ตั้งค่าเป้าหมายให้ทั้ง dropdown และช่องค้นหาตรงกัน
+  function syncTargetSelection(id) {
+    const sel = document.getElementById('targetStudentSelect');
+    const inp = document.getElementById('targetStudentInput');
+    if (sel && studentDB[id] !== undefined) sel.value = id;
+    if (inp) inp.value = studentDB[id] !== undefined ? `${id} - ${studentDB[id]}` : (inp.value || '');
   }
 
   // โหลดรายชื่อนักเรียนจาก API
@@ -562,20 +596,34 @@ require_once 'header.php';
     }
   }
 
-  // เติมรายชื่อนักเรียนลงใน datalist (ช่วยแนะนำรหัสขณะพิมพ์)
+  // เติมรายชื่อนักเรียนลงใน dropdown ทางการ + datalist (ค้นได้ทั้งรหัสและชื่อ)
   function populateStudentDatalist() {
     const dl = document.getElementById('targetStudentOptions');
-    if (!dl) return;
-    dl.innerHTML = '';
-    // ครูยังไม่เลือกกลุ่ม → ยังไม่มีรายชื่อให้แนะนำ
-    if (groupRequired() && !getGroupValue()) return;
+    const sel = document.getElementById('targetStudentSelect');
     const sortedKeys = Object.keys(studentDB).sort();
-    sortedKeys.forEach(id => {
-      const option = document.createElement('option');
-      option.value = id;
-      option.label = `${id} - ${studentDB[id]}`;
-      dl.appendChild(option);
-    });
+
+    // dropdown ทางการ: แสดง "รหัส — ชื่อ"
+    if (sel) {
+      const keep = sel.value;
+      sel.innerHTML = '<option value="">— เลือกนักเรียนจากรายการ (รหัส — ชื่อ) —</option>';
+      sortedKeys.forEach(id => {
+        const opt = document.createElement('option');
+        opt.value = id;
+        opt.textContent = `${id} — ${studentDB[id]}`;
+        sel.appendChild(opt);
+      });
+      if (keep && studentDB[keep]) sel.value = keep; // คงค่าที่เลือกไว้ถ้ายังอยู่ในรายการ
+    }
+
+    // datalist สำหรับช่องค้นหา: value = "รหัส - ชื่อ" เพื่อให้พิมพ์ค้นได้ทั้งรหัสและชื่อ
+    if (dl) {
+      dl.innerHTML = '';
+      sortedKeys.forEach(id => {
+        const option = document.createElement('option');
+        option.value = `${id} - ${studentDB[id]}`;
+        dl.appendChild(option);
+      });
+    }
   }
 
   // ปิด/เปิดการใช้งานส่วนรูบริกให้จางลงเมื่อยังไม่มีเป้าหมาย
@@ -588,30 +636,30 @@ require_once 'header.php';
 
   // ตรวจสอบรหัสนักเรียนที่พิมพ์ แล้วโหลดข้อมูล (ข้อมูลจะปรากฏเมื่อรหัสถูกต้อง)
   function resolveTargetStudent() {
-    const id = getTargetId();
     const resolvedEl = document.getElementById('targetStudentResolved');
     const errEl = document.getElementById('targetStudentError');
     if (resolvedEl) resolvedEl.classList.add('d-none');
     if (errEl) errEl.classList.add('d-none');
 
+    // อ่านสิ่งที่ผู้ใช้ระบุ: เลือกจาก dropdown หรือพิมพ์ค้นหา (รหัส/ชื่อ)
+    const sel = document.getElementById('targetStudentSelect');
+    const inp = document.getElementById('targetStudentInput');
+    const rawTyped = inp ? inp.value.trim() : '';
+    const hasTyped = rawTyped !== '';
+    const id = getTargetId();
+
     if (!id) {
-      if (errEl) { errEl.textContent = '⚠️ กรุณาพิมพ์รหัสนักเรียนก่อน'; errEl.classList.remove('d-none'); }
+      if (errEl) {
+        errEl.textContent = hasTyped
+          ? `⚠️ ไม่พบนักเรียนที่ตรงกับ "${rawTyped}" (ลองพิมพ์รหัส หรือ ชื่อให้ชัดเจนขึ้น)`
+          : '⚠️ กรุณาเลือกนักเรียนจากรายการ หรือพิมพ์ค้นหาด้วยรหัส/ชื่อก่อน';
+        errEl.classList.remove('d-none');
+      }
       dimRubric();
       return;
     }
-    // ครูต้องเลือกกลุ่มก่อน
-    if (groupRequired() && !getGroupValue()) {
-      if (errEl) { errEl.textContent = '⚠️ กรุณาเลือกกลุ่มก่อนระบุรหัสนักเรียน'; errEl.classList.remove('d-none'); }
-      dimRubric();
-      return;
-    }
-    // รหัสไม่พบในกลุ่มที่เลือก
-    if (!studentDB[id]) {
-      if (errEl) { errEl.textContent = '⚠️ ไม่พบรหัสนักเรียนนี้ในกลุ่มที่เลือก กรุณาตรวจสอบรหัสอีกครั้ง'; errEl.classList.remove('d-none'); }
-      dimRubric();
-      return;
-    }
-    // พบแล้ว → แสดงชื่อและโหลดเกณฑ์/ข้อมูลเดิม
+    // พบแล้ว → ซิงก์ทั้ง dropdown และช่องค้นหา แล้วแสดงชื่อ/โหลดข้อมูลเดิม
+    syncTargetSelection(id);
     if (resolvedEl) {
       resolvedEl.textContent = `✓ ผู้ถูกประเมิน: ${id} - ${studentDB[id]}`;
       resolvedEl.classList.remove('d-none');
@@ -887,40 +935,38 @@ require_once 'header.php';
   (function bindTargetInput() {
     const btn = document.getElementById('loadStudentBtn');
     const input = document.getElementById('targetStudentInput');
+    const sel = document.getElementById('targetStudentSelect');
     if (btn) btn.addEventListener('click', resolveTargetStudent);
+    // เลือกจาก dropdown ทางการ → โหลดข้อมูลทันที
+    if (sel) sel.addEventListener('change', () => {
+      if (sel.value && studentDB[sel.value]) resolveTargetStudent();
+    });
     if (input) {
       input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') { e.preventDefault(); resolveTargetStudent(); }
       });
       // เลือกจากรายการแนะนำ (datalist) ให้โหลดข้อมูลทันที
       input.addEventListener('change', () => {
-        if (studentDB[getTargetId()]) resolveTargetStudent();
+        if (getTargetId()) resolveTargetStudent();
       });
     }
   })();
 
-  // ปุ่มเลือกกลุ่มบน navbar เปลี่ยน (เฉพาะโหมดครู) → ซิงก์ปุ่มกลุ่มในหน้าและโหลดรายชื่อใหม่
+  // ปุ่มเลือกกลุ่มบน navbar เปลี่ยน (เฉพาะโหมดครู) → โหลดรายชื่อกลุ่มใหม่แล้วรีเซ็ตเป้าหมาย
   window.onTEGChange = async function() {
     if (modeParam !== 'teacher' || !window.TEG) return; // โหมดอื่นไม่ยุ่งกับกลุ่ม
-    const want = TEG.filterValue();
-    const gBtns = document.querySelectorAll('#groupFilterButtons .group-btn');
-    let matched = null;
-    gBtns.forEach(b => { if ((b.dataset.group || '') === want) matched = b; });
-    if (matched) {
-      gBtns.forEach(b => b.classList.remove('active'));
-      matched.classList.add('active');
-      const hidden = document.getElementById('groupFilterValue');
-      if (hidden) hidden.value = want;
-    }
     await loadStudents();
     populateStudentDatalist();
-    // รีเซ็ตการระบุรหัสเป้าหมายเพราะรายชื่ออาจเปลี่ยนกลุ่ม
+    // รีเซ็ตการระบุเป้าหมายเพราะรายชื่ออาจเปลี่ยนกลุ่ม
     const tInput = document.getElementById('targetStudentInput');
-    if (tInput && modeParam !== 'self') { tInput.value = ''; tInput.disabled = false; }
+    if (tInput) tInput.value = '';
+    const tSel = document.getElementById('targetStudentSelect');
+    if (tSel) tSel.value = '';
     const resolvedEl = document.getElementById('targetStudentResolved');
     const errEl = document.getElementById('targetStudentError');
     if (resolvedEl) resolvedEl.classList.add('d-none');
     if (errEl) errEl.classList.add('d-none');
+    dimRubric();
   };
 
   // เลือกกลุ่มด้วยปุ่ม → โหลดรายชื่อใหม่แล้วรีเซ็ตการระบุรหัสเป้าหมาย
@@ -945,9 +991,11 @@ require_once 'header.php';
           applyPeerPairing(phase);
           return;
         }
-        // โหมดอื่น: รีเซ็ตการระบุรหัสเป้าหมาย
+        // โหมดอื่น: รีเซ็ตการระบุเป้าหมาย
         const tInput = document.getElementById('targetStudentInput');
         if (tInput) { tInput.value = ''; tInput.disabled = false; }
+        const tSel = document.getElementById('targetStudentSelect');
+        if (tSel) { tSel.value = ''; tSel.disabled = false; }
         const resolvedEl = document.getElementById('targetStudentResolved');
         const errEl = document.getElementById('targetStudentError');
         if (resolvedEl) resolvedEl.classList.add('d-none');
@@ -1012,16 +1060,20 @@ require_once 'header.php';
 
     try {
       const res = await (await fetch(`api.php?action=get_my_peer_partner&round=${phase}&_t=${Date.now()}`)).json();
+      const tSelPeer = document.getElementById('targetStudentSelect');
       if (res.success && res.partner && studentDB[res.partner]) {
-        // มีคู่ → ตั้งค่าและล็อกช่องระบุรหัส
-        if (tInput) { tInput.value = res.partner; tInput.disabled = true; }
+        // มีคู่ → ตั้งค่าและล็อกช่องระบุเป้าหมาย
+        syncTargetSelection(res.partner);
+        if (tInput) tInput.disabled = true;
+        if (tSelPeer) tSelPeer.disabled = true;
         if (loadBtn) loadBtn.disabled = true;
         if (resolvedEl) { resolvedEl.textContent = `✓ ผู้ถูกประเมิน: ${res.partner} - ${studentDB[res.partner]}`; resolvedEl.classList.remove('d-none'); }
         if (lockNotice) lockNotice.classList.remove('d-none');
         checkExistingEvaluation(res.partner);
       } else {
-        // ไม่มีคู่ → เปิดช่องให้ระบุรหัสเองพร้อมข้อความเตือน (fallback)
+        // ไม่มีคู่ → เปิดช่องให้ระบุเองพร้อมข้อความเตือน (fallback)
         if (tInput) { tInput.disabled = false; tInput.value = ''; }
+        if (tSelPeer) { tSelPeer.disabled = false; tSelPeer.value = ''; }
         if (loadBtn) loadBtn.disabled = false;
         if (resolvedEl) resolvedEl.classList.add('d-none');
         if (fallbackNotice) fallbackNotice.classList.remove('d-none');
@@ -1118,31 +1170,21 @@ require_once 'header.php';
 
   // ทำการทำงานเริ่มต้นแบบเงียบ
   (async function init() {
-    // โหมดครู: ตั้งกลุ่มเริ่มต้นจากค่าที่จำไว้ร่วมกันทุกหน้า (ค่าเริ่มต้น = กลุ่มตัวอย่าง)
-    if (modeParam === 'teacher' && window.TEG) {
-      const want = TEG.filterValue();
-      const gBtns = document.querySelectorAll('#groupFilterButtons .group-btn');
-      let matched = null;
-      gBtns.forEach(b => { if ((b.dataset.group || '') === want) matched = b; });
-      if (matched) {
-        gBtns.forEach(b => b.classList.remove('active'));
-        matched.classList.add('active');
-        const hidden = document.getElementById('groupFilterValue');
-        if (hidden) hidden.value = want;
-      }
-    }
+    // โหมดครูใช้กลุ่มจากปุ่มบน navbar อัตโนมัติ (ผ่าน getGroupValue → TEG) จึงไม่ต้องตั้งค่าปุ่มในฟอร์ม
 
     await loadStudents();
     populateStudentDatalist();
     buildRubric();
 
     const tInput = document.getElementById('targetStudentInput');
+    const tSel = document.getElementById('targetStudentSelect');
     const loadBtn = document.getElementById('loadStudentBtn');
     const resolvedEl = document.getElementById('targetStudentResolved');
 
     if (modeParam === 'self') {
-      // โหมดประเมินตนเอง → ล็อกรหัสเป็นของตนเองและโหลดข้อมูลทันที
-      if (tInput) { tInput.value = currentUser.id; tInput.disabled = true; }
+      // โหมดประเมินตนเอง → ล็อกเป้าหมายเป็นของตนเองและโหลดข้อมูลทันที
+      if (tSel) { tSel.value = currentUser.id; tSel.disabled = true; }
+      if (tInput) { tInput.value = `${currentUser.id} - ${studentDB[currentUser.id] || ''}`; tInput.disabled = true; }
       if (loadBtn) loadBtn.disabled = true;
       if (resolvedEl && studentDB[currentUser.id]) {
         resolvedEl.textContent = `✓ ผู้ถูกประเมิน: ${currentUser.id} - ${studentDB[currentUser.id]}`;
@@ -1151,6 +1193,7 @@ require_once 'header.php';
       checkExistingEvaluation(currentUser.id);
     } else {
       if (tInput) { tInput.value = ''; tInput.disabled = false; }
+      if (tSel) { tSel.value = ''; tSel.disabled = false; }
       dimRubric();
     }
   })();
