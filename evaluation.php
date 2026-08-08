@@ -286,9 +286,12 @@ require_once 'header.php';
     </div>
     <div class="essay-doc-scroll">
       <div class="essay-sheet">
+        <!-- หัวกระดาษแบบข้อสอบ: ชื่อแบบวัด → ชื่อเรื่อง → ชื่อ/ชั้น/เลขที่ เจ้าของผลงาน -->
+        <div class="essay-doc-formtitle" id="essayPanelFormTitle">แบบวัดความสามารถก่อนเรียน</div>
         <h1 class="essay-doc-title" id="essayPanelTitle">—</h1>
+        <div class="essay-doc-author" id="essayPanelAuthor"></div>
         <div class="essay-doc-content" id="essayPanelContent">
-          <!-- เนื้อหาเรียงความ (พร้อมเส้นบรรทัดและเลขบรรทัด) -->
+          <!-- เนื้อหาเรียงความ (พร้อมเส้นบรรทัดและเลขบรรทัดทุกบรรทัด) -->
         </div>
       </div>
     </div>
@@ -317,7 +320,8 @@ require_once 'header.php';
 .essay-doc-scroll {
   max-height: 70vh;
   overflow-y: auto;
-  background: #ffffff;
+  background: #eceff3;           /* พื้นเทาอ่อนเพื่อให้แผ่นกระดาษ A4 สีขาวเด่นเหมือนโปรแกรมดูเอกสาร */
+  padding: 16px 10px;
 }
 /* จอใหญ่ (lg ขึ้นไป): แบ่งครึ่งจอ ซ้าย = แบบประเมิน / ขวา = เรียงความ (ลอยติดขอบขวา ตามการเลื่อนเสมอ) ให้กว้างเท่า ๆ กัน */
 @media (min-width: 992px) {
@@ -336,24 +340,46 @@ require_once 'header.php';
   /* เว้นครึ่งขวาไว้ให้กล่องเรียงความ แบบประเมินจึงกว้างเท่ากันในครึ่งซ้าย */
   #view-evaluation.essay-open { padding-right: calc(50vw + 1.5rem); }
 }
+/* แผ่นกระดาษสัดส่วน A4 (210:297 ≈ 1:1.414) — แคบลงและมีระยะขอบเหมือนกระดาษจริง */
 .essay-sheet {
-  max-width: 820px;
+  width: 100%;
+  max-width: 640px;             /* แคบลงเพื่อให้เส้นบรรทัดสั้นลงและเหมาะกับการอ่าน */
+  min-height: 905px;            /* ≈ 640 × 1.414 ให้ได้สัดส่วน A4 */
   margin: 0 auto;
-  padding: 26px 30px 34px;
+  padding: 56px 52px 64px;      /* ระยะขอบกระดาษ */
   background: #ffffff;
   color: #1a1a1a;
+  box-shadow: 0 3px 14px rgba(0,0,0,0.14);
+  border: 1px solid #dfe3e8;
   font-family: "TH Sarabun New", "Sarabun", "Leelawadee UI", "Tahoma", sans-serif;
+}
+/* ชื่อแบบวัด (หัวกระดาษบนสุด) */
+.essay-doc-formtitle {
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0d3b66;
+  margin: 0 0 0.3rem;
 }
 .essay-doc-title {
   text-align: center;
-  font-size: 1.7rem;
+  font-size: 1.35rem;
   font-weight: 700;
-  line-height: 1.4;
-  color: #0d3b66;
+  line-height: 1.35;
+  color: #1a1a1a;
+  margin: 0 0 0.5rem;
+}
+/* บรรทัดเจ้าของผลงาน: ชื่อ / ชั้น / เลขที่ */
+.essay-doc-author {
+  text-align: center;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #444;
   margin: 0 0 1rem;
   padding-bottom: 0.6rem;
   border-bottom: 2px solid #e7e5e4;
 }
+.essay-doc-author:empty { display: none; }
 /* เนื้อความแบบกระดาษมีเส้นบรรทัด (ruled paper) + เว้นที่ซ้ายสำหรับเลขบรรทัด */
 .essay-doc-content {
   position: relative;
@@ -846,8 +872,8 @@ require_once 'header.php';
     return paras.map(p => `<p class="essay-para">${nl2brSafe(p)}</p>`).join('');
   }
 
-  // สร้างเลขบรรทัดทุก 5 บรรทัด (5, 10, 15, ...) ที่ขอบซ้ายของเนื้อความ ให้ตรงกับเส้นบรรทัดของกระดาษ
-  // คำนวณจำนวนบรรทัดจริงหลังจัดหน้าเสร็จ แล้ววางตัวเลขตามระยะบรรทัด (LH) — วิธีเดียวกับ essay_print.php
+  // สร้างเลขบรรทัด "ทุกบรรทัด" (1, 2, 3, ...) ที่ขอบซ้ายของเนื้อความ ให้ตรงกับเส้นบรรทัดของกระดาษ
+  // คำนวณจำนวนบรรทัดจริงหลังจัดหน้าเสร็จ แล้ววางตัวเลขตามระยะบรรทัด (LH)
   function addEssayLineNumbers() {
     const box = document.getElementById('essayPanelContent');
     if (!box) return;
@@ -855,7 +881,7 @@ require_once 'header.php';
     if (box.querySelector('.no-content')) return; // ไม่มีเนื้อหา → ไม่ต้องใส่เลขบรรทัด
     const LH = parseFloat(getComputedStyle(box).lineHeight) || 36; // ต้องตรงกับ line-height ของ .essay-doc-content
     const lines = Math.round(box.clientHeight / LH);
-    for (let i = 5; i <= lines; i += 5) {
+    for (let i = 1; i <= lines; i++) {
       const s = document.createElement('span');
       s.className = 'lnum';
       s.textContent = i;
@@ -882,8 +908,18 @@ require_once 'header.php';
     if (view) view.classList.toggle('essay-open', show);
   }
 
+  // ชื่อหัวกระดาษตามรอบการประเมิน
+  const essayFormTitleByPhase = {
+    pretest:  'แบบวัดความสามารถก่อนเรียน',
+    posttest: 'แบบวัดความสามารถหลังเรียน',
+    task1:    'แบบฝึกภารงาน หน่วยที่ 1',
+    task2:    'แบบฝึกภารงาน หน่วยที่ 2'
+  };
+
   async function fetchStudentEssayForEvaluation(studentId, testPhase) {
+    const formTitleEl = document.getElementById('essayPanelFormTitle');
     const titleEl = document.getElementById('essayPanelTitle');
+    const authorEl = document.getElementById('essayPanelAuthor');
     const contentEl = document.getElementById('essayPanelContent');
     const countEl = document.getElementById('essayPanelWordCount');
 
@@ -898,7 +934,19 @@ require_once 'header.php';
       const data = await response.json();
 
       if (data.success && data.found) {
+        // หัวกระดาษ: ชื่อแบบวัดตามรอบ
+        if (formTitleEl) formTitleEl.textContent = essayFormTitleByPhase[testPhase] || 'แบบวัดความสามารถ';
+        // ชื่อเรื่อง
         titleEl.textContent = data.data.essay_title || 'ไม่มีชื่อเรื่อง';
+        // ชื่อ / ชั้น / เลขที่ ของเจ้าของผลงาน
+        const ownerName = studentDB[studentId] || data.data.student_name || '';
+        const ownerRoom = data.data.classroom || '';
+        if (authorEl) {
+          authorEl.textContent =
+            `ชื่อ ${ownerName || '—'}` +
+            `   ชั้น ${ownerRoom || '—'}` +
+            `   เลขที่ ${studentId}`;
+        }
         contentEl.innerHTML = formatEssayHTML(data.data.essay_content);
         countEl.textContent = `${data.data.word_count || 0} คำ`;
         toggleEssayColumn(true);
