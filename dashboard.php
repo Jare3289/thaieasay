@@ -48,11 +48,21 @@ require_once 'header.php';
 
     <!-- รายงานกราฟสถิติเพื่อการวิจัยชั้นเรียน (Classroom Research Charts) -->
     <div class="card border-0 shadow-sm rounded-4 bg-white mb-4 overflow-hidden">
-      <div class="card-header bg-light d-flex justify-content-between align-items-center py-3">
+      <div class="card-header bg-light d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 py-3">
         <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-pie-chart-fill text-primary"></i> รายงานสถิติภาพรวมเพื่อการทำวิจัยวิชาการ (Research Statistical Analysis)</h6>
-        <button class="btn btn-sm btn-outline-secondary fw-bold rounded-pill px-3" type="button" data-bs-toggle="collapse" data-bs-target="#researchChartsCollapse" aria-expanded="true" aria-controls="researchChartsCollapse">
-          แสดง/ซ่อน รายงานวิจัย
-        </button>
+        <div class="d-flex align-items-center gap-2">
+          <div class="input-group input-group-sm" style="width: auto;">
+            <span class="input-group-text bg-white text-secondary border-end-0"><i class="bi bi-people-fill"></i> แยกกลุ่ม</span>
+            <select id="dashboardGroupFilter" onchange="switchGroupFilter()" class="form-select bg-white border-start-0 fw-bold text-primary">
+              <option value="all" selected>ทุกกลุ่มรวมกัน</option>
+              <option value="กลุ่มทดลอง">กลุ่มทดลอง</option>
+              <option value="กลุ่มตัวอย่าง">กลุ่มตัวอย่าง</option>
+            </select>
+          </div>
+          <button class="btn btn-sm btn-outline-secondary fw-bold rounded-pill px-3 text-nowrap" type="button" data-bs-toggle="collapse" data-bs-target="#researchChartsCollapse" aria-expanded="true" aria-controls="researchChartsCollapse">
+            แสดง/ซ่อน
+          </button>
+        </div>
       </div>
       <div class="collapse show" id="researchChartsCollapse">
         <div class="card-body">
@@ -69,10 +79,10 @@ require_once 'header.php';
                 <canvas id="classDimensionAveragesChart"></canvas>
               </div>
             </div>
-            <!-- กราฟเส้นคะแนนเฉลี่ยรายบุคคลแยกตามรายด้าน (1 นักเรียน = 1 เส้นพาด) -->
+            <!-- กราฟแมงมุมคะแนนเฉลี่ยรายบุคคลแยกตามรายด้าน (1 นักเรียน = 1 รูปใย) -->
             <div class="col-12 text-center mt-4 border-top pt-4">
-              <span class="small fw-bold text-secondary mb-2 d-block">3. กราฟเส้นวิเคราะห์รูปแบบคะแนนเฉลี่ยของผู้เรียนแต่ละคนแยกตามรายด้าน (1 นักเรียน = 1 เส้นพาด)</span>
-              <div style="position: relative; height: 340px;" class="w-100">
+              <span class="small fw-bold text-secondary mb-2 d-block">3. กราฟแมงมุมวิเคราะห์รูปแบบคะแนนเฉลี่ยของผู้เรียนแต่ละคนแยกตามรายด้าน (1 นักเรียน = 1 รูปใยแมงมุม)</span>
+              <div style="position: relative; height: 460px;" class="w-100">
                 <canvas id="classDimensionLinesChart"></canvas>
               </div>
             </div>
@@ -364,6 +374,23 @@ require_once 'header.php';
   let currentResearchPhase = 'task1';
   let currentDashboardViewMode = 'task1';
 
+  // แผนที่กลุ่มการวิจัยของนักเรียน (รหัส -> กลุ่มทดลอง/กลุ่มตัวอย่าง) และตัวกรองกลุ่มปัจจุบัน
+  let studentGroupDB = {};
+  let currentGroupFilter = 'all';
+
+  // ตรวจว่านักเรียนคนนี้อยู่ในกลุ่มที่กำลังเลือกแสดงหรือไม่ (ใช้กรองทั้งตาราง สถิติ และกราฟทั้ง 3)
+  function passesGroupFilter(id) {
+    if (currentGroupFilter === 'all') return true;
+    return (studentGroupDB[id] || '') === currentGroupFilter;
+  }
+
+  // เปลี่ยนกลุ่มที่แสดง (ทั้งหมด/กลุ่มทดลอง/กลุ่มตัวอย่าง) แล้ววาดรายงานใหม่
+  function switchGroupFilter() {
+    const sel = document.getElementById('dashboardGroupFilter');
+    currentGroupFilter = sel ? sel.value : 'all';
+    if (classroomResearchData) processDashboardData();
+  }
+
   const criteriaMap = {
     '1.1': { name: '1.1 ความตรงประเด็น (คะแนนเต็ม 12)', mult: 3 },
     '1.2': { name: '1.2 แก่นเรื่องชัดเจน (คะแนนเต็ม 6)', mult: 1.5 },
@@ -544,6 +571,13 @@ require_once 'header.php';
       
       if (res.success) {
         classroomResearchData = res;
+        // สร้างแผนที่กลุ่มการวิจัยของนักเรียน (รหัส -> กลุ่ม) เพื่อใช้กรองแยกกลุ่มทดลอง/กลุ่มตัวอย่าง
+        studentGroupDB = {};
+        if (Array.isArray(classroomResearchData.students)) {
+          classroomResearchData.students.forEach(s => {
+            studentGroupDB[s.student_id] = s.student_group || '';
+          });
+        }
         // แปลง evaluator_type จากภาษาไทย → รหัสอังกฤษ ให้ตรงกับที่โค้ดแดชบอร์ดใช้เทียบ (self/peer/teacher/expert)
         if (Array.isArray(classroomResearchData.evaluations)) {
           const _typeMap = { 'ตนเองประเมิน': 'self', 'เพื่อนประเมิน': 'peer', 'ครูประเมิน': 'teacher', 'ผู้เชี่ยวชาญประเมิน': 'expert' };
@@ -729,7 +763,8 @@ require_once 'header.php';
 
     tbody.innerHTML = '';
 
-    const sortedKeys = Object.keys(studentDB).sort();
+    // กรองเฉพาะนักเรียนในกลุ่มที่เลือก (ทั้งหมด/กลุ่มทดลอง/กลุ่มตัวอย่าง)
+    const sortedKeys = Object.keys(studentDB).sort().filter(passesGroupFilter);
     let totalRegistered = sortedKeys.length;
     let totalScoredCount = 0;
     let totalSumScores = 0;
@@ -872,10 +907,11 @@ require_once 'header.php';
     // In prepost mode, completion means having both pre and post evaluations from the teacher
     let completionPercentage = 0;
     if (currentDashboardViewMode === 'task') {
-      completionPercentage = Math.round((activeEvaluationSetCount / totalRegistered) * 100);
+      completionPercentage = totalRegistered > 0 ? Math.round((activeEvaluationSetCount / totalRegistered) * 100) : 0;
     } else {
-      let bothTeacherCount = Object.values(data).filter(x => x.preScore !== null && x.postScore !== null).length;
-      completionPercentage = Math.round((bothTeacherCount / totalRegistered) * 100);
+      // นับเฉพาะนักเรียนในกลุ่มที่เลือก เพื่อให้ตรงกับจำนวนผู้เรียนที่ใช้เป็นตัวหาร (totalRegistered)
+      let bothTeacherCount = sortedKeys.filter(id => data[id] && data[id].preScore !== null && data[id].postScore !== null).length;
+      completionPercentage = totalRegistered > 0 ? Math.round((bothTeacherCount / totalRegistered) * 100) : 0;
     }
     document.getElementById('statCompletion').textContent = completionPercentage + "%";
 
@@ -1065,8 +1101,9 @@ require_once 'header.php';
     if (classDimensionLinesChartInstance) classDimensionLinesChartInstance.destroy();
     
     const datasets = [];
-    const sortedKeys = Object.keys(studentDB).sort();
-    
+    // กรองเฉพาะนักเรียนในกลุ่มที่เลือกให้ตรงกับตารางและกราฟอื่น
+    const sortedKeys = Object.keys(studentDB).sort().filter(passesGroupFilter);
+
     let lineCount = 0;
     sortedKeys.forEach(id => {
       const studentData = res.data && res.data[id] ? res.data[id] : null;
@@ -1085,9 +1122,10 @@ require_once 'header.php';
         const pct43 = (parseFloat(studentData.avg_4_3) / 2) * 100;
         
         const hue = (lineCount * 33) % 360;
-        const colorDefault = `hsla(${hue}, 60%, 60%, 0.15)`; // เส้นจางลงโดยเริ่มต้นเพื่อให้อ่านง่าย
-        const colorHover = `hsla(${hue}, 85%, 45%, 1.0)`; // เส้นเข้มขึ้นชัดเจนเมื่อเอาเมาส์ชี้ (Hover)
-        
+        const colorDefault = `hsla(${hue}, 60%, 60%, 0.18)`; // เส้นใยจางลงโดยเริ่มต้นเพื่อให้อ่านง่ายเมื่อมีนักเรียนหลายคน
+        const colorHover = `hsla(${hue}, 85%, 45%, 1.0)`; // เส้นใยเข้มขึ้นชัดเจนเมื่อเอาเมาส์ชี้ (Hover)
+        const fillHover = `hsla(${hue}, 85%, 55%, 0.18)`; // เติมสีในรูปใยจาง ๆ เมื่อชี้เพื่อเน้นรูปทรงของนักเรียนคนนั้น
+
         datasets.push({
           label: `${id} - ${studentDB[id]}`,
           data: [
@@ -1105,21 +1143,23 @@ require_once 'header.php';
           ],
           borderColor: colorDefault,
           borderWidth: 1.5,
-          fill: false,
-          tension: 0.15,
+          backgroundColor: 'transparent',
+          fill: true,
+          tension: 0.05,
           pointBackgroundColor: colorDefault,
           pointRadius: 1,
-          pointHoverRadius: 6,
+          pointHoverRadius: 5,
           pointHoverBackgroundColor: colorHover,
           hoverBorderColor: colorHover,
-          hoverBorderWidth: 4
+          hoverBackgroundColor: fillHover,
+          hoverBorderWidth: 3
         });
         lineCount++;
       }
     });
     
     classDimensionLinesChartInstance = new Chart(ctx, {
-      type: 'line',
+      type: 'radar',
       data: {
         labels: [
           '1.1 ตรงประเด็น (12)',
@@ -1151,7 +1191,7 @@ require_once 'header.php';
             callbacks: {
               label: function(context) {
                 const studentInfo = context.dataset.label;
-                const val = context.parsed.y;
+                const val = context.parsed.r;
                 let rawStr = '';
                 
                 if (context.dataIndex === 0) rawStr = ` (${(val/100*12).toFixed(2)}/12 คะแนน)`;
@@ -1177,13 +1217,20 @@ require_once 'header.php';
           }
         },
         scales: {
-          y: {
+          r: {
             beginAtZero: true,
+            min: 0,
             max: 100,
-            ticks: { stepSize: 20 },
-            title: { display: true, text: 'ร้อยละจากคะแนนเต็ม (%)', font: { family: 'Google Sans', size: 10, weight: 'bold' } }
-          },
-          x: { ticks: { font: { family: 'Google Sans', size: 10 } } }
+            ticks: {
+              stepSize: 20,
+              font: { family: 'Google Sans', size: 9 },
+              backdropColor: 'rgba(255, 255, 255, 0.75)',
+              callback: function(value) { return value + '%'; }
+            },
+            pointLabels: { font: { family: 'Google Sans', size: 9.5, weight: 'bold' } },
+            grid: { color: 'rgba(0, 0, 0, 0.06)' },
+            angleLines: { color: 'rgba(0, 0, 0, 0.08)' }
+          }
         }
       }
     });
