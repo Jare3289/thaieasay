@@ -134,20 +134,13 @@ require_once 'header.php';
 
             <!-- ระบุรหัสหรือชื่อนักเรียนเป้าหมาย แล้วข้อมูลจะปรากฏขึ้น -->
             <label for="targetStudentInput" class="form-label fw-bold text-secondary small text-uppercase tracking-wider">ระบุรหัสหรือชื่อนักเรียนที่เป็นเป้าหมายผู้ถูกประเมิน <span class="text-danger">*</span></label>
+            <!-- ช่องเดียว: คลิกเพื่อเลือกจากรายการ (dropdown) หรือพิมพ์ค้นหาด้วยรหัส/ชื่อก็ได้ -->
             <div class="input-group input-group-lg shadow-sm">
-              <span class="input-group-text bg-white border-2 border-end-0"><i class="bi bi-search text-primary"></i></span>
-              <select id="targetStudentSelect" class="form-select border-2 border-start-0 border-end-0 fw-semibold text-dark">
-                <option value="">— เลือกนักเรียนจากรายการ (รหัส — ชื่อ) —</option>
-              </select>
+              <span class="input-group-text bg-white border-2 border-end-0"><i class="bi bi-person-vcard text-primary"></i></span>
+              <input type="text" id="targetStudentInput" list="targetStudentOptions" autocomplete="off" class="form-control border-2 border-start-0 fw-semibold text-dark" placeholder="คลิกเพื่อเลือกนักเรียน หรือพิมพ์ค้นหาด้วยรหัส/ชื่อ...">
               <button type="button" id="loadStudentBtn" class="btn btn-primary fw-bold px-4"><i class="bi bi-box-arrow-in-down me-1"></i> แสดงข้อมูล</button>
             </div>
-            <div class="mt-2">
-              <div class="input-group input-group-sm" style="max-width: 420px;">
-                <span class="input-group-text bg-light text-secondary border-end-0"><i class="bi bi-keyboard"></i></span>
-                <input type="text" id="targetStudentInput" list="targetStudentOptions" autocomplete="off" class="form-control border-start-0" placeholder="หรือพิมพ์ค้นหาด้วยรหัส หรือ ชื่อนักเรียน...">
-              </div>
-              <datalist id="targetStudentOptions"></datalist>
-            </div>
+            <datalist id="targetStudentOptions"></datalist>
             <div id="targetStudentResolved" class="mt-2 small fw-bold text-success d-none"></div>
             <div id="targetStudentError" class="mt-2 small fw-bold text-danger d-none"></div>
             <?php if ($mode_param === 'self'): ?>
@@ -286,7 +279,7 @@ require_once 'header.php';
     </div>
     <div class="essay-doc-scroll">
       <div class="essay-sheet">
-        <!-- หัวกระดาษแบบข้อสอบ: ชื่อแบบวัด → ชื่อเรื่อง → ชื่อ/ชั้น/เลขที่ เจ้าของผลงาน -->
+        <!-- หัวกระดาษแบบข้อสอบ: ชื่อแบบวัด → ชื่อเรื่อง → ชื่อ/ชั้น/รหัสประจำตัวนักเรียน เจ้าของผลงาน -->
         <div class="essay-doc-formtitle" id="essayPanelFormTitle">แบบวัดความสามารถก่อนเรียน</div>
         <h1 class="essay-doc-title" id="essayPanelTitle">—</h1>
         <div class="essay-doc-author" id="essayPanelAuthor"></div>
@@ -340,11 +333,11 @@ require_once 'header.php';
   /* เว้นครึ่งขวาไว้ให้กล่องเรียงความ แบบประเมินจึงกว้างเท่ากันในครึ่งซ้าย */
   #view-evaluation.essay-open { padding-right: calc(50vw + 1.5rem); }
 }
-/* แผ่นกระดาษสัดส่วน A4 (210:297 ≈ 1:1.414) — แคบลงและมีระยะขอบเหมือนกระดาษจริง */
+/* แผ่นกระดาษสัดส่วน A4 (210:297 ≈ 1:1.414) — ขยายให้กว้างขึ้นด้านละ ~1 นิ้ว มีระยะขอบเหมือนกระดาษจริง */
 .essay-sheet {
   width: 100%;
-  max-width: 640px;             /* แคบลงเพื่อให้เส้นบรรทัดสั้นลงและเหมาะกับการอ่าน */
-  min-height: 905px;            /* ≈ 640 × 1.414 ให้ได้สัดส่วน A4 */
+  max-width: 832px;             /* กว้างขึ้นจากเดิม 640px ≈ ด้านละ 1 นิ้ว (96px) */
+  min-height: 1176px;           /* ≈ 832 × 1.414 ให้ได้สัดส่วน A4 */
   margin: 0 auto;
   padding: 56px 52px 64px;      /* ระยะขอบกระดาษ */
   background: #ffffff;
@@ -353,26 +346,27 @@ require_once 'header.php';
   border: 1px solid #dfe3e8;
   font-family: "TH Sarabun New", "Sarabun", "Leelawadee UI", "Tahoma", sans-serif;
 }
-/* ชื่อแบบวัด (หัวกระดาษบนสุด) */
+/* ชื่อแบบวัด (หัวกระดาษบนสุด) — 20px */
 .essay-doc-formtitle {
   text-align: center;
-  font-size: 1.5rem;
+  font-size: 20px;
   font-weight: 700;
   color: #0d3b66;
   margin: 0 0 0.3rem;
 }
+/* ชื่อเรื่อง — 18px */
 .essay-doc-title {
   text-align: center;
-  font-size: 1.35rem;
+  font-size: 18px;
   font-weight: 700;
   line-height: 1.35;
   color: #1a1a1a;
-  margin: 0 0 0.5rem;
+  margin: 0 0 0.4rem;
 }
-/* บรรทัดเจ้าของผลงาน: ชื่อ / ชั้น / เลขที่ */
+/* บรรทัดเจ้าของผลงาน: ชื่อ / ชั้น / รหัสประจำตัวนักเรียน — 16px */
 .essay-doc-author {
   text-align: center;
-  font-size: 1.05rem;
+  font-size: 16px;
   font-weight: 600;
   color: #444;
   margin: 0 0 1rem;
@@ -380,16 +374,30 @@ require_once 'header.php';
   border-bottom: 2px solid #e7e5e4;
 }
 .essay-doc-author:empty { display: none; }
-/* เนื้อความแบบกระดาษมีเส้นบรรทัด (ruled paper) + เว้นที่ซ้ายสำหรับเลขบรรทัด */
+/* เนื้อความแบบกระดาษมีเส้นบรรทัด (ruled paper) + เว้นที่ซ้ายสำหรับเลขบรรทัด + เว้นที่ขวาสำหรับป้ายส่วน */
 .essay-doc-content {
   position: relative;
   padding-left: 2.8em;
-  font-size: 1.35rem;
+  padding-right: 2.6em;        /* เว้นที่ริมขวาไว้ให้ป้ายบอกส่วน (คำนำ/เนื้อเรื่อง/สรุป) แบบไม่กระทบเนื้อหา */
+  font-size: 18px;             /* เล็กลงจากเดิมเพื่อให้อ่านสบายและเหมือน A4 */
   line-height: 36px;          /* ต้องตรงกับ LH ในสคริปต์สร้างเลขบรรทัด */
   text-align: justify;
   background-image: linear-gradient(to bottom, transparent 0, transparent 35px, #e3e7ec 35px, #e3e7ec 36px);
   background-size: 100% 36px;
   background-position: 0 0;
+}
+/* ป้ายบอกส่วน (คำนำ/เนื้อเรื่อง/สรุป) — แอบเล็ก ๆ ที่ริมขวา ไม่รบกวนการอ่าน */
+.essay-doc-content .section-tag {
+  position: absolute;
+  right: 0;
+  width: 2.4em;
+  text-align: left;
+  color: #cbd0d8;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  user-select: none;
+  pointer-events: none;
 }
 .essay-doc-content .essay-para {
   margin: 0;
@@ -581,20 +589,16 @@ require_once 'header.php';
     return '';
   }
 
-  // รหัสนักเรียนเป้าหมาย — เอาจาก dropdown ก่อน ถ้าไม่มีจึงตีความจากช่องค้นหา (รหัส/ชื่อ)
+  // รหัสนักเรียนเป้าหมาย — ตีความจากช่องเดียว (เลือกจากรายการ หรือพิมพ์รหัส/ชื่อ)
   function getTargetId() {
-    const sel = document.getElementById('targetStudentSelect');
-    if (sel && sel.value && studentDB[sel.value]) return sel.value;
     const el = document.getElementById('targetStudentInput');
     return resolveStudentId(el ? el.value : '');
   }
 
-  // ตั้งค่าเป้าหมายให้ทั้ง dropdown และช่องค้นหาตรงกัน
+  // ตั้งค่าช่องเป้าหมายให้แสดงเป็น "รหัส - ชื่อ"
   function syncTargetSelection(id) {
-    const sel = document.getElementById('targetStudentSelect');
     const inp = document.getElementById('targetStudentInput');
-    if (sel && studentDB[id] !== undefined) sel.value = id;
-    if (inp) inp.value = studentDB[id] !== undefined ? `${id} - ${studentDB[id]}` : (inp.value || '');
+    if (inp && studentDB[id] !== undefined) inp.value = `${id} - ${studentDB[id]}`;
   }
 
   // โหลดรายชื่อนักเรียนจาก API
@@ -622,34 +626,18 @@ require_once 'header.php';
     }
   }
 
-  // เติมรายชื่อนักเรียนลงใน dropdown ทางการ + datalist (ค้นได้ทั้งรหัสและชื่อ)
+  // เติมรายชื่อนักเรียนลงใน datalist ของช่องเดียว (คลิกเพื่อเลือก หรือพิมพ์ค้นด้วยรหัส/ชื่อ)
   function populateStudentDatalist() {
     const dl = document.getElementById('targetStudentOptions');
-    const sel = document.getElementById('targetStudentSelect');
+    if (!dl) return;
     const sortedKeys = Object.keys(studentDB).sort();
-
-    // dropdown ทางการ: แสดง "รหัส — ชื่อ"
-    if (sel) {
-      const keep = sel.value;
-      sel.innerHTML = '<option value="">— เลือกนักเรียนจากรายการ (รหัส — ชื่อ) —</option>';
-      sortedKeys.forEach(id => {
-        const opt = document.createElement('option');
-        opt.value = id;
-        opt.textContent = `${id} — ${studentDB[id]}`;
-        sel.appendChild(opt);
-      });
-      if (keep && studentDB[keep]) sel.value = keep; // คงค่าที่เลือกไว้ถ้ายังอยู่ในรายการ
-    }
-
-    // datalist สำหรับช่องค้นหา: value = "รหัส - ชื่อ" เพื่อให้พิมพ์ค้นได้ทั้งรหัสและชื่อ
-    if (dl) {
-      dl.innerHTML = '';
-      sortedKeys.forEach(id => {
-        const option = document.createElement('option');
-        option.value = `${id} - ${studentDB[id]}`;
-        dl.appendChild(option);
-      });
-    }
+    dl.innerHTML = '';
+    sortedKeys.forEach(id => {
+      const option = document.createElement('option');
+      // value = "รหัส - ชื่อ" เพื่อให้พิมพ์ค้นได้ทั้งรหัสและชื่อ และเลือกจากรายการได้
+      option.value = `${id} - ${studentDB[id]}`;
+      dl.appendChild(option);
+    });
   }
 
   // ปิด/เปิดการใช้งานส่วนรูบริกให้จางลงเมื่อยังไม่มีเป้าหมาย
@@ -667,8 +655,7 @@ require_once 'header.php';
     if (resolvedEl) resolvedEl.classList.add('d-none');
     if (errEl) errEl.classList.add('d-none');
 
-    // อ่านสิ่งที่ผู้ใช้ระบุ: เลือกจาก dropdown หรือพิมพ์ค้นหา (รหัส/ชื่อ)
-    const sel = document.getElementById('targetStudentSelect');
+    // อ่านสิ่งที่ผู้ใช้ระบุจากช่องเดียว (เลือกจากรายการ หรือพิมพ์รหัส/ชื่อ)
     const inp = document.getElementById('targetStudentInput');
     const rawTyped = inp ? inp.value.trim() : '';
     const hasTyped = rawTyped !== '';
@@ -853,23 +840,49 @@ require_once 'header.php';
     return escapeHTML(s).replace(/\n/g, '<br>');
   }
   function formatEssayHTML(contentStr) {
-    const paras = [];
+    // เก็บย่อหน้าพร้อม "ส่วน" (intro/body/concl) เพื่อทำป้ายบอกส่วนแบบแอบ ๆ
+    const paras = []; // { text, sec }  (sec = 'intro' | 'body' | 'concl' | '')
     if (contentStr) {
       let parsed = null;
       try { parsed = JSON.parse(contentStr); } catch (e) { parsed = null; }
       if (parsed && typeof parsed === 'object' && parsed.introduction !== undefined) {
-        if (parsed.introduction && parsed.introduction.trim()) paras.push(parsed.introduction);
+        if (parsed.introduction && parsed.introduction.trim()) paras.push({ text: parsed.introduction, sec: 'intro' });
         if (Array.isArray(parsed.body)) {
-          parsed.body.forEach(p => { if (p && p.trim()) paras.push(p); });
+          parsed.body.forEach(p => { if (p && p.trim()) paras.push({ text: p, sec: 'body' }); });
         }
-        if (parsed.conclusion && parsed.conclusion.trim()) paras.push(parsed.conclusion);
+        if (parsed.conclusion && parsed.conclusion.trim()) paras.push({ text: parsed.conclusion, sec: 'concl' });
       } else {
-        // ข้อความล้วน — แยกย่อหน้าด้วยการเว้นบรรทัด
-        String(contentStr).split(/\n{2,}/).forEach(p => { if (p.trim()) paras.push(p); });
+        // ข้อความล้วน — แยกย่อหน้าด้วยการเว้นบรรทัด (ตรวจส่วนไม่ได้)
+        String(contentStr).split(/\n{2,}/).forEach(p => { if (p.trim()) paras.push({ text: p, sec: '' }); });
       }
     }
     if (!paras.length) return '<div class="no-content">— ยังไม่มีเนื้อหาเรียงความ —</div>';
-    return paras.map(p => `<p class="essay-para">${nl2brSafe(p)}</p>`).join('');
+    // ทำเครื่องหมาย data-sec เฉพาะย่อหน้า "แรก" ของแต่ละส่วน เพื่อวางป้ายเพียงจุดเดียวต่อส่วน
+    let seenBody = false;
+    return paras.map(p => {
+      let mark = '';
+      if (p.sec === 'intro') mark = ' data-sec="intro"';
+      else if (p.sec === 'concl') mark = ' data-sec="concl"';
+      else if (p.sec === 'body' && !seenBody) { mark = ' data-sec="body"'; seenBody = true; }
+      return `<p class="essay-para"${mark}>${nl2brSafe(p.text)}</p>`;
+    }).join('');
+  }
+
+  // วางป้ายบอกส่วน (คำนำ/เนื้อเรื่อง/สรุป) แบบแอบเล็ก ๆ ที่ริมขวา ตรงกับย่อหน้าแรกของแต่ละส่วน
+  function addEssaySectionTags() {
+    const box = document.getElementById('essayPanelContent');
+    if (!box) return;
+    box.querySelectorAll('.section-tag').forEach(el => el.remove());
+    const labelMap = { intro: 'คำนำ', body: 'เนื้อเรื่อง', concl: 'สรุป' };
+    box.querySelectorAll('.essay-para[data-sec]').forEach(p => {
+      const key = p.getAttribute('data-sec');
+      if (!labelMap[key]) return;
+      const tag = document.createElement('span');
+      tag.className = 'section-tag';
+      tag.textContent = labelMap[key];
+      tag.style.top = p.offsetTop + 'px'; // จัดให้ตรงกับย่อหน้า
+      box.appendChild(tag);
+    });
   }
 
   // สร้างเลขบรรทัด "ทุกบรรทัด" (1, 2, 3, ...) ที่ขอบซ้ายของเนื้อความ ให้ตรงกับเส้นบรรทัดของกระดาษ
@@ -896,7 +909,7 @@ require_once 'header.php';
     const essay = document.getElementById('essayFloating');
     if (!essay || essay.classList.contains('d-none')) return;
     clearTimeout(essayLnumTimer);
-    essayLnumTimer = setTimeout(addEssayLineNumbers, 150);
+    essayLnumTimer = setTimeout(() => { addEssayLineNumbers(); addEssaySectionTags(); }, 150);
   });
 
   // แสดง/ซ่อน section เรียงความแบบลอย (fixed) ฝั่งขวา และเว้นที่ฝั่งขวาของแบบประเมินไม่ให้ถูกทับ
@@ -938,20 +951,20 @@ require_once 'header.php';
         if (formTitleEl) formTitleEl.textContent = essayFormTitleByPhase[testPhase] || 'แบบวัดความสามารถ';
         // ชื่อเรื่อง
         titleEl.textContent = data.data.essay_title || 'ไม่มีชื่อเรื่อง';
-        // ชื่อ / ชั้น / เลขที่ ของเจ้าของผลงาน
+        // ชื่อ / ชั้น / รหัสประจำตัวนักเรียน ของเจ้าของผลงาน
         const ownerName = studentDB[studentId] || data.data.student_name || '';
         const ownerRoom = data.data.classroom || '';
         if (authorEl) {
           authorEl.textContent =
             `ชื่อ ${ownerName || '—'}` +
             `   ชั้น ${ownerRoom || '—'}` +
-            `   เลขที่ ${studentId}`;
+            `   รหัสประจำตัวนักเรียน ${studentId}`;
         }
         contentEl.innerHTML = formatEssayHTML(data.data.essay_content);
         countEl.textContent = `${data.data.word_count || 0} คำ`;
         toggleEssayColumn(true);
-        // รอให้จัดหน้าเสร็จก่อนคำนวณ/วางเลขบรรทัด (กล่องเพิ่งแสดง)
-        requestAnimationFrame(() => requestAnimationFrame(addEssayLineNumbers));
+        // รอให้จัดหน้าเสร็จก่อนคำนวณ/วางเลขบรรทัดและป้ายบอกส่วน (กล่องเพิ่งแสดง)
+        requestAnimationFrame(() => requestAnimationFrame(() => { addEssayLineNumbers(); addEssaySectionTags(); }));
       } else {
         toggleEssayColumn(false);
       }
@@ -983,17 +996,12 @@ require_once 'header.php';
   (function bindTargetInput() {
     const btn = document.getElementById('loadStudentBtn');
     const input = document.getElementById('targetStudentInput');
-    const sel = document.getElementById('targetStudentSelect');
     if (btn) btn.addEventListener('click', resolveTargetStudent);
-    // เลือกจาก dropdown ทางการ → โหลดข้อมูลทันที
-    if (sel) sel.addEventListener('change', () => {
-      if (sel.value && studentDB[sel.value]) resolveTargetStudent();
-    });
     if (input) {
       input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') { e.preventDefault(); resolveTargetStudent(); }
       });
-      // เลือกจากรายการแนะนำ (datalist) ให้โหลดข้อมูลทันที
+      // เลือกจากรายการ (datalist) ให้โหลดข้อมูลทันที
       input.addEventListener('change', () => {
         if (getTargetId()) resolveTargetStudent();
       });
@@ -1008,8 +1016,6 @@ require_once 'header.php';
     // รีเซ็ตการระบุเป้าหมายเพราะรายชื่ออาจเปลี่ยนกลุ่ม
     const tInput = document.getElementById('targetStudentInput');
     if (tInput) tInput.value = '';
-    const tSel = document.getElementById('targetStudentSelect');
-    if (tSel) tSel.value = '';
     const resolvedEl = document.getElementById('targetStudentResolved');
     const errEl = document.getElementById('targetStudentError');
     if (resolvedEl) resolvedEl.classList.add('d-none');
@@ -1042,8 +1048,6 @@ require_once 'header.php';
         // โหมดอื่น: รีเซ็ตการระบุเป้าหมาย
         const tInput = document.getElementById('targetStudentInput');
         if (tInput) { tInput.value = ''; tInput.disabled = false; }
-        const tSel = document.getElementById('targetStudentSelect');
-        if (tSel) { tSel.value = ''; tSel.disabled = false; }
         const resolvedEl = document.getElementById('targetStudentResolved');
         const errEl = document.getElementById('targetStudentError');
         if (resolvedEl) resolvedEl.classList.add('d-none');
@@ -1108,12 +1112,10 @@ require_once 'header.php';
 
     try {
       const res = await (await fetch(`api.php?action=get_my_peer_partner&round=${phase}&_t=${Date.now()}`)).json();
-      const tSelPeer = document.getElementById('targetStudentSelect');
       if (res.success && res.partner && studentDB[res.partner]) {
         // มีคู่ → ตั้งค่าและล็อกช่องระบุเป้าหมาย
         syncTargetSelection(res.partner);
         if (tInput) tInput.disabled = true;
-        if (tSelPeer) tSelPeer.disabled = true;
         if (loadBtn) loadBtn.disabled = true;
         if (resolvedEl) { resolvedEl.textContent = `✓ ผู้ถูกประเมิน: ${res.partner} - ${studentDB[res.partner]}`; resolvedEl.classList.remove('d-none'); }
         if (lockNotice) lockNotice.classList.remove('d-none');
@@ -1121,7 +1123,6 @@ require_once 'header.php';
       } else {
         // ไม่มีคู่ → เปิดช่องให้ระบุเองพร้อมข้อความเตือน (fallback)
         if (tInput) { tInput.disabled = false; tInput.value = ''; }
-        if (tSelPeer) { tSelPeer.disabled = false; tSelPeer.value = ''; }
         if (loadBtn) loadBtn.disabled = false;
         if (resolvedEl) resolvedEl.classList.add('d-none');
         if (fallbackNotice) fallbackNotice.classList.remove('d-none');
@@ -1225,13 +1226,11 @@ require_once 'header.php';
     buildRubric();
 
     const tInput = document.getElementById('targetStudentInput');
-    const tSel = document.getElementById('targetStudentSelect');
     const loadBtn = document.getElementById('loadStudentBtn');
     const resolvedEl = document.getElementById('targetStudentResolved');
 
     if (modeParam === 'self') {
       // โหมดประเมินตนเอง → ล็อกเป้าหมายเป็นของตนเองและโหลดข้อมูลทันที
-      if (tSel) { tSel.value = currentUser.id; tSel.disabled = true; }
       if (tInput) { tInput.value = `${currentUser.id} - ${studentDB[currentUser.id] || ''}`; tInput.disabled = true; }
       if (loadBtn) loadBtn.disabled = true;
       if (resolvedEl && studentDB[currentUser.id]) {
@@ -1241,7 +1240,6 @@ require_once 'header.php';
       checkExistingEvaluation(currentUser.id);
     } else {
       if (tInput) { tInput.value = ''; tInput.disabled = false; }
-      if (tSel) { tSel.value = ''; tSel.disabled = false; }
       dimRubric();
     }
   })();
