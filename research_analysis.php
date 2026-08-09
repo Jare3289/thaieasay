@@ -75,7 +75,120 @@ require_once 'header.php';
         <a href="#section-essay" class="btn btn-outline-danger btn-sm fw-bold rounded-pill px-3">
           <i class="bi bi-pencil-square"></i> Essay Viewer
         </a>
+        <a href="#section-export" class="btn btn-dark btn-sm fw-bold rounded-pill px-3">
+          <i class="bi bi-cloud-download-fill"></i> ส่งออกรายงาน
+        </a>
       </div>
+
+      <!-- 📥 ศูนย์ส่งออกชุดข้อมูลรายงาน (Report Export Center) -->
+      <section id="section-export" class="mb-5" style="scroll-margin-top: 84px;">
+        <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+          <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-3 flex-wrap gap-2">
+            <h6 class="fw-bold mb-0 text-white"><i class="bi bi-cloud-download-fill text-info"></i> ศูนย์ส่งออกชุดข้อมูลรายงานเพื่อการวิเคราะห์ (Report Export Center)</h6>
+            <span class="badge bg-info text-dark fw-bold">CSV · Excel (หลายชีต)</span>
+          </div>
+          <div class="card-body p-4">
+            <p class="text-muted small mb-3" style="line-height:1.6;">
+              ส่งออกข้อมูลทุกส่วนของระบบเป็น <strong>ชุดข้อมูลรายงาน</strong> พร้อมนำไปวิเคราะห์ต่อด้วย Excel, SPSS, R หรือ Python
+              — เลือกได้ทั้งแบบ <strong>ภาพรวม (Overview)</strong> และ <strong>รายละเอียดย่อยรายเกณฑ์ (Detail)</strong>
+              ไฟล์ CSV ฝัง UTF-8 BOM รองรับภาษาไทย และมีการป้องกัน CSV formula injection
+            </p>
+
+            <!-- ตัวกรองก่อนส่งออก -->
+            <div class="row g-2 align-items-end mb-4">
+              <div class="col-md-4 col-sm-6">
+                <label class="form-label small fw-semibold text-secondary mb-1"><i class="bi bi-people-fill me-1"></i>กรองตามกลุ่ม</label>
+                <select id="exportGroupFilter" class="form-select form-select-sm rounded-3">
+                  <option value="">ทุกกลุ่ม</option>
+                  <option value="กลุ่มทดลอง">กลุ่มทดลอง (Experimental)</option>
+                  <option value="กลุ่มตัวอย่าง">กลุ่มตัวอย่าง (Control/Sample)</option>
+                </select>
+              </div>
+              <div class="col-md-4 col-sm-6">
+                <label class="form-label small fw-semibold text-secondary mb-1"><i class="bi bi-door-open-fill me-1"></i>กรองตามห้องเรียน</label>
+                <input type="text" id="exportClassroomFilter" class="form-control form-control-sm rounded-3" placeholder="เช่น 606 (เว้นว่าง = ทุกห้อง)">
+              </div>
+              <div class="col-md-4 col-sm-12">
+                <a href="#" onclick="return doExport('all','xls')" class="btn btn-dark btn-sm fw-bold rounded-pill w-100 py-2">
+                  <i class="bi bi-file-earmark-excel-fill text-success"></i> ดาวน์โหลดรายงานฉบับสมบูรณ์ (Excel หลายชีต)
+                </a>
+              </div>
+            </div>
+
+            <div class="row g-4">
+              <!-- กลุ่มรายงานภาพรวม -->
+              <div class="col-lg-4">
+                <div class="border rounded-3 p-3 h-100 bg-light">
+                  <div class="fw-bold text-primary mb-2"><i class="bi bi-pie-chart-fill me-1"></i>รายงานภาพรวม (Overview)</div>
+                  <div class="d-grid gap-2">
+                    <button onclick="doExport('summary','xls')" class="btn btn-outline-primary btn-sm text-start rounded-3">
+                      <i class="bi bi-table me-1"></i>สรุปคะแนนรายบุคคล (3 ฝ่าย + 4 ด้าน)
+                    </button>
+                    <button onclick="doExport('class_stats','xls')" class="btn btn-outline-primary btn-sm text-start rounded-3">
+                      <i class="bi bi-bar-chart-line me-1"></i>สถิติเชิงพรรณนาระดับชั้น (N/Mean/SD)
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- กลุ่มรายงานรายละเอียด (เชิงปริมาณ) -->
+              <div class="col-lg-4">
+                <div class="border rounded-3 p-3 h-100 bg-light">
+                  <div class="fw-bold text-success mb-2"><i class="bi bi-123 me-1"></i>รายละเอียดเชิงปริมาณ</div>
+                  <div class="d-grid gap-2">
+                    <button onclick="doExport('evaluations','xls')" class="btn btn-outline-success btn-sm text-start rounded-3">
+                      <i class="bi bi-clipboard-data me-1"></i>ผลประเมินรายด้านย่อย 11 ด้าน
+                    </button>
+                    <button onclick="doExport('self_checklists','xls')" class="btn btn-outline-success btn-sm text-start rounded-3">
+                      <i class="bi bi-check2-square me-1"></i>รายการตรวจสอบตนเอง (รายเกณฑ์)
+                    </button>
+                    <button onclick="doExport('essays','xls')" class="btn btn-outline-success btn-sm text-start rounded-3">
+                      <i class="bi bi-pencil-square me-1"></i>เรียงความนักเรียน (คำ/เนื้อหา)
+                    </button>
+                    <button onclick="doExport('peer_pairs','xls')" class="btn btn-outline-success btn-sm text-start rounded-3">
+                      <i class="bi bi-people me-1"></i>การจับคู่ประเมินเพื่อน
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- กลุ่มรายงานรายละเอียด (เชิงคุณภาพ) -->
+              <div class="col-lg-4">
+                <div class="border rounded-3 p-3 h-100 bg-light">
+                  <div class="fw-bold text-warning-emphasis mb-2"><i class="bi bi-chat-square-text me-1"></i>รายละเอียดเชิงคุณภาพ</div>
+                  <div class="d-grid gap-2">
+                    <button onclick="doExport('writing_problems','xls')" class="btn btn-outline-warning btn-sm text-start rounded-3">
+                      <i class="bi bi-exclamation-triangle me-1"></i>ปัญหาการเขียน + แนวทางแก้ (รายเกณฑ์)
+                    </button>
+                    <button onclick="doExport('peer_reviews','xls')" class="btn btn-outline-warning btn-sm text-start rounded-3">
+                      <i class="bi bi-chat-left-heart me-1"></i>การประเมินเพื่อนเชิงคุณภาพ
+                    </button>
+                    <button onclick="doExport('reflections','xls')" class="btn btn-outline-warning btn-sm text-start rounded-3">
+                      <i class="bi bi-journal-text me-1"></i>การสะท้อนการเรียนรู้
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="text-muted small mt-3 d-flex align-items-center gap-2">
+              <i class="bi bi-info-circle"></i>
+              <span>ปุ่มด้านบนดาวน์โหลดเป็น Excel (.xls); กด <i class="bi bi-filetype-csv"></i> เพื่อรับเป็น CSV ต่อรายงาน</span>
+            </div>
+            <div class="d-flex flex-wrap gap-2 mt-2" id="csvQuickLinks">
+              <button onclick="doExport('summary','csv')" class="btn btn-link btn-sm text-decoration-none p-1 small"><i class="bi bi-filetype-csv"></i> สรุปคะแนน</button>
+              <button onclick="doExport('class_stats','csv')" class="btn btn-link btn-sm text-decoration-none p-1 small"><i class="bi bi-filetype-csv"></i> สถิติระดับชั้น</button>
+              <button onclick="doExport('evaluations','csv')" class="btn btn-link btn-sm text-decoration-none p-1 small"><i class="bi bi-filetype-csv"></i> ผลประเมิน</button>
+              <button onclick="doExport('writing_problems','csv')" class="btn btn-link btn-sm text-decoration-none p-1 small"><i class="bi bi-filetype-csv"></i> ปัญหาการเขียน</button>
+              <button onclick="doExport('self_checklists','csv')" class="btn btn-link btn-sm text-decoration-none p-1 small"><i class="bi bi-filetype-csv"></i> ตรวจสอบตนเอง</button>
+              <button onclick="doExport('peer_reviews','csv')" class="btn btn-link btn-sm text-decoration-none p-1 small"><i class="bi bi-filetype-csv"></i> ประเมินเพื่อน</button>
+              <button onclick="doExport('reflections','csv')" class="btn btn-link btn-sm text-decoration-none p-1 small"><i class="bi bi-filetype-csv"></i> สะท้อนการเรียนรู้</button>
+              <button onclick="doExport('essays','csv')" class="btn btn-link btn-sm text-decoration-none p-1 small"><i class="bi bi-filetype-csv"></i> เรียงความ</button>
+              <button onclick="doExport('peer_pairs','csv')" class="btn btn-link btn-sm text-decoration-none p-1 small"><i class="bi bi-filetype-csv"></i> การจับคู่</button>
+            </div>
+          </div>
+        </div>
+      </section>
 
         <!-- ส่วนที่ 1: ICC -->
         <section id="section-icc" class="mb-5">
@@ -417,6 +530,18 @@ require_once 'header.php';
 </div>
 
 <script>
+  // ==== ศูนย์ส่งออกรายงาน: ประกอบ URL แล้วสั่งดาวน์โหลดตามตัวกรองที่เลือก ====
+  function doExport(report, format) {
+    const grp = (document.getElementById('exportGroupFilter') || {}).value || '';
+    const room = ((document.getElementById('exportClassroomFilter') || {}).value || '').trim();
+    const params = new URLSearchParams({ report: report, format: format });
+    if (grp) params.set('group', grp);
+    if (room) params.set('classroom', room);
+    // เปิดในแท็บชั่วคราวเพื่อให้เบราว์เซอร์รับไฟล์แนบ (Content-Disposition: attachment)
+    window.location.href = 'export.php?' + params.toString();
+    return false;
+  }
+
   // ค่าคงที่ของงานวิจัย: ห้อง 606 คือกลุ่มทดลองสำหรับทุกองค์ประกอบของ ICC และ Paired t-test
   const EXPERIMENTAL_CLASSROOM = '606';
 
