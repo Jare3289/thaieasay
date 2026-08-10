@@ -12,10 +12,15 @@
  *   5. คัดลอก Client ID และ Client Secret มาวางด้านล่างนี้
  */
 
-// ====== กรอกค่าจาก Google Cloud Console ที่นี่ ======
-define('GOOGLE_CLIENT_ID',     '');   // เช่น 1234567890-abcxxx.apps.googleusercontent.com
-define('GOOGLE_CLIENT_SECRET', '');   // เช่น GOCSPX-xxxxxxxxxxxxxxxx
-// ===================================================
+// ====== ค่าลับ (Client ID/Secret) ======
+// เก็บไว้ในไฟล์ google_secrets.php ที่ไม่ถูก commit ขึ้น git (ดู .gitignore)
+// ถ้าไม่มีไฟล์นั้น ให้ปล่อยค่าว่างไว้ (ระบบจะแจ้งว่ายังไม่ได้ตั้งค่า)
+if (file_exists(__DIR__ . '/google_secrets.php')) {
+    require_once __DIR__ . '/google_secrets.php';
+}
+if (!defined('GOOGLE_CLIENT_ID'))     define('GOOGLE_CLIENT_ID',     '');
+if (!defined('GOOGLE_CLIENT_SECRET')) define('GOOGLE_CLIENT_SECRET', '');
+// =======================================
 
 // ขอบเขตสิทธิ์: สร้างไฟล์ใน Drive ของผู้ใช้ (drive.file = เข้าถึงเฉพาะไฟล์ที่แอปสร้างเอง — ปลอดภัยสุด)
 define('GOOGLE_SCOPES', 'https://www.googleapis.com/auth/drive.file');
