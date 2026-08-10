@@ -65,6 +65,14 @@ function google_get_access_token() {
     return $_SESSION['google_tokens']['access_token'];
 }
 
+// ให้ตัวจัดการคำสั่ง (dispatcher) ทำงานเฉพาะเมื่อเรียก google_auth.php โดยตรงเท่านั้น
+// ไม่ให้ทำงานตอนถูก include จากไฟล์อื่น (เช่น google_upload_doc.php ที่ต้องการเพียงฟังก์ชัน)
+$__is_direct = isset($_SERVER['SCRIPT_FILENAME'])
+    && @realpath($_SERVER['SCRIPT_FILENAME']) === @realpath(__FILE__);
+if (!$__is_direct) {
+    return; // ถูก include → หยุดแค่ประกาศฟังก์ชัน ไม่รัน dispatcher
+}
+
 $action = $_GET['action'] ?? 'status';
 
 // ---------- status ----------
