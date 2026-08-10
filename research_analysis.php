@@ -901,10 +901,18 @@ require_once 'header.php';
       }
       // 2) สร้างเนื้อหารายงาน แล้วส่งขึ้น Google Drive (แปลงเป็น Google Docs)
       const rep = await buildReportHtml();
-      const res = await (await fetch('google_upload_doc.php', {
+      const httpResp = await fetch('google_upload_doc.php', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ html: rep.doc, title: rep.filename })
-      })).json();
+      });
+      const raw = await httpResp.text();
+      let res;
+      try { res = JSON.parse(raw); }
+      catch (e) {
+        // เซิร์ฟเวอร์ตอบไม่ใช่ JSON (เช่น PHP error/warning) — แสดงเนื้อหาเพื่อวินิจฉัย
+        console.error('Upload response (HTTP ' + httpResp.status + '):', raw);
+        throw new Error('เซิร์ฟเวอร์ตอบไม่ใช่ JSON (HTTP ' + httpResp.status + '): ' + raw.slice(0, 200));
+      }
       if (res.success) {
         if (typeof showToast === 'function') showToast('ส่งเข้า Google Docs สำเร็จ! กำลังเปิดเอกสาร...', 'success');
         window.open(res.link, '_blank');
@@ -912,7 +920,9 @@ require_once 'header.php';
         const ret = encodeURIComponent(location.pathname + '#section-export');
         window.location.href = 'google_auth.php?action=connect&return=' + ret;
       } else {
-        throw new Error(res.error || 'อัปโหลดไม่สำเร็จ');
+        // แสดงรายละเอียดให้มากที่สุดเพื่อวินิจฉัย (เผื่อ response ไม่ใช่รูปแบบที่คาดไว้)
+        console.error('Upload failed, response =', res);
+        throw new Error(res.error || ('อัปโหลดไม่สำเร็จ (HTTP ' + httpResp.status + ') — ' + JSON.stringify(res).slice(0, 200)));
       }
     } catch (err) {
       console.error(err);

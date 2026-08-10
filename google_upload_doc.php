@@ -7,7 +7,7 @@
  */
 require_once 'auth_helper.php';
 require_once 'google_config.php';
-require_once 'google_auth.php'; // ใช้ google_get_access_token()
+require_once 'google_lib.php'; // ใช้ google_get_access_token() — ไลบรารีล้วน ไม่มี dispatcher
 
 header('Content-Type: application/json; charset=utf-8');
 
