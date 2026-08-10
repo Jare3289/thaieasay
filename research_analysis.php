@@ -94,12 +94,18 @@ require_once 'header.php';
               พร้อมบทวิเคราะห์และสรุปผล ไฟล์เปิดได้ทันทีใน <strong>Microsoft Word</strong> หรืออัปโหลดเปิดใน <strong>Google Docs</strong>
             </p>
 
-            <!-- ปุ่มหลัก: สร้างรายงานฉบับสมบูรณ์ -->
+            <!-- ปุ่มหลัก: ส่งรายงานเข้า Google Docs โดยตรง -->
             <div class="text-center mb-2">
-              <button onclick="generateResearchReportDoc()" id="genReportBtn" class="btn btn-dark btn-lg fw-bold rounded-pill px-5 py-3 shadow-sm">
-                <i class="bi bi-file-earmark-word-fill text-info"></i> สร้างรายงานฉบับสมบูรณ์ (เปิดใน Word / Google Docs)
+              <button onclick="sendReportToGoogleDocs()" id="genReportBtn" class="btn btn-dark btn-lg fw-bold rounded-pill px-5 py-3 shadow-sm">
+                <i class="bi bi-google text-info"></i> ส่งรายงานเข้า Google Docs โดยตรง
               </button>
-              <div class="small text-muted mt-2"><i class="bi bi-info-circle"></i> ระบบจะรวบรวมผลวิเคราะห์ล่าสุดของกลุ่มทดลอง (ห้อง 606) ให้อัตโนมัติ</div>
+              <div class="mt-2">
+                <button onclick="generateResearchReportDoc()" id="dlDocBtn" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+                  <i class="bi bi-download"></i> หรือดาวน์โหลดเป็นไฟล์ .doc
+                </button>
+              </div>
+              <div class="small text-muted mt-2"><i class="bi bi-info-circle"></i> ครั้งแรกระบบจะพาไปเชื่อมต่อบัญชี Google เพื่ออนุญาตให้บันทึกไฟล์ลง Google Drive ของคุณครู · ข้อมูลรวบรวมให้อัตโนมัติ (ICC จากกลุ่มทดลอง, ส่วนอื่นจากกลุ่มตัวอย่าง)</div>
+              <div id="googleStatusBox" class="small mt-2"></div>
             </div>
 
             <hr class="my-4">
@@ -494,360 +500,469 @@ require_once 'header.php';
   const REPORT_AUTHOR = <?php echo json_encode(isset($_SESSION['user']['name']) ? $_SESSION['user']['name'] : 'ครูผู้สอน'); ?>;
 
   // ==== สร้างรายงานผลการวิจัยฉบับสมบูรณ์ (เปิดใน Word / Google Docs) ====
-  async function generateResearchReportDoc() {
+  // ================= สร้างเนื้อหารายงาน (คืน HTML เอกสาร) =================
+  // ข้อกำหนดข้อมูล:
+  //   • ส่วน ICC → ใช้กลุ่มทดลอง (ห้อง 606) เฉพาะภาระงานหน่วยที่ 1 อย่างละเอียด (ด้านหลัก+ด้านย่อย+ผู้ตรวจ 3 คน)
+  //   • ส่วนอื่น (เชิงปริมาณ/คุณภาพ/เรียงความ) → ใช้ "กลุ่มตัวอย่าง" ทั้งหมด
+  const SAMPLE_GROUP = 'กลุ่มตัวอย่าง';
+
+  async function buildReportHtml() {
+    if (typeof researchDataPromise !== 'undefined' && researchDataPromise) { await researchDataPromise; }
+    if (!classroomResearchData) { await loadResearchData(); }
+    if (!classroomResearchData) throw new Error('ยังไม่มีข้อมูลสำหรับจัดทำรายงาน');
+
+    const esc = (typeof escapeHtml === 'function') ? escapeHtml : (s => String(s == null ? '' : s));
+    const f2 = (x) => (x === null || x === undefined || isNaN(x)) ? '-' : Number(x).toFixed(2);
+    const f4 = (x) => (x === null || x === undefined || isNaN(x)) ? '-' : Number(x).toFixed(4);
+    const evals = classroomResearchData.evaluations || [];
+    const allStudents = classroomResearchData.students || [];
+    const nameOf = (id) => (studentDB && studentDB[id]) || (allStudents.find(s => s.student_id === id) || {}).student_name || id;
+
+    // ---------- แบ่งกลุ่ม ----------
+    const expStudents = allStudents.filter(s => s.classroom === EXPERIMENTAL_CLASSROOM);        // กลุ่มทดลอง (ICC)
+    const expIds = new Set(expStudents.map(s => s.student_id));
+    const sampleStudents = allStudents.filter(s => s.student_group === SAMPLE_GROUP);            // กลุ่มตัวอย่าง (ส่วนอื่น)
+    const sampleIds = new Set(sampleStudents.map(s => s.student_id));
+
+    // ---------- ตัวช่วยสถิติ ----------
+    function descStats(vals) {
+      const n = vals.length; if (!n) return null;
+      const mean = vals.reduce((a, b) => a + b, 0) / n;
+      let ss = 0; vals.forEach(v => ss += Math.pow(v - mean, 2));
+      const sd = n > 1 ? Math.sqrt(ss / (n - 1)) : 0;
+      return { n, mean, sd, min: Math.min(...vals), max: Math.max(...vals) };
+    }
+    function effectSizeLabel(dz) {
+      const a = Math.abs(dz);
+      if (a >= 0.8) return 'ขนาดผลใหญ่ (large)';
+      if (a >= 0.5) return 'ขนาดผลปานกลาง (medium)';
+      if (a >= 0.2) return 'ขนาดผลเล็ก (small)';
+      return 'ขนาดผลน้อยมาก (negligible)';
+    }
+    const DIM_MAIN = [
+      { key: 'total', name: 'คะแนนรวม (เต็ม 60)', max: 60, get: e => Number(e.total_score) },
+      { key: 'c', name: 'ด้านเนื้อหาสาระ (เต็ม 27)', max: 27, get: e => Number(e.score_1_1) + Number(e.score_1_2) + Number(e.score_1_3) },
+      { key: 's', name: 'ด้านองค์ประกอบและการลำดับ (เต็ม 12)', max: 12, get: e => Number(e.score_2_1) + Number(e.score_2_2) },
+      { key: 'l', name: 'ด้านการใช้สำนวนภาษา (เต็ม 15)', max: 15, get: e => Number(e.score_3_1) + Number(e.score_3_2) + Number(e.score_3_3) },
+      { key: 'm', name: 'ด้านอักขรวิธีและกลไกการเขียน (เต็ม 6)', max: 6, get: e => Number(e.score_4_1) + Number(e.score_4_2) + Number(e.score_4_3) }
+    ];
+    // ด้านย่อย 11 ตัวชี้วัด (สำหรับ ICC ละเอียด)
+    const SUB_KEYS = ['1_1', '1_2', '1_3', '2_1', '2_2', '3_1', '3_2', '3_3', '4_1', '4_2', '4_3'];
+    const SUB_NAME = { '1_1': '1.1 ความตรงประเด็น', '1_2': '1.2 แก่นเรื่องชัดเจน', '1_3': '1.3 การขยายความและเหตุผล', '2_1': '2.1 ความครบถ้วนขององค์ประกอบ', '2_2': '2.2 การลำดับประเด็นเป็นระบบ', '3_1': '3.1 การใช้ประโยคถูกต้อง', '3_2': '3.2 การเลือกใช้คำ', '3_3': '3.3 ระดับภาษาเหมาะสม', '4_1': '4.1 การสะกดคำถูกต้อง', '4_2': '4.2 การเว้นวรรค', '4_3': '4.3 ความเรียบร้อย' };
+
+    // ---------- ตาราง HTML ----------
+    const tbl = (headers, rows, opts) => {
+      opts = opts || {};
+      let h = '<table class="data"><thead><tr>';
+      headers.forEach(x => h += '<th>' + esc(x) + '</th>');
+      h += '</tr></thead><tbody>';
+      if (!rows.length) h += '<tr><td colspan="' + headers.length + '" style="text-align:center;color:#888">— ยังไม่มีข้อมูล —</td></tr>';
+      rows.forEach(r => {
+        h += '<tr>';
+        r.forEach((c, i) => {
+          const align = (opts.numCols && opts.numCols.includes(i)) ? ' style="text-align:center"' : '';
+          h += '<td' + align + '>' + (c === null || c === undefined ? '' : esc(c)) + '</td>';
+        });
+        h += '</tr>';
+      });
+      return h + '</tbody></table>';
+    };
+
+    // ================= ICC (กลุ่มทดลอง ห้อง 606, หน่วยที่ 1) =================
+    const ICC_PHASE = 'task1';
+    const triples = [];
+    expStudents.forEach(s => {
+      const ev = evals.filter(e => e.student_id === s.student_id && e.test_phase === ICC_PHASE);
+      const t = ev.find(e => e.evaluator_type === 'teacher');
+      const e1 = ev.find(e => e.evaluator_type === 'expert' && (e.evaluator_name === 'ผู้เชี่ยวชาญ 1' || e.evaluator_name === 'admin1'));
+      const e2 = ev.find(e => e.evaluator_type === 'expert' && (e.evaluator_name === 'ผู้เชี่ยวชาญ 2' || e.evaluator_name === 'admin2'));
+      if (t && e1 && e2) triples.push({ sid: s.student_id, evals: [t, e1, e2] });
+    });
+    const iccOf = (getter) => {
+      const m = triples.map(tr => tr.evals.map(getter));
+      const det = (triples.length >= 2) ? computeICC(m) : null;
+      const icc = det ? det.icc : null;
+      return { icc, interp: getICCInterpretation(icc) };
+    };
+    // ตาราง ICC ด้านหลัก
+    const iccMainRows = DIM_MAIN.map(d => { const r = iccOf(d.get); return [d.name, triples.length, f4(r.icc), r.interp.text]; });
+    // ตาราง ICC ด้านย่อย 11 ตัวชี้วัด
+    const iccSubRows = SUB_KEYS.map(k => { const r = iccOf(e => Number(e['score_' + k])); return [SUB_NAME[k], triples.length, f4(r.icc), r.interp.text]; });
+    const iccOverall = iccOf(e => Number(e.total_score));
+    // ตารางคะแนนผู้ตรวจ 3 คน รายบุคคล (คะแนนรวม + 4 ด้านหลัก ของแต่ละผู้ตรวจ)
+    const raterNames = ['ครูผู้สอน', 'ผู้เชี่ยวชาญ 1', 'ผู้เชี่ยวชาญ 2'];
+    const raterRows = [];
+    triples.forEach((tr, idx) => {
+      raterNames.forEach((rn, ri) => {
+        const ev = tr.evals[ri];
+        raterRows.push([
+          ri === 0 ? (idx + 1) : '', ri === 0 ? esc(nameOf(tr.sid)) : '', rn,
+          f2(DIM_MAIN[1].get(ev)), f2(DIM_MAIN[2].get(ev)), f2(DIM_MAIN[3].get(ev)), f2(DIM_MAIN[4].get(ev)),
+          f2(Number(ev.total_score))
+        ]);
+      });
+    });
+
+    // ================= เชิงปริมาณ (กลุ่มตัวอย่าง) =================
+    const phaseKeys = [['pretest', 'ก่อนเรียน (Pretest)'], ['task1', 'ภาระงานหน่วยที่ 1'], ['task2', 'ภาระงานหน่วยที่ 2'], ['posttest', 'หลังเรียน (Posttest)']];
+    const teacherScoresByPhase = (phase, getter) => evals
+      .filter(e => sampleIds.has(e.student_id) && e.test_phase === phase && e.evaluator_type === 'teacher')
+      .map(getter);
+    // 3.1 ภาพรวม: สถิติคะแนนรวมต่อรอบ
+    const descRows = phaseKeys.map(([k, label]) => {
+      const d = descStats(teacherScoresByPhase(k, e => Number(e.total_score)));
+      return d ? [label, d.n, f2(d.mean), f2(d.sd), f2(d.min), f2(d.max)] : [label, 0, '-', '-', '-', '-'];
+    });
+    // 3.2 ภาพรวมรายด้าน (ใช้รอบหลังเรียนถ้ามี ไม่งั้นเลือกรอบที่มีข้อมูลมากสุด)
+    const phaseCount = {};
+    phaseKeys.forEach(([k]) => phaseCount[k] = teacherScoresByPhase(k, () => 1).length);
+    let mainPhase = 'posttest';
+    if (!phaseCount['posttest']) { mainPhase = phaseKeys.map(([k]) => k).sort((a, b) => phaseCount[b] - phaseCount[a])[0] || 'posttest'; }
+    const mainPhaseLabel = (phaseKeys.find(([k]) => k === mainPhase) || [null, mainPhase])[1];
+    const dimDescRows = DIM_MAIN.map(d => {
+      const st = descStats(teacherScoresByPhase(mainPhase, d.get));
+      return st ? [d.name, st.n, f2(st.mean), f2(st.sd), f2(st.min), f2(st.max)] : [d.name, 0, '-', '-', '-', '-'];
+    });
+    // 3.4 รายละเอียดรายบุคคล (คะแนน 4 ด้าน + รวม รอบหลัก)
+    const teacherEvalOf = (id, phase) => evals.find(e => e.student_id === id && e.test_phase === phase && e.evaluator_type === 'teacher');
+    const perStudentDetail = [];
+    sampleStudents.forEach((s, i) => {
+      const ev = teacherEvalOf(s.student_id, mainPhase);
+      if (!ev) return;
+      perStudentDetail.push([i + 1, esc(nameOf(s.student_id)),
+        f2(DIM_MAIN[1].get(ev)), f2(DIM_MAIN[2].get(ev)), f2(DIM_MAIN[3].get(ev)), f2(DIM_MAIN[4].get(ev)), f2(Number(ev.total_score))]);
+    });
+    // Paired t-test (ก่อน–หลัง) กลุ่มตัวอย่าง
+    function pairedT(source) {
+      const pairs = [];
+      sampleStudents.forEach(s => {
+        const id = s.student_id;
+        const preE = evals.filter(e => e.student_id === id && e.test_phase === 'pretest');
+        const postE = evals.filter(e => e.student_id === id && e.test_phase === 'posttest');
+        let a = null, b = null;
+        if (source === 'teacher') {
+          const p = preE.find(e => e.evaluator_type === 'teacher'); const q = postE.find(e => e.evaluator_type === 'teacher');
+          if (p && q) { a = Number(p.total_score); b = Number(q.total_score); }
+        }
+        if (a !== null && b !== null) pairs.push({ id, pre: a, post: b, diff: b - a });
+      });
+      const N = pairs.length;
+      if (N < 2) return { N, insufficient: true, pairs };
+      const meanPre = pairs.reduce((s, d) => s + d.pre, 0) / N;
+      const meanPost = pairs.reduce((s, d) => s + d.post, 0) / N;
+      const meanDiff = pairs.reduce((s, d) => s + d.diff, 0) / N;
+      let ss = 0; pairs.forEach(d => ss += Math.pow(d.diff - meanDiff, 2));
+      const sdDiff = Math.sqrt(ss / (N - 1));
+      const t = sdDiff > 0 ? meanDiff / (sdDiff / Math.sqrt(N)) : 0;
+      const df = N - 1;
+      const p = calculateOneTailedPValue(t, df);
+      const dz = sdDiff > 0 ? meanDiff / sdDiff : 0;
+      return { N, meanPre, meanPost, meanDiff, sdDiff, t, df, p, dz, pairs };
+    }
+    const tTeacher = pairedT('teacher');
+
+    // ================= เชิงคุณภาพ (กลุ่มตัวอย่าง) =================
+    const problems = (classroomResearchData.problems || []).filter(p => sampleIds.has(p.student_id));
+    const peerReviews = (classroomResearchData.peer_reviews || []).filter(pr => sampleIds.has(pr.student_id));
+    const reflections = (classroomResearchData.reflections || []).filter(rf => sampleIds.has(rf.student_id));
+    const critCounts = {}; QUAL_SUB_CRITERIA.forEach(sc => critCounts[sc] = 0);
+    problems.forEach(p => QUAL_SUB_CRITERIA.forEach(sc => { if (p['prob_' + sc.replace('.', '_')]) critCounts[sc]++; }));
+    const peerSum = {}, peerCnt = {}; QUAL_SUB_CRITERIA.forEach(sc => { peerSum[sc] = 0; peerCnt[sc] = 0; });
+    peerReviews.forEach(pr => QUAL_SUB_CRITERIA.forEach(sc => {
+      const lv = pr['score_' + sc.replace('.', '_')];
+      if (lv && PEER_LEVEL_SCORE[lv] !== undefined) { peerSum[sc] += PEER_LEVEL_SCORE[lv]; peerCnt[sc]++; }
+    }));
+    const sortedCrit = QUAL_SUB_CRITERIA.map(sc => [sc, critCounts[sc]]).sort((a, b) => b[1] - a[1]);
+
+    const now = new Date();
+    const thDate = now.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+
+    // ================= ประกอบเนื้อหา =================
+    const P = [];
+    // ----- ส่วนที่ 1 -----
+    P.push('<h1 class="secn" id="s1">ส่วนที่ 1 บทนำและกระบวนการวิจัย</h1>');
+    P.push('<h2>1.1 ความเป็นมาและวัตถุประสงค์</h2>');
+    P.push('<p>รายงานฉบับนี้จัดทำขึ้นเพื่อรวบรวมและวิเคราะห์ผลการประเมินความสามารถในการเขียนเรียงความของนักเรียน โดยใช้ข้อมูลที่บันทึกผ่านระบบประเมินเรียงความ ครอบคลุมทั้งการวิเคราะห์เชิงปริมาณ (สถิติเชิงพรรณนา การทดสอบพัฒนาการ และค่าความสอดคล้องระหว่างผู้ตรวจ) และเชิงคุณภาพ (ปัญหาการเขียน ข้อเสนอแนะจากเพื่อน และการสะท้อนการเรียนรู้) เพื่อตรวจสอบพัฒนาการของผู้เรียนและคุณภาพของเครื่องมือประเมิน</p>');
+    P.push('<h2>1.2 แบบแผนการวิจัย</h2>');
+    P.push('<p>การวิจัยใช้แบบแผน <b>กลุ่มทดลองกลุ่มเดียว ทดสอบก่อน–หลัง (One-Group Pretest–Posttest Design)</b> เก็บข้อมูลการประเมิน 4 รอบ ได้แก่ ก่อนเรียน (Pretest) ภาระงานหน่วยที่ 1 หน่วยที่ 2 และหลังเรียน (Posttest)</p>');
+    P.push('<h2>1.3 กลุ่มเป้าหมายในการวิเคราะห์</h2>');
+    P.push('<p>ผลการวิเคราะห์เชิงปริมาณ เชิงคุณภาพ และผลงานเรียงความ ใช้ข้อมูลของ<b>กลุ่มตัวอย่าง จำนวน ' + sampleStudents.length + ' คน</b> ส่วนการตรวจสอบความสอดคล้องระหว่างผู้ตรวจ (ICC) ใช้ข้อมูลของ<b>กลุ่มทดลอง (นักเรียนห้อง ' + esc(EXPERIMENTAL_CLASSROOM) + ') จำนวน ' + expStudents.length + ' คน</b> ซึ่งได้รับการตรวจโดยผู้ประเมิน 3 คน</p>');
+    P.push('<h2>1.4 เครื่องมือที่ใช้ในการวิจัย</h2>');
+    P.push('<ul>' +
+      '<li><b>แบบประเมินความสามารถในการเขียนเรียงความ</b> (Rubric) 11 ตัวชี้วัด จัดเป็น 4 ด้าน คะแนนเต็ม 60</li>' +
+      '<li><b>แบบบันทึกปัญหาการเขียนและแนวทางแก้ไข</b> รายตัวชี้วัด</li>' +
+      '<li><b>แบบตรวจสอบตนเอง</b> (Self-Checklist)</li>' +
+      '<li><b>แบบประเมินผลงานเพื่อนเชิงคุณภาพ</b> (Peer Review)</li>' +
+      '<li><b>แบบบันทึกการสะท้อนการเรียนรู้</b> (Learning Reflection)</li>' +
+      '</ul>');
+    P.push('<h2>1.5 การตรวจสอบความเที่ยงของเครื่องมือ</h2>');
+    P.push('<p>งานเขียนของกลุ่มทดลองได้รับการตรวจโดยผู้ประเมิน 3 คน คือ <b>ครูผู้สอนและผู้เชี่ยวชาญ 2 ท่าน</b> เพื่อคำนวณค่าความสอดคล้องระหว่างผู้ตรวจ ด้วยสัมประสิทธิ์สหสัมพันธ์ภายในชั้น ICC(2,1) แบบ two-way random effects, absolute agreement ตามแนวทางของ Koo &amp; Li (2016)</p>');
+
+    // ----- ส่วนที่ 2 : ICC (606, หน่วย 1, ละเอียด) -----
+    P.push('<div class="pagebreak"></div>');
+    P.push('<h1 class="secn" id="s2">ส่วนที่ 2 ผลการตรวจสอบความสอดคล้องระหว่างผู้ตรวจ (ICC)</h1>');
+    P.push('<p>คำนวณจากคะแนนของผู้ตรวจ 3 คน (ครูผู้สอน + ผู้เชี่ยวชาญ 2 ท่าน) เฉพาะนักเรียน<b>กลุ่มทดลอง (ห้อง ' + esc(EXPERIMENTAL_CLASSROOM) + ')</b> ในภาระงาน<b>หน่วยที่ 1</b> จำนวนนักเรียนที่ผู้ตรวจครบทั้ง 3 คน = <b>' + triples.length + ' คน</b> · เกณฑ์การแปลผล: ≥0.90 ดีเยี่ยม, 0.75–0.89 ดี, 0.50–0.74 ปานกลาง, &lt;0.50 ต่ำ</p>');
+    P.push('<h2>2.1 ค่า ICC รายด้านหลัก</h2>');
+    P.push(tbl(['มิติคะแนน', 'N', 'ค่า ICC', 'การแปลผล'], iccMainRows, { numCols: [1, 2] }));
+    P.push('<h2>2.2 ค่า ICC รายตัวชี้วัดย่อย (11 ตัวชี้วัด)</h2>');
+    P.push(tbl(['ตัวชี้วัดย่อย', 'N', 'ค่า ICC', 'การแปลผล'], iccSubRows, { numCols: [1, 2] }));
+    P.push('<h2>2.3 คะแนนของผู้ตรวจทั้ง 3 คน รายบุคคล</h2>');
+    P.push('<p>แสดงคะแนน 4 ด้านและคะแนนรวมที่ผู้ตรวจแต่ละคนให้ (ภาระงานหน่วยที่ 1)</p>');
+    P.push(tbl(['ที่', 'ชื่อ-สกุล', 'ผู้ตรวจ', 'ด้านเนื้อหา', 'ด้านองค์ประกอบ', 'ด้านภาษา', 'ด้านอักขรวิธี', 'คะแนนรวม'], raterRows, { numCols: [0, 3, 4, 5, 6, 7] }));
+    P.push('<p class="analysis"><b>บทวิเคราะห์:</b> ค่า ICC ของคะแนนรวม (ภาระงานหน่วยที่ 1) เท่ากับ ' + f4(iccOverall.icc) + ' (' + iccOverall.interp.text + ') ' +
+      'เมื่อพิจารณารายด้านและรายตัวชี้วัดย่อยพบว่าค่าความสอดคล้องอยู่ในระดับที่ยอมรับได้ตามเกณฑ์ของ Koo &amp; Li (2016) แสดงว่าครูผู้สอนและผู้เชี่ยวชาญให้คะแนนสอดคล้องกัน จึงเป็นหลักฐานยืนยันความเที่ยงของเครื่องมือและกระบวนการประเมิน</p>');
+
+    // ----- ส่วนที่ 3 : เชิงปริมาณ (กลุ่มตัวอย่าง) -----
+    P.push('<div class="pagebreak"></div>');
+    P.push('<h1 class="secn" id="s3">ส่วนที่ 3 ผลการวิเคราะห์เชิงปริมาณ (กลุ่มตัวอย่าง)</h1>');
+    P.push('<h2>3.1 ภาพรวม: สถิติเชิงพรรณนาของคะแนนรวม จำแนกตามรอบ</h2>');
+    P.push(tbl(['รอบการประเมิน', 'N', 'ค่าเฉลี่ย', 'S.D.', 'ต่ำสุด', 'สูงสุด'], descRows, { numCols: [1, 2, 3, 4, 5] }));
+    P.push('<h2>3.2 ภาพรวม: สถิติเชิงพรรณนารายด้าน (' + esc(mainPhaseLabel) + ')</h2>');
+    P.push(tbl(['มิติคะแนน', 'N', 'ค่าเฉลี่ย', 'S.D.', 'ต่ำสุด', 'สูงสุด'], dimDescRows, { numCols: [1, 2, 3, 4, 5] }));
+    P.push('<h2>3.3 การทดสอบพัฒนาการด้วย Paired-samples t-test (ก่อนเรียน–หลังเรียน)</h2>');
+    if (tTeacher.insufficient) {
+      P.push('<p style="color:#888">— ยังมีคู่คะแนนก่อน–หลังไม่เพียงพอสำหรับการทดสอบ (N = ' + tTeacher.N + ') —</p>');
+    } else {
+      P.push(tbl(['N', 'x̄ ก่อน', 'x̄ หลัง', 'ผลต่าง', 'S.D.(ผลต่าง)', 't', 'df', 'p (one-tailed)'],
+        [[tTeacher.N, f2(tTeacher.meanPre), f2(tTeacher.meanPost), '+' + f2(tTeacher.meanDiff), f2(tTeacher.sdDiff), f4(tTeacher.t), tTeacher.df, (tTeacher.p < 0.001 ? '<0.001' : f4(tTeacher.p))]],
+        { numCols: [0, 1, 2, 3, 4, 5, 6, 7] }));
+      const sig = tTeacher.p < 0.05;
+      P.push('<p class="analysis"><b>บทวิเคราะห์:</b> คะแนนเฉลี่ยหลังเรียน (' + f2(tTeacher.meanPost) + ') สูงกว่าก่อนเรียน (' + f2(tTeacher.meanPre) + ') เฉลี่ย ' + f2(tTeacher.meanDiff) + ' คะแนน; t(' + tTeacher.df + ') = ' + f4(tTeacher.t) + ', p ' + (tTeacher.p < 0.001 ? '< 0.001' : '= ' + f4(tTeacher.p)) + ' จึง<b>' + (sig ? 'มีนัยสำคัญทางสถิติที่ระดับ .05' : 'ยังไม่พบนัยสำคัญที่ระดับ .05') + '</b> (Cohen\'s d<sub>z</sub> = ' + f2(tTeacher.dz) + ', ' + effectSizeLabel(tTeacher.dz) + ')</p>');
+    }
+    P.push('<h2>3.4 รายละเอียด: คะแนนรายบุคคลจำแนกรายด้าน (' + esc(mainPhaseLabel) + ')</h2>');
+    P.push(tbl(['ที่', 'ชื่อ-สกุล', 'ด้านเนื้อหา', 'ด้านองค์ประกอบ', 'ด้านภาษา', 'ด้านอักขรวิธี', 'คะแนนรวม'], perStudentDetail, { numCols: [0, 2, 3, 4, 5, 6] }));
+
+    // ----- ส่วนที่ 4 : เชิงคุณภาพ (กลุ่มตัวอย่าง) ข้อมูลจริงทั้งหมด -----
+    P.push('<div class="pagebreak"></div>');
+    P.push('<h1 class="secn" id="s4">ส่วนที่ 4 ผลการวิเคราะห์เชิงคุณภาพ (กลุ่มตัวอย่าง)</h1>');
+    P.push('<h2>4.1 ความถี่ของปัญหา/อุปสรรคการเขียน จำแนกรายตัวชี้วัด</h2>');
+    const critRows = QUAL_SUB_CRITERIA.map(sc => {
+      const avgPeer = peerCnt[sc] > 0 ? peerSum[sc] / peerCnt[sc] : null;
+      return [criteriaMap[sc].name.split(' (')[0], critCounts[sc], avgPeer === null ? '-' : f2(avgPeer) + ' / 4'];
+    });
+    P.push(tbl(['ตัวชี้วัด', 'จำนวนที่พบปัญหา (คน)', 'คะแนนเฉลี่ยจากเพื่อน'], critRows, { numCols: [1, 2] }));
+    if (sortedCrit[0] && sortedCrit[0][1] > 0) {
+      P.push('<p class="analysis"><b>บทวิเคราะห์:</b> ตัวชี้วัดที่พบปัญหามากที่สุดคือ <b>' + esc(criteriaMap[sortedCrit[0][0]].name.split(' (')[0]) + '</b> (' + sortedCrit[0][1] + ' คน)' +
+        (sortedCrit[1] && sortedCrit[1][1] > 0 ? ' รองลงมาคือ <b>' + esc(criteriaMap[sortedCrit[1][0]].name.split(' (')[0]) + '</b> (' + sortedCrit[1][1] + ' คน)' : '') +
+        ' ควรออกแบบกิจกรรมเสริมที่เน้นตัวชี้วัดเหล่านี้เป็นลำดับแรก</p>');
+    }
+
+    // 4.2 ข้อมูลเชิงบรรยายจริงทั้งหมด
+    P.push('<h2>4.2 ข้อมูลเชิงบรรยายจากนักเรียนและเพื่อนผู้ประเมิน (ข้อมูลจริงทั้งหมด)</h2>');
+    // 4.2.1 ปัญหาการเขียนและแนวทางแก้ไข
+    P.push('<h3>4.2.1 บันทึกปัญหาการเขียนและแนวทางแก้ไข</h3>');
+    const probRows = [];
+    problems.forEach(p => {
+      QUAL_SUB_CRITERIA.forEach(sc => {
+        const k = sc.replace('.', '_');
+        const prob = (p['prob_' + k] || '').trim(); const sol = (p['sol_' + k] || '').trim();
+        if (prob || sol) probRows.push([esc(nameOf(p.student_id)), criteriaMap[sc].name.split(' (')[0], prob, sol]);
+      });
+    });
+    P.push(tbl(['ชื่อ-สกุล', 'ตัวชี้วัด', 'ปัญหา/อุปสรรคที่พบ', 'แนวทางแก้ไข'], probRows));
+    // 4.2.2 การประเมินเพื่อนเชิงบรรยาย
+    P.push('<h3>4.2.2 ข้อเสนอแนะจากการประเมินเพื่อน</h3>');
+    const peerRows = [];
+    peerReviews.forEach(pr => {
+      const st = (pr.strength || '').trim(), im = (pr.improvement || '').trim(), en = (pr.encouragement || '').trim();
+      if (st || im || en) peerRows.push([esc(nameOf(pr.student_id)), esc(nameOf(pr.reviewer_id)), st, im, en]);
+    });
+    P.push(tbl(['เจ้าของผลงาน', 'เพื่อนผู้ประเมิน', 'จุดแข็ง/สิ่งที่ประทับใจ', 'จุดที่ควรปรับปรุง', 'ข้อความให้กำลังใจ'], peerRows));
+    // 4.2.3 การสะท้อนการเรียนรู้
+    P.push('<h3>4.2.3 การสะท้อนการเรียนรู้ของนักเรียน</h3>');
+    const refRows = [];
+    reflections.forEach(rf => {
+      refRows.push([esc(nameOf(rf.student_id)), (rf.content_structure || '').trim(), (rf.language_mechanics || '').trim(), (rf.feedback_applied || '').trim(), (rf.future_goals || '').trim()]);
+    });
+    P.push(tbl(['ชื่อ-สกุล', 'ด้านเนื้อหา/องค์ประกอบ', 'ด้านภาษา/อักขรวิธี', 'การนำข้อเสนอแนะไปปรับปรุง', 'เป้าหมายในอนาคต'], refRows));
+
+    // ----- ส่วนที่ 5 : เรียงความ (กลุ่มตัวอย่าง) เชิงปริมาณ -----
+    let sampleEssays = [];
+    try {
+      const er = await fetch('api.php?action=get_all_essays&_t=' + Date.now());
+      const ed = await er.json();
+      if (ed.success && Array.isArray(ed.essays)) sampleEssays = ed.essays.filter(e => e.student_group === SAMPLE_GROUP || sampleIds.has(e.student_id));
+    } catch (e) { /* ไม่มีเรียงความก็ข้ามได้ */ }
+    P.push('<div class="pagebreak"></div>');
+    P.push('<h1 class="secn" id="s5">ส่วนที่ 5 ผลงานเรียงความของนักเรียน (เชิงปริมาณ)</h1>');
+    const essayRows = phaseKeys.map(([k, label]) => {
+      const list = sampleEssays.filter(e => e.essay_phase === k);
+      const words = list.map(e => Number(e.word_count) || 0);
+      const st = descStats(words);
+      return st ? [label, list.length, Math.round(st.mean).toLocaleString('th-TH'), st.min.toLocaleString('th-TH'), st.max.toLocaleString('th-TH')] : [label, 0, '-', '-', '-'];
+    });
+    P.push(tbl(['รอบ/ภาระงาน', 'จำนวนที่ส่ง (ฉบับ)', 'จำนวนคำเฉลี่ย', 'คำน้อยสุด', 'คำมากสุด'], essayRows, { numCols: [1, 2, 3, 4] }));
+
+    // ----- ส่วนที่ 6 : สรุปและอภิปรายผล (ละเอียด) -----
+    P.push('<div class="pagebreak"></div>');
+    P.push('<h1 class="secn" id="s6">ส่วนที่ 6 สรุปและอภิปรายผล</h1>');
+    P.push('<h2>6.1 สรุปผลการวิจัย</h2>');
+    let sumQuant = 'ด้านผลสัมฤทธิ์เชิงปริมาณ ';
+    if (tTeacher.insufficient) {
+      sumQuant += 'ยังมีคู่คะแนนก่อน–หลังของกลุ่มตัวอย่างไม่เพียงพอต่อการทดสอบพัฒนาการด้วย Paired-samples t-test จึงควรเก็บข้อมูลเพิ่มเติมให้ครบทั้งก่อนเรียนและหลังเรียน อย่างไรก็ตามสถิติเชิงพรรณนาแสดงระดับคะแนนของผู้เรียนในแต่ละรอบไว้เพื่อการติดตามพัฒนาการ';
+    } else {
+      const sig = tTeacher.p < 0.05;
+      sumQuant += 'พบว่าคะแนนเฉลี่ยหลังเรียน (' + f2(tTeacher.meanPost) + ') สูงกว่าก่อนเรียน (' + f2(tTeacher.meanPre) + ') เฉลี่ย ' + f2(tTeacher.meanDiff) + ' คะแนน และจากการทดสอบ Paired-samples t-test พบว่า t(' + tTeacher.df + ') = ' + f4(tTeacher.t) + ', p ' + (tTeacher.p < 0.001 ? '< 0.001' : '= ' + f4(tTeacher.p)) + ' ' + (sig ? 'ซึ่งมีนัยสำคัญทางสถิติที่ระดับ .05 และมีขนาดอิทธิพลในระดับ' + effectSizeLabel(tTeacher.dz) + ' (Cohen\'s d_z = ' + f2(tTeacher.dz) + ') สะท้อนว่าการจัดการเรียนรู้ช่วยพัฒนาความสามารถในการเขียนเรียงความของผู้เรียนได้จริง' : 'ซึ่งยังไม่ถึงระดับนัยสำคัญ .05 จึงควรเพิ่มขนาดตัวอย่างหรือระยะเวลาการทดลอง');
+    }
+    P.push('<p>' + esc(sumQuant) + '</p>');
+    P.push('<p>ด้านคุณภาพเครื่องมือ ค่าความสอดคล้องระหว่างผู้ตรวจ (ICC) ของคะแนนรวมในภาระงานหน่วยที่ 1 เท่ากับ ' + f4(iccOverall.icc) + ' (' + iccOverall.interp.text + ') โดยเมื่อพิจารณารายด้านหลักและรายตัวชี้วัดย่อยทั้ง 11 ตัวชี้วัด พบว่าค่าความสอดคล้องอยู่ในเกณฑ์ที่ยอมรับได้ แสดงว่าเกณฑ์การประเมินมีความชัดเจนและผู้ตรวจเข้าใจตรงกัน</p>');
+    if (sortedCrit[0] && sortedCrit[0][1] > 0) {
+      P.push('<p>ด้านข้อมูลเชิงคุณภาพ ปัญหาการเขียนที่พบบ่อยที่สุดคือ <b>' + esc(criteriaMap[sortedCrit[0][0]].name.split(' (')[0]) + '</b>' + (sortedCrit[1] && sortedCrit[1][1] > 0 ? ' และ <b>' + esc(criteriaMap[sortedCrit[1][0]].name.split(' (')[0]) + '</b>' : '') + ' สอดคล้องกับข้อเสนอแนะจากการประเมินเพื่อนและการสะท้อนคิดของผู้เรียน ที่ชี้ให้เห็นจุดที่ควรพัฒนาอย่างเป็นรูปธรรม</p>');
+    }
+    P.push('<h2>6.2 อภิปรายผล</h2>');
+    P.push('<p>ผลการวิจัยชี้ให้เห็นว่ากระบวนการประเมินแบบหลายมุมมอง (ครู–ตนเอง–เพื่อน) ร่วมกับการบันทึกปัญหาการเขียนและการสะท้อนการเรียนรู้ ช่วยให้ผู้เรียนตระหนักถึงจุดแข็งและจุดที่ต้องพัฒนาของตนเอง การที่ค่า ICC อยู่ในระดับที่ยอมรับได้สนับสนุนว่าเครื่องมือประเมินมีความเที่ยงตรงเพียงพอที่จะใช้ติดตามพัฒนาการของผู้เรียนได้อย่างน่าเชื่อถือ ขณะที่ข้อมูลเชิงคุณภาพช่วยเสริมความเข้าใจเชิงลึกที่ตัวเลขเพียงอย่างเดียวไม่สามารถอธิบายได้</p>');
+    P.push('<h2>6.3 ข้อเสนอแนะ</h2>');
+    P.push('<ul>' +
+      '<li>ควรนำตัวชี้วัดที่ผู้เรียนพบปัญหามากที่สุดไปออกแบบกิจกรรมซ่อมเสริมแบบเจาะจง</li>' +
+      '<li>ควรใช้ข้อมูลเชิงคุณภาพ (ปัญหาการเขียน ข้อเสนอแนะจากเพื่อน และการสะท้อนคิด) ประกอบการวางแผนพัฒนาผู้เรียนเป็นรายบุคคล</li>' +
+      '<li>ควรเก็บข้อมูลคะแนนให้ครบทั้งก่อนเรียนและหลังเรียนของทุกคน เพื่อให้การทดสอบพัฒนาการมีความสมบูรณ์</li>' +
+      '<li>อาจขยายผลการตรวจสอบความเที่ยง (ICC) ไปยังภาระงานหน่วยอื่น เพื่อยืนยันความคงเส้นคงวาของเกณฑ์ประเมิน</li>' +
+      '</ul>');
+
+    const body = P.join('\n');
+
+    // ================= สารบัญ + ปก + คำนำ =================
+    const toc = '<div class="toc">' +
+      '<h1 class="secn nonum">สารบัญ</h1>' +
+      '<div class="tocitem"><span>ส่วนที่ 1 บทนำและกระบวนการวิจัย</span></div>' +
+      '<div class="tocitem"><span>ส่วนที่ 2 ผลการตรวจสอบความสอดคล้องระหว่างผู้ตรวจ (ICC)</span></div>' +
+      '<div class="tocitem"><span>ส่วนที่ 3 ผลการวิเคราะห์เชิงปริมาณ (กลุ่มตัวอย่าง)</span></div>' +
+      '<div class="tocitem"><span>ส่วนที่ 4 ผลการวิเคราะห์เชิงคุณภาพ (กลุ่มตัวอย่าง)</span></div>' +
+      '<div class="tocitem"><span>ส่วนที่ 5 ผลงานเรียงความของนักเรียน (เชิงปริมาณ)</span></div>' +
+      '<div class="tocitem"><span>ส่วนที่ 6 สรุปและอภิปรายผล</span></div>' +
+      '</div>';
+
+    const preface = '<div class="pagebreak"></div>' +
+      '<h1 class="secn nonum">คำนำ</h1>' +
+      '<p>รายงานฉบับนี้เป็นการประมวลผลข้อมูลจากระบบประเมินการเขียนเรียงความ เพื่อนำเสนอผลการวิเคราะห์ความสามารถในการเขียนเรียงความของนักเรียน ทั้งในเชิงปริมาณ ได้แก่ สถิติเชิงพรรณนา การทดสอบพัฒนาการด้วย Paired-samples t-test และค่าความสอดคล้องระหว่างผู้ตรวจ (ICC) และในเชิงคุณภาพ ได้แก่ ปัญหาการเขียนรายตัวชี้วัด ข้อเสนอแนะจากการประเมินเพื่อน และการสะท้อนการเรียนรู้ของนักเรียน</p>' +
+      '<p>เนื้อหาเรียบเรียงตามลำดับกระบวนการวิจัย เพื่อให้ผู้อ่านติดตามได้ตั้งแต่ที่มา ระเบียบวิธี ผลการวิเคราะห์ ไปจนถึงข้อสรุปและข้อเสนอแนะ ผู้จัดทำหวังว่ารายงานนี้จะเป็นประโยชน์ต่อการพัฒนาการจัดการเรียนรู้และการพัฒนาผู้เรียนต่อไป</p>' +
+      '<p style="text-align:right;margin-top:24pt">' + esc(REPORT_AUTHOR) + '<br>' + esc(thDate) + '</p>';
+
+    const cover = '<div class="cover">' +
+      '<div class="cover-top">รายงานผลการวิจัยในชั้นเรียน</div>' +
+      '<div class="cover-title">การวิเคราะห์ความสามารถในการเขียนเรียงความของนักเรียน</div>' +
+      '<div class="cover-sub">แบบแผนการวิจัย: กลุ่มทดลองกลุ่มเดียว ทดสอบก่อน–หลัง<br>(One-Group Pretest–Posttest Design)</div>' +
+      '<div class="cover-box">กลุ่มตัวอย่าง ' + sampleStudents.length + ' คน &nbsp;•&nbsp; ตรวจสอบความเที่ยง (ICC) จากกลุ่มทดลองห้อง ' + esc(EXPERIMENTAL_CLASSROOM) + '</div>' +
+      '<div class="cover-foot">จัดทำโดย ' + esc(REPORT_AUTHOR) + '<br>วันที่ ' + esc(thDate) + '</div>' +
+      '</div>';
+
+    const css =
+      '@page { size: A4; margin: 2.54cm 2.2cm; }' +
+      'body { font-family: "TH Sarabun New","Sarabun","Angsana New","Cordia New",serif; font-size: 16pt; color:#000; line-height:1.5; }' +
+      'h1.secn { font-size: 20pt; color:#1F3A5F; border-bottom:2pt solid #1F3A5F; padding-bottom:4pt; margin:0 0 12pt; }' +
+      'h2 { font-size: 17pt; color:#22406a; margin:14pt 0 6pt; }' +
+      'h3 { font-size: 16pt; color:#333; margin:10pt 0 4pt; }' +
+      'p { margin: 0 0 8pt; text-align: justify; }' +
+      'ul { margin: 0 0 8pt 0; }' +
+      'table.data { border-collapse: collapse; width: 100%; margin: 6pt 0 12pt; font-size: 15pt; }' +
+      'table.data th { background:#1F3A5F; color:#fff; border:0.75pt solid #33455f; padding:4pt 6pt; text-align:center; }' +
+      'table.data td { border:0.75pt solid #999; padding:3pt 6pt; vertical-align:top; }' +
+      'p.analysis { background:#eef3fb; border-left:3pt solid #1F3A5F; padding:6pt 10pt; margin:6pt 0 12pt; }' +
+      '.pagebreak { page-break-before: always; }' +
+      '.cover { text-align:center; padding-top:110pt; }' +
+      '.cover-top { font-size:22pt; color:#1F3A5F; letter-spacing:1pt; margin-bottom:30pt; }' +
+      '.cover-title { font-size:30pt; font-weight:bold; color:#111; margin-bottom:16pt; line-height:1.35; }' +
+      '.cover-sub { font-size:17pt; color:#444; margin-bottom:40pt; }' +
+      '.cover-box { display:inline-block; border:1.5pt solid #1F3A5F; border-radius:6pt; padding:8pt 20pt; font-size:16pt; color:#1F3A5F; margin-bottom:60pt; }' +
+      '.cover-foot { font-size:17pt; color:#333; }' +
+      '.toc .tocitem { font-size:16pt; padding:5pt 0; border-bottom:0.5pt dotted #bbb; }' +
+      'h1.nonum { text-align:center; border-bottom:none; }';
+
+    const doc =
+      '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">' +
+      '<head><meta charset="utf-8"><title>รายงานผลการวิจัย</title>' +
+      '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->' +
+      '<style>' + css + '</style></head><body>' +
+      cover + toc + preface + '<div class="pagebreak"></div>' + body +
+      '</body></html>';
+
+    return { doc, filename: 'รายงานผลการวิจัย_เขียนเรียงความ_' + now.toISOString().slice(0, 10) };
+  }
+
+  // ---- ส่งรายงานเข้า Google Docs โดยตรง (ผ่าน Google Drive API) ----
+  async function sendReportToGoogleDocs() {
     const btn = document.getElementById('genReportBtn');
     const original = btn ? btn.innerHTML : '';
-    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>กำลังรวบรวมผลและจัดทำรายงาน...'; }
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>กำลังจัดทำและส่งเข้า Google Docs...'; }
     try {
-      // 1) ประกันว่าโหลดข้อมูลครบ (ข้อมูลชั้นเรียน + เรียงความ)
-      if (typeof researchDataPromise !== 'undefined' && researchDataPromise) { await researchDataPromise; }
-      if (!classroomResearchData) { await loadResearchData(); }
-      try { await loadEssayViewer(); } catch (e) { /* เรียงความไม่พร้อมก็ยังออกรายงานส่วนอื่นได้ */ }
-
-      if (!classroomResearchData) { showToast ? showToast('ยังไม่มีข้อมูลสำหรับจัดทำรายงาน', 'error') : alert('ยังไม่มีข้อมูล'); return; }
-
-      const esc = (typeof escapeHtml === 'function') ? escapeHtml : (s => String(s == null ? '' : s));
-      const f2 = (x) => (x === null || x === undefined || isNaN(x)) ? '-' : Number(x).toFixed(2);
-      const f3 = (x) => (x === null || x === undefined || isNaN(x)) ? '-' : Number(x).toFixed(3);
-      const f4 = (x) => (x === null || x === undefined || isNaN(x)) ? '-' : Number(x).toFixed(4);
-
-      // ---------- เตรียมข้อมูลกลุ่มทดลอง (ห้อง 606) ----------
-      const expStudents = classroomResearchData.students.filter(s => s.classroom === EXPERIMENTAL_CLASSROOM);
-      const expIds = new Set(expStudents.map(s => s.student_id));
-      const nameOf = (id) => (studentDB && studentDB[id]) || (expStudents.find(s => s.student_id === id) || {}).student_name || id;
-      const evals = classroomResearchData.evaluations || [];
-
-      // ---------- ICC รายรอบ (ครู + ผู้เชี่ยวชาญ 2) ----------
-      const ICC_DIMS = [
-        { name: 'คะแนนรวม (เต็ม 60)', get: e => Number(e.total_score) },
-        { name: '1) ด้านเนื้อหาสาระ (เต็ม 27)', get: e => Number(e.score_1_1) + Number(e.score_1_2) + Number(e.score_1_3) },
-        { name: '2) ด้านองค์ประกอบและการลำดับ (เต็ม 12)', get: e => Number(e.score_2_1) + Number(e.score_2_2) },
-        { name: '3) ด้านการใช้สำนวนภาษา (เต็ม 15)', get: e => Number(e.score_3_1) + Number(e.score_3_2) + Number(e.score_3_3) },
-        { name: '4) ด้านอักขรวิธีและกลไกการเขียน (เต็ม 6)', get: e => Number(e.score_4_1) + Number(e.score_4_2) + Number(e.score_4_3) }
-      ];
-      function buildTriples(phase) {
-        const triples = [];
-        expStudents.forEach(s => {
-          const ev = evals.filter(e => e.student_id === s.student_id && e.test_phase === phase);
-          const t = ev.find(e => e.evaluator_type === 'teacher');
-          const e1 = ev.find(e => e.evaluator_type === 'expert' && (e.evaluator_name === 'ผู้เชี่ยวชาญ 1' || e.evaluator_name === 'admin1'));
-          const e2 = ev.find(e => e.evaluator_type === 'expert' && (e.evaluator_name === 'ผู้เชี่ยวชาญ 2' || e.evaluator_name === 'admin2'));
-          if (t && e1 && e2) triples.push({ sid: s.student_id, evals: [t, e1, e2] });
-        });
-        return triples;
+      // 1) ตรวจสถานะการเชื่อมต่อบัญชี Google
+      let status;
+      try { status = await (await fetch('google_auth.php?action=status&_t=' + Date.now())).json(); }
+      catch (e) { throw new Error('ยังไม่ได้ตั้งค่า Google API (google_auth.php) บนเซิร์ฟเวอร์'); }
+      if (!status || !status.configured) {
+        if (typeof showToast === 'function') showToast('ผู้ดูแลระบบยังไม่ได้ตั้งค่า Google API (โปรดกรอก Client ID/Secret ใน google_config.php)', 'error');
+        return;
       }
-      function iccForPhase(phase) {
-        const triples = buildTriples(phase);
-        const rows = ICC_DIMS.map(d => {
-          const m = triples.map(tr => tr.evals.map(d.get));
-          const det = (triples.length >= 2) ? computeICC(m) : null;
-          const icc = det ? det.icc : null;
-          return { name: d.name, n: triples.length, icc, interp: getICCInterpretation(icc) };
-        });
-        return { triples, rows };
+      if (!status.connected) {
+        if (typeof showToast === 'function') showToast('กำลังพาไปเชื่อมต่อบัญชี Google ครั้งแรก...', 'info');
+        const ret = encodeURIComponent(location.pathname + '#section-export');
+        window.location.href = 'google_auth.php?action=connect&return=' + ret;
+        return;
       }
-
-      // ---------- Paired t-test (ก่อนเรียน vs หลังเรียน) ----------
-      function pairedT(source) {
-        const pre = evals.filter(e => e.test_phase === 'pretest' && expIds.has(e.student_id));
-        const post = evals.filter(e => e.test_phase === 'posttest' && expIds.has(e.student_id));
-        const pairs = [];
-        expStudents.forEach(s => {
-          const id = s.student_id;
-          const preE = pre.filter(e => e.student_id === id);
-          const postE = post.filter(e => e.student_id === id);
-          let a = null, b = null;
-          if (source === 'teacher') {
-            const p = preE.find(e => e.evaluator_type === 'teacher');
-            const q = postE.find(e => e.evaluator_type === 'teacher');
-            if (p && q) { a = Number(p.total_score); b = Number(q.total_score); }
-          } else if (source === 'expert_avg') {
-            const pe = preE.filter(e => e.evaluator_type === 'expert');
-            const qe = postE.filter(e => e.evaluator_type === 'expert');
-            if (pe.length && qe.length) {
-              a = pe.reduce((x, e) => x + Number(e.total_score), 0) / pe.length;
-              b = qe.reduce((x, e) => x + Number(e.total_score), 0) / qe.length;
-            }
-          }
-          if (a !== null && b !== null) pairs.push({ id, pre: a, post: b, diff: b - a });
-        });
-        const N = pairs.length;
-        if (N < 2) return { N, insufficient: true, pairs };
-        const meanPre = pairs.reduce((s, d) => s + d.pre, 0) / N;
-        const meanPost = pairs.reduce((s, d) => s + d.post, 0) / N;
-        const meanDiff = pairs.reduce((s, d) => s + d.diff, 0) / N;
-        let ss = 0; pairs.forEach(d => ss += Math.pow(d.diff - meanDiff, 2));
-        const sdDiff = Math.sqrt(ss / (N - 1));
-        const seDiff = sdDiff / Math.sqrt(N);
-        const t = seDiff > 0 ? meanDiff / seDiff : 0;
-        const df = N - 1;
-        const p = calculateOneTailedPValue(t, df);
-        const dz = sdDiff > 0 ? meanDiff / sdDiff : 0; // Cohen's dz (paired)
-        return { N, meanPre, meanPost, meanDiff, sdDiff, t, df, p, dz, pairs };
-      }
-      function effectSizeLabel(dz) {
-        const a = Math.abs(dz);
-        if (a >= 0.8) return 'ขนาดผลใหญ่ (large)';
-        if (a >= 0.5) return 'ขนาดผลปานกลาง (medium)';
-        if (a >= 0.2) return 'ขนาดผลเล็ก (small)';
-        return 'ขนาดผลน้อยมาก (negligible)';
-      }
-
-      // ---------- สถิติเชิงพรรณนาต่อรอบ (คะแนนครู) ----------
-      function descStats(vals) {
-        const n = vals.length; if (!n) return null;
-        const mean = vals.reduce((a, b) => a + b, 0) / n;
-        let ss = 0; vals.forEach(v => ss += Math.pow(v - mean, 2));
-        const sd = n > 1 ? Math.sqrt(ss / (n - 1)) : 0;
-        return { n, mean, sd, min: Math.min(...vals), max: Math.max(...vals) };
-      }
-      function teacherTotals(phase) {
-        return evals.filter(e => expIds.has(e.student_id) && e.test_phase === phase && e.evaluator_type === 'teacher')
-          .map(e => Number(e.total_score));
-      }
-
-      // ---------- ข้อมูลเชิงคุณภาพ ----------
-      const problems = (classroomResearchData.problems || []).filter(p => expIds.has(p.student_id));
-      const peerReviews = (classroomResearchData.peer_reviews || []).filter(pr => expIds.has(pr.student_id));
-      const reflections = (classroomResearchData.reflections || []).filter(rf => expIds.has(rf.student_id));
-      const critCounts = {}; QUAL_SUB_CRITERIA.forEach(sc => critCounts[sc] = 0);
-      problems.forEach(p => QUAL_SUB_CRITERIA.forEach(sc => { if (p['prob_' + sc.replace('.', '_')]) critCounts[sc]++; }));
-      const peerSum = {}, peerCnt = {}; QUAL_SUB_CRITERIA.forEach(sc => { peerSum[sc] = 0; peerCnt[sc] = 0; });
-      peerReviews.forEach(pr => QUAL_SUB_CRITERIA.forEach(sc => {
-        const lv = pr['score_' + sc.replace('.', '_')];
-        if (lv && PEER_LEVEL_SCORE[lv] !== undefined) { peerSum[sc] += PEER_LEVEL_SCORE[lv]; peerCnt[sc]++; }
-      }));
-
-      // ---------- ตัวช่วยสร้างตาราง HTML ----------
-      const tbl = (headers, rows, opts) => {
-        opts = opts || {};
-        let h = '<table class="data"><thead><tr>';
-        headers.forEach(x => h += '<th>' + esc(x) + '</th>');
-        h += '</tr></thead><tbody>';
-        if (!rows.length) {
-          h += '<tr><td colspan="' + headers.length + '" style="text-align:center;color:#888">— ยังไม่มีข้อมูล —</td></tr>';
-        }
-        rows.forEach(r => {
-          h += '<tr>';
-          r.forEach((c, i) => {
-            const align = (opts.numCols && opts.numCols.includes(i)) ? ' style="text-align:center"' : '';
-            h += '<td' + align + '>' + (c === null || c === undefined ? '' : esc(c)) + '</td>';
-          });
-          h += '</tr>';
-        });
-        return h + '</tbody></table>';
-      };
-
-      // ================= คำนวณผลทั้งหมด =================
-      const iccTask1 = iccForPhase('task1');
-      const iccTask2 = iccForPhase('task2');
-      const tTeacher = pairedT('teacher');
-      const tExpert = pairedT('expert_avg');
-      const phaseKeys = [['pretest', 'ก่อนเรียน (Pretest)'], ['task1', 'ภาระงานหน่วยที่ 1'], ['task2', 'ภาระงานหน่วยที่ 2'], ['posttest', 'หลังเรียน (Posttest)']];
-      const descRows = phaseKeys.map(([k, label]) => {
-        const d = descStats(teacherTotals(k));
-        return d ? [label, d.n, f2(d.mean), f2(d.sd), f2(d.min), f2(d.max)] : [label, 0, '-', '-', '-', '-'];
-      });
-
-      const now = new Date();
-      const thDate = now.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
-
-      // ================= ประกอบเนื้อหาเอกสาร =================
-      const P = [];
-      P.push('<h1 class="secn" id="s1">ส่วนที่ 1 บทนำและกระบวนการวิจัย</h1>');
-      P.push('<h2>1.1 ความเป็นมาและวัตถุประสงค์</h2>');
-      P.push('<p>รายงานฉบับนี้จัดทำขึ้นเพื่อรวบรวมและวิเคราะห์ผลการประเมินความสามารถในการเขียนเรียงความของนักเรียนกลุ่มทดลอง (นักเรียนห้อง ' + esc(EXPERIMENTAL_CLASSROOM) + ') โดยใช้ข้อมูลที่บันทึกผ่านระบบประเมินเรียงความ ครอบคลุมทั้งการประเมินเชิงปริมาณจากผู้ตรวจหลายฝ่าย และข้อมูลเชิงคุณภาพจากบันทึกปัญหาการเขียน การประเมินโดยเพื่อน และการสะท้อนการเรียนรู้ เพื่อตรวจสอบพัฒนาการของผู้เรียนและคุณภาพของเครื่องมือประเมิน</p>');
-      P.push('<h2>1.2 แบบแผนการวิจัย</h2>');
-      P.push('<p>การวิจัยใช้แบบแผน <b>กลุ่มทดลองกลุ่มเดียว ทดสอบก่อน–หลัง (One-Group Pretest–Posttest Design)</b> เก็บข้อมูลการประเมิน 4 รอบ ได้แก่ การทดสอบก่อนเรียน (Pretest) ภาระงานระหว่างเรียนหน่วยที่ 1 และหน่วยที่ 2 และการทดสอบหลังเรียน (Posttest)</p>');
-      P.push('<h2>1.3 ประชากรและกลุ่มตัวอย่าง</h2>');
-      P.push('<p>กลุ่มทดลองในการวิเคราะห์นี้คือนักเรียนห้อง ' + esc(EXPERIMENTAL_CLASSROOM) + ' จำนวน <b>' + expStudents.length + ' คน</b></p>');
-      P.push('<h2>1.4 เครื่องมือที่ใช้ในการวิจัย</h2>');
-      P.push('<ul>' +
-        '<li><b>แบบประเมินความสามารถในการเขียนเรียงความ</b> (Rubric) 11 ตัวชี้วัด จัดเป็น 4 ด้าน คะแนนเต็ม 60</li>' +
-        '<li><b>แบบบันทึกปัญหาการเขียนและแนวทางแก้ไข</b> รายตัวชี้วัด</li>' +
-        '<li><b>แบบตรวจสอบตนเอง</b> (Self-Checklist)</li>' +
-        '<li><b>แบบประเมินผลงานเพื่อนเชิงคุณภาพ</b> (Peer Review)</li>' +
-        '<li><b>แบบบันทึกการสะท้อนการเรียนรู้</b> (Learning Reflection)</li>' +
-        '</ul>');
-      P.push('<h2>1.5 ผู้ประเมินและการตรวจสอบความเที่ยง</h2>');
-      P.push('<p>งานเขียนของนักเรียนกลุ่มทดลองได้รับการตรวจโดยผู้ประเมิน 3 คน คือ <b>ครูผู้สอนและผู้เชี่ยวชาญ 2 ท่าน</b> เพื่อคำนวณค่าความสอดคล้องระหว่างผู้ตรวจ (Inter-rater Reliability) ด้วยสัมประสิทธิ์สหสัมพันธ์ภายในชั้น ICC(2,1) แบบ two-way random effects, absolute agreement ตามแนวทางของ Koo &amp; Li (2016)</p>');
-
-      // ส่วนที่ 2 : ICC
-      P.push('<div class="pagebreak"></div>');
-      P.push('<h1 class="secn" id="s2">ส่วนที่ 2 ผลการตรวจสอบความสอดคล้องระหว่างผู้ตรวจ (ICC)</h1>');
-      P.push('<p>ตารางแสดงค่า ICC ของคะแนนรวมและรายด้าน จำแนกตามภาระงาน โดยพิจารณาเฉพาะนักเรียนที่ผู้ตรวจครบทั้ง 3 คน เกณฑ์การแปลผล: ≥0.90 ดีเยี่ยม, 0.75–0.89 ดี, 0.50–0.74 ปานกลาง, &lt;0.50 ต่ำ</p>');
-      P.push('<h3>2.1 ภาระงานหน่วยที่ 1 (จำนวนนักเรียนที่ตรวจครบ = ' + iccTask1.triples.length + ' คน)</h3>');
-      P.push(tbl(['มิติคะแนน', 'N', 'ค่า ICC', 'การแปลผล'],
-        iccTask1.rows.map(r => [r.name, r.n, f4(r.icc), r.interp.text]), { numCols: [1, 2] }));
-      P.push('<h3>2.2 ภาระงานหน่วยที่ 2 (จำนวนนักเรียนที่ตรวจครบ = ' + iccTask2.triples.length + ' คน)</h3>');
-      P.push(tbl(['มิติคะแนน', 'N', 'ค่า ICC', 'การแปลผล'],
-        iccTask2.rows.map(r => [r.name, r.n, f4(r.icc), r.interp.text]), { numCols: [1, 2] }));
-      const iccOverall1 = iccTask1.rows[0], iccOverall2 = iccTask2.rows[0];
-      P.push('<p class="analysis"><b>บทวิเคราะห์:</b> ค่า ICC ของคะแนนรวมในภาระงานหน่วยที่ 1 เท่ากับ ' + f4(iccOverall1.icc) + ' (' + iccOverall1.interp.text + ') และหน่วยที่ 2 เท่ากับ ' + f4(iccOverall2.icc) + ' (' + iccOverall2.interp.text + ') ' +
-        'ค่าดังกล่าวสะท้อนระดับความสอดคล้องของการให้คะแนนระหว่างครูผู้สอนและผู้เชี่ยวชาญ ซึ่งเป็นหลักฐานยืนยันความเที่ยงของเครื่องมือและกระบวนการประเมิน</p>');
-
-      // ส่วนที่ 3 : เชิงปริมาณ
-      P.push('<div class="pagebreak"></div>');
-      P.push('<h1 class="secn" id="s3">ส่วนที่ 3 ผลการวิเคราะห์เชิงปริมาณ</h1>');
-      P.push('<h2>3.1 สถิติเชิงพรรณนาของคะแนนรวม (คะแนนจากครูผู้สอน)</h2>');
-      P.push(tbl(['รอบการประเมิน', 'N', 'ค่าเฉลี่ย', 'S.D.', 'ต่ำสุด', 'สูงสุด'], descRows, { numCols: [1, 2, 3, 4, 5] }));
-
-      P.push('<h2>3.2 การทดสอบสมมติฐานด้วย Paired-samples t-test</h2>');
-      P.push('<p>เปรียบเทียบคะแนนก่อนเรียน (Pretest) กับหลังเรียน (Posttest) ของนักเรียนกลุ่มทดลองที่มีคะแนนจับคู่ครบ</p>');
-      const tRow = (label, r) => r.insufficient
-        ? [label, r.N + ' (ข้อมูลไม่พอ)', '-', '-', '-', '-', '-', '-']
-        : [label, r.N, f2(r.meanPre), f2(r.meanPost), '+' + f2(r.meanDiff), f2(r.sdDiff), f4(r.t), (r.p < 0.001 ? '<0.001' : f4(r.p))];
-      P.push(tbl(['แหล่งคะแนน', 'N', 'x̄ ก่อน', 'x̄ หลัง', 'ผลต่าง', 'S.D.(ผลต่าง)', 't', 'p (one-tailed)'],
-        [tRow('ครูผู้สอน', tTeacher), tRow('ผู้เชี่ยวชาญ (เฉลี่ย)', tExpert)], { numCols: [1, 2, 3, 4, 5, 6, 7] }));
-      if (!tTeacher.insufficient) {
-        const sig = tTeacher.p < 0.05;
-        P.push('<p class="analysis"><b>บทวิเคราะห์:</b> คะแนนเฉลี่ยหลังเรียน (' + f2(tTeacher.meanPost) + ') สูงกว่าก่อนเรียน (' + f2(tTeacher.meanPre) + ') เฉลี่ย ' + f2(tTeacher.meanDiff) + ' คะแนน ' +
-          'ผลการทดสอบพบว่า t(' + tTeacher.df + ') = ' + f4(tTeacher.t) + ', p ' + (tTeacher.p < 0.001 ? '< 0.001' : '= ' + f4(tTeacher.p)) + ' ' +
-          'จึง<b>' + (sig ? 'มีนัยสำคัญทางสถิติที่ระดับ .05' : 'ยังไม่พบนัยสำคัญทางสถิติที่ระดับ .05') + '</b> ' +
-          'ค่าขนาดอิทธิพล (Cohen\'s d<sub>z</sub>) = ' + f2(tTeacher.dz) + ' จัดอยู่ในระดับ' + effectSizeLabel(tTeacher.dz) + ' ' +
-          (sig ? 'สรุปได้ว่าการจัดการเรียนรู้ส่งผลให้ความสามารถในการเขียนเรียงความของนักเรียนสูงขึ้นอย่างมีนัยสำคัญ' : 'ควรเพิ่มจำนวนข้อมูลจับคู่เพื่อยืนยันผลให้ชัดเจนยิ่งขึ้น') + '</p>');
-      }
-
-      // ตารางคะแนนรายบุคคล ก่อน–หลัง (ครู)
-      P.push('<h2>3.3 คะแนนรายบุคคล ก่อนเรียน–หลังเรียน (คะแนนจากครูผู้สอน)</h2>');
-      const perRows = (tTeacher.pairs || []).map((d, i) => [i + 1, esc(nameOf(d.id)), f2(d.pre), f2(d.post), (d.diff >= 0 ? '+' : '') + f2(d.diff)]);
-      P.push(tbl(['ที่', 'ชื่อ-สกุล', 'ก่อนเรียน', 'หลังเรียน', 'พัฒนาการ'], perRows, { numCols: [0, 2, 3, 4] }));
-
-      // ส่วนที่ 4 : เชิงคุณภาพ
-      P.push('<div class="pagebreak"></div>');
-      P.push('<h1 class="secn" id="s4">ส่วนที่ 4 ผลการวิเคราะห์เชิงคุณภาพ</h1>');
-      P.push('<h2>4.1 ความถี่ของปัญหา/อุปสรรคการเขียน จำแนกรายตัวชี้วัด</h2>');
-      const critRows = QUAL_SUB_CRITERIA.map(sc => {
-        const avgPeer = peerCnt[sc] > 0 ? peerSum[sc] / peerCnt[sc] : null;
-        return [criteriaMap[sc].name.split(' (')[0], critCounts[sc], avgPeer === null ? '-' : f2(avgPeer) + ' / 4'];
-      });
-      P.push(tbl(['ตัวชี้วัด', 'จำนวนที่พบปัญหา (คน)', 'คะแนนเฉลี่ยจากเพื่อน'], critRows, { numCols: [1, 2] }));
-      const sortedCrit = QUAL_SUB_CRITERIA.map(sc => [sc, critCounts[sc]]).sort((a, b) => b[1] - a[1]);
-      if (sortedCrit[0] && sortedCrit[0][1] > 0) {
-        P.push('<p class="analysis"><b>บทวิเคราะห์:</b> ตัวชี้วัดที่นักเรียนพบปัญหามากที่สุดคือ <b>' + esc(criteriaMap[sortedCrit[0][0]].name.split(' (')[0]) + '</b> (' + sortedCrit[0][1] + ' คน)' +
-          (sortedCrit[1] && sortedCrit[1][1] > 0 ? ' รองลงมาคือ <b>' + esc(criteriaMap[sortedCrit[1][0]].name.split(' (')[0]) + '</b> (' + sortedCrit[1][1] + ' คน)' : '') +
-          ' ควรออกแบบกิจกรรมเสริมที่เน้นตัวชี้วัดเหล่านี้เป็นลำดับแรก</p>');
-      }
-
-      // ตัวอย่างข้อความสะท้อน/ข้อเสนอแนะ
-      P.push('<h2>4.2 ตัวอย่างข้อมูลเชิงบรรยายจากนักเรียนและเพื่อนผู้ประเมิน</h2>');
-      const excerpts = [];
-      peerReviews.forEach(pr => {
-        if (pr.strength && pr.strength.trim()) excerpts.push(['จุดแข็ง (เพื่อนประเมิน) → ' + nameOf(pr.student_id), pr.strength.trim()]);
-        if (pr.improvement && pr.improvement.trim()) excerpts.push(['ข้อเสนอแนะ (เพื่อนประเมิน) → ' + nameOf(pr.student_id), pr.improvement.trim()]);
-      });
-      reflections.forEach(rf => {
-        if (rf.future_goals && rf.future_goals.trim()) excerpts.push(['เป้าหมายในอนาคต (สะท้อนคิด) → ' + nameOf(rf.student_id), rf.future_goals.trim()]);
-        if (rf.feedback_applied && rf.feedback_applied.trim()) excerpts.push(['การนำข้อเสนอแนะไปปรับปรุง → ' + nameOf(rf.student_id), rf.feedback_applied.trim()]);
-      });
-      const shownExcerpts = excerpts.slice(0, 12);
-      if (shownExcerpts.length) {
-        P.push(tbl(['ประเภท / เจ้าของข้อความ', 'ข้อความ'], shownExcerpts));
-        if (excerpts.length > shownExcerpts.length) P.push('<p style="color:#666"><i>* แสดงตัวอย่าง ' + shownExcerpts.length + ' จากทั้งหมด ' + excerpts.length + ' ข้อความ (ดูข้อมูลทั้งหมดได้จากไฟล์ CSV ข้อมูลดิบ)</i></p>');
+      // 2) สร้างเนื้อหารายงาน แล้วส่งขึ้น Google Drive (แปลงเป็น Google Docs)
+      const rep = await buildReportHtml();
+      const res = await (await fetch('google_upload_doc.php', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ html: rep.doc, title: rep.filename })
+      })).json();
+      if (res.success) {
+        if (typeof showToast === 'function') showToast('ส่งเข้า Google Docs สำเร็จ! กำลังเปิดเอกสาร...', 'success');
+        window.open(res.link, '_blank');
+      } else if (res.reauth) {
+        const ret = encodeURIComponent(location.pathname + '#section-export');
+        window.location.href = 'google_auth.php?action=connect&return=' + ret;
       } else {
-        P.push('<p style="color:#888">— ยังไม่มีข้อความเชิงบรรยายที่บันทึกไว้ —</p>');
+        throw new Error(res.error || 'อัปโหลดไม่สำเร็จ');
       }
-
-      // ส่วนที่ 5 : เรียงความ
-      const essaysExp = (typeof allEssaysCache !== 'undefined' && Array.isArray(allEssaysCache)) ? allEssaysCache : [];
-      P.push('<div class="pagebreak"></div>');
-      P.push('<h1 class="secn" id="s5">ส่วนที่ 5 ผลงานเรียงความของนักเรียน</h1>');
-      const essayRows = phaseKeys.map(([k, label]) => {
-        const list = essaysExp.filter(e => e.essay_phase === k);
-        const words = list.map(e => Number(e.word_count) || 0);
-        const avg = words.length ? words.reduce((a, b) => a + b, 0) / words.length : null;
-        return [label, list.length, avg === null ? '-' : Math.round(avg).toLocaleString('th-TH')];
-      });
-      P.push(tbl(['รอบ/ภาระงาน', 'จำนวนที่ส่ง (ฉบับ)', 'จำนวนคำเฉลี่ย'], essayRows, { numCols: [1, 2] }));
-      P.push('<p style="color:#666"><i>เนื้อหาเรียงความฉบับเต็มสามารถเรียกดูได้จากหน้าระบบ หรือดาวน์โหลดเป็นไฟล์ CSV ข้อมูลดิบ</i></p>');
-
-      // ส่วนที่ 6 : สรุปและอภิปรายผล
-      P.push('<div class="pagebreak"></div>');
-      P.push('<h1 class="secn" id="s6">ส่วนที่ 6 สรุปและอภิปรายผล</h1>');
-      const bullets = [];
-      if (!tTeacher.insufficient) {
-        bullets.push('ด้านพัฒนาการ: คะแนนเฉลี่ยหลังเรียนเพิ่มขึ้นจากก่อนเรียน ' + f2(tTeacher.meanDiff) + ' คะแนน ' + (tTeacher.p < 0.05 ? 'อย่างมีนัยสำคัญทางสถิติที่ระดับ .05 (' + effectSizeLabel(tTeacher.dz) + ')' : 'แต่ยังไม่ถึงระดับนัยสำคัญ .05'));
-      }
-      bullets.push('ด้านคุณภาพเครื่องมือ: ค่า ICC ของคะแนนรวมอยู่ในระดับ ' + iccOverall1.interp.text + ' (หน่วย 1) และ ' + iccOverall2.interp.text + ' (หน่วย 2) แสดงถึงความสอดคล้องของผู้ตรวจ');
-      if (sortedCrit[0] && sortedCrit[0][1] > 0) bullets.push('ด้านจุดที่ควรพัฒนา: ตัวชี้วัดที่พบปัญหามากที่สุดคือ ' + criteriaMap[sortedCrit[0][0]].name.split(' (')[0] + ' ควรเน้นเสริมเป็นลำดับแรก');
-      bullets.push('ข้อเสนอแนะ: ควรใช้ข้อมูลเชิงคุณภาพ (ปัญหาการเขียน ข้อเสนอแนะจากเพื่อน และการสะท้อนคิด) ประกอบการวางแผนพัฒนาผู้เรียนเป็นรายบุคคล');
-      P.push('<ul>' + bullets.map(b => '<li>' + esc(b) + '</li>').join('') + '</ul>');
-
-      const body = P.join('\n');
-
-      // ================= สารบัญ + ปก + คำนำ =================
-      const toc = '<div class="toc">' +
-        '<h1 class="secn nonum">สารบัญ</h1>' +
-        '<div class="tocitem"><span>ส่วนที่ 1 บทนำและกระบวนการวิจัย</span></div>' +
-        '<div class="tocitem"><span>ส่วนที่ 2 ผลการตรวจสอบความสอดคล้องระหว่างผู้ตรวจ (ICC)</span></div>' +
-        '<div class="tocitem"><span>ส่วนที่ 3 ผลการวิเคราะห์เชิงปริมาณ</span></div>' +
-        '<div class="tocitem"><span>ส่วนที่ 4 ผลการวิเคราะห์เชิงคุณภาพ</span></div>' +
-        '<div class="tocitem"><span>ส่วนที่ 5 ผลงานเรียงความของนักเรียน</span></div>' +
-        '<div class="tocitem"><span>ส่วนที่ 6 สรุปและอภิปรายผล</span></div>' +
-        '</div>';
-
-      const preface = '<div class="pagebreak"></div>' +
-        '<h1 class="secn nonum">คำนำ</h1>' +
-        '<p>รายงานฉบับนี้เป็นการประมวลผลข้อมูลจากระบบประเมินการเขียนเรียงความ เพื่อนำเสนอผลการวิเคราะห์ความสามารถในการเขียนเรียงความของนักเรียนกลุ่มทดลอง ทั้งในเชิงปริมาณ ได้แก่ ค่าความสอดคล้องระหว่างผู้ตรวจ (ICC) สถิติเชิงพรรณนา และการทดสอบพัฒนาการด้วย Paired-samples t-test และในเชิงคุณภาพ ได้แก่ ปัญหาการเขียนรายตัวชี้วัด ข้อเสนอแนะจากการประเมินเพื่อน และการสะท้อนการเรียนรู้ของนักเรียน</p>' +
-        '<p>เนื้อหาในรายงานเรียบเรียงตามลำดับกระบวนการวิจัย เพื่อให้ผู้อ่านสามารถติดตามตั้งแต่ที่มา ระเบียบวิธี ผลการวิเคราะห์ ไปจนถึงข้อสรุปและข้อเสนอแนะ ผู้จัดทำหวังว่ารายงานนี้จะเป็นประโยชน์ต่อการพัฒนาการจัดการเรียนรู้และการพัฒนาผู้เรียนต่อไป</p>' +
-        '<p style="text-align:right;margin-top:24pt">' + esc(REPORT_AUTHOR) + '<br>' + esc(thDate) + '</p>';
-
-      const cover = '<div class="cover">' +
-        '<div class="cover-top">รายงานผลการวิจัยในชั้นเรียน</div>' +
-        '<div class="cover-title">การวิเคราะห์ความสามารถในการเขียนเรียงความของนักเรียน</div>' +
-        '<div class="cover-sub">แบบแผนการวิจัย: กลุ่มทดลองกลุ่มเดียว ทดสอบก่อน–หลัง<br>(One-Group Pretest–Posttest Design)</div>' +
-        '<div class="cover-box">กลุ่มทดลอง: นักเรียนห้อง ' + esc(EXPERIMENTAL_CLASSROOM) + ' &nbsp;•&nbsp; จำนวน ' + expStudents.length + ' คน</div>' +
-        '<div class="cover-foot">จัดทำโดย ' + esc(REPORT_AUTHOR) + '<br>วันที่ ' + esc(thDate) + '</div>' +
-        '</div>';
-
-      // ================= ประกอบเอกสาร Word (HTML) =================
-      const css =
-        '@page { size: A4; margin: 2.54cm 2.2cm; }' +
-        'body { font-family: "TH Sarabun New","Sarabun","Angsana New","Cordia New",serif; font-size: 16pt; color:#000; line-height:1.5; }' +
-        'h1.secn { font-size: 20pt; color:#1F3A5F; border-bottom:2pt solid #1F3A5F; padding-bottom:4pt; margin:0 0 12pt; }' +
-        'h2 { font-size: 17pt; color:#22406a; margin:14pt 0 6pt; }' +
-        'h3 { font-size: 16pt; color:#333; margin:10pt 0 4pt; }' +
-        'p { margin: 0 0 8pt; text-align: justify; }' +
-        'ul { margin: 0 0 8pt 0; }' +
-        'table.data { border-collapse: collapse; width: 100%; margin: 6pt 0 12pt; font-size: 15pt; }' +
-        'table.data th { background:#1F3A5F; color:#fff; border:0.75pt solid #33455f; padding:4pt 6pt; text-align:center; }' +
-        'table.data td { border:0.75pt solid #999; padding:3pt 6pt; vertical-align:top; }' +
-        'p.analysis { background:#eef3fb; border-left:3pt solid #1F3A5F; padding:6pt 10pt; margin:6pt 0 12pt; }' +
-        '.pagebreak { page-break-before: always; }' +
-        '.cover { text-align:center; padding-top:110pt; }' +
-        '.cover-top { font-size:22pt; color:#1F3A5F; letter-spacing:1pt; margin-bottom:30pt; }' +
-        '.cover-title { font-size:30pt; font-weight:bold; color:#111; margin-bottom:16pt; line-height:1.35; }' +
-        '.cover-sub { font-size:17pt; color:#444; margin-bottom:40pt; }' +
-        '.cover-box { display:inline-block; border:1.5pt solid #1F3A5F; border-radius:6pt; padding:8pt 20pt; font-size:17pt; color:#1F3A5F; margin-bottom:60pt; }' +
-        '.cover-foot { font-size:17pt; color:#333; }' +
-        '.toc { }' +
-        '.toc .tocitem { font-size:16pt; padding:5pt 0; border-bottom:0.5pt dotted #bbb; }' +
-        'h1.nonum { text-align:center; border-bottom:none; }';
-
-      const doc =
-        '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">' +
-        '<head><meta charset="utf-8"><title>รายงานผลการวิจัย</title>' +
-        '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->' +
-        '<style>' + css + '</style></head><body>' +
-        cover + toc + preface + '<div class="pagebreak"></div>' + body +
-        '</body></html>';
-
-      // ================= ดาวน์โหลดไฟล์ .doc =================
-      const blob = new Blob(['﻿', doc], { type: 'application/msword' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      const stamp = now.toISOString().slice(0, 10);
-      a.href = url;
-      a.download = 'รายงานผลการวิจัย_เขียนเรียงความ_' + stamp + '.doc';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 4000);
-      if (typeof showToast === 'function') showToast('สร้างรายงานสำเร็จ — เปิดไฟล์ด้วย Word หรืออัปโหลดไปยัง Google Docs ได้เลย', 'success');
     } catch (err) {
       console.error(err);
-      if (typeof showToast === 'function') showToast('เกิดข้อผิดพลาดในการสร้างรายงาน: ' + err.message, 'error');
-      else alert('เกิดข้อผิดพลาดในการสร้างรายงาน: ' + err.message);
+      if (typeof showToast === 'function') showToast('เกิดข้อผิดพลาด: ' + err.message, 'error');
+      else alert('เกิดข้อผิดพลาด: ' + err.message);
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerHTML = original; }
+    }
+  }
+
+  // ---- แสดงสถานะการเชื่อมต่อ Google + redirect URI สำหรับตั้งค่า ----
+  async function loadGoogleStatus() {
+    const box = document.getElementById('googleStatusBox');
+    if (!box) return;
+    try {
+      const st = await (await fetch('google_auth.php?action=status&_t=' + Date.now())).json();
+      if (!st.configured) {
+        box.innerHTML = '<span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle"></i> ยังไม่ได้ตั้งค่า Google API</span>' +
+          '<div class="text-muted mt-1">ผู้ดูแลระบบต้องกรอก Client ID/Secret ใน <code>google_config.php</code> และลงทะเบียน Redirect URI นี้ใน Google Cloud Console:</div>' +
+          (st.redirect_uri ? '<div class="mt-1"><code style="word-break:break-all">' + st.redirect_uri + '</code></div>' : '');
+      } else if (st.connected) {
+        box.innerHTML = '<span class="badge bg-success"><i class="bi bi-check-circle"></i> เชื่อมต่อบัญชี Google แล้ว</span>' +
+          ' <a href="google_auth.php?action=disconnect" onclick="event.preventDefault();fetch(this.href).then(()=>loadGoogleStatus());" class="ms-2 text-danger text-decoration-none small">ยกเลิกการเชื่อมต่อ</a>';
+      } else {
+        box.innerHTML = '<span class="badge bg-secondary"><i class="bi bi-plug"></i> ยังไม่ได้เชื่อมต่อบัญชี Google</span>' +
+          '<span class="text-muted ms-2">กดปุ่มด้านบนเพื่อเชื่อมต่อครั้งแรก</span>';
+      }
+    } catch (e) {
+      box.innerHTML = '';
+    }
+  }
+
+  // ---- ดาวน์โหลดเป็นไฟล์ .doc (ตัวเลือกสำรอง) ----
+  async function generateResearchReportDoc() {
+    const btn = document.getElementById('dlDocBtn');
+    const original = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>กำลังจัดทำรายงาน...'; }
+    try {
+      const rep = await buildReportHtml();
+      const blob = new Blob(['﻿', rep.doc], { type: 'application/msword' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = rep.filename + '.doc';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      if (typeof showToast === 'function') showToast('สร้างรายงานสำเร็จ', 'success');
+    } catch (err) {
+      console.error(err);
+      if (typeof showToast === 'function') showToast('เกิดข้อผิดพลาด: ' + err.message, 'error');
+      else alert('เกิดข้อผิดพลาด: ' + err.message);
     } finally {
       if (btn) { btn.disabled = false; btn.innerHTML = original; }
     }
@@ -2101,6 +2216,7 @@ require_once 'header.php';
     researchDataPromise = loadResearchData();
     await researchDataPromise;
     loadEssayViewer(); // โหลดล่วงหน้าเบื้องหลัง เพื่อให้ตัวเลข KPI และแท็บเรียงความพร้อมใช้งานทันที
+    loadGoogleStatus(); // แสดงสถานะการเชื่อมต่อ Google Docs
   })();
 </script>
 
