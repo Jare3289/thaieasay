@@ -1062,6 +1062,288 @@ try {
             echo json_encode(['success' => true, 'pairs' => $result, 'count' => count($result)]);
             break;
 
+        // ============================================================
+        //  ระบบให้นักเรียนจับคู่ประเมินเพื่อนกันเอง (Student-initiated Peer Matching)
+        //  นักเรียนฝ่ายหนึ่งส่งคำขอ อีกฝ่ายกดรับ → ระบบสร้างคู่ไป-กลับใน peer_pairs ให้อัตโนมัติ
+        //  แยกตามรอบ/หน่วย — พอขึ้นรอบใหม่ต้องส่งคำขอกันใหม่
+        // ============================================================
+
+        // ดึงสถานะการจับคู่ของนักเรียนที่ล็อกอินอยู่สำหรับรอบที่เลือก
+        // คืนค่า: คู่ปัจจุบัน (ถ้ามี), คำขอที่ส่งออก (รอตอบรับ), คำขอที่เข้ามา, และรายชื่อเพื่อนในห้องที่ขอได้
+        case 'get_peer_match_status':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'student') {
+                echo json_encode(['success' => false, 'error' => 'ต้องเป็นนักเรียน']);
+                exit;
+            }
+            $round = isset($_GET['round']) ? trim($_GET['round']) : '';
+            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
+                echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
+                exit;
+            }
+            $myId = $_SESSION['user']['id'];
+
+            // ข้อมูลห้อง/กลุ่มของฉัน (จับคู่ได้เฉพาะเพื่อนในห้องเดียวกัน)
+            $meStmt = $pdo->prepare('SELECT classroom, student_group FROM students WHERE student_id = ?');
+            $meStmt->execute([$myId]);
+            $me = $meStmt->fetch();
+            $myRoom = ($me && $me['classroom'] !== null) ? trim($me['classroom']) : '';
+
+            // คู่ปัจจุบันของฉัน (ถ้าจับคู่แล้ว)
+            $pStmt = $pdo->prepare('SELECT partner_code FROM peer_pairs WHERE round = ? AND student_code = ?');
+            $pStmt->execute([$round, $myId]);
+            $pRow = $pStmt->fetch();
+            $partner = ($pRow && !empty($pRow['partner_code'])) ? $pRow['partner_code'] : null;
+
+            // ผู้ที่จับคู่แล้วในรอบนี้ทั้งหมด (ใช้กรองว่าใครยังว่าง)
+            $pairedSet = [];
+            $allPaired = $pdo->prepare('SELECT student_code FROM peer_pairs WHERE round = ?');
+            $allPaired->execute([$round]);
+            while ($r = $allPaired->fetch()) { $pairedSet[$r['student_code']] = true; }
+
+            // คำขอที่ค้างอยู่ (pending) ที่เกี่ยวกับฉันในรอบนี้
+            $reqStmt = $pdo->prepare('
+                SELECT r.requester_code, r.target_code, s.student_name, s.classroom
+                FROM peer_requests r
+                JOIN students s ON s.student_id = CASE WHEN r.requester_code = ? THEN r.target_code ELSE r.requester_code END
+                WHERE r.round = ? AND r.status = "pending" AND (r.requester_code = ? OR r.target_code = ?)
+            ');
+            $reqStmt->execute([$myId, $round, $myId, $myId]);
+            $incoming = [];   // คำขอที่คนอื่นส่งมาหาฉัน (ฉันเป็น target)
+            $outgoing = null; // คำขอที่ฉันส่งออกไป (ฉันเป็น requester)
+            while ($r = $reqStmt->fetch()) {
+                if ($r['requester_code'] === $myId) {
+                    $outgoing = ['code' => $r['target_code'], 'name' => $r['student_name']];
+                } else {
+                    $incoming[] = ['code' => $r['requester_code'], 'name' => $r['student_name']];
+                }
+            }
+
+            // รายชื่อเพื่อนร่วมห้อง (ยกเว้นตนเอง) พร้อมสถานะแต่ละคน
+            $classmates = [];
+            if ($myRoom !== '') {
+                $cmStmt = $pdo->prepare('SELECT student_id, student_name FROM students WHERE classroom = ? AND student_id != ? ORDER BY student_id ASC');
+                $cmStmt->execute([$myRoom, $myId]);
+                $outCode = $outgoing ? $outgoing['code'] : null;
+                $incCodes = array_column($incoming, 'code');
+                while ($c = $cmStmt->fetch()) {
+                    $cid = $c['student_id'];
+                    if ($partner !== null) {
+                        $state = ($cid === $partner) ? 'paired_with_me' : 'unavailable';
+                    } elseif ($cid === $outCode) {
+                        $state = 'outgoing_pending';
+                    } elseif (in_array($cid, $incCodes, true)) {
+                        $state = 'incoming_pending';
+                    } elseif (isset($pairedSet[$cid])) {
+                        $state = 'paired_other';
+                    } else {
+                        $state = 'available';
+                    }
+                    $classmates[] = ['code' => $cid, 'name' => $c['student_name'], 'state' => $state];
+                }
+            }
+
+            echo json_encode([
+                'success'    => true,
+                'round'      => $round,
+                'myRoom'     => $myRoom,
+                'partner'    => $partner,
+                'incoming'   => $incoming,
+                'outgoing'   => $outgoing,
+                'classmates' => $classmates,
+            ]);
+            break;
+
+        // นักเรียนส่งคำขอจับคู่ไปยังเพื่อน (target) ในรอบที่เลือก
+        // ถ้าเพื่อนคนนั้นเคยส่งคำขอหาเราอยู่แล้ว (pending) → ถือว่าตกลงกันทั้งคู่ จับคู่ให้ทันที
+        case 'send_peer_request':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'student') {
+                echo json_encode(['success' => false, 'error' => 'ต้องเป็นนักเรียน']);
+                exit;
+            }
+            $round  = isset($request_data['round']) ? trim($request_data['round']) : '';
+            $target = isset($request_data['target']) ? trim($request_data['target']) : '';
+            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
+                echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
+                exit;
+            }
+            $myId = $_SESSION['user']['id'];
+            if ($target === '' || $target === $myId) {
+                echo json_encode(['success' => false, 'error' => 'กรุณาเลือกเพื่อนที่ต้องการจับคู่ (ไม่ใช่ตนเอง)']);
+                exit;
+            }
+
+            // ตรวจว่าเป้าหมายมีอยู่จริงและอยู่ห้องเดียวกัน
+            $meStmt = $pdo->prepare('SELECT classroom FROM students WHERE student_id = ?');
+            $meStmt->execute([$myId]);
+            $meRow = $meStmt->fetch();
+            $myRoom = ($meRow && $meRow['classroom'] !== null) ? trim($meRow['classroom']) : '';
+            $tStmt = $pdo->prepare('SELECT classroom FROM students WHERE student_id = ?');
+            $tStmt->execute([$target]);
+            $tRow = $tStmt->fetch();
+            if (!$tRow) {
+                echo json_encode(['success' => false, 'error' => 'ไม่พบเพื่อนที่ระบุ']);
+                exit;
+            }
+            $tRoom = ($tRow['classroom'] !== null) ? trim($tRow['classroom']) : '';
+            if ($myRoom === '' || $tRoom === '' || $myRoom !== $tRoom) {
+                echo json_encode(['success' => false, 'error' => 'จับคู่ได้เฉพาะเพื่อนที่อยู่ห้องเดียวกันเท่านั้น']);
+                exit;
+            }
+
+            // ตรวจว่าฉันหรือเป้าหมายจับคู่ไปแล้วหรือยังในรอบนี้
+            $chk = $pdo->prepare('SELECT student_code FROM peer_pairs WHERE round = ? AND student_code IN (?, ?)');
+            $chk->execute([$round, $myId, $target]);
+            $pairedNow = $chk->fetchAll(PDO::FETCH_COLUMN);
+            if (in_array($myId, $pairedNow, true)) {
+                echo json_encode(['success' => false, 'error' => 'คุณจับคู่ในรอบนี้ไปแล้ว']);
+                exit;
+            }
+            if (in_array($target, $pairedNow, true)) {
+                echo json_encode(['success' => false, 'error' => 'เพื่อนคนนี้จับคู่กับคนอื่นในรอบนี้ไปแล้ว']);
+                exit;
+            }
+
+            $pdo->beginTransaction();
+            try {
+                // ถ้าเป้าหมายเคยส่งคำขอหาเราอยู่แล้ว (pending) → จับคู่ให้ทันที (ตกลงกันทั้งสองฝ่าย)
+                $recip = $pdo->prepare('SELECT id FROM peer_requests WHERE round = ? AND requester_code = ? AND target_code = ? AND status = "pending"');
+                $recip->execute([$round, $target, $myId]);
+                $matchedNow = false;
+                if ($recip->fetch()) {
+                    peer_match_create_pair($pdo, $round, $myId, $target);
+                    $matchedNow = true;
+                } else {
+                    // ยกเลิกคำขอที่ฉันเคยส่งค้างไว้ก่อนหน้า (ให้ค้างได้ครั้งละหนึ่งคน)
+                    $canc = $pdo->prepare('UPDATE peer_requests SET status = "cancelled", responded_at = NOW() WHERE round = ? AND requester_code = ? AND status = "pending"');
+                    $canc->execute([$round, $myId]);
+                    // บันทึกคำขอใหม่ (ถ้าเคยมีแถวเดิมกับคนนี้ที่ถูกปฏิเสธ/ยกเลิก ให้เปิดใหม่เป็น pending)
+                    $ins = $pdo->prepare('
+                        INSERT INTO peer_requests (round, requester_code, target_code, status)
+                        VALUES (?, ?, ?, "pending")
+                        ON DUPLICATE KEY UPDATE status = "pending", created_at = NOW(), responded_at = NULL
+                    ');
+                    $ins->execute([$round, $myId, $target]);
+                }
+                $pdo->commit();
+                echo json_encode(['success' => true, 'matched' => $matchedNow]);
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+            break;
+
+        // นักเรียนตอบคำขอที่เข้ามา: accept (รับ → จับคู่ไป-กลับ) หรือ decline (ปฏิเสธ)
+        case 'respond_peer_request':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'student') {
+                echo json_encode(['success' => false, 'error' => 'ต้องเป็นนักเรียน']);
+                exit;
+            }
+            $round     = isset($request_data['round']) ? trim($request_data['round']) : '';
+            $requester = isset($request_data['requester']) ? trim($request_data['requester']) : '';
+            $decision  = isset($request_data['decision']) ? trim($request_data['decision']) : '';
+            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
+                echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
+                exit;
+            }
+            if (!in_array($decision, ['accept', 'decline'], true)) {
+                echo json_encode(['success' => false, 'error' => 'คำสั่งไม่ถูกต้อง']);
+                exit;
+            }
+            $myId = $_SESSION['user']['id'];
+
+            // ต้องมีคำขอ pending ที่คนนี้ส่งมาหาฉันจริง
+            $find = $pdo->prepare('SELECT id FROM peer_requests WHERE round = ? AND requester_code = ? AND target_code = ? AND status = "pending"');
+            $find->execute([$round, $requester, $myId]);
+            $reqRow = $find->fetch();
+            if (!$reqRow) {
+                echo json_encode(['success' => false, 'error' => 'ไม่พบคำขอนี้ (อาจถูกยกเลิกไปแล้ว)']);
+                exit;
+            }
+
+            if ($decision === 'decline') {
+                $upd = $pdo->prepare('UPDATE peer_requests SET status = "declined", responded_at = NOW() WHERE id = ?');
+                $upd->execute([$reqRow['id']]);
+                echo json_encode(['success' => true, 'matched' => false]);
+                break;
+            }
+
+            // accept: ตรวจว่าทั้งสองฝ่ายยังว่างในรอบนี้ แล้วจับคู่ไป-กลับ
+            $chk = $pdo->prepare('SELECT student_code FROM peer_pairs WHERE round = ? AND student_code IN (?, ?)');
+            $chk->execute([$round, $myId, $requester]);
+            $pairedNow = $chk->fetchAll(PDO::FETCH_COLUMN);
+            if (in_array($myId, $pairedNow, true)) {
+                echo json_encode(['success' => false, 'error' => 'คุณจับคู่ในรอบนี้ไปแล้ว']);
+                exit;
+            }
+            if (in_array($requester, $pairedNow, true)) {
+                echo json_encode(['success' => false, 'error' => 'เพื่อนคนนี้จับคู่กับคนอื่นไปแล้ว']);
+                exit;
+            }
+
+            $pdo->beginTransaction();
+            try {
+                peer_match_create_pair($pdo, $round, $myId, $requester);
+                $pdo->commit();
+                echo json_encode(['success' => true, 'matched' => true, 'partner' => $requester]);
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+            break;
+
+        // นักเรียนยกเลิกคำขอที่ตนเองส่งออกไป (ยังไม่ถูกตอบรับ)
+        case 'cancel_peer_request':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'student') {
+                echo json_encode(['success' => false, 'error' => 'ต้องเป็นนักเรียน']);
+                exit;
+            }
+            $round  = isset($request_data['round']) ? trim($request_data['round']) : '';
+            $target = isset($request_data['target']) ? trim($request_data['target']) : '';
+            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
+                echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
+                exit;
+            }
+            $myId = $_SESSION['user']['id'];
+            $upd = $pdo->prepare('UPDATE peer_requests SET status = "cancelled", responded_at = NOW() WHERE round = ? AND requester_code = ? AND target_code = ? AND status = "pending"');
+            $upd->execute([$round, $myId, $target]);
+            echo json_encode(['success' => true]);
+            break;
+
+        // นักเรียนยกเลิกการจับคู่ที่ตกลงกันแล้ว (ปลดคู่ทั้งสองฝั่งในรอบนี้ เพื่อขอใหม่ได้)
+        case 'unpair_peer_match':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'student') {
+                echo json_encode(['success' => false, 'error' => 'ต้องเป็นนักเรียน']);
+                exit;
+            }
+            $round = isset($request_data['round']) ? trim($request_data['round']) : '';
+            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
+                echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
+                exit;
+            }
+            $myId = $_SESSION['user']['id'];
+            $pStmt = $pdo->prepare('SELECT partner_code FROM peer_pairs WHERE round = ? AND student_code = ?');
+            $pStmt->execute([$round, $myId]);
+            $pRow = $pStmt->fetch();
+            if (!$pRow || empty($pRow['partner_code'])) {
+                echo json_encode(['success' => false, 'error' => 'คุณยังไม่มีคู่ในรอบนี้']);
+                exit;
+            }
+            $partner = $pRow['partner_code'];
+            $pdo->beginTransaction();
+            try {
+                $del = $pdo->prepare('DELETE FROM peer_pairs WHERE round = ? AND student_code IN (?, ?)');
+                $del->execute([$round, $myId, $partner]);
+                // คืนคำขอที่จับคู่กันไว้ให้เป็น cancelled เพื่อให้ส่งขอใหม่ได้
+                $upd = $pdo->prepare('UPDATE peer_requests SET status = "cancelled", responded_at = NOW() WHERE round = ? AND status = "accepted" AND ((requester_code = ? AND target_code = ?) OR (requester_code = ? AND target_code = ?))');
+                $upd->execute([$round, $myId, $partner, $partner, $myId]);
+                $pdo->commit();
+                echo json_encode(['success' => true]);
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+            break;
+
         case 'save_learning_reflection':
             $studentId = isset($request_data['studentId']) ? $request_data['studentId'] : '';
             if (empty($studentId)) {

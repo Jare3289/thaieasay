@@ -61,6 +61,38 @@ function safe_ddl(PDO $pdo, $sql) {
     }
 }
 
+// ---- ตัวช่วยจับคู่ประเมินเพื่อน (นักเรียนจับคู่กันเอง) ----
+
+// สร้างคู่ประเมินแบบไป-กลับ (A↔B) ในรอบที่กำหนด: A ตรวจ B และ B ตรวจ A
+// พร้อมทำเครื่องหมายคำขอที่เกี่ยวข้องเป็น accepted และยกเลิกคำขอค้างอื่น ๆ ของทั้งสองคน
+// เรียกจากภายใน transaction ที่เปิดไว้แล้ว (ไม่ commit เอง)
+function peer_match_create_pair(PDO $pdo, $round, $a, $b) {
+    // จับคู่ไป-กลับ (ทับของเดิมถ้ามี ด้วย unique key round+student_code)
+    $ins = $pdo->prepare('
+        INSERT INTO peer_pairs (round, student_code, partner_code)
+        VALUES (?, ?, ?)
+        ON DUPLICATE KEY UPDATE partner_code = VALUES(partner_code)
+    ');
+    $ins->execute([$round, $a, $b]);
+    $ins->execute([$round, $b, $a]);
+
+    // คำขอระหว่างสองคนนี้ → accepted
+    $acc = $pdo->prepare('
+        UPDATE peer_requests SET status = "accepted", responded_at = NOW()
+        WHERE round = ? AND status = "pending"
+          AND ((requester_code = ? AND target_code = ?) OR (requester_code = ? AND target_code = ?))
+    ');
+    $acc->execute([$round, $a, $b, $b, $a]);
+
+    // ยกเลิกคำขอค้างอื่น ๆ ที่เกี่ยวกับสองคนนี้ (ทั้งที่ส่งออกและเข้ามา) เพราะจับคู่แล้ว
+    $canc = $pdo->prepare('
+        UPDATE peer_requests SET status = "cancelled", responded_at = NOW()
+        WHERE round = ? AND status = "pending"
+          AND (requester_code IN (?, ?) OR target_code IN (?, ?))
+    ');
+    $canc->execute([$round, $a, $b, $a, $b]);
+}
+
 // ---- ตัวช่วยเกี่ยวกับเรียงความ (คอลัมน์แยกส่วน + หัวข้อที่ครูกำหนด) ----
 
 // แผนที่รอบเรียงความ → รอบหัวข้อ: ภารงานมีร่าง D1/D2 แต่ใช้หัวข้อเดียวกันต่อหน่วย (task1_d1/task1_d2 → task1)
@@ -333,6 +365,33 @@ try {
                 FOREIGN KEY (student_code) REFERENCES students(student_id) ON DELETE CASCADE,
                 FOREIGN KEY (partner_code) REFERENCES students(student_id) ON DELETE CASCADE,
                 UNIQUE KEY unique_peer_pair (round, student_code)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+    }
+} catch (Exception $e) {
+    // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
+}
+
+// ตารางคำขอจับคู่ประเมินเพื่อน (peer_requests) — นักเรียนขอจับคู่กันเอง
+// นักเรียนฝ่ายหนึ่งส่งคำขอ (requester) อีกฝ่ายกดรับ (target) แล้วระบบจะสร้างคู่ไป-กลับ
+// ใน peer_pairs ให้อัตโนมัติ แยกตามรอบ/หน่วย พอขึ้นรอบใหม่ต้องขอกันใหม่
+try {
+    $has_req = $pdo->query("SHOW TABLES LIKE 'peer_requests'");
+    if (!$has_req || $has_req->rowCount() === 0) {
+        safe_ddl($pdo, "
+            CREATE TABLE IF NOT EXISTS peer_requests (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                round VARCHAR(20) NOT NULL,
+                requester_code VARCHAR(10) NOT NULL,
+                target_code VARCHAR(10) NOT NULL,
+                status VARCHAR(10) NOT NULL DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                responded_at TIMESTAMP NULL DEFAULT NULL,
+                FOREIGN KEY (requester_code) REFERENCES students(student_id) ON DELETE CASCADE,
+                FOREIGN KEY (target_code) REFERENCES students(student_id) ON DELETE CASCADE,
+                UNIQUE KEY unique_peer_request (round, requester_code, target_code),
+                INDEX idx_req_round_target (round, target_code),
+                INDEX idx_req_round_requester (round, requester_code)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         ");
     }

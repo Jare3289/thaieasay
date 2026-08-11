@@ -126,11 +126,16 @@ require_once 'header.php';
             <div class="flex-grow-1">
               <h5 class="fw-bold text-dark mb-1">ประเมินผลงานของเพื่อน</h5>
               <p class="text-muted small mb-3" style="line-height:1.5; font-size:0.82rem;">
-                สวมบทบาทเป็นผู้ประเมินเพื่อช่วยเหลือเพื่อนร่วมชั้นเรียน ให้คะแนนวิจารณ์ผลงานพร้อมส่งข้อเสนอแนะเชิงสร้างสรรค์และให้กำลังใจเพื่อน
+                จับคู่กับเพื่อนร่วมห้องด้วยตนเอง (ส่งคำขอ–กดรับ แล้วจับคู่ไป-กลับอัตโนมัติ) จากนั้นให้คะแนนวิจารณ์ผลงานพร้อมส่งข้อเสนอแนะเชิงสร้างสรรค์และให้กำลังใจเพื่อน
               </p>
-              <a href="evaluation.php?mode=peer" class="btn btn-sm btn-info text-white rounded-pill px-4 fw-bold shadow-sm">
-                เลือกเพื่อนประเมิน &rarr;
-              </a>
+              <div class="d-flex flex-wrap gap-2">
+                <a href="peer_matching.php" class="btn btn-sm btn-primary rounded-pill px-4 fw-bold shadow-sm">
+                  🤝 จับคู่เพื่อน &rarr;
+                </a>
+                <a href="evaluation.php?mode=peer" class="btn btn-sm btn-info text-white rounded-pill px-4 fw-bold shadow-sm">
+                  เริ่มประเมินเพื่อน &rarr;
+                </a>
+              </div>
             </div>
           </div>
         </div>
