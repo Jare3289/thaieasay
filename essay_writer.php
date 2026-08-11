@@ -43,14 +43,14 @@ require_once 'header.php';
       <div class="col-6 col-md-3">
         <button class="essay-phase-btn btn btn-outline-success w-100 rounded-3 py-3 fw-bold active-phase" data-unit="task1" onclick="setEssayUnit('task1')">
           <div class="fs-4 mb-1">📚</div>
-          <div class="small">ภารงาน หน่วยที่ 1</div>
+          <div class="small">ภาระงาน หน่วยที่ 1</div>
           <div class="text-muted" style="font-size:0.72rem;">Task Unit 1</div>
         </button>
       </div>
       <div class="col-6 col-md-3">
         <button class="essay-phase-btn btn btn-outline-warning w-100 rounded-3 py-3 fw-bold" data-unit="task2" onclick="setEssayUnit('task2')">
           <div class="fs-4 mb-1">📖</div>
-          <div class="small">ภารงาน หน่วยที่ 2</div>
+          <div class="small">ภาระงาน หน่วยที่ 2</div>
           <div class="text-muted" style="font-size:0.72rem;">Task Unit 2</div>
         </button>
       </div>
@@ -63,10 +63,10 @@ require_once 'header.php';
       </div>
     </div>
 
-    <!-- ตัวเลือกร่าง (แสดงเฉพาะภารงานหน่วยที่ 1/2): D1 = ร่างที่ 1, D2 = ร่างที่ 2 -->
+    <!-- ตัวเลือกร่าง (แสดงเฉพาะภาระงานหน่วยที่ 1/2): D1 = ร่างที่ 1, D2 = ร่างที่ 2 -->
     <div id="draftSelector" class="mt-3 d-none">
       <div class="d-flex align-items-center flex-wrap gap-2 bg-light border rounded-3 p-2">
-        <span class="fw-bold text-secondary small ms-1 me-1"><i class="bi bi-layers-half me-1"></i>เลือกร่างของภารงาน:</span>
+        <span class="fw-bold text-secondary small ms-1 me-1"><i class="bi bi-layers-half me-1"></i>เลือกร่างของภาระงาน:</span>
         <button type="button" class="draft-btn btn btn-outline-secondary btn-sm rounded-pill px-3 fw-bold active-draft" data-draft="d1" onclick="setEssayDraft('d1')">
           ร่างที่ 1 (D1)
         </button>
@@ -83,7 +83,7 @@ require_once 'header.php';
     <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between py-3 px-4 rounded-top-4">
       <div class="d-flex align-items-center gap-3">
         <h6 class="fw-bold text-dark mb-0"><i class="bi bi-file-text-fill text-primary me-1"></i>กรอกเนื้อหาเรียงความ</h6>
-        <span id="currentPhaseBadge" class="badge bg-success">ภารงาน หน่วยที่ 1</span>
+        <span id="currentPhaseBadge" class="badge bg-success">ภาระงาน หน่วยที่ 1</span>
       </div>
       <div class="d-flex align-items-center gap-3">
         <span id="saveStatusBadge" class="badge bg-light text-muted small d-none"></span>
@@ -250,10 +250,10 @@ require_once 'header.php';
 <script>
 const phaseLabels = {
   pretest:  'ก่อนเรียน (Pretest)',
-  task1_d1: 'ภารงาน หน่วยที่ 1 · ร่างที่ 1 (D1)',
-  task1_d2: 'ภารงาน หน่วยที่ 1 · ร่างที่ 2 (D2)',
-  task2_d1: 'ภารงาน หน่วยที่ 2 · ร่างที่ 1 (D1)',
-  task2_d2: 'ภารงาน หน่วยที่ 2 · ร่างที่ 2 (D2)',
+  task1_d1: 'ภาระงาน หน่วยที่ 1 · ร่างที่ 1 (D1)',
+  task1_d2: 'ภาระงาน หน่วยที่ 1 · ร่างที่ 2 (D2)',
+  task2_d1: 'ภาระงาน หน่วยที่ 2 · ร่างที่ 1 (D1)',
+  task2_d2: 'ภาระงาน หน่วยที่ 2 · ร่างที่ 2 (D2)',
   posttest: 'หลังเรียน (Posttest)'
 };
 const phaseBadgeColors = {
@@ -263,19 +263,19 @@ const phaseBadgeColors = {
   posttest: 'bg-danger'
 };
 
-// แยกสถานะเป็น 2 ระดับ: หน่วย (pretest/task1/task2/posttest) และร่าง (d1/d2 เฉพาะภารงาน)
+// แยกสถานะเป็น 2 ระดับ: หน่วย (pretest/task1/task2/posttest) และร่าง (d1/d2 เฉพาะภาระงาน)
 let currentUnit = 'task1';
 let currentDraft = 'd1';
 let currentEssayPhase = 'task1_d1';
 let autoSaveTimer = null;
 let bodyParagraphCount = 0;
 
-// รวมหน่วย + ร่าง เป็นคีย์ essay_phase: ภารงานมีร่าง (task1_d1) ส่วนก่อน/หลังเรียนไม่มีร่าง
+// รวมหน่วย + ร่าง เป็นคีย์ essay_phase: ภาระงานมีร่าง (task1_d1) ส่วนก่อน/หลังเรียนไม่มีร่าง
 function computeEssayPhase(unit, draft) {
   return (unit === 'task1' || unit === 'task2') ? (unit + '_' + draft) : unit;
 }
 
-// หัวข้อที่ครูกำหนด (map: pretest/task1/task2/posttest → หัวข้อ) — ภารงานใช้หัวข้อเดียวกันทั้ง D1/D2
+// หัวข้อที่ครูกำหนด (map: pretest/task1/task2/posttest → หัวข้อ) — ภาระงานใช้หัวข้อเดียวกันทั้ง D1/D2
 let essayTopics = {};
 async function loadEssayTopics() {
   try {
@@ -344,12 +344,12 @@ function reindexBodyParagraphs() {
   });
 }
 
-// เลือกหน่วยการเรียน — ภารงานจะเปิดแถบเลือกร่าง (D1/D2) ให้ด้วย
+// เลือกหน่วยการเรียน — ภาระงานจะเปิดแถบเลือกร่าง (D1/D2) ให้ด้วย
 function setEssayUnit(unit) {
   currentUnit = unit;
   const isTask = (unit === 'task1' || unit === 'task2');
 
-  // แสดง/ซ่อนแถบเลือกร่าง เฉพาะภารงาน
+  // แสดง/ซ่อนแถบเลือกร่าง เฉพาะภาระงาน
   const draftSel = document.getElementById('draftSelector');
   if (draftSel) draftSel.classList.toggle('d-none', !isTask);
 
@@ -364,7 +364,7 @@ function setEssayUnit(unit) {
   loadEssayForPhase(currentEssayPhase);
 }
 
-// เลือกร่าง (D1/D2) ของภารงานหน่วยปัจจุบัน
+// เลือกร่าง (D1/D2) ของภาระงานหน่วยปัจจุบัน
 function setEssayDraft(draft) {
   currentDraft = draft;
   document.querySelectorAll('.draft-btn').forEach(b => b.classList.remove('active-draft'));
@@ -633,7 +633,7 @@ async function loadSavedList() {
 // Init
 (async function() {
   await loadEssayTopics();          // โหลดหัวข้อที่ครูกำหนด
-  // ค่าเริ่มต้น: ภารงานหน่วยที่ 1 · ร่างที่ 1 (D1)
+  // ค่าเริ่มต้น: ภาระงานหน่วยที่ 1 · ร่างที่ 1 (D1)
   setEssayUnit('task1');
   await loadSavedList();
 })();

@@ -152,7 +152,7 @@ require_once 'header.php';
           </div>
           <div class="d-flex flex-wrap justify-content-end mb-3">
             <div class="input-group" style="width: auto;">
-              <span class="input-group-text bg-white small border-end-0 text-nowrap"><i class="bi bi-calendar-check"></i> ภารงานที่ใช้คำนวณ ICC</span>
+              <span class="input-group-text bg-white small border-end-0 text-nowrap"><i class="bi bi-calendar-check"></i> ภาระงานที่ใช้คำนวณ ICC</span>
               <select id="iccTaskPhaseSelector" class="form-select form-select-sm bg-white border-start-0 small" onchange="switchICCTaskPhase()">
                 <option value="task1" selected>หน่วยที่ 1</option>
                 <option value="task2">หน่วยที่ 2</option>
@@ -432,8 +432,8 @@ require_once 'header.php';
               <select id="essayPhaseFilter" onchange="filterEssayViewer()" class="form-select form-select-sm border-2 rounded-pill" style="width:auto;">
                 <option value="all">ทุกรอบ</option>
                 <option value="pretest">ก่อนเรียน</option>
-                <option value="task1">ภารงาน หน่วยที่ 1</option>
-                <option value="task2">ภารงาน หน่วยที่ 2</option>
+                <option value="task1">ภาระงาน หน่วยที่ 1</option>
+                <option value="task2">ภาระงาน หน่วยที่ 2</option>
                 <option value="posttest">หลังเรียน</option>
               </select>
               <input type="text" id="essaySearchInput" onkeyup="filterEssayViewer()" class="form-control form-control-sm border-2 rounded-pill" placeholder="ค้นหาชื่อหรือเนื้อหา..." style="width:220px;">
@@ -1974,8 +1974,8 @@ require_once 'header.php';
 
   const essayPhaseLabels = {
     pretest:  'ก่อนเรียน (Pretest)',
-    task1:    'ภารงาน หน่วยที่ 1',
-    task2:    'ภารงาน หน่วยที่ 2',
+    task1:    'ภาระงาน หน่วยที่ 1',
+    task2:    'ภาระงาน หน่วยที่ 2',
     posttest: 'หลังเรียน (Posttest)'
   };
   const essayPhaseBadgeClass = {
