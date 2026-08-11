@@ -8,7 +8,7 @@
 -- ต้องการ MySQL 5.7+ หรือ MariaDB 10.2+ (ใช้ฟังก์ชัน JSON ในขั้นตอน backfill)
 -- =============================================================================
 
--- 1) ภารงานรุ่นเก่า (ร่างเดียว) → ร่างที่ 1 (D1)
+-- 1) ภาระงานรุ่นเก่า (ร่างเดียว) → ร่างที่ 1 (D1)
 UPDATE IGNORE student_essays SET essay_phase = 'task1_d1' WHERE essay_phase = 'task1';
 UPDATE IGNORE student_essays SET essay_phase = 'task2_d1' WHERE essay_phase = 'task2';
 

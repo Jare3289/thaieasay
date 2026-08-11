@@ -86,7 +86,7 @@ require_once 'header.php';
             <div class="flex-grow-1">
               <h5 class="fw-bold text-dark mb-1">บันทึกเรียงความของฉัน</h5>
               <p class="text-muted small mb-3" style="line-height:1.5; font-size:0.82rem;">
-                พิมพ์เรียงความที่คุณเขียนลงบนกระดาษเข้ามาในระบบ เพื่อจัดเก็บข้อมูลดิบและนำไปใช้วิเคราะห์ประเมินผลในรอบก่อนเรียนและภารงานในหน่วยการเรียน
+                พิมพ์เรียงความที่คุณเขียนลงบนกระดาษเข้ามาในระบบ เพื่อจัดเก็บข้อมูลดิบและนำไปใช้วิเคราะห์ประเมินผลในรอบก่อนเรียนและภาระงานในหน่วยการเรียน
               </p>
               <a href="essay_writer.php" class="btn btn-sm btn-success rounded-pill px-4 fw-bold shadow-sm">
                 พิมพ์บันทึกเรียงความ &rarr;

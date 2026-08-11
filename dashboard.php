@@ -69,12 +69,12 @@ require_once 'header.php';
                 <canvas id="classDimensionAveragesChart"></canvas>
               </div>
             </div>
-            <!-- กราฟแมงมุมคะแนนเฉลี่ยรายบุคคลแยกตามรายด้าน (1 นักเรียน = 1 รูปใย) — แยก 2 กราฟ: ภารงาน และ ก่อน/หลังเรียน -->
+            <!-- กราฟแมงมุมคะแนนเฉลี่ยรายบุคคลแยกตามรายด้าน (1 นักเรียน = 1 รูปใย) — แยก 2 กราฟ: ภาระงาน และ ก่อน/หลังเรียน -->
             <div class="col-12 mt-4 border-top pt-4">
               <span class="small fw-bold text-secondary mb-3 d-block text-center">3. กราฟแมงมุมวิเคราะห์รูปแบบคะแนนเฉลี่ยของผู้เรียนแต่ละคนแยกตามรายด้าน (1 นักเรียน = 1 รูปใยแมงมุม)</span>
               <div class="row g-4">
                 <div class="col-lg-6 col-12 text-center">
-                  <span class="small fw-bold text-primary-emphasis mb-2 d-block"><i class="bi bi-clipboard-check"></i> 3.1 ภารงานในหน่วยเรียน (Task 1 + Task 2)</span>
+                  <span class="small fw-bold text-primary-emphasis mb-2 d-block"><i class="bi bi-clipboard-check"></i> 3.1 ภาระงานในหน่วยเรียน (Task 1 + Task 2)</span>
                   <div style="position: relative; height: 440px;" class="w-100">
                     <canvas id="classDimensionSpiderTask"></canvas>
                   </div>
@@ -146,7 +146,7 @@ require_once 'header.php';
             <div class="input-group">
               <span class="input-group-text bg-white text-secondary border-end-0"><i class="bi bi-grid-3x3-gap"></i> มุมมองรายงาน</span>
               <select id="dashboardViewMode" onchange="switchDashboardViewMode()" class="form-select bg-white border-start-0 font-semibold text-primary">
-                <option value="task" selected>ภารงานในหน่วยเรียน (360° & Expert)</option>
+                <option value="task" selected>ภาระงานในหน่วยเรียน (360° & Expert)</option>
                 <option value="prepost">เปรียบเทียบผลสัมฤทธิ์ (ก่อนเรียน vs หลังเรียน)</option>
               </select>
             </div>
@@ -206,8 +206,8 @@ require_once 'header.php';
     <div class="d-flex align-items-center gap-2">
       <label for="studentPhaseSelector" class="small text-white-50 text-nowrap mb-0">รอบประเมิน:</label>
       <select id="studentPhaseSelector" class="form-select form-select-sm bg-white text-dark font-semibold border-0" style="width:160px;" onchange="switchStudentPhase()">
-        <option value="task1" selected>ภารงาน หน่วยที่ 1</option>
-        <option value="task2">ภารงาน หน่วยที่ 2</option>
+        <option value="task1" selected>ภาระงาน หน่วยที่ 1</option>
+        <option value="task2">ภาระงาน หน่วยที่ 2</option>
         <option value="posttest">หลังเรียน (T2)</option>
         <option value="pretest">ก่อนเรียน (T1)</option>
       </select>
@@ -370,7 +370,7 @@ require_once 'header.php';
   let individualRadarChartInstance = null;
   let classQualityChartInstance = null;
   let classDimensionChartInstance = null;
-  // อินสแตนซ์กราฟแมงมุมรายบุคคล 2 กราฟ: ภารงาน และ ก่อน/หลังเรียน
+  // อินสแตนซ์กราฟแมงมุมรายบุคคล 2 กราฟ: ภาระงาน และ ก่อน/หลังเรียน
   let spiderChartInstances = { task: null, prepost: null };
   let classroomResearchData = null;
   let currentResearchPhase = 'task1';
@@ -635,7 +635,7 @@ require_once 'header.php';
     const summaryData = {};
 
     if (currentDashboardViewMode === 'task1' || currentDashboardViewMode === 'task2') {
-      // --- 1. โหมดรายงานภารงานในหน่วยเรียน (Task 1 หรือ Task 2) ---
+      // --- 1. โหมดรายงานภาระงานในหน่วยเรียน (Task 1 หรือ Task 2) ---
       const taskPhaseKey = currentDashboardViewMode; // 'task1' or 'task2'
       studentsList.forEach(s => {
         const id = s.student_id;
@@ -742,7 +742,7 @@ require_once 'header.php';
 
     renderCustomTeacherOverview(summaryData);
 
-    // กราฟแมงมุมรายบุคคล 2 กราฟ — ไม่ขึ้นกับโหมดตาราง แสดงทั้ง "ภารงาน" และ "ก่อน/หลังเรียน" เสมอ
+    // กราฟแมงมุมรายบุคคล 2 กราฟ — ไม่ขึ้นกับโหมดตาราง แสดงทั้ง "ภาระงาน" และ "ก่อน/หลังเรียน" เสมอ
     const taskDimMap = buildDimMapFromEvals(studentEvals, 'task');
     const prepostDimMap = buildDimMapFromEvals(studentEvals, 'prepost');
     drawDimensionSpider(taskDimMap, 'classDimensionSpiderTask', 'task');
@@ -1200,7 +1200,7 @@ require_once 'header.php';
     });
   }
 
-  // วาดกราฟแมงมุมรายบุคคล (ใช้ร่วมกันทั้งกราฟ "ภารงาน" และ "ก่อน/หลังเรียน")
+  // วาดกราฟแมงมุมรายบุคคล (ใช้ร่วมกันทั้งกราฟ "ภาระงาน" และ "ก่อน/หลังเรียน")
   //  dataMap  = { id: {count, avg_1_1..avg_4_3} }
   //  canvasId = id ของ <canvas>
   //  key      = 'task' | 'prepost' เพื่อเก็บอินสแตนซ์แยกกัน

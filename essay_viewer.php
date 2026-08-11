@@ -163,15 +163,15 @@ require_once 'header.php';
   const IS_TEACHER = <?php echo ($_SESSION['user']['role'] === 'teacher') ? 'true' : 'false'; ?>;
 
   // คอลัมน์ในตาราง: ก่อนเรียน · หน่วยที่ 1 (D1,D2) · หน่วยที่ 2 (D1,D2) · หลังเรียน
-  // ภารงานแต่ละหน่วยแตกเป็น 2 ร่าง: D1 = ร่างที่ 1, D2 = ร่างที่ 2 (ให้คะแนนเฉพาะ D2)
+  // ภาระงานแต่ละหน่วยแตกเป็น 2 ร่าง: D1 = ร่างที่ 1, D2 = ร่างที่ 2 (ให้คะแนนเฉพาะ D2)
   const ESSAY_PHASE_KEYS = ['pretest', 'task1_d1', 'task1_d2', 'task2_d1', 'task2_d2', 'posttest'];
 
   const essayPhaseLabels = {
     pretest:  'ก่อนเรียน (Pretest)',
-    task1_d1: 'ภารงาน หน่วยที่ 1 · ร่างที่ 1 (D1)',
-    task1_d2: 'ภารงาน หน่วยที่ 1 · ร่างที่ 2 (D2)',
-    task2_d1: 'ภารงาน หน่วยที่ 2 · ร่างที่ 1 (D1)',
-    task2_d2: 'ภารงาน หน่วยที่ 2 · ร่างที่ 2 (D2)',
+    task1_d1: 'ภาระงาน หน่วยที่ 1 · ร่างที่ 1 (D1)',
+    task1_d2: 'ภาระงาน หน่วยที่ 1 · ร่างที่ 2 (D2)',
+    task2_d1: 'ภาระงาน หน่วยที่ 2 · ร่างที่ 1 (D1)',
+    task2_d2: 'ภาระงาน หน่วยที่ 2 · ร่างที่ 2 (D2)',
     posttest: 'หลังเรียน (Posttest)'
   };
 
@@ -318,7 +318,7 @@ require_once 'header.php';
     const students  = pivotByStudent(filtered);
     const multiRoom = ((document.getElementById('essayClassroomFilter') || {}).value || 'all') === 'all';
 
-    // แถบสรุป: จำนวนนักเรียน และจำนวนที่ส่ง (ภารงานนับจากร่างที่ให้คะแนน = D2)
+    // แถบสรุป: จำนวนนักเรียน และจำนวนที่ส่ง (ภาระงานนับจากร่างที่ให้คะแนน = D2)
     const cnt = key => students.reduce((n, rec) => n + (rec.phases[key] ? 1 : 0), 0);
     const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = Number(val).toLocaleString('th-TH'); };
     setEl('essayStatStudents', students.length);
@@ -347,7 +347,7 @@ require_once 'header.php';
       </tr>`;
     }).join('');
 
-    // หัวตาราง 2 ชั้น: ภารงานแต่ละหน่วยแตกเป็นคอลัมน์ย่อย D1 / D2 (D2 = ร่างที่ให้คะแนน)
+    // หัวตาราง 2 ชั้น: ภาระงานแต่ละหน่วยแตกเป็นคอลัมน์ย่อย D1 / D2 (D2 = ร่างที่ให้คะแนน)
     const d2Head = 'text-center small table-warning text-nowrap';
     container.innerHTML = `
       <table class="table table-hover table-bordered align-middle mb-0 text-center">

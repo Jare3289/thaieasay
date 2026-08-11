@@ -68,14 +68,14 @@ require_once 'header.php';
         <div class="<?php echo $phaseColClass; ?>">
           <button type="button" class="phase-btn w-100 btn btn-outline-success rounded-3 p-3 text-center fw-bold" data-phase="task1" onclick="selectPhase('task1')">
             <div class="fs-2 mb-2">📚</div>
-            <div class="fw-bold">ภารงาน หน่วยที่ 1</div>
+            <div class="fw-bold">ภาระงาน หน่วยที่ 1</div>
             <div class="text-muted small">ให้คะแนนจากร่างที่ 2 (D2)</div>
           </button>
         </div>
         <div class="<?php echo $phaseColClass; ?>">
           <button type="button" class="phase-btn w-100 btn btn-outline-warning rounded-3 p-3 text-center fw-bold" data-phase="task2" onclick="selectPhase('task2')">
             <div class="fs-2 mb-2">📖</div>
-            <div class="fw-bold">ภารงาน หน่วยที่ 2</div>
+            <div class="fw-bold">ภาระงาน หน่วยที่ 2</div>
             <div class="text-muted small">ให้คะแนนจากร่างที่ 2 (D2)</div>
           </button>
         </div>
@@ -927,11 +927,11 @@ require_once 'header.php';
   const essayFormTitleByPhase = {
     pretest:  'แบบวัดความสามารถก่อนเรียน',
     posttest: 'แบบวัดความสามารถหลังเรียน',
-    task1:    'แบบฝึกภารงาน หน่วยที่ 1',
-    task2:    'แบบฝึกภารงาน หน่วยที่ 2'
+    task1:    'แบบฝึกภาระงาน หน่วยที่ 1',
+    task2:    'แบบฝึกภาระงาน หน่วยที่ 2'
   };
 
-  // ภารงานมีร่าง D1/D2 แต่ให้คะแนนเฉพาะร่างที่ 2 (D2) — จึงดึงเรียงความร่าง D2 มาแสดงเวลาประเมินหน่วยภารงาน
+  // ภาระงานมีร่าง D1/D2 แต่ให้คะแนนเฉพาะร่างที่ 2 (D2) — จึงดึงเรียงความร่าง D2 มาแสดงเวลาประเมินหน่วยภาระงาน
   // (คะแนนยังบันทึกภายใต้รอบ task1/task2 ตามเดิม เพื่อไม่ให้กระทบแดชบอร์ด/การส่งออก)
   const gradingEssayPhase = { pretest: 'pretest', task1: 'task1_d2', task2: 'task2_d2', posttest: 'posttest' };
 
@@ -1067,8 +1067,8 @@ require_once 'header.php';
   // phase picker functions
   const phaseLabels = {
     pretest:  'ก่อนเรียน (Pretest - T1)',
-    task1:    'ภารงาน หน่วยที่ 1 (Task 1)',
-    task2:    'ภารงาน หน่วยที่ 2 (Task 2)',
+    task1:    'ภาระงาน หน่วยที่ 1 (Task 1)',
+    task2:    'ภาระงาน หน่วยที่ 2 (Task 2)',
     posttest: 'หลังเรียน (Posttest - T2)'
   };
   function selectPhase(phase) {
