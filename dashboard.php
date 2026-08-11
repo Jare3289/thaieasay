@@ -121,13 +121,13 @@ require_once 'header.php';
         <button onclick="loadTeacherOverview()" class="btn btn-outline-light btn-sm fw-bold px-3">🔄 โหลดข้อมูลใหม่</button>
       </div>
       
-      <!-- ตัวกรองและกล่องค้นหา -->
+      <!-- ตัวกรองและกล่องค้นหา (ใช้ร่วมกันทั้ง 2 ตาราง) -->
       <div class="card-body bg-light border-bottom p-3">
         <div class="row g-2">
-          <div class="col-md-4 col-sm-12">
+          <div class="col-md-5 col-sm-12">
             <div class="input-group">
               <span class="input-group-text bg-white text-secondary border-end-0"><i class="bi bi-search"></i></span>
-              <input type="text" id="teacherSearchInput" onkeyup="filterTeacherTable()" class="form-control bg-white border-start-0" placeholder="พิมพ์ชื่อนักเรียนหรือรหัส 5 หลักเพื่อค้นหา...">
+              <input type="text" id="teacherSearchInput" onkeyup="filterTeacherTable()" class="form-control bg-white border-start-0" placeholder="พิมพ์ชื่อนักเรียนหรือรหัส 5 หลักเพื่อค้นหา (กรองทั้ง 2 ตาราง)...">
             </div>
           </div>
           <div class="col-md-4 col-sm-12">
@@ -135,45 +135,71 @@ require_once 'header.php';
               <span class="input-group-text bg-white text-secondary border-end-0"><i class="bi bi-funnel"></i> ตัวกรองสถานะ</span>
               <select id="teacherStatusFilter" onchange="filterTeacherTable()" class="form-select bg-white border-start-0 font-semibold">
                 <option value="all">ทั้งหมด (แสดงเด็กทั้งหมด)</option>
-                <option value="complete">ประเมินเสร็จสมบูรณ์ครบ 3 มิติ</option>
-                <option value="incomplete">ยังส่งประเมินไม่ครบถ้วน</option>
-                <option value="no_eval">ยังไม่มีการประเมินเลยสักรายการ</option>
-                <option value="missing_teacher">เฉพาะคนที่ "คุณครูยังไม่ได้ให้คะแนน"</option>
+                <option value="complete">มีคะแนนครบถ้วน</option>
+                <option value="incomplete">ยังมีคะแนนไม่ครบถ้วน</option>
+                <option value="no_eval">ยังไม่มีคะแนนเลย</option>
               </select>
             </div>
           </div>
-          <div class="col-md-4 col-sm-12">
+          <div class="col-md-3 col-sm-12">
             <div class="input-group">
-              <span class="input-group-text bg-white text-secondary border-end-0"><i class="bi bi-grid-3x3-gap"></i> มุมมองรายงาน</span>
-              <select id="dashboardViewMode" onchange="switchDashboardViewMode()" class="form-select bg-white border-start-0 font-semibold text-primary">
-                <option value="task1" selected>ภาระงาน หน่วยที่ 1 (360° & Expert)</option>
-                <option value="task2">ภาระงาน หน่วยที่ 2 (360° & Expert)</option>
-                <option value="prepost">เปรียบเทียบผลสัมฤทธิ์ (ก่อนเรียน vs หลังเรียน)</option>
+              <span class="input-group-text bg-white text-secondary border-end-0"><i class="bi bi-pie-chart"></i> มุมมองกราฟ</span>
+              <select id="dashboardViewMode" onchange="switchDashboardViewMode()" class="form-select bg-white border-start-0 font-semibold text-primary" title="เลือกชุดข้อมูลที่จะใช้แสดงในกราฟสถิติและบทวิเคราะห์ด้านบน">
+                <option value="task1" selected>กราฟ: ภาระงาน หน่วยที่ 1</option>
+                <option value="task2">กราฟ: ภาระงาน หน่วยที่ 2</option>
+                <option value="prepost">กราฟ: ก่อนเรียน vs หลังเรียน</option>
               </select>
             </div>
           </div>
         </div>
+        <p class="text-muted small mb-0 mt-2"><i class="bi bi-info-circle"></i> ตัวเลือก "มุมมองกราฟ" ใช้กับกราฟสถิติและบทวิเคราะห์ด้านบนเท่านั้น ส่วนตาราง 2 ตารางด้านล่างแสดงข้อมูลครบทุกหน่วยเสมอ</p>
       </div>
 
-      <!-- ตารางรายชื่อ -->
+      <!-- ตารางที่ 1: สรุปคะแนนภาระงาน (หน่วยที่ 1 และ หน่วยที่ 2) -->
+      <div class="px-3 pt-4 pb-2">
+        <h6 class="fw-bold text-primary-emphasis mb-1"><i class="bi bi-clipboard-check"></i> ตารางที่ 1 &nbsp;สรุปคะแนนภาระงานในหน่วยเรียน (หน่วยที่ 1 และ หน่วยที่ 2)</h6>
+        <p class="text-muted small mb-0">คะแนนเฉลี่ยจากการประเมินรอบด้าน 360° (เต็มหน่วยละ 60 คะแนน) พร้อมค่าสถิติพื้นฐานเพื่อการวิจัยที่ท้ายตาราง</p>
+      </div>
       <div class="table-responsive">
         <table class="table table-hover align-middle mb-0 text-start table-classroom">
-          <thead id="overviewTableHead" class="table-light text-secondary small fw-bold text-uppercase">
+          <thead class="table-light text-secondary small fw-bold text-uppercase">
             <tr>
-              <th class="px-3 py-3" style="width: 10%">รหัสนักเรียน</th>
-              <th class="px-3 py-3" style="width: 20%">ชื่อ-สกุลผู้เรียน</th>
-              <th class="px-3 py-3 text-center" style="width: 10%">ตนเองประเมิน</th>
-              <th class="px-3 py-3 text-center" style="width: 10%">เพื่อนประเมิน</th>
-              <th class="px-3 py-3 text-center" style="width: 10%">ครูประเมิน</th>
-              <th class="px-3 py-3 text-center text-warning-emphasis" style="width: 12%">ผู้เชี่ยวชาญ 1</th>
-              <th class="px-3 py-3 text-center text-warning-emphasis" style="width: 12%">ผู้เชี่ยวชาญ 2</th>
-              <th class="px-3 py-3 text-center" style="width: 8%">เฉลี่ยสะสม</th>
-              <th class="px-3 py-3 text-end" style="width: 8%">การจัดการ</th>
+              <th class="px-3 py-3" style="width: 12%">รหัสนักเรียน</th>
+              <th class="px-3 py-3" style="width: 28%">ชื่อ-สกุลผู้เรียน</th>
+              <th class="px-3 py-3 text-center text-primary-emphasis" style="width: 15%">หน่วยที่ 1<br><span class="fw-normal text-muted" style="font-size:.7rem">(เฉลี่ย 360°)</span></th>
+              <th class="px-3 py-3 text-center text-primary-emphasis" style="width: 15%">หน่วยที่ 2<br><span class="fw-normal text-muted" style="font-size:.7rem">(เฉลี่ย 360°)</span></th>
+              <th class="px-3 py-3 text-center" style="width: 15%">เฉลี่ยรวม 2 หน่วย</th>
+              <th class="px-3 py-3 text-end" style="width: 15%">การจัดการ</th>
             </tr>
           </thead>
-          <tbody id="overviewTableBody" class="small">
-            <tr><td colspan="9" class="text-center text-muted py-5 fw-bold">กำลังประมวลผลสรุปคะแนนนักเรียนรายบุคคล...</td></tr>
+          <tbody id="taskTableBody" class="small">
+            <tr><td colspan="6" class="text-center text-muted py-5 fw-bold">กำลังประมวลผลสรุปคะแนนภาระงาน...</td></tr>
           </tbody>
+          <tfoot id="taskTableFoot" class="small border-top border-2"></tfoot>
+        </table>
+      </div>
+
+      <!-- ตารางที่ 2: เปรียบเทียบคะแนนก่อนเรียน–หลังเรียน -->
+      <div class="px-3 pt-4 pb-2 border-top mt-2">
+        <h6 class="fw-bold text-success-emphasis mb-1"><i class="bi bi-arrow-left-right"></i> ตารางที่ 2 &nbsp;เปรียบเทียบคะแนนก่อนเรียน–หลังเรียน (Pretest / Posttest โดยครู)</h6>
+        <p class="text-muted small mb-0">คะแนนที่ครูประเมิน (เต็ม 60 คะแนน) และคะแนนพัฒนาการ (หลังเรียน − ก่อนเรียน) พร้อมค่าสถิติพื้นฐานเพื่อการวิจัยที่ท้ายตาราง</p>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0 text-start table-classroom">
+          <thead class="table-light text-secondary small fw-bold text-uppercase">
+            <tr>
+              <th class="px-3 py-3" style="width: 12%">รหัสนักเรียน</th>
+              <th class="px-3 py-3" style="width: 28%">ชื่อ-สกุลผู้เรียน</th>
+              <th class="px-3 py-3 text-center text-danger-emphasis" style="width: 15%">ก่อนเรียน<br><span class="fw-normal text-muted" style="font-size:.7rem">(Pretest)</span></th>
+              <th class="px-3 py-3 text-center text-success-emphasis" style="width: 15%">หลังเรียน<br><span class="fw-normal text-muted" style="font-size:.7rem">(Posttest)</span></th>
+              <th class="px-3 py-3 text-center text-primary" style="width: 15%">คะแนนพัฒนาการ</th>
+              <th class="px-3 py-3 text-end" style="width: 15%">การจัดการ</th>
+            </tr>
+          </thead>
+          <tbody id="prepostTableBody" class="small">
+            <tr><td colspan="6" class="text-center text-muted py-5 fw-bold">กำลังประมวลผลคะแนนก่อนเรียน–หลังเรียน...</td></tr>
+          </tbody>
+          <tfoot id="prepostTableFoot" class="small border-top border-2"></tfoot>
         </table>
       </div>
     </div>
@@ -568,10 +594,16 @@ require_once 'header.php';
 
   // --- ระบบสำหรับคุณครู ---
   async function loadTeacherOverview() {
-    const tbody = document.getElementById('overviewTableBody');
-    if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-5 fw-bold"><div class="spinner-border spinner-border-sm mb-2 d-block mx-auto"></div>กำลังประมวลคำนวณและดึงข้อมูลสถิติสำหรับการวิจัย...</td></tr>';
-    
+    const taskBody = document.getElementById('taskTableBody');
+    const prepostBody = document.getElementById('prepostTableBody');
+    if (!taskBody || !prepostBody) return;
+    // แสดงข้อความสถานะเดียวกันในทั้ง 2 ตาราง
+    const setBothBodies = (innerHtml) => {
+      taskBody.innerHTML = innerHtml;
+      prepostBody.innerHTML = innerHtml;
+    };
+    setBothBodies('<tr><td colspan="6" class="text-center text-muted py-5 fw-bold"><div class="spinner-border spinner-border-sm mb-2 d-block mx-auto"></div>กำลังประมวลคำนวณและดึงข้อมูลสถิติสำหรับการวิจัย...</td></tr>');
+
     try {
       const response = await fetch(`api.php?action=get_classroom_research_data&_t=${new Date().getTime()}`);
       const text = await response.text();
@@ -580,7 +612,7 @@ require_once 'header.php';
         res = JSON.parse(text);
       } catch (parseErr) {
         console.error("JSON parse error:", parseErr, "Response text:", text);
-        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-danger py-5 fw-bold">เกิดข้อผิดพลาดในการโหลดข้อมูลวิจัยชั้นเรียน<br><small class="fw-normal text-muted" style="font-family: monospace; display: block; max-height: 150px; overflow-y: auto; text-align: left; padding: 10px; background: #f8d7da; border-radius: 6px; border: 1px solid #f5c6cb; margin-top: 10px;">' + text.substring(0, 500).replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</small></td></tr>';
+        setBothBodies('<tr><td colspan="6" class="text-center text-danger py-5 fw-bold">เกิดข้อผิดพลาดในการโหลดข้อมูลวิจัยชั้นเรียน<br><small class="fw-normal text-muted" style="font-family: monospace; display: block; max-height: 150px; overflow-y: auto; text-align: left; padding: 10px; background: #f8d7da; border-radius: 6px; border: 1px solid #f5c6cb; margin-top: 10px;">' + text.substring(0, 500).replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</small></td></tr>');
         return;
       }
       
@@ -602,10 +634,10 @@ require_once 'header.php';
         }
         processDashboardData();
       } else {
-        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-danger py-5 fw-bold">เกิดข้อผิดพลาดจาก API: ' + res.error + '</td></tr>';
+        setBothBodies('<tr><td colspan="6" class="text-center text-danger py-5 fw-bold">เกิดข้อผิดพลาดจาก API: ' + res.error + '</td></tr>');
       }
     } catch (err) {
-      tbody.innerHTML = '<tr><td colspan="9" class="text-center text-danger py-5 fw-bold">เกิดข้อผิดพลาดในการเชื่อมต่อเครือข่าย: ' + err.message + '</td></tr>';
+      setBothBodies('<tr><td colspan="6" class="text-center text-danger py-5 fw-bold">เกิดข้อผิดพลาดในการเชื่อมต่อเครือข่าย: ' + err.message + '</td></tr>');
     }
   }
 
@@ -743,11 +775,145 @@ require_once 'header.php';
 
     renderCustomTeacherOverview(summaryData);
 
+    // ตารางสรุป 2 ตาราง (ภาระงานทั้ง 2 หน่วย + ก่อน/หลังเรียน) แสดงข้อมูลครบเสมอไม่ขึ้นกับมุมมองกราฟ
+    renderSplitSummaryTables(studentEvals);
+
     // กราฟแมงมุมรายบุคคล 2 กราฟ — ไม่ขึ้นกับโหมดตาราง แสดงทั้ง "ภาระงาน" และ "ก่อน/หลังเรียน" เสมอ
     const taskDimMap = buildDimMapFromEvals(studentEvals, 'task');
     const prepostDimMap = buildDimMapFromEvals(studentEvals, 'prepost');
     drawDimensionSpider(taskDimMap, 'classDimensionSpiderTask', 'task');
     drawDimensionSpider(prepostDimMap, 'classDimensionSpiderPrePost', 'prepost');
+  }
+
+  // คำนวณค่าสถิติพื้นฐานเพื่อการวิจัยจากชุดคะแนน (ข้ามค่าว่าง null)
+  //  n = จำนวนตัวอย่าง, mean = ค่าเฉลี่ย, sd = ส่วนเบี่ยงเบนมาตรฐาน (แบบกลุ่มตัวอย่าง n−1), min/max = ค่าต่ำสุด/สูงสุด
+  function computeDescriptiveStats(values) {
+    const arr = values.filter(v => v !== null && v !== undefined && !isNaN(v)).map(Number);
+    const n = arr.length;
+    if (n === 0) return { n: 0, mean: null, sd: null, min: null, max: null };
+    const sum = arr.reduce((a, b) => a + b, 0);
+    const mean = sum / n;
+    let sd = null;
+    if (n >= 2) {
+      const variance = arr.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (n - 1);
+      sd = Math.sqrt(variance);
+    }
+    return { n, mean, sd, min: Math.min(...arr), max: Math.max(...arr) };
+  }
+
+  // สร้างแถวค่าสถิติท้ายตาราง (tfoot) จากรายการคอลัมน์คะแนน
+  //  cols = อาร์เรย์ของอาร์เรย์คะแนนแต่ละคอลัมน์ (เรียงตรงกับหัวตารางคอลัมน์คะแนน)
+  function buildStatsFooter(cols, leadColspan, trailColspan) {
+    const stats = cols.map(computeDescriptiveStats);
+    const fmt = (v) => (v === null ? '—' : v.toFixed(2));
+    const rows = [
+      { label: 'จำนวน (N)', get: s => s.n + ' คน', cls: 'text-secondary' },
+      { label: 'ค่าเฉลี่ย (x̄)', get: s => fmt(s.mean), cls: 'text-primary fw-bold' },
+      { label: 'ส่วนเบี่ยงเบนมาตรฐาน (S.D.)', get: s => fmt(s.sd), cls: 'text-dark' },
+      { label: 'ค่าต่ำสุด (Min)', get: s => fmt(s.min), cls: 'text-muted' },
+      { label: 'ค่าสูงสุด (Max)', get: s => fmt(s.max), cls: 'text-muted' }
+    ];
+    let html = '';
+    rows.forEach((r, i) => {
+      const topClass = i === 0 ? 'border-top border-2' : '';
+      html += `<tr class="table-light ${topClass}">
+        <td class="px-3 py-2 fw-bold text-end text-secondary" colspan="${leadColspan}">${r.label}</td>`;
+      stats.forEach(s => {
+        html += `<td class="px-3 py-2 text-center font-mono fw-semibold ${r.cls}">${r.get(s)}</td>`;
+      });
+      html += `<td colspan="${trailColspan}"></td></tr>`;
+    });
+    return html;
+  }
+
+  // วาดตารางสรุป 2 ตาราง: (1) คะแนนภาระงานทั้ง 2 หน่วย และ (2) ก่อนเรียน–หลังเรียน พร้อมค่าสถิติท้ายตาราง
+  function renderSplitSummaryTables(studentEvals) {
+    const taskBody = document.getElementById('taskTableBody');
+    const taskFoot = document.getElementById('taskTableFoot');
+    const prepostBody = document.getElementById('prepostTableBody');
+    const prepostFoot = document.getElementById('prepostTableFoot');
+    if (!taskBody || !prepostBody) return;
+
+    const sortedKeys = Object.keys(studentDB).sort().filter(passesGroupFilter);
+
+    // เฉลี่ยคะแนนภาระงานของหน่วยหนึ่ง ๆ (เฉลี่ยจากผู้ประเมินทุกฝ่ายที่มีในหน่วยนั้น) หรือ null ถ้ายังไม่มี
+    const unitAvg = (id, phaseKey) => {
+      const evs = (studentEvals[id] && studentEvals[id][phaseKey]) || [];
+      if (evs.length === 0) return null;
+      const sum = evs.reduce((a, e) => a + Number(e.total_score), 0);
+      return sum / evs.length;
+    };
+
+    // ---------- ตารางที่ 1: ภาระงาน 2 หน่วย ----------
+    const unit1Vals = [], unit2Vals = [], combinedVals = [];
+    let taskHtml = '';
+    sortedKeys.forEach(id => {
+      const u1 = unitAvg(id, 'task1');
+      const u2 = unitAvg(id, 'task2');
+      const present = [u1, u2].filter(v => v !== null);
+      const combined = present.length > 0 ? present.reduce((a, b) => a + b, 0) / present.length : null;
+
+      if (u1 !== null) unit1Vals.push(u1);
+      if (u2 !== null) unit2Vals.push(u2);
+      if (combined !== null) combinedVals.push(combined);
+
+      const cell = (v, extra) => v !== null
+        ? `<td class="px-3 py-3 text-center font-mono fw-semibold ${extra || ''}">${v.toFixed(2)}</td>`
+        : `<td class="px-3 py-3 text-center text-muted">-</td>`;
+
+      taskHtml += `
+        <tr class="hover-row cursor-pointer" onclick="viewStudentDetail('${id}')">
+          <td class="px-3 py-3 font-mono fw-bold text-secondary">${id}</td>
+          <td class="px-3 py-3 fw-bold text-dark text-start">${studentDB[id]}</td>
+          ${cell(u1)}
+          ${cell(u2)}
+          ${cell(combined, combined !== null ? 'text-primary bg-light-blue fw-extrabold' : '')}
+          <td class="px-3 py-3 text-end">
+             <button class="btn btn-outline-primary btn-sm fw-bold rounded-pill px-3" onclick="event.stopPropagation(); viewStudentDetail('${id}')">วิเคราะห์</button>
+          </td>
+        </tr>`;
+    });
+    taskBody.innerHTML = taskHtml || '<tr><td colspan="6" class="text-center text-muted py-5 fw-bold">ยังไม่มีข้อมูลนักเรียนในกลุ่มนี้</td></tr>';
+    if (taskFoot) taskFoot.innerHTML = buildStatsFooter([unit1Vals, unit2Vals, combinedVals], 2, 1);
+
+    // ---------- ตารางที่ 2: ก่อนเรียน–หลังเรียน ----------
+    const preVals = [], postVals = [], gainVals = [];
+    let ppHtml = '';
+    sortedKeys.forEach(id => {
+      const preT = (studentEvals[id] && studentEvals[id]['pretest'] || []).find(e => e.evaluator_type === 'teacher');
+      const postT = (studentEvals[id] && studentEvals[id]['posttest'] || []).find(e => e.evaluator_type === 'teacher');
+      const pre = preT ? Number(preT.total_score) : null;
+      const post = postT ? Number(postT.total_score) : null;
+      const gain = (pre !== null && post !== null) ? (post - pre) : null;
+
+      if (pre !== null) preVals.push(pre);
+      if (post !== null) postVals.push(post);
+      if (gain !== null) gainVals.push(gain);
+
+      let gainDisp = '-', gainClass = 'text-muted';
+      if (gain !== null) {
+        if (gain > 0) { gainDisp = `+${gain.toFixed(2)}`; gainClass = 'text-success fw-bold'; }
+        else if (gain < 0) { gainDisp = `${gain.toFixed(2)}`; gainClass = 'text-danger fw-bold'; }
+        else { gainDisp = '0.00'; gainClass = 'text-secondary'; }
+      }
+
+      ppHtml += `
+        <tr class="hover-row cursor-pointer" onclick="viewStudentDetail('${id}')">
+          <td class="px-3 py-3 font-mono fw-bold text-secondary">${id}</td>
+          <td class="px-3 py-3 fw-bold text-dark text-start">${studentDB[id]}</td>
+          <td class="px-3 py-3 text-center font-mono fw-semibold">${pre !== null ? pre.toFixed(2) : '-'}</td>
+          <td class="px-3 py-3 text-center font-mono fw-semibold">${post !== null ? post.toFixed(2) : '-'}</td>
+          <td class="px-3 py-3 text-center font-mono ${gainClass}">${gainDisp}</td>
+          <td class="px-3 py-3 text-end">
+             <button class="btn btn-outline-primary btn-sm fw-bold rounded-pill px-3" onclick="event.stopPropagation(); viewStudentDetail('${id}')">วิเคราะห์</button>
+          </td>
+        </tr>`;
+    });
+    prepostBody.innerHTML = ppHtml || '<tr><td colspan="6" class="text-center text-muted py-5 fw-bold">ยังไม่มีข้อมูลนักเรียนในกลุ่มนี้</td></tr>';
+    if (prepostFoot) prepostFoot.innerHTML = buildStatsFooter([preVals, postVals, gainVals], 2, 1);
+
+    // ใช้ตัวกรอง/ค้นหาที่ผู้ใช้เลือกอยู่กับตารางที่เพิ่งวาดใหม่
+    filterTeacherTable();
   }
 
   // สร้างแผนที่คะแนนเฉลี่ยรายด้านต่อคน สำหรับกราฟแมงมุม
@@ -776,40 +942,9 @@ require_once 'header.php';
     return map;
   }
 
+  // คำนวณค่าสถิติภาพรวมสำหรับกราฟ บทวิเคราะห์ และการ์ดสรุป (ขับเคลื่อนด้วยมุมมองกราฟที่เลือก)
+  // หมายเหตุ: ตารางสรุป 2 ตารางถูกวาดแยกใน renderSplitSummaryTables() โดยไม่ขึ้นกับมุมมองนี้
   function renderCustomTeacherOverview(data) {
-    const tbody = document.getElementById('overviewTableBody');
-    const thead = document.getElementById('overviewTableHead');
-    if (!tbody || !thead) return;
-    
-    // แสดงผลส่วนหัวตารางแบบไดนามิก
-    if (currentDashboardViewMode === 'task1' || currentDashboardViewMode === 'task2') {
-      const unitLabel = currentDashboardViewMode === 'task1' ? 'หน่วยที่ 1' : 'หน่วยที่ 2';
-      thead.innerHTML = `
-        <tr>
-          <th class="px-3 py-3" style="width: 10%">รหัสนักเรียน</th>
-          <th class="px-3 py-3" style="width: 28%">ชื่อ-สกุลผู้เรียน</th>
-          <th class="px-3 py-3 text-center" style="width: 14%">ตนเองประเมิน</th>
-          <th class="px-3 py-3 text-center" style="width: 14%">เพื่อนประเมิน</th>
-          <th class="px-3 py-3 text-center" style="width: 14%">ครูประเมิน</th>
-          <th class="px-3 py-3 text-center" style="width: 8%">เฉลี่ย${unitLabel}</th>
-          <th class="px-3 py-3 text-end" style="width: 12%">การจัดการ</th>
-        </tr>
-      `;
-    } else {
-      thead.innerHTML = `
-        <tr>
-          <th class="px-3 py-3" style="width: 15%">รหัสนักเรียน</th>
-          <th class="px-3 py-3" style="width: 30%">ชื่อ-สกุลผู้เรียน</th>
-          <th class="px-3 py-3 text-center text-danger-emphasis" style="width: 15%">ก่อนเรียน (Pretest)</th>
-          <th class="px-3 py-3 text-center text-success-emphasis" style="width: 15%">หลังเรียน (Posttest)</th>
-          <th class="px-3 py-3 text-center text-primary" style="width: 15%">คะแนนพัฒนาการ</th>
-          <th class="px-3 py-3 text-end" style="width: 10%">การจัดการ</th>
-        </tr>
-      `;
-    }
-
-    tbody.innerHTML = '';
-
     // กรองเฉพาะนักเรียนในกลุ่มที่เลือก (ทั้งหมด/กลุ่มทดลอง/กลุ่มตัวอย่าง)
     const sortedKeys = Object.keys(studentDB).sort().filter(passesGroupFilter);
     let totalRegistered = sortedKeys.length;
@@ -827,14 +962,10 @@ require_once 'header.php';
       '4.1': 0, '4.2': 0, '4.3': 0
     };
 
-    let html = '';
     sortedKeys.forEach(id => {
       const sData = data[id] || {};
 
       if (currentDashboardViewMode === 'task1' || currentDashboardViewMode === 'task2') {
-        const checkIcon = '<i class="bi bi-check-circle-fill text-success fs-5" title="ส่งแล้ว"></i>';
-        const crossIcon = '<span class="text-muted">-</span>';
-
         if (sData.avgScore > 0) {
           const avg = Number(sData.avgScore);
           totalSumScores += avg;
@@ -868,39 +999,7 @@ require_once 'header.php';
         if (sData.self && sData.peer && sData.teacher) {
           activeEvaluationSetCount++;
         }
-
-        html += `
-          <tr class="hover-row cursor-pointer" onclick="viewStudentDetail('${id}')">
-            <td class="px-3 py-3 font-mono fw-bold text-secondary">${id}</td>
-            <td class="px-3 py-3 fw-bold text-dark text-start">${studentDB[id]}</td>
-            <td class="px-3 py-3 text-center">${sData.self ? checkIcon : crossIcon}</td>
-            <td class="px-3 py-3 text-center">${sData.peer ? checkIcon : crossIcon}</td>
-            <td class="px-3 py-3 text-center">${sData.teacher ? checkIcon : crossIcon}</td>
-            <td class="px-3 py-3 text-center fw-extrabold ${sData.avgScore > 0 ? 'text-primary bg-light-blue' : 'text-muted'}">${sData.avgScore > 0 ? sData.avgScore.toFixed(2) : '-'}</td>
-            <td class="px-3 py-3 text-end">
-               <button class="btn btn-outline-primary btn-sm fw-bold rounded-pill px-3" onclick="event.stopPropagation(); viewStudentDetail('${id}')">วิเคราะห์</button>
-            </td>
-          </tr>
-        `;
       } else {
-        // prepost mode row rendering
-        const preDisp = sData.preScore !== null ? sData.preScore.toFixed(2) : '-';
-        const postDisp = sData.postScore !== null ? sData.postScore.toFixed(2) : '-';
-        let gainDisp = '-';
-        let gainClass = 'text-muted';
-        if (sData.gain !== null) {
-          if (sData.gain > 0) {
-            gainDisp = `+${sData.gain.toFixed(2)}`;
-            gainClass = 'text-success fw-bold';
-          } else if (sData.gain < 0) {
-            gainDisp = `${sData.gain.toFixed(2)}`;
-            gainClass = 'text-danger fw-bold';
-          } else {
-            gainDisp = '0.00';
-            gainClass = 'text-secondary';
-          }
-        }
-
         if (sData.postScore !== null) {
           const postVal = Number(sData.postScore);
           totalSumScores += postVal;
@@ -930,23 +1029,8 @@ require_once 'header.php';
           subCriteriaSums['4.3'] += Number(sData.avg_4_3 || 0);
           evaluatedStdsCount++;
         }
-
-        html += `
-          <tr class="hover-row cursor-pointer" onclick="viewStudentDetail('${id}')">
-            <td class="px-3 py-3 font-mono fw-bold text-secondary">${id}</td>
-            <td class="px-3 py-3 fw-bold text-dark text-start">${studentDB[id]}</td>
-            <td class="px-3 py-3 text-center font-mono fw-semibold">${preDisp}</td>
-            <td class="px-3 py-3 text-center font-mono fw-semibold">${postDisp}</td>
-            <td class="px-3 py-3 text-center font-mono ${gainClass}">${gainDisp}</td>
-            <td class="px-3 py-3 text-end">
-               <button class="btn btn-outline-primary btn-sm fw-bold rounded-pill px-3" onclick="event.stopPropagation(); viewStudentDetail('${id}')">วิเคราะห์</button>
-            </td>
-          </tr>
-        `;
       }
     });
-
-    tbody.innerHTML = html;
 
     document.getElementById('statTotalStudents').textContent = totalRegistered + " คน";
     document.getElementById('statClassAvg').textContent = totalScoredCount > 0 ? (totalSumScores / totalScoredCount).toFixed(2) + " / 60" : "0 / 60";
@@ -1347,73 +1431,44 @@ require_once 'header.php';
     });
   }
 
+  // กรอง/ค้นหาพร้อมกันทั้ง 2 ตาราง (ภาระงาน + ก่อน/หลังเรียน) ด้วยคำค้นและตัวกรองสถานะร่วมกัน
   function filterTeacherTable() {
     const input = document.getElementById('teacherSearchInput');
     const filter = document.getElementById('teacherStatusFilter');
     if (!input || !filter) return;
-    
+
     const query = input.value.toLowerCase().trim();
     const filterVal = filter.value;
-    const rows = document.querySelectorAll('#overviewTableBody tr');
-    
-    rows.forEach(row => {
-      if (currentDashboardViewMode === 'task1' || currentDashboardViewMode === 'task2') {
-        if(row.cells.length < 7) return;
+
+    // แต่ละตารางมีคอลัมน์คะแนน 2 คอลัมน์แรกเป็นตัวชี้วัดความครบถ้วน
+    //  - ตารางภาระงาน: หน่วยที่ 1 (cell 2) / หน่วยที่ 2 (cell 3)
+    //  - ตารางก่อน/หลังเรียน: ก่อนเรียน (cell 2) / หลังเรียน (cell 3)
+    const applyToBody = (bodyId) => {
+      document.querySelectorAll(`#${bodyId} tr`).forEach(row => {
+        if (row.cells.length < 6) return;
 
         const studentId = row.cells[0].textContent.toLowerCase();
         const name = row.cells[1].textContent.toLowerCase();
+        const hasA = row.cells[2].textContent.trim() !== '-';
+        const hasB = row.cells[3].textContent.trim() !== '-';
 
-        const hasSelf = row.cells[2].innerHTML.includes('bi-check-circle-fill');
-        const hasPeer = row.cells[3].innerHTML.includes('bi-check-circle-fill');
-        const hasTeacher = row.cells[4].innerHTML.includes('bi-check-circle-fill');
-        
         const matchesSearch = studentId.includes(query) || name.includes(query);
-        
+
         let matchesFilter = true;
         if (filterVal === 'complete') {
-          matchesFilter = (hasSelf && hasPeer && hasTeacher);
+          matchesFilter = (hasA && hasB);
         } else if (filterVal === 'incomplete') {
-          matchesFilter = !(hasSelf && hasPeer && hasTeacher);
+          matchesFilter = !(hasA && hasB);
         } else if (filterVal === 'no_eval') {
-          matchesFilter = (!hasSelf && !hasPeer && !hasTeacher);
-        } else if (filterVal === 'missing_teacher') {
-          matchesFilter = !hasTeacher;
+          matchesFilter = (!hasA && !hasB);
         }
-        
-        if (matchesSearch && matchesFilter) {
-          row.classList.remove('d-none');
-        } else {
-          row.classList.add('d-none');
-        }
-      } else {
-        if(row.cells.length < 6) return;
 
-        const studentId = row.cells[0].textContent.toLowerCase();
-        const name = row.cells[1].textContent.toLowerCase();
-        
-        const hasPre = row.cells[2].textContent.trim() !== '-';
-        const hasPost = row.cells[3].textContent.trim() !== '-';
-        
-        const matchesSearch = studentId.includes(query) || name.includes(query);
-        
-        let matchesFilter = true;
-        if (filterVal === 'complete') {
-          matchesFilter = (hasPre && hasPost);
-        } else if (filterVal === 'incomplete') {
-          matchesFilter = !(hasPre && hasPost);
-        } else if (filterVal === 'no_eval') {
-          matchesFilter = (!hasPre && !hasPost);
-        } else if (filterVal === 'missing_teacher') {
-          matchesFilter = !hasPost;
-        }
-        
-        if (matchesSearch && matchesFilter) {
-          row.classList.remove('d-none');
-        } else {
-          row.classList.add('d-none');
-        }
-      }
-    });
+        row.classList.toggle('d-none', !(matchesSearch && matchesFilter));
+      });
+    };
+
+    applyToBody('taskTableBody');
+    applyToBody('prepostTableBody');
   }
 
   function viewStudentDetail(id) {
