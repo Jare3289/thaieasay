@@ -150,10 +150,12 @@ require_once 'header.php';
             <?php endif; ?>
             <?php if ($mode_param === 'peer'): ?>
             <p id="peerLockNotice" class="mt-2 text-success small fw-bold mb-0 d-none">
-              <i class="bi bi-lock-fill"></i> ระบบได้จับคู่ผู้ถูกประเมินให้คุณโดยคุณครูแล้ว (ล็อกอัตโนมัติ) ไม่ต้องระบุเอง
+              <i class="bi bi-lock-fill"></i> ระบบล็อกผู้ถูกประเมินตามคู่ที่คุณจับกับเพื่อนไว้แล้ว (จับคู่ไป-กลับอัตโนมัติ) ไม่ต้องระบุเอง
             </p>
             <p id="peerFallbackNotice" class="mt-2 text-danger small fw-bold mb-0 d-none">
-              <i class="bi bi-exclamation-triangle-fill"></i> ยังไม่มีการจับคู่สำหรับรอบนี้ กรุณาระบุรหัสเพื่อนที่ต้องการประเมินด้วยตนเอง
+              <i class="bi bi-exclamation-triangle-fill"></i> ยังไม่มีการจับคู่สำหรับหน่วยนี้ กรุณาไปที่หน้า
+              <a href="peer_matching.php" class="fw-bold text-decoration-underline">🤝 จับคู่ประเมินเพื่อน</a>
+              เพื่อส่งคำขอจับคู่กับเพื่อนก่อน แล้วจึงกลับมาประเมิน
             </p>
             <?php endif; ?>
             <?php if ($mode_param === 'expert'): ?>
