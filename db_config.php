@@ -243,7 +243,7 @@ if ($needs_migration) {
         CREATE TABLE IF NOT EXISTS student_essays (
             id INT AUTO_INCREMENT PRIMARY KEY,
             student_id VARCHAR(10) NOT NULL,
-            essay_phase VARCHAR(20) NOT NULL DEFAULT 'task1',
+            essay_phase VARCHAR(20) NOT NULL DEFAULT 'task1_d1',
             essay_title VARCHAR(255) DEFAULT NULL,
             essay_content LONGTEXT,
             word_count INT DEFAULT 0,
@@ -292,6 +292,21 @@ try {
                 UNIQUE KEY unique_peer_pair (round, student_code)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         ");
+    }
+} catch (Exception $e) {
+    // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
+}
+
+// Migration ย่อย: รองรับร่าง D1/D2 ของภารงาน (Task Unit Drafts) — ตรวจแยกจาก migration หลัก
+// ภารงานรุ่นเก่าถูกเก็บเป็น 'task1'/'task2' (มีร่างเดียว) จึงย้ายให้เป็น "ร่างที่ 1 (D1)" = task1_d1 / task2_d1
+// เพื่อให้เข้ากับคอลัมน์ D1/D2 ใหม่ในหน้า Essay Viewer และตัวเขียนเรียงความ
+// ใช้ SELECT ... LIMIT 1 ตรวจก่อน จึงเบามาก — เมื่อย้ายครบแล้วจะไม่ทำงานอีก
+try {
+    $legacyEssay = $pdo->query("SELECT 1 FROM student_essays WHERE essay_phase IN ('task1','task2') LIMIT 1");
+    if ($legacyEssay && $legacyEssay->fetch()) {
+        // UPDATE IGNORE กันชนกับแถว _d1 ที่อาจมีอยู่แล้ว (unique student_id+essay_phase)
+        safe_ddl($pdo, "UPDATE IGNORE student_essays SET essay_phase = 'task1_d1' WHERE essay_phase = 'task1'");
+        safe_ddl($pdo, "UPDATE IGNORE student_essays SET essay_phase = 'task2_d1' WHERE essay_phase = 'task2'");
     }
 } catch (Exception $e) {
     // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ

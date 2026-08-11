@@ -1350,7 +1350,7 @@ try {
                 exit;
             }
             $studentId    = $_SESSION['user']['id'];
-            $essayPhase   = isset($request_data['essay_phase'])   ? trim($request_data['essay_phase'])   : 'task1';
+            $essayPhase   = isset($request_data['essay_phase'])   ? trim($request_data['essay_phase'])   : 'task1_d1';
             $essayTitle   = isset($request_data['essay_title'])   ? trim($request_data['essay_title'])   : '';
             $essayContent = isset($request_data['essay_content']) ? trim($request_data['essay_content']) : '';
             // นับจำนวนคำ (แยกด้วยช่องว่างและขึ้นบรรทัดใหม่)
@@ -1376,7 +1376,7 @@ try {
                 exit;
             }
             $studentId  = isset($_GET['studentId'])  ? trim($_GET['studentId'])  : $_SESSION['user']['id'];
-            $essayPhase = isset($_GET['essay_phase']) ? trim($_GET['essay_phase']) : 'task1';
+            $essayPhase = isset($_GET['essay_phase']) ? trim($_GET['essay_phase']) : 'task1_d1';
             // ดึงข้อมูลเจ้าของผลงาน (ชื่อ/ชั้น) มาด้วย เพื่อแสดงหัวกระดาษแบบข้อสอบ
             $stmt = $pdo->prepare('
                 SELECT se.*, s.student_name, s.classroom

@@ -69,14 +69,14 @@ require_once 'header.php';
           <button type="button" class="phase-btn w-100 btn btn-outline-success rounded-3 p-3 text-center fw-bold" data-phase="task1" onclick="selectPhase('task1')">
             <div class="fs-2 mb-2">📚</div>
             <div class="fw-bold">ภารงาน หน่วยที่ 1</div>
-            <div class="text-muted small">Task Unit 1</div>
+            <div class="text-muted small">ให้คะแนนจากร่างที่ 2 (D2)</div>
           </button>
         </div>
         <div class="<?php echo $phaseColClass; ?>">
           <button type="button" class="phase-btn w-100 btn btn-outline-warning rounded-3 p-3 text-center fw-bold" data-phase="task2" onclick="selectPhase('task2')">
             <div class="fs-2 mb-2">📖</div>
             <div class="fw-bold">ภารงาน หน่วยที่ 2</div>
-            <div class="text-muted small">Task Unit 2</div>
+            <div class="text-muted small">ให้คะแนนจากร่างที่ 2 (D2)</div>
           </button>
         </div>
         <?php if (!$isStudentEval): ?>
@@ -929,6 +929,10 @@ require_once 'header.php';
     task2:    'แบบฝึกภารงาน หน่วยที่ 2'
   };
 
+  // ภารงานมีร่าง D1/D2 แต่ให้คะแนนเฉพาะร่างที่ 2 (D2) — จึงดึงเรียงความร่าง D2 มาแสดงเวลาประเมินหน่วยภารงาน
+  // (คะแนนยังบันทึกภายใต้รอบ task1/task2 ตามเดิม เพื่อไม่ให้กระทบแดชบอร์ด/การส่งออก)
+  const gradingEssayPhase = { pretest: 'pretest', task1: 'task1_d2', task2: 'task2_d2', posttest: 'posttest' };
+
   async function fetchStudentEssayForEvaluation(studentId, testPhase) {
     const formTitleEl = document.getElementById('essayPanelFormTitle');
     const titleEl = document.getElementById('essayPanelTitle');
@@ -943,7 +947,8 @@ require_once 'header.php';
     }
 
     try {
-      const response = await fetch(`api.php?action=get_essay&studentId=${studentId}&essay_phase=${testPhase}`);
+      const fetchPhase = gradingEssayPhase[testPhase] || testPhase;
+      const response = await fetch(`api.php?action=get_essay&studentId=${studentId}&essay_phase=${fetchPhase}`);
       const data = await response.json();
 
       if (data.success && data.found) {
