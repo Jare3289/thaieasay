@@ -146,7 +146,8 @@ require_once 'header.php';
             <div class="input-group">
               <span class="input-group-text bg-white text-secondary border-end-0"><i class="bi bi-grid-3x3-gap"></i> มุมมองรายงาน</span>
               <select id="dashboardViewMode" onchange="switchDashboardViewMode()" class="form-select bg-white border-start-0 font-semibold text-primary">
-                <option value="task" selected>ภาระงานในหน่วยเรียน (360° & Expert)</option>
+                <option value="task1" selected>ภาระงาน หน่วยที่ 1 (360° & Expert)</option>
+                <option value="task2">ภาระงาน หน่วยที่ 2 (360° & Expert)</option>
                 <option value="prepost">เปรียบเทียบผลสัมฤทธิ์ (ก่อนเรียน vs หลังเรียน)</option>
               </select>
             </div>
@@ -831,8 +832,8 @@ require_once 'header.php';
       const sData = data[id] || {};
 
       if (currentDashboardViewMode === 'task1' || currentDashboardViewMode === 'task2') {
-        const checkIcon = '<span class="badge badge-teal"><i class="bi bi-check-circle-fill"></i> ส่งแล้ว</span>';
-        const crossIcon = '<span class="badge bg-light text-muted border px-2.5 py-1 rounded-pill">-</span>';
+        const checkIcon = '<i class="bi bi-check-circle-fill text-success fs-5" title="ส่งแล้ว"></i>';
+        const crossIcon = '<span class="text-muted">-</span>';
 
         if (sData.avgScore > 0) {
           const avg = Number(sData.avgScore);
@@ -952,7 +953,7 @@ require_once 'header.php';
     
     // In prepost mode, completion means having both pre and post evaluations from the teacher
     let completionPercentage = 0;
-    if (currentDashboardViewMode === 'task') {
+    if (currentDashboardViewMode === 'task1' || currentDashboardViewMode === 'task2') {
       completionPercentage = totalRegistered > 0 ? Math.round((activeEvaluationSetCount / totalRegistered) * 100) : 0;
     } else {
       // นับเฉพาะนักเรียนในกลุ่มที่เลือก เพื่อให้ตรงกับจำนวนผู้เรียนที่ใช้เป็นตัวหาร (totalRegistered)
@@ -1356,15 +1357,15 @@ require_once 'header.php';
     const rows = document.querySelectorAll('#overviewTableBody tr');
     
     rows.forEach(row => {
-      if (currentDashboardViewMode === 'task') {
-        if(row.cells.length < 9) return;
+      if (currentDashboardViewMode === 'task1' || currentDashboardViewMode === 'task2') {
+        if(row.cells.length < 7) return;
 
         const studentId = row.cells[0].textContent.toLowerCase();
         const name = row.cells[1].textContent.toLowerCase();
-        
-        const hasSelf = row.cells[2].innerHTML.includes('ส่งแล้ว');
-        const hasPeer = row.cells[3].innerHTML.includes('ส่งแล้ว');
-        const hasTeacher = row.cells[4].innerHTML.includes('ส่งแล้ว');
+
+        const hasSelf = row.cells[2].innerHTML.includes('bi-check-circle-fill');
+        const hasPeer = row.cells[3].innerHTML.includes('bi-check-circle-fill');
+        const hasTeacher = row.cells[4].innerHTML.includes('bi-check-circle-fill');
         
         const matchesSearch = studentId.includes(query) || name.includes(query);
         
