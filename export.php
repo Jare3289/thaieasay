@@ -334,17 +334,23 @@ function build_reflections($pdo, $students, $STD_HEADERS) {
 /* 3.8 [รายละเอียด] เรียงความนักเรียน (พร้อมจำนวนคำและเนื้อหาเต็ม) */
 function build_essays($pdo, $students, $STD_HEADERS) {
     $stmt = $pdo->query('SELECT * FROM student_essays ORDER BY student_id ASC, essay_phase ASC');
+    $topicsMap = essay_topics_map($pdo);
     $rows = [];
     $rows[] = array_merge($STD_HEADERS, [
-        'รอบ/ภาระงาน', 'ชื่อเรื่อง', 'จำนวนคำ', 'เนื้อหาเรียงความ', 'บันทึกเมื่อ', 'แก้ไขล่าสุด',
+        'รอบ/ภาระงาน', 'หัวข้อ (ครูกำหนด)', 'จำนวนคำ', 'ส่วนนำ (Introduction)', 'ส่วนเนื้อหา (Body)', 'ส่วนสรุป (Conclusion)', 'บันทึกเมื่อ', 'แก้ไขล่าสุด',
     ]);
     while ($r = $stmt->fetch()) {
         if (!isset($students[$r['student_id']])) continue;
+        // เนื้อหาแยกส่วน: เนื้อหา (หลายย่อหน้า) เก็บเป็น JSON array — คลี่เป็นข้อความคั่นบรรทัดเพื่อส่งออก
+        $bodyArr = json_decode((string)($r['body_content'] ?? ''), true);
+        $bodyText = is_array($bodyArr) ? implode("\n\n", $bodyArr) : trim((string)($r['body_content'] ?? ''));
         $rows[] = array_merge(stdCols($students, $r['student_id']), [
             phaseLabel($r['essay_phase'] ?? ''),
-            (string)($r['essay_title'] ?? ''),
+            (string)($topicsMap[essay_topic_phase($r['essay_phase'] ?? '')] ?? ''),
             (int)($r['word_count'] ?? 0),
-            trim((string)($r['essay_content'] ?? '')),
+            trim((string)($r['intro_content'] ?? '')),
+            $bodyText,
+            trim((string)($r['conclusion_content'] ?? '')),
             $r['created_at'] ?? '', $r['updated_at'] ?? '',
         ]);
     }

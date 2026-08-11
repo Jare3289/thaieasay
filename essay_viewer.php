@@ -30,6 +30,40 @@ require_once 'header.php';
     </a>
   </div>
 
+  <?php $isTeacher = ($_SESSION['user']['role'] === 'teacher'); ?>
+  <!-- กำหนดหัวข้อเรียงความแต่ละงาน (ครูกำหนด — นักเรียนจะเห็นตอนเขียน) -->
+  <div class="card border-0 shadow-sm rounded-4 bg-white mb-4">
+    <div class="card-body p-4">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+        <h6 class="fw-bold text-dark mb-0"><i class="bi bi-bookmark-star-fill text-primary me-2"></i>หัวข้อเรียงความแต่ละงาน <span class="text-muted fw-normal small">(นักเรียนจะเห็นหัวข้อนี้ตอนเขียน แทนการตั้งชื่อเรื่องเอง)</span></h6>
+        <?php if ($isTeacher): ?>
+        <button id="saveTopicsBtn" class="btn btn-primary btn-sm rounded-pill px-3" onclick="saveEssayTopics()">
+          <i class="bi bi-save me-1"></i>บันทึกหัวข้อ
+        </button>
+        <?php endif; ?>
+      </div>
+      <div class="row g-3">
+        <?php
+          $topicFields = [
+            'pretest'  => ['ก่อนเรียน', 'bi-pencil', 'text-primary'],
+            'task1'    => ['หน่วยที่ 1', 'bi-journal-text', 'text-success'],
+            'task2'    => ['หน่วยที่ 2', 'bi-journal-text', 'text-warning'],
+            'posttest' => ['หลังเรียน', 'bi-mortarboard', 'text-danger'],
+          ];
+          foreach ($topicFields as $ph => $meta):
+        ?>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold small mb-1 <?php echo $meta[2]; ?>"><i class="bi <?php echo $meta[1]; ?> me-1"></i><?php echo $meta[0]; ?></label>
+          <input type="text" id="topic_<?php echo $ph; ?>" maxlength="500"
+            class="form-control form-control-sm border-2 rounded-3"
+            placeholder="กำหนดหัวข้อสำหรับ<?php echo $meta[0]; ?>..."
+            <?php echo $isTeacher ? '' : 'readonly'; ?>>
+        </div>
+        <?php endforeach; ?>
+      </div>
+    </div>
+  </div>
+
   <div class="card border-0 shadow-sm rounded-4 bg-white mb-4 overflow-hidden">
     <div class="card-body p-4">
 
@@ -385,7 +419,7 @@ require_once 'header.php';
       if (/^[=+\-@\t\r]/.test(v)) v = "'" + v;
       return '"' + v.replace(/"/g,'""').replace(/\n/g,' ') + '"';
     };
-    let csv = '﻿' + 'รหัสนักเรียน,ชื่อ-สกุล,ห้องเรียน,กลุ่ม,รอบการประเมิน,ชื่อเรื่อง,ส่วนคำนำ (Introduction),ส่วนเนื้อเรื่อง (Body),ส่วนสรุป (Conclusion),วันที่บันทึก\n';
+    let csv = '﻿' + 'รหัสนักเรียน,ชื่อ-สกุล,ห้องเรียน,กลุ่ม,รอบการประเมิน,หัวข้อ (ครูกำหนด),ส่วนคำนำ (Introduction),ส่วนเนื้อเรื่อง (Body),ส่วนสรุป (Conclusion),วันที่บันทึก\n';
     filtered.forEach(e => {
       const dt = new Date(e.updated_at||e.created_at).toLocaleString('th-TH');
       let intro = '';
@@ -420,7 +454,49 @@ require_once 'header.php';
     filterEssayViewer();
   };
 
+  // ===== หัวข้อเรียงความที่ครูกำหนด =====
+  const TOPIC_PHASES = ['pretest', 'task1', 'task2', 'posttest'];
+
+  async function loadEssayTopics() {
+    try {
+      const res = await fetch('api.php?action=get_essay_topics');
+      const data = await res.json();
+      if (data.success && data.topics) {
+        TOPIC_PHASES.forEach(ph => {
+          const el = document.getElementById('topic_' + ph);
+          if (el) el.value = data.topics[ph] || '';
+        });
+      }
+    } catch (e) { /* เงียบไว้ */ }
+  }
+
+  async function saveEssayTopics() {
+    const btn = document.getElementById('saveTopicsBtn');
+    if (!btn) return;
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>กำลังบันทึก...';
+    btn.disabled = true;
+    try {
+      for (const ph of TOPIC_PHASES) {
+        const el = document.getElementById('topic_' + ph);
+        if (!el) continue;
+        await fetch('api.php?action=save_essay_topic', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phase: ph, topic: el.value.trim() })
+        });
+      }
+      showToast('บันทึกหัวข้อเรียงความเรียบร้อยแล้ว', 'success');
+    } catch (e) {
+      showToast('บันทึกหัวข้อไม่สำเร็จ', 'error');
+    } finally {
+      btn.innerHTML = orig;
+      btn.disabled = false;
+    }
+  }
+
   // --- เริ่มรันอัตโนมัติ ---
+  loadEssayTopics();
   initEssayGroupFromStore();
   loadEssayViewer();
 </script>

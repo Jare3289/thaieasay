@@ -94,13 +94,12 @@ require_once 'header.php';
     </div>
     <div class="card-body p-4">
 
-      <!-- Title Field -->
-      <div class="mb-3">
-        <label for="essayTitle" class="form-label fw-bold text-secondary small text-uppercase tracking-wider">
-          ชื่อเรื่องเรียงความ <span class="text-muted fw-normal">(ถ้ามี)</span>
-        </label>
-        <input type="text" id="essayTitle" class="form-control form-control-lg border-2 rounded-3 fw-semibold"
-          placeholder="เช่น: เรียงความเรื่อง ความรักต่อแผ่นดิน..." maxlength="200">
+      <!-- หัวข้อที่ครูกำหนด (นักเรียนไม่ต้องตั้งชื่อเรื่องเอง) -->
+      <div class="mb-3 p-3 rounded-3 border" style="background-color:#eef6ff; border-color:#cfe2ff !important;">
+        <div class="fw-bold text-primary small mb-1"><i class="bi bi-bookmark-star-fill me-1"></i>หัวข้อเรียงความ (คุณครูกำหนด)</div>
+        <div id="essayTopicText" class="fs-5 fw-semibold text-dark">
+          <span class="text-muted fst-italic fs-6">กำลังโหลดหัวข้อ...</span>
+        </div>
       </div>
 
       <!-- Instructions -->
@@ -276,6 +275,30 @@ function computeEssayPhase(unit, draft) {
   return (unit === 'task1' || unit === 'task2') ? (unit + '_' + draft) : unit;
 }
 
+// หัวข้อที่ครูกำหนด (map: pretest/task1/task2/posttest → หัวข้อ) — ภารงานใช้หัวข้อเดียวกันทั้ง D1/D2
+let essayTopics = {};
+async function loadEssayTopics() {
+  try {
+    const res = await fetch('api.php?action=get_essay_topics');
+    const data = await res.json();
+    if (data.success) essayTopics = data.topics || {};
+  } catch (e) { essayTopics = {}; }
+  updateTopicDisplay();
+}
+function updateTopicDisplay() {
+  const el = document.getElementById('essayTopicText');
+  if (!el) return;
+  const topic = (essayTopics[currentUnit] || '').trim();
+  el.innerHTML = topic
+    ? escapeHtmlWriter(topic)
+    : '<span class="text-muted fst-italic fs-6">คุณครูยังไม่กำหนดหัวข้อสำหรับงานนี้</span>';
+}
+function escapeHtmlWriter(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 function addBodyParagraph(content = "") {
   bodyParagraphCount++;
   const container = document.getElementById('bodyParagraphsContainer');
@@ -337,6 +360,7 @@ function setEssayUnit(unit) {
 
   currentEssayPhase = computeEssayPhase(unit, currentDraft);
   updatePhaseBadge();
+  updateTopicDisplay();
   loadEssayForPhase(currentEssayPhase);
 }
 
@@ -384,7 +408,6 @@ async function loadEssayForPhase(phase) {
     container.innerHTML = '';
 
     if (data.success && data.found) {
-      document.getElementById('essayTitle').value = data.data.essay_title || '';
       const contentStr = data.data.essay_content || '';
       
       try {
@@ -417,7 +440,6 @@ async function loadEssayForPhase(phase) {
       statusBadge.textContent = '✓ มีข้อมูลบันทึกไว้แล้ว';
       statusBadge.className = 'badge bg-success small';
     } else {
-      document.getElementById('essayTitle').value = '';
       document.getElementById('essayIntro').value = '';
       document.getElementById('essayConclusion').value = '';
       addBodyParagraph();
@@ -490,25 +512,21 @@ async function saveEssay() {
     return;
   }
 
-  const essayContentObj = {
-    introduction: intro,
-    body: bodyParagraphs,
-    conclusion: conclusion
-  };
-
   const btn = document.getElementById('saveBtn');
   const origHTML = btn.innerHTML;
   btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>กำลังบันทึก...`;
   btn.disabled = true;
 
   try {
+    // ส่งเนื้อหาแยกเป็น 3 ส่วน (ส่วนนำ/เนื้อหาหลายย่อหน้า/สรุป) — ไม่มีชื่อเรื่องจากนักเรียน
     const res = await fetch('api.php?action=save_essay', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        essay_phase:   currentEssayPhase,
-        essay_title:   document.getElementById('essayTitle').value.trim(),
-        essay_content: JSON.stringify(essayContentObj)
+        essay_phase:  currentEssayPhase,
+        introduction: intro,
+        body:         bodyParagraphs,
+        conclusion:   conclusion
       })
     });
     const data = await res.json();
@@ -538,7 +556,6 @@ async function saveEssay() {
 
 function clearEssay() {
   if (!confirm('คุณต้องการล้างข้อความบนหน้าจอนี้ใช่ไหม? (ไม่ได้ลบข้อมูลที่บันทึกแล้วในระบบ)')) return;
-  document.getElementById('essayTitle').value = '';
   document.getElementById('essayIntro').value = '';
   document.getElementById('essayConclusion').value = '';
   const container = document.getElementById('bodyParagraphsContainer');
@@ -615,6 +632,7 @@ async function loadSavedList() {
 
 // Init
 (async function() {
+  await loadEssayTopics();          // โหลดหัวข้อที่ครูกำหนด
   // ค่าเริ่มต้น: ภารงานหน่วยที่ 1 · ร่างที่ 1 (D1)
   setEssayUnit('task1');
   await loadSavedList();

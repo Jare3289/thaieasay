@@ -259,6 +259,15 @@ function essayPlainText($contentStr) {
     return $contentStr;
 }
 
+// ประกอบเนื้อหาจากคอลัมน์แยกส่วน + หัวข้อที่ครูกำหนด (essay_title = หัวข้อของครู) ก่อนนำไปค้นหา/แสดงผล
+$topicsMap = essay_topics_map($pdo);
+foreach ($rows as &$r) {
+    $r['student_name']  = formatNamePrefix($r['student_name']);
+    $r['essay_content'] = essay_compose_content($r['intro_content'] ?? null, $r['body_content'] ?? null, $r['conclusion_content'] ?? null);
+    $r['essay_title']   = $topicsMap[essay_topic_phase($r['essay_phase'])] ?? '';
+}
+unset($r);
+
 if (!$isSingle && $fQuery !== '') {
     $needle = mb_strtolower($fQuery, 'UTF-8');
     $rows = array_values(array_filter($rows, function ($e) use ($needle) {
@@ -270,9 +279,6 @@ if (!$isSingle && $fQuery !== '') {
         return mb_strpos($hay, $needle) !== false;
     }));
 }
-
-foreach ($rows as &$r) { $r['student_name'] = formatNamePrefix($r['student_name']); }
-unset($r);
 
 $h = function ($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); };
 
