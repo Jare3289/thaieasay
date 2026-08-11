@@ -30,6 +30,40 @@ require_once 'header.php';
     </a>
   </div>
 
+  <?php $isTeacher = ($_SESSION['user']['role'] === 'teacher'); ?>
+  <!-- กำหนดหัวข้อเรียงความแต่ละงาน (ครูกำหนด — นักเรียนจะเห็นตอนเขียน) -->
+  <div class="card border-0 shadow-sm rounded-4 bg-white mb-4">
+    <div class="card-body p-4">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+        <h6 class="fw-bold text-dark mb-0"><i class="bi bi-bookmark-star-fill text-primary me-2"></i>หัวข้อเรียงความแต่ละงาน <span class="text-muted fw-normal small">(นักเรียนจะเห็นหัวข้อนี้ตอนเขียน แทนการตั้งชื่อเรื่องเอง)</span></h6>
+        <?php if ($isTeacher): ?>
+        <button id="saveTopicsBtn" class="btn btn-primary btn-sm rounded-pill px-3" onclick="saveEssayTopics()">
+          <i class="bi bi-save me-1"></i>บันทึกหัวข้อ
+        </button>
+        <?php endif; ?>
+      </div>
+      <div class="row g-3">
+        <?php
+          $topicFields = [
+            'pretest'  => ['ก่อนเรียน', 'bi-pencil', 'text-primary'],
+            'task1'    => ['หน่วยที่ 1', 'bi-journal-text', 'text-success'],
+            'task2'    => ['หน่วยที่ 2', 'bi-journal-text', 'text-warning'],
+            'posttest' => ['หลังเรียน', 'bi-mortarboard', 'text-danger'],
+          ];
+          foreach ($topicFields as $ph => $meta):
+        ?>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold small mb-1 <?php echo $meta[2]; ?>"><i class="bi <?php echo $meta[1]; ?> me-1"></i><?php echo $meta[0]; ?></label>
+          <input type="text" id="topic_<?php echo $ph; ?>" maxlength="500"
+            class="form-control form-control-sm border-2 rounded-3"
+            placeholder="กำหนดหัวข้อสำหรับ<?php echo $meta[0]; ?>..."
+            <?php echo $isTeacher ? '' : 'readonly'; ?>>
+        </div>
+        <?php endforeach; ?>
+      </div>
+    </div>
+  </div>
+
   <div class="card border-0 shadow-sm rounded-4 bg-white mb-4 overflow-hidden">
     <div class="card-body p-4">
 
@@ -94,13 +128,13 @@ require_once 'header.php';
         <div class="col">
           <div class="card border-0 rounded-3 p-3 text-center bg-light">
             <div class="fs-4 fw-bold text-success" id="essayStatT1">-</div>
-            <div class="text-muted small">ส่งหน่วยที่ 1</div>
+            <div class="text-muted small">ส่งหน่วยที่ 1 (D2)</div>
           </div>
         </div>
         <div class="col">
           <div class="card border-0 rounded-3 p-3 text-center bg-light">
             <div class="fs-4 fw-bold text-warning" id="essayStatT2">-</div>
-            <div class="text-muted small">ส่งหน่วยที่ 2</div>
+            <div class="text-muted small">ส่งหน่วยที่ 2 (D2)</div>
           </div>
         </div>
         <div class="col">
@@ -128,18 +162,16 @@ require_once 'header.php';
 
   const IS_TEACHER = <?php echo ($_SESSION['user']['role'] === 'teacher') ? 'true' : 'false'; ?>;
 
-  // รอบการประเมิน: ลำดับคอลัมน์ในตาราง = ก่อนเรียน → หน่วย 1 → หน่วย 2 → หลังเรียน
-  const ESSAY_PHASES = [
-    { key: 'pretest',  label: 'ก่อนเรียน' },
-    { key: 'task1',    label: 'หน่วยที่ 1' },
-    { key: 'task2',    label: 'หน่วยที่ 2' },
-    { key: 'posttest', label: 'หลังเรียน' }
-  ];
+  // คอลัมน์ในตาราง: ก่อนเรียน · หน่วยที่ 1 (D1,D2) · หน่วยที่ 2 (D1,D2) · หลังเรียน
+  // ภารงานแต่ละหน่วยแตกเป็น 2 ร่าง: D1 = ร่างที่ 1, D2 = ร่างที่ 2 (ให้คะแนนเฉพาะ D2)
+  const ESSAY_PHASE_KEYS = ['pretest', 'task1_d1', 'task1_d2', 'task2_d1', 'task2_d2', 'posttest'];
 
   const essayPhaseLabels = {
     pretest:  'ก่อนเรียน (Pretest)',
-    task1:    'ภารงาน หน่วยที่ 1',
-    task2:    'ภารงาน หน่วยที่ 2',
+    task1_d1: 'ภารงาน หน่วยที่ 1 · ร่างที่ 1 (D1)',
+    task1_d2: 'ภารงาน หน่วยที่ 1 · ร่างที่ 2 (D2)',
+    task2_d1: 'ภารงาน หน่วยที่ 2 · ร่างที่ 1 (D1)',
+    task2_d2: 'ภารงาน หน่วยที่ 2 · ร่างที่ 2 (D2)',
     posttest: 'หลังเรียน (Posttest)'
   };
 
@@ -266,12 +298,14 @@ require_once 'header.php';
   }
 
   // ช่องรอบการประเมินหนึ่งช่อง: มีเรียงความ → ไอคอน PDF (กดเปิดเป็นเอกสาร) / ยังไม่มี → เว้นว่าง
-  function buildPhaseCell(rec, phaseKey) {
+  // graded = ร่างที่ให้คะแนน (D2) จะไฮไลต์พื้นหลังอ่อน ๆ
+  function buildPhaseCell(rec, phaseKey, graded) {
+    const cls = 'text-center' + (graded ? ' table-warning' : '');
     const e = rec.phases[phaseKey];
-    if (!e) return '<td class="text-center text-muted"></td>';
-    return `<td class="text-center">
+    if (!e) return `<td class="${cls} text-muted"></td>`;
+    return `<td class="${cls}">
       <button class="btn btn-sm btn-outline-danger rounded-circle p-0 d-inline-flex align-items-center justify-content-center"
-        style="width:36px;height:36px;" title="เปิด PDF เรียงความ"
+        style="width:36px;height:36px;" title="เปิด PDF เรียงความ (${escapeHtml(essayPhaseLabels[phaseKey] || phaseKey)})"
         onclick='openEssayPdf(${JSON.stringify(rec.student_id)}, ${JSON.stringify(phaseKey)})'>
         <i class="bi bi-file-earmark-pdf-fill fs-6"></i>
       </button>
@@ -284,43 +318,58 @@ require_once 'header.php';
     const students  = pivotByStudent(filtered);
     const multiRoom = ((document.getElementById('essayClassroomFilter') || {}).value || 'all') === 'all';
 
-    // แถบสรุป: จำนวนนักเรียน และจำนวนที่ส่งในแต่ละรอบ
-    const counts = { pretest: 0, task1: 0, task2: 0, posttest: 0 };
-    students.forEach(rec => ESSAY_PHASES.forEach(p => { if (rec.phases[p.key]) counts[p.key]++; }));
+    // แถบสรุป: จำนวนนักเรียน และจำนวนที่ส่ง (ภารงานนับจากร่างที่ให้คะแนน = D2)
+    const cnt = key => students.reduce((n, rec) => n + (rec.phases[key] ? 1 : 0), 0);
     const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = Number(val).toLocaleString('th-TH'); };
     setEl('essayStatStudents', students.length);
-    setEl('essayStatPre',  counts.pretest);
-    setEl('essayStatT1',   counts.task1);
-    setEl('essayStatT2',   counts.task2);
-    setEl('essayStatPost', counts.posttest);
+    setEl('essayStatPre',  cnt('pretest'));
+    setEl('essayStatT1',   cnt('task1_d2'));
+    setEl('essayStatT2',   cnt('task2_d2'));
+    setEl('essayStatPost', cnt('posttest'));
 
     if (students.length === 0) {
       container.innerHTML = '<div class="text-center py-5 text-muted"><i class="bi bi-inbox fs-3 d-block mb-2"></i>ไม่พบเรียงความที่ตรงกับเงื่อนไข</div>';
       return;
     }
 
-    const headCols = ESSAY_PHASES.map(p => `<th class="text-center text-nowrap">${escapeHtml(p.label)}</th>`).join('');
     const bodyRows = students.map(rec => {
       const roomBadge = (multiRoom && rec.classroom)
         ? ` <span class="badge bg-info-subtle text-info-emphasis small align-middle">ห้อง ${escapeHtml(rec.classroom)}</span>` : '';
       return `<tr>
         <td class="fw-semibold text-nowrap align-middle">${escapeHtml(rec.student_id)}</td>
         <td class="align-middle">${escapeHtml(rec.student_name)}${roomBadge}</td>
-        ${ESSAY_PHASES.map(p => buildPhaseCell(rec, p.key)).join('')}
+        ${buildPhaseCell(rec, 'pretest', false)}
+        ${buildPhaseCell(rec, 'task1_d1', false)}
+        ${buildPhaseCell(rec, 'task1_d2', true)}
+        ${buildPhaseCell(rec, 'task2_d1', false)}
+        ${buildPhaseCell(rec, 'task2_d2', true)}
+        ${buildPhaseCell(rec, 'posttest', false)}
       </tr>`;
     }).join('');
 
+    // หัวตาราง 2 ชั้น: ภารงานแต่ละหน่วยแตกเป็นคอลัมน์ย่อย D1 / D2 (D2 = ร่างที่ให้คะแนน)
+    const d2Head = 'text-center small table-warning text-nowrap';
     container.innerHTML = `
-      <table class="table table-hover align-middle mb-0">
+      <table class="table table-hover table-bordered align-middle mb-0 text-center">
         <thead class="table-light" style="position:sticky; top:0; z-index:1;">
           <tr>
-            <th class="text-nowrap">รหัสนักเรียน</th>
-            <th class="text-nowrap">ชื่อสกุล</th>
-            ${headCols}
+            <th rowspan="2" class="align-middle text-nowrap text-start">รหัสนักเรียน</th>
+            <th rowspan="2" class="align-middle text-nowrap text-start">ชื่อสกุล</th>
+            <th rowspan="2" class="align-middle text-nowrap">ก่อนเรียน</th>
+            <th colspan="2" class="text-nowrap">หน่วยที่ 1</th>
+            <th colspan="2" class="text-nowrap">หน่วยที่ 2</th>
+            <th rowspan="2" class="align-middle text-nowrap">หลังเรียน</th>
+          </tr>
+          <tr>
+            <th class="text-center small text-nowrap">D1</th>
+            <th class="${d2Head}" title="ร่างที่ให้คะแนน">D2 <i class="bi bi-star-fill text-warning"></i></th>
+            <th class="text-center small text-nowrap">D1</th>
+            <th class="${d2Head}" title="ร่างที่ให้คะแนน">D2 <i class="bi bi-star-fill text-warning"></i></th>
           </tr>
         </thead>
-        <tbody>${bodyRows}</tbody>
-      </table>`;
+        <tbody class="text-start">${bodyRows}</tbody>
+      </table>
+      <div class="text-muted small mt-2"><i class="bi bi-star-fill text-warning me-1"></i>D2 = ร่างที่ 2 (ร่างที่คุณครูใช้ให้คะแนน) · D1 = ร่างที่ 1</div>`;
   }
 
   // เปิดเรียงความของนักเรียนคนเดียว (รอบที่ระบุ) เป็นเอกสาร PDF ฝั่งเซิร์ฟเวอร์
@@ -370,7 +419,7 @@ require_once 'header.php';
       if (/^[=+\-@\t\r]/.test(v)) v = "'" + v;
       return '"' + v.replace(/"/g,'""').replace(/\n/g,' ') + '"';
     };
-    let csv = '﻿' + 'รหัสนักเรียน,ชื่อ-สกุล,ห้องเรียน,กลุ่ม,รอบการประเมิน,ชื่อเรื่อง,ส่วนคำนำ (Introduction),ส่วนเนื้อเรื่อง (Body),ส่วนสรุป (Conclusion),วันที่บันทึก\n';
+    let csv = '﻿' + 'รหัสนักเรียน,ชื่อ-สกุล,ห้องเรียน,กลุ่ม,รอบการประเมิน,หัวข้อ (ครูกำหนด),ส่วนคำนำ (Introduction),ส่วนเนื้อเรื่อง (Body),ส่วนสรุป (Conclusion),วันที่บันทึก\n';
     filtered.forEach(e => {
       const dt = new Date(e.updated_at||e.created_at).toLocaleString('th-TH');
       let intro = '';
@@ -405,7 +454,49 @@ require_once 'header.php';
     filterEssayViewer();
   };
 
+  // ===== หัวข้อเรียงความที่ครูกำหนด =====
+  const TOPIC_PHASES = ['pretest', 'task1', 'task2', 'posttest'];
+
+  async function loadEssayTopics() {
+    try {
+      const res = await fetch('api.php?action=get_essay_topics');
+      const data = await res.json();
+      if (data.success && data.topics) {
+        TOPIC_PHASES.forEach(ph => {
+          const el = document.getElementById('topic_' + ph);
+          if (el) el.value = data.topics[ph] || '';
+        });
+      }
+    } catch (e) { /* เงียบไว้ */ }
+  }
+
+  async function saveEssayTopics() {
+    const btn = document.getElementById('saveTopicsBtn');
+    if (!btn) return;
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>กำลังบันทึก...';
+    btn.disabled = true;
+    try {
+      for (const ph of TOPIC_PHASES) {
+        const el = document.getElementById('topic_' + ph);
+        if (!el) continue;
+        await fetch('api.php?action=save_essay_topic', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phase: ph, topic: el.value.trim() })
+        });
+      }
+      showToast('บันทึกหัวข้อเรียงความเรียบร้อยแล้ว', 'success');
+    } catch (e) {
+      showToast('บันทึกหัวข้อไม่สำเร็จ', 'error');
+    } finally {
+      btn.innerHTML = orig;
+      btn.disabled = false;
+    }
+  }
+
   // --- เริ่มรันอัตโนมัติ ---
+  loadEssayTopics();
   initEssayGroupFromStore();
   loadEssayViewer();
 </script>

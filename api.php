@@ -1350,23 +1350,73 @@ try {
                 exit;
             }
             $studentId    = $_SESSION['user']['id'];
-            $essayPhase   = isset($request_data['essay_phase'])   ? trim($request_data['essay_phase'])   : 'task1';
-            $essayTitle   = isset($request_data['essay_title'])   ? trim($request_data['essay_title'])   : '';
-            $essayContent = isset($request_data['essay_content']) ? trim($request_data['essay_content']) : '';
-            // นับจำนวนคำ (แยกด้วยช่องว่างและขึ้นบรรทัดใหม่)
-            $wordCount    = $essayContent ? count(preg_split('/[\s\n\r]+/u', $essayContent, -1, PREG_SPLIT_NO_EMPTY)) : 0;
+            $essayPhase   = isset($request_data['essay_phase'])   ? trim($request_data['essay_phase'])   : 'task1_d1';
+
+            // เนื้อหาแยกเป็น 3 ส่วน: ส่วนนำ / เนื้อหา (หลายย่อหน้า) / สรุป — ไม่มีชื่อเรื่องจากนักเรียนแล้ว
+            $intro      = isset($request_data['introduction']) ? trim((string)$request_data['introduction']) : '';
+            $bodyArr    = (isset($request_data['body']) && is_array($request_data['body'])) ? $request_data['body'] : null;
+            $conclusion = isset($request_data['conclusion']) ? trim((string)$request_data['conclusion']) : '';
+
+            // รองรับ payload รูปแบบเดิม (essay_content เป็น JSON) เผื่อไคลเอนต์เก่า
+            if ($bodyArr === null && isset($request_data['essay_content'])) {
+                $obj = json_decode((string)$request_data['essay_content'], true);
+                if (is_array($obj)) {
+                    if ($intro === '')      $intro = (string)($obj['introduction'] ?? '');
+                    $bodyArr = (isset($obj['body']) && is_array($obj['body'])) ? $obj['body'] : [];
+                    if ($conclusion === '') $conclusion = (string)($obj['conclusion'] ?? '');
+                }
+            }
+            if ($bodyArr === null) $bodyArr = [];
+            // ตัดย่อหน้าว่างทิ้ง และเก็บทุกย่อหน้าเป็น JSON array ไว้ในคอลัมน์เนื้อหาคอลัมน์เดียว
+            $bodyArr  = array_values(array_filter(array_map(function ($p) { return trim((string)$p); }, $bodyArr), function ($p) { return $p !== ''; }));
+            $bodyJson = json_encode($bodyArr, JSON_UNESCAPED_UNICODE);
+
+            // นับจำนวนคำจากทั้ง 3 ส่วนรวมกัน
+            $allText   = trim($intro . "\n" . implode("\n", $bodyArr) . "\n" . $conclusion);
+            $wordCount = $allText !== '' ? count(preg_split('/[\s\n\r]+/u', $allText, -1, PREG_SPLIT_NO_EMPTY)) : 0;
 
             $stmt = $pdo->prepare('
-                INSERT INTO student_essays (student_id, essay_phase, essay_title, essay_content, word_count)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO student_essays (student_id, essay_phase, intro_content, body_content, conclusion_content, word_count)
+                VALUES (?, ?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE
-                    essay_title   = VALUES(essay_title),
-                    essay_content = VALUES(essay_content),
-                    word_count    = VALUES(word_count),
-                    updated_at    = CURRENT_TIMESTAMP
+                    intro_content      = VALUES(intro_content),
+                    body_content       = VALUES(body_content),
+                    conclusion_content = VALUES(conclusion_content),
+                    word_count         = VALUES(word_count),
+                    updated_at         = CURRENT_TIMESTAMP
             ');
-            $stmt->execute([$studentId, $essayPhase, $essayTitle, $essayContent, $wordCount]);
+            $stmt->execute([$studentId, $essayPhase, $intro, $bodyJson, $conclusion, $wordCount]);
             echo json_encode(['success' => true, 'word_count' => $wordCount]);
+            break;
+
+        // Essay: หัวข้อเรียงความที่ครูกำหนดต่อรอบ (ก่อนเรียน/หน่วยที่ 1/หน่วยที่ 2/หลังเรียน)
+        case 'get_essay_topics':
+            if (!isset($_SESSION['user'])) {
+                echo json_encode(['success' => false, 'error' => 'Not logged in']);
+                exit;
+            }
+            echo json_encode(['success' => true, 'topics' => essay_topics_map($pdo)]);
+            break;
+
+        // Essay: ครูบันทึกหัวข้อเรียงความของรอบใดรอบหนึ่ง
+        case 'save_essay_topic':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'เฉพาะครูเท่านั้นที่กำหนดหัวข้อได้']);
+                exit;
+            }
+            $tPhase = isset($request_data['phase']) ? trim((string)$request_data['phase']) : '';
+            $tTopic = isset($request_data['topic']) ? trim((string)$request_data['topic']) : '';
+            if (!in_array($tPhase, ['pretest', 'task1', 'task2', 'posttest'], true)) {
+                echo json_encode(['success' => false, 'error' => 'รอบไม่ถูกต้อง']);
+                exit;
+            }
+            if (mb_strlen($tTopic, 'UTF-8') > 500) { $tTopic = mb_substr($tTopic, 0, 500, 'UTF-8'); }
+            $stmt = $pdo->prepare('
+                INSERT INTO essay_topics (phase, topic) VALUES (?, ?)
+                ON DUPLICATE KEY UPDATE topic = VALUES(topic), updated_at = CURRENT_TIMESTAMP
+            ');
+            $stmt->execute([$tPhase, $tTopic]);
+            echo json_encode(['success' => true]);
             break;
 
         // Essay: ดึงเรียงความของนักเรียนคนนั้น (นักเรียนดูของตัวเอง)
@@ -1376,7 +1426,7 @@ try {
                 exit;
             }
             $studentId  = isset($_GET['studentId'])  ? trim($_GET['studentId'])  : $_SESSION['user']['id'];
-            $essayPhase = isset($_GET['essay_phase']) ? trim($_GET['essay_phase']) : 'task1';
+            $essayPhase = isset($_GET['essay_phase']) ? trim($_GET['essay_phase']) : 'task1_d1';
             // ดึงข้อมูลเจ้าของผลงาน (ชื่อ/ชั้น) มาด้วย เพื่อแสดงหัวกระดาษแบบข้อสอบ
             $stmt = $pdo->prepare('
                 SELECT se.*, s.student_name, s.classroom
@@ -1386,7 +1436,13 @@ try {
             ');
             $stmt->execute([$studentId, $essayPhase]);
             $row = $stmt->fetch();
-            if ($row && isset($row['student_name'])) { $row['student_name'] = formatNamePrefix($row['student_name']); }
+            if ($row) {
+                if (isset($row['student_name'])) { $row['student_name'] = formatNamePrefix($row['student_name']); }
+                // ประกอบ essay_content (JSON) จากคอลัมน์แยกส่วน + เติมหัวข้อที่ครูกำหนดเป็น essay_title
+                $row['essay_content'] = essay_compose_content($row['intro_content'] ?? null, $row['body_content'] ?? null, $row['conclusion_content'] ?? null);
+                $topics = essay_topics_map($pdo);
+                $row['essay_title'] = $topics[essay_topic_phase($row['essay_phase'])] ?? '';
+            }
             echo json_encode(['success' => true, 'found' => (bool)$row, 'data' => $row ?: null]);
             break;
 
@@ -1403,9 +1459,12 @@ try {
                 ORDER BY s.classroom ASC, se.essay_phase ASC, s.student_id ASC
             ');
             $essays = $stmt->fetchAll();
-            // apply formatNamePrefix
+            $topics = essay_topics_map($pdo);
+            // เติมชื่อ + ประกอบ essay_content จากคอลัมน์แยกส่วน + หัวข้อที่ครูกำหนด (เพื่อความเข้ากันได้กับส่วนแสดงผลเดิม)
             foreach ($essays as &$e) {
-                $e['student_name'] = formatNamePrefix($e['student_name']);
+                $e['student_name']  = formatNamePrefix($e['student_name']);
+                $e['essay_content'] = essay_compose_content($e['intro_content'] ?? null, $e['body_content'] ?? null, $e['conclusion_content'] ?? null);
+                $e['essay_title']   = $topics[essay_topic_phase($e['essay_phase'])] ?? '';
             }
             unset($e);
             echo json_encode(['success' => true, 'essays' => $essays]);

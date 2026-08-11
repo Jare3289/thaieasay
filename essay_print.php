@@ -30,12 +30,8 @@ $isSingle   = ($oneStudent !== '');
 // ===== โหมดรายงานสรุปทั้งห้อง (ตารางสถานะการส่งเรียงความรายบุคคล) =====
 // เอกสาร PDF อย่างเป็นทางการ: แต่ละแถว = นักเรียนหนึ่งคน, แต่ละช่องรอบ = ส่งแล้ว (✓) / ยังไม่ส่ง (ว่าง)
 if (!$isSingle && $fMode === 'summary') {
-    $phaseCols = [
-        'pretest'  => 'ก่อนเรียน',
-        'task1'    => 'หน่วยที่ 1',
-        'task2'    => 'หน่วยที่ 2',
-        'posttest' => 'หลังเรียน',
-    ];
+    // คอลัมน์รายงาน: ภารงานแต่ละหน่วยแตกเป็นร่าง D1/D2 (ให้คะแนนเฉพาะ D2)
+    $sumCols = ['pretest', 'task1_d1', 'task1_d2', 'task2_d1', 'task2_d2', 'posttest'];
 
     $sconds  = [];
     $sparams = [];
@@ -84,10 +80,10 @@ if (!$isSingle && $fMode === 'summary') {
         return in_array($key, $set, true);
     };
 
-    // นับยอดรวมที่ส่งในแต่ละรอบ
-    $totals = ['pretest' => 0, 'task1' => 0, 'task2' => 0, 'posttest' => 0];
+    // นับยอดรวมที่ส่งในแต่ละคอลัมน์ (รวมร่าง D1/D2 แยกกัน)
+    $totals = array_fill_keys($sumCols, 0);
     foreach ($srows as $r) {
-        foreach ($totals as $k => $_) { if ($hasPhase($r['phases'] ?? '', $k)) $totals[$k]++; }
+        foreach ($sumCols as $k) { if ($hasPhase($r['phases'] ?? '', $k)) $totals[$k]++; }
     }
 
     $groupLabel = ($fGroup === '__none__') ? 'ยังไม่ระบุกลุ่ม'
@@ -131,6 +127,8 @@ if (!$isSingle && $fMode === 'summary') {
       table.report td.mark { text-align: center; font-weight: 700; color: #0a7d33; }
       table.report tfoot td { background: #f4f6f9; font-weight: 700; text-align: center; }
       table.report tfoot td.foot-label { text-align: right; }
+      table.report th.d2col { background: #fde7c9; }
+      table.report td.d2col { background: #fff7e6; }
       .empty { text-align: center; padding: 60px 20px; color: #94a3b8; font-family: "Tahoma", sans-serif; }
       @media print {
         .toolbar { display: none !important; }
@@ -162,13 +160,26 @@ if (!$isSingle && $fMode === 'summary') {
         <?php if (empty($srows)): ?>
           <div class="empty"><div style="font-size:40px">📭</div>ไม่พบนักเรียนที่ตรงกับเงื่อนไข</div>
         <?php else: ?>
+        <?php
+          // คอลัมน์ที่เป็นร่างให้คะแนน (D2) — ไฮไลต์ในตาราง
+          $isD2 = function ($key) { return $key === 'task1_d2' || $key === 'task2_d2'; };
+        ?>
         <table class="report">
           <thead>
             <tr>
-              <th>ที่</th>
-              <th>รหัสนักเรียน</th>
-              <th style="text-align:left;">ชื่อสกุล</th>
-              <?php foreach ($phaseCols as $lbl): ?><th><?php echo $hh($lbl); ?></th><?php endforeach; ?>
+              <th rowspan="2">ที่</th>
+              <th rowspan="2">รหัสนักเรียน</th>
+              <th rowspan="2" style="text-align:left;">ชื่อสกุล</th>
+              <th rowspan="2">ก่อนเรียน</th>
+              <th colspan="2">หน่วยที่ 1</th>
+              <th colspan="2">หน่วยที่ 2</th>
+              <th rowspan="2">หลังเรียน</th>
+            </tr>
+            <tr>
+              <th>D1</th>
+              <th class="d2col">D2 ★</th>
+              <th>D1</th>
+              <th class="d2col">D2 ★</th>
             </tr>
           </thead>
           <tbody>
@@ -178,8 +189,8 @@ if (!$isSingle && $fMode === 'summary') {
               <td class="idx"><?php echo $i; ?></td>
               <td class="sid"><?php echo $hh($r['student_id']); ?></td>
               <td><?php echo $hh($r['student_name']); ?><?php if ($room !== '' && ($fClassroom === 'all' || $fClassroom === '')): ?> <span style="color:#666;font-size:15px;">(ห้อง <?php echo $hh($room); ?>)</span><?php endif; ?></td>
-              <?php foreach ($phaseCols as $key => $lbl): ?>
-                <td class="mark"><?php echo $hasPhase($r['phases'] ?? '', $key) ? '✓' : ''; ?></td>
+              <?php foreach ($sumCols as $key): ?>
+                <td class="mark<?php echo $isD2($key) ? ' d2col' : ''; ?>"><?php echo $hasPhase($r['phases'] ?? '', $key) ? '✓' : ''; ?></td>
               <?php endforeach; ?>
             </tr>
             <?php endforeach; ?>
@@ -187,12 +198,13 @@ if (!$isSingle && $fMode === 'summary') {
           <tfoot>
             <tr>
               <td class="foot-label" colspan="3">รวมส่งแล้ว (คน)</td>
-              <?php foreach ($phaseCols as $key => $lbl): ?>
-                <td><?php echo $totals[$key]; ?></td>
+              <?php foreach ($sumCols as $key): ?>
+                <td class="<?php echo $isD2($key) ? 'd2col' : ''; ?>"><?php echo $totals[$key]; ?></td>
               <?php endforeach; ?>
             </tr>
           </tfoot>
         </table>
+        <div style="font-size:15px;color:#555;margin-top:8px;">★ D2 = ร่างที่ 2 (ร่างที่ใช้ให้คะแนน) · D1 = ร่างที่ 1 · เครื่องหมาย ✓ = ส่งแล้ว</div>
         <?php endif; ?>
       </div>
 
@@ -247,6 +259,15 @@ function essayPlainText($contentStr) {
     return $contentStr;
 }
 
+// ประกอบเนื้อหาจากคอลัมน์แยกส่วน + หัวข้อที่ครูกำหนด (essay_title = หัวข้อของครู) ก่อนนำไปค้นหา/แสดงผล
+$topicsMap = essay_topics_map($pdo);
+foreach ($rows as &$r) {
+    $r['student_name']  = formatNamePrefix($r['student_name']);
+    $r['essay_content'] = essay_compose_content($r['intro_content'] ?? null, $r['body_content'] ?? null, $r['conclusion_content'] ?? null);
+    $r['essay_title']   = $topicsMap[essay_topic_phase($r['essay_phase'])] ?? '';
+}
+unset($r);
+
 if (!$isSingle && $fQuery !== '') {
     $needle = mb_strtolower($fQuery, 'UTF-8');
     $rows = array_values(array_filter($rows, function ($e) use ($needle) {
@@ -258,9 +279,6 @@ if (!$isSingle && $fQuery !== '') {
         return mb_strpos($hay, $needle) !== false;
     }));
 }
-
-foreach ($rows as &$r) { $r['student_name'] = formatNamePrefix($r['student_name']); }
-unset($r);
 
 $h = function ($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); };
 
