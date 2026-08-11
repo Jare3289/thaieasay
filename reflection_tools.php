@@ -435,6 +435,40 @@ $role = $sessionUser['role'];
               </div>
             </div>
 
+            <!-- ตารางสรุปสถานะการส่งงานรวมในตารางเดียว (ใครส่งแล้ว/ยังไม่ส่ง) -->
+            <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
+              <div class="p-3 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2" style="background: linear-gradient(135deg, var(--primary-navy) 0%, var(--secondary-blue) 100%);">
+                <h6 class="fw-bold text-white mb-0"><i class="bi bi-table"></i> ตารางสรุปสถานะการส่งงานของนักเรียนทั้งหมด</h6>
+                <div class="d-flex align-items-center gap-3 small text-white-50">
+                  <span><i class="bi bi-check-circle-fill text-success"></i> ส่งแล้ว</span>
+                  <span><i class="bi bi-dash-circle text-white-50"></i> ยังไม่ส่ง</span>
+                </div>
+              </div>
+              <div class="card-body p-2 bg-light border-bottom">
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text bg-white text-secondary border-end-0"><i class="bi bi-search"></i></span>
+                  <input type="text" id="reflectionStatusSearch" onkeyup="filterReflectionStatusTable()" class="form-control bg-white border-start-0" placeholder="พิมพ์ชื่อหรือรหัสนักเรียนเพื่อค้นหา...">
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 text-start">
+                  <thead class="table-light text-secondary small fw-bold text-uppercase">
+                    <tr>
+                      <th class="px-3 py-3" style="width: 14%;">รหัสนักเรียน</th>
+                      <th class="px-3 py-3" style="width: 30%;">ชื่อ-สกุลผู้เรียน</th>
+                      <th class="px-3 py-3 text-center" style="width: 16%;">📝 ปัญหาการเขียน</th>
+                      <th class="px-3 py-3 text-center" style="width: 16%;">📋 ตรวจสอบตนเอง</th>
+                      <th class="px-3 py-3 text-center" style="width: 16%;">💡 สะท้อนการเรียนรู้</th>
+                      <th class="px-3 py-3 text-center" style="width: 8%;">รวม</th>
+                    </tr>
+                  </thead>
+                  <tbody id="reflectionStatusTableBody" class="small">
+                    <tr><td colspan="6" class="text-center text-muted py-5 fw-bold">กำลังโหลดสถานะการส่งงาน...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
             <style>
               .hover-card:hover {
                 transform: translateY(-4px);
@@ -1253,7 +1287,10 @@ $role = $sessionUser['role'];
           document.getElementById('statChecklists').textContent = `${stats.checklists_completed} / ${total} คน`;
           document.getElementById('statPeerReviews').textContent = `${stats.peer_reviews_completed} / ${total} คน`;
           document.getElementById('statReflections').textContent = `${stats.reflections_completed} / ${total} คน`;
-          
+
+          // ตารางสรุปสถานะการส่งงานรวมในตารางเดียว — เห็นได้ทันทีว่าใครส่งแล้ว/ยังไม่ส่ง (รายชื่อครบทุกคนในกลุ่ม)
+          renderReflectionStatusTable(res.students_details || []);
+
           // แสดงรายชื่อการ์ดแยกตามหัวข้อการประเมิน (Topics) และกรองเฉพาะคนที่มีข้อมูล
           const gridObstacles = document.getElementById('gridObstacles');
           const gridChecklist = document.getElementById('gridChecklist');
@@ -1676,6 +1713,60 @@ $role = $sessionUser['role'];
         select.value = studentId;
         select.dispatchEvent(new Event('change'));
       }
+    };
+
+    // สร้างตารางสรุปสถานะการส่งงานรวม (ปัญหาการเขียน / ตรวจสอบตนเอง / สะท้อนการเรียนรู้) ของนักเรียนทุกคน
+    function renderReflectionStatusTable(students) {
+      const tbody = document.getElementById('reflectionStatusTableBody');
+      if (!tbody) return;
+
+      const critKeys = ['1_1','1_2','1_3','2_1','2_2','3_1','3_2','3_3','4_1','4_2','4_3'];
+      const notEmpty = (v) => v !== null && v !== undefined && String(v).trim() !== '';
+
+      const yes = '<i class="bi bi-check-circle-fill text-success fs-5" title="ส่งแล้ว"></i>';
+      const no  = '<i class="bi bi-dash-circle text-muted fs-5" title="ยังไม่ส่ง"></i>';
+
+      if (!students || students.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-5 fw-bold">ยังไม่มีรายชื่อนักเรียนในกลุ่มนี้</td></tr>';
+        return;
+      }
+
+      let html = '';
+      students.forEach(st => {
+        const hasProblems = critKeys.some(k => notEmpty(st['prob_' + k]) || notEmpty(st['sol_' + k]));
+        const hasChecklist = critKeys.some(k => notEmpty(st['check_' + k]));
+        const hasReflection = notEmpty(st.content_structure) || notEmpty(st.language_mechanics) || notEmpty(st.feedback_applied) || notEmpty(st.future_goals);
+
+        const submitted = (hasProblems ? 1 : 0) + (hasChecklist ? 1 : 0) + (hasReflection ? 1 : 0);
+        const totalClass = submitted === 3 ? 'text-success' : (submitted === 0 ? 'text-muted' : 'text-warning-emphasis');
+        const rowClass = submitted === 0 ? 'table-warning' : '';
+
+        html += `
+          <tr class="${rowClass}" style="cursor: pointer;" onclick="viewStudentDetails('${st.student_id}')">
+            <td class="px-3 py-3 font-mono fw-bold text-secondary">${st.student_id}</td>
+            <td class="px-3 py-3 fw-bold text-dark text-start">${st.student_name || '-'}</td>
+            <td class="px-3 py-3 text-center">${hasProblems ? yes : no}</td>
+            <td class="px-3 py-3 text-center">${hasChecklist ? yes : no}</td>
+            <td class="px-3 py-3 text-center">${hasReflection ? yes : no}</td>
+            <td class="px-3 py-3 text-center fw-bold ${totalClass}">${submitted}/3</td>
+          </tr>
+        `;
+      });
+      tbody.innerHTML = html;
+    }
+
+    // ค้นหา/กรองแถวในตารางสรุปสถานะการส่งงาน
+    window.filterReflectionStatusTable = function() {
+      const input = document.getElementById('reflectionStatusSearch');
+      const tbody = document.getElementById('reflectionStatusTableBody');
+      if (!input || !tbody) return;
+      const query = input.value.toLowerCase().trim();
+      tbody.querySelectorAll('tr').forEach(row => {
+        if (row.cells.length < 2) return;
+        const id = row.cells[0].textContent.toLowerCase();
+        const name = row.cells[1].textContent.toLowerCase();
+        row.classList.toggle('d-none', !(id.includes(query) || name.includes(query)));
+      });
     };
 
     // 2. โหลดข้อมูลรายบุคคลของนักเรียนที่ครูเลือกส่อง
