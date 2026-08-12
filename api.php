@@ -1752,6 +1752,82 @@ try {
             echo json_encode(['success' => true, 'essays' => $essays]);
             break;
 
+        // ==========================================
+        // รายงานการส่งงานรายบุคคล (Submission Report) — ครูเท่านั้น
+        // แสดงสถานะการส่งงานแต่ละชิ้น: ก่อนเรียน / D1.1 / D1.2 / เครื่องมือสะท้อนคิด / D2.1 / D2.2 / หลังเรียน
+        // ==========================================
+        case 'get_submission_report':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'ต้องเป็นคุณครู']);
+                exit;
+            }
+
+            // กรองตามกลุ่มการวิจัย (ทดลอง/ตัวอย่าง) — ค่าว่าง = ทุกกลุ่ม
+            $groupParam = isset($_GET['group']) ? trim($_GET['group']) : '';
+            $stuSql = 'SELECT student_id, student_name, classroom, student_group FROM students';
+            $stuParams = [];
+            if ($groupParam !== '') {
+                $stuSql .= ' WHERE student_group = ?';
+                $stuParams[] = $groupParam;
+            }
+            $stuSql .= ' ORDER BY classroom ASC, student_id ASC';
+            $stuStmt = $pdo->prepare($stuSql);
+            $stuStmt->execute($stuParams);
+            $stuRows = $stuStmt->fetchAll();
+
+            // ชุดรหัสนักเรียนที่ "ส่งแล้ว" ของแต่ละชิ้นงาน (ดึงทีเดียวแล้วแมปในหน่วยความจำ ประหยัด query)
+            // เรียงความ: นับว่าส่งแล้วเมื่อมีเนื้อหาอย่างน้อยหนึ่งส่วน หรือ word_count > 0
+            $essaySet = [
+                'pretest' => [], 'task1_d1' => [], 'task1_d2' => [],
+                'task2_d1' => [], 'task2_d2' => [], 'posttest' => [],
+            ];
+            $esStmt = $pdo->query("
+                SELECT student_id, essay_phase FROM student_essays
+                WHERE COALESCE(word_count,0) > 0
+                   OR COALESCE(intro_content,'') <> ''
+                   OR COALESCE(body_content,'') <> ''
+                   OR COALESCE(conclusion_content,'') <> ''
+            ");
+            while ($r = $esStmt->fetch()) {
+                $ph = $r['essay_phase'];
+                if (isset($essaySet[$ph])) $essaySet[$ph][$r['student_id']] = true;
+            }
+
+            // เครื่องมือสะท้อนคิด (เก็บ 1 แถวต่อคน) — มีแถว = ส่งแล้ว
+            $flagSet = ['problems' => [], 'checklist' => [], 'reflection' => []];
+            foreach ([
+                'problems'   => 'writing_problems',
+                'checklist'  => 'self_checklists',
+                'reflection' => 'learning_reflections',
+            ] as $key => $tbl) {
+                try {
+                    $q = $pdo->query("SELECT student_id FROM `$tbl`");
+                    while ($sid = $q->fetchColumn()) { $flagSet[$key][$sid] = true; }
+                } catch (Exception $e) { /* ตารางอาจยังไม่ถูกสร้าง — ปล่อยว่าง */ }
+            }
+
+            $report = [];
+            foreach ($stuRows as $s) {
+                $sid = $s['student_id'];
+                $report[] = [
+                    'student_id'    => $sid,
+                    'student_name'  => formatNamePrefix($s['student_name']),
+                    'classroom'     => $s['classroom'],
+                    'student_group' => $s['student_group'],
+                    'pretest'       => isset($essaySet['pretest'][$sid]),
+                    'd1_1'          => isset($essaySet['task1_d1'][$sid]),
+                    'd1_2'          => isset($essaySet['task1_d2'][$sid]),
+                    'problems'      => isset($flagSet['problems'][$sid]),
+                    'checklist'     => isset($flagSet['checklist'][$sid]),
+                    'reflection'    => isset($flagSet['reflection'][$sid]),
+                    'd2_1'          => isset($essaySet['task2_d1'][$sid]),
+                    'd2_2'          => isset($essaySet['task2_d2'][$sid]),
+                    'posttest'      => isset($essaySet['posttest'][$sid]),
+                ];
+            }
+            echo json_encode(['success' => true, 'report' => $report]);
+            break;
+
         default:
             echo json_encode(['success' => false, 'error' => 'Action not found']);
             break;

@@ -1,4 +1,11 @@
-  </div>
+<?php if (isset($sessionUser) && $sessionUser): ?>
+      </main><!-- /.app-content -->
+    </div><!-- /.app-main -->
+  </div><!-- /.app-shell -->
+<?php else: ?>
+    </div><!-- /.auth-content -->
+  </div><!-- /.auth-shell -->
+<?php endif; ?>
 
   <!-- โทสต์แจ้งเตือน (Custom UI Toast Alerts) -->
   <div class="toast-container-custom" id="toastContainer"></div>
