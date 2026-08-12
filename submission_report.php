@@ -53,7 +53,7 @@ require_once 'header.php';
           <i class="bi bi-filetype-csv me-1"></i> ส่งออก CSV
         </button>
         <button class="btn btn-primary btn-sm rounded-pill px-3 fw-bold shadow-sm" onclick="exportSubmissionPDF()">
-          <i class="bi bi-filetype-pdf me-1"></i> ส่งออก PDF (แนวนอน)
+          <i class="bi bi-filetype-pdf me-1"></i> ส่งออก PDF (ดูตัวอย่างก่อนพิมพ์)
         </button>
       </div>
     </div>
@@ -256,52 +256,14 @@ require_once 'header.php';
     URL.revokeObjectURL(url);
   }
 
-  // ส่งออก PDF แนวนอน พอดี 1 หน้ากระดาษ (ใช้การพิมพ์ของเบราว์เซอร์ → เลือก "บันทึกเป็น PDF")
+  // ส่งออก PDF — เปิดหน้าตัวอย่างพร้อมพิมพ์ (submission_print.php) ให้ดูก่อน
+  // เอกสารถูกย่อให้พอดีกระดาษแผ่นเดียว หน้าเดียว (A4 แนวนอน) แล้วผู้ใช้เลือก "บันทึกเป็น PDF" ได้เอง
   function exportSubmissionPDF() {
     if (!submissionData.length) { showToast('ยังไม่มีข้อมูลให้ส่งออก', 'error'); return; }
-
-    // เติมข้อมูลหัวรายงานสำหรับพิมพ์ (กลุ่ม + วันที่)
-    const g = (window.TEG ? TEG.get() : 'all');
-    const groupText = (g === 'all') ? 'ทุกกลุ่มการวิจัย' : g;
-    const today = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
-    document.getElementById('printMeta').innerHTML =
-      'กลุ่ม: <b>' + groupText + '</b> · จำนวน ' + submissionData.length + ' คน · พิมพ์เมื่อ ' + today;
-
-    const inner = document.getElementById('reportPrintInner');
-    const area = document.getElementById('reportPrintArea');
-
-    // คำนวณอัตราย่อ-ขยายให้เนื้อหาพอดีกระดาษ A4 แนวนอน (≈ 1050 × 715 px ที่ 96dpi หลังหักขอบ)
-    inner.style.transform = 'none';
-    area.style.width = ''; area.style.height = '';
-    const cw = inner.scrollWidth || 1;
-    const ch = inner.scrollHeight || 1;
-    const pageW = 1052, pageH = 715;
-    const scale = Math.min(pageW / cw, pageH / ch, 1.15);
-
-    const applyScale = () => {
-      inner.style.transform = 'scale(' + scale + ')';
-      // ล็อกขนาดกล่องนอกให้เท่าเนื้อหาที่ย่อแล้ว → บังคับให้อยู่หน้าเดียว
-      area.style.width = (cw * scale) + 'px';
-      area.style.height = (ch * scale) + 'px';
-    };
-    const clearScale = () => {
-      inner.style.transform = 'none';
-      area.style.width = ''; area.style.height = '';
-    };
-
-    applyScale();
-    // เผื่อการ reflow ของฟอนต์/ตารางก่อนเปิดกล่องพิมพ์
-    setTimeout(() => {
-      window.print();
-      clearScale();
-    }, 120);
+    const g = (window.TEG ? TEG.param() : ''); // เช่น '&group=กลุ่มตัวอย่าง' หรือ '' = ทุกกลุ่ม
+    const win = window.open('submission_print.php?_t=' + Date.now() + g, '_blank');
+    if (!win) { showToast('เบราว์เซอร์บล็อกป๊อปอัป — โปรดอนุญาตป๊อปอัปเพื่อเปิดหน้าตัวอย่างพิมพ์', 'error'); }
   }
-  window.addEventListener('afterprint', () => {
-    const inner = document.getElementById('reportPrintInner');
-    const area = document.getElementById('reportPrintArea');
-    if (inner) inner.style.transform = 'none';
-    if (area) { area.style.width = ''; area.style.height = ''; }
-  });
 
   // ให้ตัวกรองกลุ่มบนแถบบนสั่งโหลดใหม่โดยไม่รีเฟรชทั้งหน้า
   window.onTEGChange = loadSubmissionReport;
