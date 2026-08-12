@@ -354,19 +354,23 @@ if ($needs_migration) {
     safe_ddl($pdo, "ALTER TABLE self_checklists ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
     safe_ddl($pdo, "ALTER TABLE peer_reviews ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
     safe_ddl($pdo, "ALTER TABLE learning_reflections ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
+}
 
-    // 4.5) เพิ่มมิติ "หน่วยการเรียน" (task_unit) ให้เครื่องมือสะท้อนคิด เพื่อเก็บบันทึกของหน่วยที่ 1 และ 2 แยกกัน
-    //      ทำครั้งเดียว (เช็คก่อนว่ายังไม่มีคอลัมน์) แล้วเปลี่ยนคีย์หลักเป็น (student_id, task_unit)
-    foreach (['writing_problems', 'self_checklists', 'learning_reflections'] as $__reflTbl) {
-        try {
-            $hasUnit = $pdo->query("SHOW COLUMNS FROM `$__reflTbl` LIKE 'task_unit'")->fetch();
-            if (!$hasUnit) {
-                safe_ddl($pdo, "ALTER TABLE `$__reflTbl` ADD COLUMN task_unit TINYINT NOT NULL DEFAULT 1 AFTER student_id");
-                // เปลี่ยนคีย์หลักจาก student_id เดี่ยว ๆ เป็นคีย์ผสม (student_id, task_unit) ในคำสั่งเดียวเพื่อความปลอดภัย
-                safe_ddl($pdo, "ALTER TABLE `$__reflTbl` DROP PRIMARY KEY, ADD PRIMARY KEY (student_id, task_unit)");
-            }
-        } catch (PDOException $e) { /* ตารางอาจยังไม่ถูกสร้าง — ปล่อยผ่าน */ }
-    }
+// เพิ่มมิติ "หน่วยการเรียน" (task_unit) ให้เครื่องมือสะท้อนคิด — ตรวจแยกจาก migration หลัก
+// (สำคัญมาก: ต้องรันแม้ระบบเดิมที่ migration หลักผ่านไปแล้ว มิฉะนั้นคิวรีที่อ้าง task_unit จะพัง)
+// ทำ DDL จริงเพียงครั้งเดียว โดยเช็ค SHOW COLUMNS ก่อน แล้วเปลี่ยนคีย์หลักเป็น (student_id, task_unit)
+foreach (['writing_problems', 'self_checklists', 'learning_reflections'] as $__reflTbl) {
+    try {
+        $__tblExists = $pdo->query("SHOW TABLES LIKE '" . $__reflTbl . "'");
+        if (!$__tblExists || $__tblExists->rowCount() === 0) continue; // ตารางยังไม่ถูกสร้าง — ข้ามไปก่อน
+        $__hasUnit = $pdo->query("SHOW COLUMNS FROM `$__reflTbl` LIKE 'task_unit'")->fetch();
+        if (!$__hasUnit) {
+            safe_ddl($pdo, "ALTER TABLE `$__reflTbl` ADD COLUMN task_unit TINYINT NOT NULL DEFAULT 1 AFTER student_id");
+            // เปลี่ยนคีย์หลักจาก student_id เดี่ยว ๆ เป็นคีย์ผสม (student_id, task_unit) ในคำสั่งเดียวเพื่อความปลอดภัย
+            // (ข้อมูลเดิมทั้งหมดถูกตั้งเป็นหน่วยที่ 1 โดยอัตโนมัติจากค่า DEFAULT 1)
+            safe_ddl($pdo, "ALTER TABLE `$__reflTbl` DROP PRIMARY KEY, ADD PRIMARY KEY (student_id, task_unit)");
+        }
+    } catch (PDOException $e) { /* เงียบไว้ ไม่ให้กระทบการทำงานหลัก */ }
 }
 
 // ตารางจับคู่ประเมินเพื่อน (peer_pairs) — ตรวจแยกจาก migration หลัก
