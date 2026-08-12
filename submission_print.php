@@ -131,7 +131,7 @@ $mark = function ($on) { return $on ? '✓' : ''; };
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>รายงานการส่งงานรายบุคคล</title>
 <style>
-  @page { size: A4 portrait; margin: 7mm; }
+  @page { size: A4 landscape; margin: 10mm; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: #eceff3; }
   body {
@@ -153,61 +153,54 @@ $mark = function ($on) { return $on ? '✓' : ''; };
   }
   .toolbar a.tb-close { background: transparent; color: #fff; border: 1px solid rgba(255,255,255,.5); }
 
-  /* กระดาษ A4 แนวตั้ง (พอดีหน้าเดียว) */
+  /* กระดาษ A4 แนวนอน — เต็มขนาด อ่านชัด ไหลได้หลายหน้า */
   .paper {
-    width: 740px;         /* ≈ 196mm ที่ 96dpi (A4 แนวตั้ง หักขอบ) */
-    height: 1069px;       /* ≈ 283mm */
+    width: 277mm;         /* พื้นที่พิมพ์ A4 แนวนอน (297 - ขอบ 10mm×2) */
+    max-width: 100%;
     margin: 18px auto;
     background: #fff;
     box-shadow: 0 3px 16px rgba(0,0,0,0.18);
-    padding: 10px 14px;
-    overflow: hidden;
+    padding: 14px 18px;
   }
-  .paper-inner { transform-origin: top left; }
 
-  .doc-title { text-align: center; font-size: 24px; font-weight: 700; margin: 0 0 2px; }
-  .doc-sub   { text-align: center; font-size: 16px; color: #333; margin: 0 0 8px; }
-  .doc-meta  { display: flex; flex-wrap: wrap; gap: 2px 22px; font-size: 16px; margin-bottom: 8px; }
+  .doc-title { text-align: center; font-size: 26px; font-weight: 700; margin: 0 0 2px; }
+  .doc-sub   { text-align: center; font-size: 18px; color: #333; margin: 0 0 10px; }
+  .doc-meta  { display: flex; flex-wrap: wrap; gap: 3px 26px; font-size: 18px; margin-bottom: 12px; }
 
-  table.report { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  table.report th, table.report td { border: 1px solid #444; padding: 3px 4px; font-size: 15px; text-align: center; }
+  table.report { width: 100%; border-collapse: collapse; }
+  table.report th, table.report td { border: 1px solid #444; padding: 7px 8px; font-size: 18px; text-align: center; line-height: 1.15; }
   table.report thead th { background: #e8eef5; font-weight: 700; }
   table.report thead th.u1 { background: #dbe8fb; }
   table.report thead th.u2 { background: #e2e0fb; }
+  /* ทำซ้ำหัวตารางทุกหน้าเวลาพิมพ์ + ไม่ตัดกลางแถว */
+  table.report thead { display: table-header-group; }
+  table.report tfoot { display: table-footer-group; }
+  table.report tr { page-break-inside: avoid; break-inside: avoid; }
 
-  /* หัวตารางแนวตั้ง — ช่องแคบ ไม่กินพื้นที่แนวนอน */
-  table.report thead th.vh { height: 108px; padding: 4px 0; vertical-align: bottom; }
-  table.report thead th.vh > span {
-    display: inline-block;
-    writing-mode: vertical-rl;
-    transform: rotate(180deg);
-    white-space: nowrap;
-    line-height: 1.05;
-    font-weight: 700;
-  }
-  table.report col.c-status { width: 26px; }
-
-  table.report td.idx { width: 30px; color: #444; }
-  table.report td.sid { width: 78px; white-space: nowrap; font-variant-numeric: tabular-nums; }
-  table.report td.name { text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  table.report td.mark { font-weight: 700; color: #0a6b2e; }
+  /* ช่อง ที่/รหัส/ชื่อ — กว้างเท่าเนื้อหา ไม่ปล่อยให้บานเกิน */
+  table.report th.fit, table.report td.idx, table.report td.sid, table.report td.name { width: 1%; white-space: nowrap; }
+  table.report td.idx { color: #444; }
+  table.report td.sid { font-variant-numeric: tabular-nums; }
+  table.report td.name { text-align: left; }
+  /* ช่องสถานะที่เหลือ ขยายแบ่งพื้นที่เท่า ๆ กัน อ่านง่าย */
+  table.report td.mark { font-weight: 700; color: #0a6b2e; font-size: 20px; }
   table.report td.u1 { background: #f4f8ff; }
   table.report td.u2 { background: #f6f5ff; }
   table.report tfoot td { background: #f4f6f9; font-weight: 700; }
   table.report tfoot td.foot-label { text-align: right; }
-  .legend { font-size: 14px; color: #555; margin-top: 6px; }
+  .legend { font-size: 16px; color: #555; margin-top: 10px; }
   .empty { text-align: center; padding: 80px 20px; color: #94a3b8; font-family: "Tahoma", sans-serif; }
 
   @media print {
     html, body { background: #fff; }
     .toolbar { display: none !important; }
-    .paper { width: auto; height: auto; margin: 0; padding: 0; box-shadow: none; overflow: visible; }
+    .paper { width: auto; max-width: none; margin: 0; padding: 0; box-shadow: none; }
   }
 </style>
 </head>
 <body>
   <div class="toolbar">
-    <span>👀 ดูตัวอย่างก่อนพิมพ์ — ข้อมูลถูกย่อให้พอดีกระดาษแผ่นเดียว (A4 แนวตั้ง) · กดปุ่ม "พิมพ์ / บันทึก PDF" เมื่อพร้อม</span>
+    <span>👀 ดูตัวอย่างก่อนพิมพ์ — ตารางเต็มขนาด อ่านชัด (A4 แนวนอน) หัวตารางจะซ้ำทุกหน้า · กดปุ่ม "พิมพ์ / บันทึก PDF" เมื่อพร้อม</span>
     <div class="tb-actions">
       <button onclick="window.print()">🖨️ พิมพ์ / บันทึก PDF</button>
       <a class="tb-close" href="submission_report.php">ปิด</a>
@@ -215,7 +208,6 @@ $mark = function ($on) { return $on ? '✓' : ''; };
   </div>
 
   <div class="paper">
-    <div class="paper-inner" id="paperInner">
       <h1 class="doc-title">รายงานการส่งงานรายบุคคล</h1>
       <div class="doc-sub">ระบบประเมินเรียงความ</div>
       <div class="doc-meta">
@@ -230,34 +222,27 @@ $mark = function ($on) { return $on ? '✓' : ''; };
         <div class="empty"><div style="font-size:40px">📭</div>ไม่พบนักเรียนในกลุ่มที่เลือก</div>
       <?php else: ?>
       <table class="report">
-        <colgroup>
-          <col><col><col>
-          <col class="c-status">
-          <col class="c-status"><col class="c-status"><col class="c-status"><col class="c-status"><col class="c-status">
-          <col class="c-status"><col class="c-status"><col class="c-status"><col class="c-status"><col class="c-status">
-          <col class="c-status">
-        </colgroup>
         <thead>
           <tr>
-            <th rowspan="2">ที่</th>
-            <th rowspan="2">รหัส</th>
-            <th rowspan="2" style="text-align:left;">ชื่อ</th>
-            <th rowspan="2" class="vh"><span>ก่อนเรียน</span></th>
+            <th class="fit" rowspan="2">ที่</th>
+            <th class="fit" rowspan="2">รหัส</th>
+            <th class="fit" rowspan="2" style="text-align:left;">ชื่อ</th>
+            <th rowspan="2">ก่อนเรียน</th>
             <th colspan="5" class="u1">หน่วยการเรียนที่ 1</th>
             <th colspan="5" class="u2">หน่วยการเรียนที่ 2</th>
-            <th rowspan="2" class="vh"><span>หลังเรียน</span></th>
+            <th rowspan="2">หลังเรียน</th>
           </tr>
           <tr>
-            <th class="u1 vh"><span>D1.1</span></th>
-            <th class="u1 vh"><span>D1.2</span></th>
-            <th class="u1 vh"><span>ปัญหาการเขียน</span></th>
-            <th class="u1 vh"><span>ตรวจสอบตนเอง</span></th>
-            <th class="u1 vh"><span>สะท้อนการเรียนรู้</span></th>
-            <th class="u2 vh"><span>D2.1</span></th>
-            <th class="u2 vh"><span>D2.2</span></th>
-            <th class="u2 vh"><span>ปัญหาการเขียน</span></th>
-            <th class="u2 vh"><span>ตรวจสอบตนเอง</span></th>
-            <th class="u2 vh"><span>สะท้อนการเรียนรู้</span></th>
+            <th class="u1">D1.1</th>
+            <th class="u1">D1.2</th>
+            <th class="u1">ปัญหา<br>การเขียน</th>
+            <th class="u1">ตรวจสอบ<br>ตนเอง</th>
+            <th class="u1">สะท้อน<br>การเรียนรู้</th>
+            <th class="u2">D2.1</th>
+            <th class="u2">D2.2</th>
+            <th class="u2">ปัญหา<br>การเขียน</th>
+            <th class="u2">ตรวจสอบ<br>ตนเอง</th>
+            <th class="u2">สะท้อน<br>การเรียนรู้</th>
           </tr>
         </thead>
         <tbody>
@@ -292,27 +277,6 @@ $mark = function ($on) { return $on ? '✓' : ''; };
       </table>
       <div class="legend">เครื่องหมาย ✓ = ส่งแล้ว · ช่องว่าง = ยังไม่ส่ง · D1/D2 = ร่างที่ 1 / ร่างที่ 2 ของภาระงานแต่ละหน่วย · สะท้อนคิดแยกบันทึกตามหน่วยการเรียน</div>
       <?php endif; ?>
-    </div><!-- /.paper-inner -->
   </div><!-- /.paper -->
-
-  <script>
-    // ย่อเนื้อหาให้พอดี "กระดาษแผ่นเดียว หน้าเดียว" — คำนวณอัตราส่วนจากพื้นที่พิมพ์จริงของ A4 แนวนอน
-    // ใช้ CSS zoom (ไม่ใช่ transform) เพื่อให้ขนาดกล่องหดจริง จะได้ไม่ล้นไปเป็นหน้าที่สองตอนพิมพ์
-    (function () {
-      var PAGE_W = 740, PAGE_H = 1069; // พิกเซลพื้นที่พิมพ์ (A4 แนวตั้ง หักขอบ ~7mm)
-      function fitOnePage() {
-        var inner = document.getElementById('paperInner');
-        if (!inner) return;
-        inner.style.zoom = '1';
-        var cw = inner.scrollWidth || 1;
-        var ch = inner.scrollHeight || 1;
-        var scale = Math.min(PAGE_W / cw, PAGE_H / ch, 1);
-        inner.style.zoom = scale;
-      }
-      window.addEventListener('load', fitOnePage);
-      window.addEventListener('beforeprint', fitOnePage);
-      window.addEventListener('resize', fitOnePage);
-    })();
-  </script>
 </body>
 </html>
