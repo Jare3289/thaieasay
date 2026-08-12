@@ -1062,6 +1062,288 @@ try {
             echo json_encode(['success' => true, 'pairs' => $result, 'count' => count($result)]);
             break;
 
+        // ============================================================
+        //  ระบบให้นักเรียนจับคู่ประเมินเพื่อนกันเอง (Student-initiated Peer Matching)
+        //  นักเรียนฝ่ายหนึ่งส่งคำขอ อีกฝ่ายกดรับ → ระบบสร้างคู่ไป-กลับใน peer_pairs ให้อัตโนมัติ
+        //  แยกตามรอบ/หน่วย — พอขึ้นรอบใหม่ต้องส่งคำขอกันใหม่
+        // ============================================================
+
+        // ดึงสถานะการจับคู่ของนักเรียนที่ล็อกอินอยู่สำหรับรอบที่เลือก
+        // คืนค่า: คู่ปัจจุบัน (ถ้ามี), คำขอที่ส่งออก (รอตอบรับ), คำขอที่เข้ามา, และรายชื่อเพื่อนในห้องที่ขอได้
+        case 'get_peer_match_status':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'student') {
+                echo json_encode(['success' => false, 'error' => 'ต้องเป็นนักเรียน']);
+                exit;
+            }
+            $round = isset($_GET['round']) ? trim($_GET['round']) : '';
+            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
+                echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
+                exit;
+            }
+            $myId = $_SESSION['user']['id'];
+
+            // ข้อมูลห้อง/กลุ่มของฉัน (จับคู่ได้เฉพาะเพื่อนในห้องเดียวกัน)
+            $meStmt = $pdo->prepare('SELECT classroom, student_group FROM students WHERE student_id = ?');
+            $meStmt->execute([$myId]);
+            $me = $meStmt->fetch();
+            $myRoom = ($me && $me['classroom'] !== null) ? trim($me['classroom']) : '';
+
+            // คู่ปัจจุบันของฉัน (ถ้าจับคู่แล้ว)
+            $pStmt = $pdo->prepare('SELECT partner_code FROM peer_pairs WHERE round = ? AND student_code = ?');
+            $pStmt->execute([$round, $myId]);
+            $pRow = $pStmt->fetch();
+            $partner = ($pRow && !empty($pRow['partner_code'])) ? $pRow['partner_code'] : null;
+
+            // ผู้ที่จับคู่แล้วในรอบนี้ทั้งหมด (ใช้กรองว่าใครยังว่าง)
+            $pairedSet = [];
+            $allPaired = $pdo->prepare('SELECT student_code FROM peer_pairs WHERE round = ?');
+            $allPaired->execute([$round]);
+            while ($r = $allPaired->fetch()) { $pairedSet[$r['student_code']] = true; }
+
+            // คำขอที่ค้างอยู่ (pending) ที่เกี่ยวกับฉันในรอบนี้
+            $reqStmt = $pdo->prepare('
+                SELECT r.requester_code, r.target_code, s.student_name, s.classroom
+                FROM peer_requests r
+                JOIN students s ON s.student_id = CASE WHEN r.requester_code = ? THEN r.target_code ELSE r.requester_code END
+                WHERE r.round = ? AND r.status = "pending" AND (r.requester_code = ? OR r.target_code = ?)
+            ');
+            $reqStmt->execute([$myId, $round, $myId, $myId]);
+            $incoming = [];   // คำขอที่คนอื่นส่งมาหาฉัน (ฉันเป็น target)
+            $outgoing = null; // คำขอที่ฉันส่งออกไป (ฉันเป็น requester)
+            while ($r = $reqStmt->fetch()) {
+                if ($r['requester_code'] === $myId) {
+                    $outgoing = ['code' => $r['target_code'], 'name' => $r['student_name']];
+                } else {
+                    $incoming[] = ['code' => $r['requester_code'], 'name' => $r['student_name']];
+                }
+            }
+
+            // รายชื่อเพื่อนร่วมห้อง (ยกเว้นตนเอง) พร้อมสถานะแต่ละคน
+            $classmates = [];
+            if ($myRoom !== '') {
+                $cmStmt = $pdo->prepare('SELECT student_id, student_name FROM students WHERE classroom = ? AND student_id != ? ORDER BY student_id ASC');
+                $cmStmt->execute([$myRoom, $myId]);
+                $outCode = $outgoing ? $outgoing['code'] : null;
+                $incCodes = array_column($incoming, 'code');
+                while ($c = $cmStmt->fetch()) {
+                    $cid = $c['student_id'];
+                    if ($partner !== null) {
+                        $state = ($cid === $partner) ? 'paired_with_me' : 'unavailable';
+                    } elseif ($cid === $outCode) {
+                        $state = 'outgoing_pending';
+                    } elseif (in_array($cid, $incCodes, true)) {
+                        $state = 'incoming_pending';
+                    } elseif (isset($pairedSet[$cid])) {
+                        $state = 'paired_other';
+                    } else {
+                        $state = 'available';
+                    }
+                    $classmates[] = ['code' => $cid, 'name' => $c['student_name'], 'state' => $state];
+                }
+            }
+
+            echo json_encode([
+                'success'    => true,
+                'round'      => $round,
+                'myRoom'     => $myRoom,
+                'partner'    => $partner,
+                'incoming'   => $incoming,
+                'outgoing'   => $outgoing,
+                'classmates' => $classmates,
+            ]);
+            break;
+
+        // นักเรียนส่งคำขอจับคู่ไปยังเพื่อน (target) ในรอบที่เลือก
+        // ถ้าเพื่อนคนนั้นเคยส่งคำขอหาเราอยู่แล้ว (pending) → ถือว่าตกลงกันทั้งคู่ จับคู่ให้ทันที
+        case 'send_peer_request':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'student') {
+                echo json_encode(['success' => false, 'error' => 'ต้องเป็นนักเรียน']);
+                exit;
+            }
+            $round  = isset($request_data['round']) ? trim($request_data['round']) : '';
+            $target = isset($request_data['target']) ? trim($request_data['target']) : '';
+            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
+                echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
+                exit;
+            }
+            $myId = $_SESSION['user']['id'];
+            if ($target === '' || $target === $myId) {
+                echo json_encode(['success' => false, 'error' => 'กรุณาเลือกเพื่อนที่ต้องการจับคู่ (ไม่ใช่ตนเอง)']);
+                exit;
+            }
+
+            // ตรวจว่าเป้าหมายมีอยู่จริงและอยู่ห้องเดียวกัน
+            $meStmt = $pdo->prepare('SELECT classroom FROM students WHERE student_id = ?');
+            $meStmt->execute([$myId]);
+            $meRow = $meStmt->fetch();
+            $myRoom = ($meRow && $meRow['classroom'] !== null) ? trim($meRow['classroom']) : '';
+            $tStmt = $pdo->prepare('SELECT classroom FROM students WHERE student_id = ?');
+            $tStmt->execute([$target]);
+            $tRow = $tStmt->fetch();
+            if (!$tRow) {
+                echo json_encode(['success' => false, 'error' => 'ไม่พบเพื่อนที่ระบุ']);
+                exit;
+            }
+            $tRoom = ($tRow['classroom'] !== null) ? trim($tRow['classroom']) : '';
+            if ($myRoom === '' || $tRoom === '' || $myRoom !== $tRoom) {
+                echo json_encode(['success' => false, 'error' => 'จับคู่ได้เฉพาะเพื่อนที่อยู่ห้องเดียวกันเท่านั้น']);
+                exit;
+            }
+
+            // ตรวจว่าฉันหรือเป้าหมายจับคู่ไปแล้วหรือยังในรอบนี้
+            $chk = $pdo->prepare('SELECT student_code FROM peer_pairs WHERE round = ? AND student_code IN (?, ?)');
+            $chk->execute([$round, $myId, $target]);
+            $pairedNow = $chk->fetchAll(PDO::FETCH_COLUMN);
+            if (in_array($myId, $pairedNow, true)) {
+                echo json_encode(['success' => false, 'error' => 'คุณจับคู่ในรอบนี้ไปแล้ว']);
+                exit;
+            }
+            if (in_array($target, $pairedNow, true)) {
+                echo json_encode(['success' => false, 'error' => 'เพื่อนคนนี้จับคู่กับคนอื่นในรอบนี้ไปแล้ว']);
+                exit;
+            }
+
+            $pdo->beginTransaction();
+            try {
+                // ถ้าเป้าหมายเคยส่งคำขอหาเราอยู่แล้ว (pending) → จับคู่ให้ทันที (ตกลงกันทั้งสองฝ่าย)
+                $recip = $pdo->prepare('SELECT id FROM peer_requests WHERE round = ? AND requester_code = ? AND target_code = ? AND status = "pending"');
+                $recip->execute([$round, $target, $myId]);
+                $matchedNow = false;
+                if ($recip->fetch()) {
+                    peer_match_create_pair($pdo, $round, $myId, $target);
+                    $matchedNow = true;
+                } else {
+                    // ยกเลิกคำขอที่ฉันเคยส่งค้างไว้ก่อนหน้า (ให้ค้างได้ครั้งละหนึ่งคน)
+                    $canc = $pdo->prepare('UPDATE peer_requests SET status = "cancelled", responded_at = NOW() WHERE round = ? AND requester_code = ? AND status = "pending"');
+                    $canc->execute([$round, $myId]);
+                    // บันทึกคำขอใหม่ (ถ้าเคยมีแถวเดิมกับคนนี้ที่ถูกปฏิเสธ/ยกเลิก ให้เปิดใหม่เป็น pending)
+                    $ins = $pdo->prepare('
+                        INSERT INTO peer_requests (round, requester_code, target_code, status)
+                        VALUES (?, ?, ?, "pending")
+                        ON DUPLICATE KEY UPDATE status = "pending", created_at = NOW(), responded_at = NULL
+                    ');
+                    $ins->execute([$round, $myId, $target]);
+                }
+                $pdo->commit();
+                echo json_encode(['success' => true, 'matched' => $matchedNow]);
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+            break;
+
+        // นักเรียนตอบคำขอที่เข้ามา: accept (รับ → จับคู่ไป-กลับ) หรือ decline (ปฏิเสธ)
+        case 'respond_peer_request':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'student') {
+                echo json_encode(['success' => false, 'error' => 'ต้องเป็นนักเรียน']);
+                exit;
+            }
+            $round     = isset($request_data['round']) ? trim($request_data['round']) : '';
+            $requester = isset($request_data['requester']) ? trim($request_data['requester']) : '';
+            $decision  = isset($request_data['decision']) ? trim($request_data['decision']) : '';
+            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
+                echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
+                exit;
+            }
+            if (!in_array($decision, ['accept', 'decline'], true)) {
+                echo json_encode(['success' => false, 'error' => 'คำสั่งไม่ถูกต้อง']);
+                exit;
+            }
+            $myId = $_SESSION['user']['id'];
+
+            // ต้องมีคำขอ pending ที่คนนี้ส่งมาหาฉันจริง
+            $find = $pdo->prepare('SELECT id FROM peer_requests WHERE round = ? AND requester_code = ? AND target_code = ? AND status = "pending"');
+            $find->execute([$round, $requester, $myId]);
+            $reqRow = $find->fetch();
+            if (!$reqRow) {
+                echo json_encode(['success' => false, 'error' => 'ไม่พบคำขอนี้ (อาจถูกยกเลิกไปแล้ว)']);
+                exit;
+            }
+
+            if ($decision === 'decline') {
+                $upd = $pdo->prepare('UPDATE peer_requests SET status = "declined", responded_at = NOW() WHERE id = ?');
+                $upd->execute([$reqRow['id']]);
+                echo json_encode(['success' => true, 'matched' => false]);
+                break;
+            }
+
+            // accept: ตรวจว่าทั้งสองฝ่ายยังว่างในรอบนี้ แล้วจับคู่ไป-กลับ
+            $chk = $pdo->prepare('SELECT student_code FROM peer_pairs WHERE round = ? AND student_code IN (?, ?)');
+            $chk->execute([$round, $myId, $requester]);
+            $pairedNow = $chk->fetchAll(PDO::FETCH_COLUMN);
+            if (in_array($myId, $pairedNow, true)) {
+                echo json_encode(['success' => false, 'error' => 'คุณจับคู่ในรอบนี้ไปแล้ว']);
+                exit;
+            }
+            if (in_array($requester, $pairedNow, true)) {
+                echo json_encode(['success' => false, 'error' => 'เพื่อนคนนี้จับคู่กับคนอื่นไปแล้ว']);
+                exit;
+            }
+
+            $pdo->beginTransaction();
+            try {
+                peer_match_create_pair($pdo, $round, $myId, $requester);
+                $pdo->commit();
+                echo json_encode(['success' => true, 'matched' => true, 'partner' => $requester]);
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+            break;
+
+        // นักเรียนยกเลิกคำขอที่ตนเองส่งออกไป (ยังไม่ถูกตอบรับ)
+        case 'cancel_peer_request':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'student') {
+                echo json_encode(['success' => false, 'error' => 'ต้องเป็นนักเรียน']);
+                exit;
+            }
+            $round  = isset($request_data['round']) ? trim($request_data['round']) : '';
+            $target = isset($request_data['target']) ? trim($request_data['target']) : '';
+            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
+                echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
+                exit;
+            }
+            $myId = $_SESSION['user']['id'];
+            $upd = $pdo->prepare('UPDATE peer_requests SET status = "cancelled", responded_at = NOW() WHERE round = ? AND requester_code = ? AND target_code = ? AND status = "pending"');
+            $upd->execute([$round, $myId, $target]);
+            echo json_encode(['success' => true]);
+            break;
+
+        // นักเรียนยกเลิกการจับคู่ที่ตกลงกันแล้ว (ปลดคู่ทั้งสองฝั่งในรอบนี้ เพื่อขอใหม่ได้)
+        case 'unpair_peer_match':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'student') {
+                echo json_encode(['success' => false, 'error' => 'ต้องเป็นนักเรียน']);
+                exit;
+            }
+            $round = isset($request_data['round']) ? trim($request_data['round']) : '';
+            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
+                echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
+                exit;
+            }
+            $myId = $_SESSION['user']['id'];
+            $pStmt = $pdo->prepare('SELECT partner_code FROM peer_pairs WHERE round = ? AND student_code = ?');
+            $pStmt->execute([$round, $myId]);
+            $pRow = $pStmt->fetch();
+            if (!$pRow || empty($pRow['partner_code'])) {
+                echo json_encode(['success' => false, 'error' => 'คุณยังไม่มีคู่ในรอบนี้']);
+                exit;
+            }
+            $partner = $pRow['partner_code'];
+            $pdo->beginTransaction();
+            try {
+                $del = $pdo->prepare('DELETE FROM peer_pairs WHERE round = ? AND student_code IN (?, ?)');
+                $del->execute([$round, $myId, $partner]);
+                // คืนคำขอที่จับคู่กันไว้ให้เป็น cancelled เพื่อให้ส่งขอใหม่ได้
+                $upd = $pdo->prepare('UPDATE peer_requests SET status = "cancelled", responded_at = NOW() WHERE round = ? AND status = "accepted" AND ((requester_code = ? AND target_code = ?) OR (requester_code = ? AND target_code = ?))');
+                $upd->execute([$round, $myId, $partner, $partner, $myId]);
+                $pdo->commit();
+                echo json_encode(['success' => true]);
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+            break;
+
         case 'save_learning_reflection':
             $studentId = isset($request_data['studentId']) ? $request_data['studentId'] : '';
             if (empty($studentId)) {
@@ -1100,37 +1382,63 @@ try {
             break;
 
         case 'get_reflection_summary':
-            $total_students_res = $pdo->query('SELECT COUNT(*) FROM students')->fetchColumn();
-            
-            $prob_count = $pdo->query('SELECT COUNT(*) FROM writing_problems')->fetchColumn();
-            $chk_count = $pdo->query('SELECT COUNT(*) FROM self_checklists')->fetchColumn();
-            $peer_count = $pdo->query('SELECT COUNT(DISTINCT student_id) FROM peer_reviews')->fetchColumn();
-            $ref_count = $pdo->query('SELECT COUNT(*) FROM learning_reflections')->fetchColumn();
-            
+            // ตัวกรองกลุ่มการวิจัย (ทดลอง/ตัวอย่าง) — ถ้าไม่ส่งมา = รวมทุกกลุ่ม
+            $refGroup = isset($_GET['group']) ? trim($_GET['group']) : '';
+            $hasRefGroup = ($refGroup !== '');
+
+            // ตัวช่วยสร้างเงื่อนไข WHERE ตามกลุ่มบนตาราง students ที่ระบุ alias
+            $grpWhere = function($alias) use ($hasRefGroup) {
+                return $hasRefGroup ? (" WHERE {$alias}.student_group = ?") : '';
+            };
+            $grpParam = $hasRefGroup ? [$refGroup] : [];
+
+            $stmt = $pdo->prepare('SELECT COUNT(*) FROM students s' . $grpWhere('s'));
+            $stmt->execute($grpParam);
+            $total_students_res = $stmt->fetchColumn();
+
+            $stmt = $pdo->prepare('SELECT COUNT(*) FROM writing_problems wp JOIN students s ON wp.student_id = s.student_id' . $grpWhere('s'));
+            $stmt->execute($grpParam);
+            $prob_count = $stmt->fetchColumn();
+
+            $stmt = $pdo->prepare('SELECT COUNT(*) FROM self_checklists chk JOIN students s ON chk.student_id = s.student_id' . $grpWhere('s'));
+            $stmt->execute($grpParam);
+            $chk_count = $stmt->fetchColumn();
+
+            $stmt = $pdo->prepare('SELECT COUNT(DISTINCT pr.student_id) FROM peer_reviews pr JOIN students s ON pr.student_id = s.student_id' . $grpWhere('s'));
+            $stmt->execute($grpParam);
+            $peer_count = $stmt->fetchColumn();
+
+            $stmt = $pdo->prepare('SELECT COUNT(*) FROM learning_reflections lr JOIN students s ON lr.student_id = s.student_id' . $grpWhere('s'));
+            $stmt->execute($grpParam);
+            $ref_count = $stmt->fetchColumn();
+
             // ปัญหาล่าสุด
-            $stmt_probs = $pdo->query('
-                SELECT wp.*, s.student_name 
+            $stmt_probs = $pdo->prepare('
+                SELECT wp.*, s.student_name
                 FROM writing_problems wp
-                JOIN students s ON wp.student_id = s.student_id
+                JOIN students s ON wp.student_id = s.student_id' . $grpWhere('s') . '
                 ORDER BY wp.created_at DESC LIMIT 5
             ');
+            $stmt_probs->execute($grpParam);
             $recent_problems = $stmt_probs->fetchAll();
-            
+
             // รีวิวล่าสุด
-            $stmt_peers = $pdo->query('
-                SELECT pr.*, s.student_name, r.student_name AS reviewer_name 
+            $stmt_peers = $pdo->prepare('
+                SELECT pr.*, s.student_name, r.student_name AS reviewer_name
                 FROM peer_reviews pr
                 JOIN students s ON pr.student_id = s.student_id
-                JOIN students r ON pr.reviewer_id = r.student_id
+                JOIN students r ON pr.reviewer_id = r.student_id' . $grpWhere('s') . '
                 ORDER BY pr.created_at DESC LIMIT 5
             ');
+            $stmt_peers->execute($grpParam);
             $recent_peers = $stmt_peers->fetchAll();
 
             // ข้อมูลของนักเรียนทุกคนสำหรับภาพรวมชั้นเรียน
-            $stmt_all = $pdo->query('
-                SELECT 
-                    s.student_id, 
+            $stmt_all = $pdo->prepare('
+                SELECT
+                    s.student_id,
                     s.student_name,
+                    s.student_group,
                     wp.prob_1_1, wp.sol_1_1, wp.prob_1_2, wp.sol_1_2, wp.prob_1_3, wp.sol_1_3,
                     wp.prob_2_1, wp.sol_2_1, wp.prob_2_2, wp.sol_2_2,
                     wp.prob_3_1, wp.sol_3_1, wp.prob_3_2, wp.sol_3_2, wp.prob_3_3, wp.sol_3_3,
@@ -1144,11 +1452,12 @@ try {
                 FROM students s
                 LEFT JOIN writing_problems wp ON s.student_id = wp.student_id
                 LEFT JOIN self_checklists chk ON s.student_id = chk.student_id
-                LEFT JOIN learning_reflections ref ON s.student_id = ref.student_id
+                LEFT JOIN learning_reflections ref ON s.student_id = ref.student_id' . $grpWhere('s') . '
                 ORDER BY s.student_id ASC
             ');
+            $stmt_all->execute($grpParam);
             $students_details = $stmt_all->fetchAll();
-            
+
             echo json_encode([
                 'success' => true,
                 'stats' => [
@@ -1323,23 +1632,73 @@ try {
                 exit;
             }
             $studentId    = $_SESSION['user']['id'];
-            $essayPhase   = isset($request_data['essay_phase'])   ? trim($request_data['essay_phase'])   : 'task1';
-            $essayTitle   = isset($request_data['essay_title'])   ? trim($request_data['essay_title'])   : '';
-            $essayContent = isset($request_data['essay_content']) ? trim($request_data['essay_content']) : '';
-            // นับจำนวนคำ (แยกด้วยช่องว่างและขึ้นบรรทัดใหม่)
-            $wordCount    = $essayContent ? count(preg_split('/[\s\n\r]+/u', $essayContent, -1, PREG_SPLIT_NO_EMPTY)) : 0;
+            $essayPhase   = isset($request_data['essay_phase'])   ? trim($request_data['essay_phase'])   : 'task1_d1';
+
+            // เนื้อหาแยกเป็น 3 ส่วน: ส่วนนำ / เนื้อหา (หลายย่อหน้า) / สรุป — ไม่มีชื่อเรื่องจากนักเรียนแล้ว
+            $intro      = isset($request_data['introduction']) ? trim((string)$request_data['introduction']) : '';
+            $bodyArr    = (isset($request_data['body']) && is_array($request_data['body'])) ? $request_data['body'] : null;
+            $conclusion = isset($request_data['conclusion']) ? trim((string)$request_data['conclusion']) : '';
+
+            // รองรับ payload รูปแบบเดิม (essay_content เป็น JSON) เผื่อไคลเอนต์เก่า
+            if ($bodyArr === null && isset($request_data['essay_content'])) {
+                $obj = json_decode((string)$request_data['essay_content'], true);
+                if (is_array($obj)) {
+                    if ($intro === '')      $intro = (string)($obj['introduction'] ?? '');
+                    $bodyArr = (isset($obj['body']) && is_array($obj['body'])) ? $obj['body'] : [];
+                    if ($conclusion === '') $conclusion = (string)($obj['conclusion'] ?? '');
+                }
+            }
+            if ($bodyArr === null) $bodyArr = [];
+            // ตัดย่อหน้าว่างทิ้ง และเก็บทุกย่อหน้าเป็น JSON array ไว้ในคอลัมน์เนื้อหาคอลัมน์เดียว
+            $bodyArr  = array_values(array_filter(array_map(function ($p) { return trim((string)$p); }, $bodyArr), function ($p) { return $p !== ''; }));
+            $bodyJson = json_encode($bodyArr, JSON_UNESCAPED_UNICODE);
+
+            // นับจำนวนคำจากทั้ง 3 ส่วนรวมกัน
+            $allText   = trim($intro . "\n" . implode("\n", $bodyArr) . "\n" . $conclusion);
+            $wordCount = $allText !== '' ? count(preg_split('/[\s\n\r]+/u', $allText, -1, PREG_SPLIT_NO_EMPTY)) : 0;
 
             $stmt = $pdo->prepare('
-                INSERT INTO student_essays (student_id, essay_phase, essay_title, essay_content, word_count)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO student_essays (student_id, essay_phase, intro_content, body_content, conclusion_content, word_count)
+                VALUES (?, ?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE
-                    essay_title   = VALUES(essay_title),
-                    essay_content = VALUES(essay_content),
-                    word_count    = VALUES(word_count),
-                    updated_at    = CURRENT_TIMESTAMP
+                    intro_content      = VALUES(intro_content),
+                    body_content       = VALUES(body_content),
+                    conclusion_content = VALUES(conclusion_content),
+                    word_count         = VALUES(word_count),
+                    updated_at         = CURRENT_TIMESTAMP
             ');
-            $stmt->execute([$studentId, $essayPhase, $essayTitle, $essayContent, $wordCount]);
+            $stmt->execute([$studentId, $essayPhase, $intro, $bodyJson, $conclusion, $wordCount]);
             echo json_encode(['success' => true, 'word_count' => $wordCount]);
+            break;
+
+        // Essay: หัวข้อเรียงความที่ครูกำหนดต่อรอบ (ก่อนเรียน/หน่วยที่ 1/หน่วยที่ 2/หลังเรียน)
+        case 'get_essay_topics':
+            if (!isset($_SESSION['user'])) {
+                echo json_encode(['success' => false, 'error' => 'Not logged in']);
+                exit;
+            }
+            echo json_encode(['success' => true, 'topics' => essay_topics_map($pdo)]);
+            break;
+
+        // Essay: ครูบันทึกหัวข้อเรียงความของรอบใดรอบหนึ่ง
+        case 'save_essay_topic':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'เฉพาะครูเท่านั้นที่กำหนดหัวข้อได้']);
+                exit;
+            }
+            $tPhase = isset($request_data['phase']) ? trim((string)$request_data['phase']) : '';
+            $tTopic = isset($request_data['topic']) ? trim((string)$request_data['topic']) : '';
+            if (!in_array($tPhase, ['pretest', 'task1', 'task2', 'posttest'], true)) {
+                echo json_encode(['success' => false, 'error' => 'รอบไม่ถูกต้อง']);
+                exit;
+            }
+            if (mb_strlen($tTopic, 'UTF-8') > 500) { $tTopic = mb_substr($tTopic, 0, 500, 'UTF-8'); }
+            $stmt = $pdo->prepare('
+                INSERT INTO essay_topics (phase, topic) VALUES (?, ?)
+                ON DUPLICATE KEY UPDATE topic = VALUES(topic), updated_at = CURRENT_TIMESTAMP
+            ');
+            $stmt->execute([$tPhase, $tTopic]);
+            echo json_encode(['success' => true]);
             break;
 
         // Essay: ดึงเรียงความของนักเรียนคนนั้น (นักเรียนดูของตัวเอง)
@@ -1349,10 +1708,23 @@ try {
                 exit;
             }
             $studentId  = isset($_GET['studentId'])  ? trim($_GET['studentId'])  : $_SESSION['user']['id'];
-            $essayPhase = isset($_GET['essay_phase']) ? trim($_GET['essay_phase']) : 'task1';
-            $stmt = $pdo->prepare('SELECT * FROM student_essays WHERE student_id = ? AND essay_phase = ?');
+            $essayPhase = isset($_GET['essay_phase']) ? trim($_GET['essay_phase']) : 'task1_d1';
+            // ดึงข้อมูลเจ้าของผลงาน (ชื่อ/ชั้น) มาด้วย เพื่อแสดงหัวกระดาษแบบข้อสอบ
+            $stmt = $pdo->prepare('
+                SELECT se.*, s.student_name, s.classroom
+                FROM student_essays se
+                LEFT JOIN students s ON se.student_id = s.student_id
+                WHERE se.student_id = ? AND se.essay_phase = ?
+            ');
             $stmt->execute([$studentId, $essayPhase]);
             $row = $stmt->fetch();
+            if ($row) {
+                if (isset($row['student_name'])) { $row['student_name'] = formatNamePrefix($row['student_name']); }
+                // ประกอบ essay_content (JSON) จากคอลัมน์แยกส่วน + เติมหัวข้อที่ครูกำหนดเป็น essay_title
+                $row['essay_content'] = essay_compose_content($row['intro_content'] ?? null, $row['body_content'] ?? null, $row['conclusion_content'] ?? null);
+                $topics = essay_topics_map($pdo);
+                $row['essay_title'] = $topics[essay_topic_phase($row['essay_phase'])] ?? '';
+            }
             echo json_encode(['success' => true, 'found' => (bool)$row, 'data' => $row ?: null]);
             break;
 
@@ -1369,12 +1741,91 @@ try {
                 ORDER BY s.classroom ASC, se.essay_phase ASC, s.student_id ASC
             ');
             $essays = $stmt->fetchAll();
-            // apply formatNamePrefix
+            $topics = essay_topics_map($pdo);
+            // เติมชื่อ + ประกอบ essay_content จากคอลัมน์แยกส่วน + หัวข้อที่ครูกำหนด (เพื่อความเข้ากันได้กับส่วนแสดงผลเดิม)
             foreach ($essays as &$e) {
-                $e['student_name'] = formatNamePrefix($e['student_name']);
+                $e['student_name']  = formatNamePrefix($e['student_name']);
+                $e['essay_content'] = essay_compose_content($e['intro_content'] ?? null, $e['body_content'] ?? null, $e['conclusion_content'] ?? null);
+                $e['essay_title']   = $topics[essay_topic_phase($e['essay_phase'])] ?? '';
             }
             unset($e);
             echo json_encode(['success' => true, 'essays' => $essays]);
+            break;
+
+        // ==========================================
+        // รายงานการส่งงานรายบุคคล (Submission Report) — ครูเท่านั้น
+        // แสดงสถานะการส่งงานแต่ละชิ้น: ก่อนเรียน / D1.1 / D1.2 / เครื่องมือสะท้อนคิด / D2.1 / D2.2 / หลังเรียน
+        // ==========================================
+        case 'get_submission_report':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'ต้องเป็นคุณครู']);
+                exit;
+            }
+
+            // กรองตามกลุ่มการวิจัย (ทดลอง/ตัวอย่าง) — ค่าว่าง = ทุกกลุ่ม
+            $groupParam = isset($_GET['group']) ? trim($_GET['group']) : '';
+            $stuSql = 'SELECT student_id, student_name, classroom, student_group FROM students';
+            $stuParams = [];
+            if ($groupParam !== '') {
+                $stuSql .= ' WHERE student_group = ?';
+                $stuParams[] = $groupParam;
+            }
+            $stuSql .= ' ORDER BY classroom ASC, student_id ASC';
+            $stuStmt = $pdo->prepare($stuSql);
+            $stuStmt->execute($stuParams);
+            $stuRows = $stuStmt->fetchAll();
+
+            // ชุดรหัสนักเรียนที่ "ส่งแล้ว" ของแต่ละชิ้นงาน (ดึงทีเดียวแล้วแมปในหน่วยความจำ ประหยัด query)
+            // เรียงความ: นับว่าส่งแล้วเมื่อมีเนื้อหาอย่างน้อยหนึ่งส่วน หรือ word_count > 0
+            $essaySet = [
+                'pretest' => [], 'task1_d1' => [], 'task1_d2' => [],
+                'task2_d1' => [], 'task2_d2' => [], 'posttest' => [],
+            ];
+            $esStmt = $pdo->query("
+                SELECT student_id, essay_phase FROM student_essays
+                WHERE COALESCE(word_count,0) > 0
+                   OR COALESCE(intro_content,'') <> ''
+                   OR COALESCE(body_content,'') <> ''
+                   OR COALESCE(conclusion_content,'') <> ''
+            ");
+            while ($r = $esStmt->fetch()) {
+                $ph = $r['essay_phase'];
+                if (isset($essaySet[$ph])) $essaySet[$ph][$r['student_id']] = true;
+            }
+
+            // เครื่องมือสะท้อนคิด (เก็บ 1 แถวต่อคน) — มีแถว = ส่งแล้ว
+            $flagSet = ['problems' => [], 'checklist' => [], 'reflection' => []];
+            foreach ([
+                'problems'   => 'writing_problems',
+                'checklist'  => 'self_checklists',
+                'reflection' => 'learning_reflections',
+            ] as $key => $tbl) {
+                try {
+                    $q = $pdo->query("SELECT student_id FROM `$tbl`");
+                    while ($sid = $q->fetchColumn()) { $flagSet[$key][$sid] = true; }
+                } catch (Exception $e) { /* ตารางอาจยังไม่ถูกสร้าง — ปล่อยว่าง */ }
+            }
+
+            $report = [];
+            foreach ($stuRows as $s) {
+                $sid = $s['student_id'];
+                $report[] = [
+                    'student_id'    => $sid,
+                    'student_name'  => formatNamePrefix($s['student_name']),
+                    'classroom'     => $s['classroom'],
+                    'student_group' => $s['student_group'],
+                    'pretest'       => isset($essaySet['pretest'][$sid]),
+                    'd1_1'          => isset($essaySet['task1_d1'][$sid]),
+                    'd1_2'          => isset($essaySet['task1_d2'][$sid]),
+                    'problems'      => isset($flagSet['problems'][$sid]),
+                    'checklist'     => isset($flagSet['checklist'][$sid]),
+                    'reflection'    => isset($flagSet['reflection'][$sid]),
+                    'd2_1'          => isset($essaySet['task2_d1'][$sid]),
+                    'd2_2'          => isset($essaySet['task2_d2'][$sid]),
+                    'posttest'      => isset($essaySet['posttest'][$sid]),
+                ];
+            }
+            echo json_encode(['success' => true, 'report' => $report]);
             break;
 
         default:

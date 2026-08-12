@@ -34,32 +34,46 @@ require_once 'header.php';
     <h6 class="fw-bold text-dark mb-3"><i class="bi bi-journal-bookmark text-primary me-2"></i>เลือกหน่วยการเรียน / รอบที่ต้องการบันทึก</h6>
     <div class="row g-2">
       <div class="col-6 col-md-3">
-        <button class="essay-phase-btn btn btn-outline-primary w-100 rounded-3 py-3 fw-bold" data-phase="pretest" onclick="setEssayPhase('pretest')">
+        <button class="essay-phase-btn btn btn-outline-primary w-100 rounded-3 py-3 fw-bold" data-unit="pretest" onclick="setEssayUnit('pretest')">
           <div class="fs-4 mb-1">📝</div>
           <div class="small">ก่อนเรียน</div>
           <div class="text-muted" style="font-size:0.72rem;">Pretest</div>
         </button>
       </div>
       <div class="col-6 col-md-3">
-        <button class="essay-phase-btn btn btn-outline-success w-100 rounded-3 py-3 fw-bold active-phase" data-phase="task1" onclick="setEssayPhase('task1')">
+        <button class="essay-phase-btn btn btn-outline-success w-100 rounded-3 py-3 fw-bold active-phase" data-unit="task1" onclick="setEssayUnit('task1')">
           <div class="fs-4 mb-1">📚</div>
-          <div class="small">ภารงาน หน่วยที่ 1</div>
+          <div class="small">ภาระงาน หน่วยที่ 1</div>
           <div class="text-muted" style="font-size:0.72rem;">Task Unit 1</div>
         </button>
       </div>
       <div class="col-6 col-md-3">
-        <button class="essay-phase-btn btn btn-outline-warning w-100 rounded-3 py-3 fw-bold" data-phase="task2" onclick="setEssayPhase('task2')">
+        <button class="essay-phase-btn btn btn-outline-warning w-100 rounded-3 py-3 fw-bold" data-unit="task2" onclick="setEssayUnit('task2')">
           <div class="fs-4 mb-1">📖</div>
-          <div class="small">ภารงาน หน่วยที่ 2</div>
+          <div class="small">ภาระงาน หน่วยที่ 2</div>
           <div class="text-muted" style="font-size:0.72rem;">Task Unit 2</div>
         </button>
       </div>
       <div class="col-6 col-md-3">
-        <button class="essay-phase-btn btn btn-outline-danger w-100 rounded-3 py-3 fw-bold" data-phase="posttest" onclick="setEssayPhase('posttest')">
+        <button class="essay-phase-btn btn btn-outline-danger w-100 rounded-3 py-3 fw-bold" data-unit="posttest" onclick="setEssayUnit('posttest')">
           <div class="fs-4 mb-1">🎓</div>
           <div class="small">หลังเรียน</div>
           <div class="text-muted" style="font-size:0.72rem;">Posttest</div>
         </button>
+      </div>
+    </div>
+
+    <!-- ตัวเลือกร่าง (แสดงเฉพาะภาระงานหน่วยที่ 1/2): D1 = ร่างที่ 1, D2 = ร่างที่ 2 -->
+    <div id="draftSelector" class="mt-3 d-none">
+      <div class="d-flex align-items-center flex-wrap gap-2 bg-light border rounded-3 p-2">
+        <span class="fw-bold text-secondary small ms-1 me-1"><i class="bi bi-layers-half me-1"></i>เลือกร่างของภาระงาน:</span>
+        <button type="button" class="draft-btn btn btn-outline-secondary btn-sm rounded-pill px-3 fw-bold active-draft" data-draft="d1" onclick="setEssayDraft('d1')">
+          ร่างที่ 1 (D1)
+        </button>
+        <button type="button" class="draft-btn btn btn-outline-secondary btn-sm rounded-pill px-3 fw-bold" data-draft="d2" onclick="setEssayDraft('d2')">
+          ร่างที่ 2 (D2)
+        </button>
+        <span class="text-muted small ms-auto me-1"><i class="bi bi-info-circle me-1"></i>คุณครูจะให้คะแนนจาก <strong>ร่างที่ 2 (D2)</strong> เท่านั้น</span>
       </div>
     </div>
   </div>
@@ -69,7 +83,7 @@ require_once 'header.php';
     <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between py-3 px-4 rounded-top-4">
       <div class="d-flex align-items-center gap-3">
         <h6 class="fw-bold text-dark mb-0"><i class="bi bi-file-text-fill text-primary me-1"></i>กรอกเนื้อหาเรียงความ</h6>
-        <span id="currentPhaseBadge" class="badge bg-success">ภารงาน หน่วยที่ 1</span>
+        <span id="currentPhaseBadge" class="badge bg-success">ภาระงาน หน่วยที่ 1</span>
       </div>
       <div class="d-flex align-items-center gap-3">
         <span id="saveStatusBadge" class="badge bg-light text-muted small d-none"></span>
@@ -80,13 +94,12 @@ require_once 'header.php';
     </div>
     <div class="card-body p-4">
 
-      <!-- Title Field -->
-      <div class="mb-3">
-        <label for="essayTitle" class="form-label fw-bold text-secondary small text-uppercase tracking-wider">
-          ชื่อเรื่องเรียงความ <span class="text-muted fw-normal">(ถ้ามี)</span>
-        </label>
-        <input type="text" id="essayTitle" class="form-control form-control-lg border-2 rounded-3 fw-semibold"
-          placeholder="เช่น: เรียงความเรื่อง ความรักต่อแผ่นดิน..." maxlength="200">
+      <!-- หัวข้อที่ครูกำหนด (นักเรียนไม่ต้องตั้งชื่อเรื่องเอง) -->
+      <div class="mb-3 p-3 rounded-3 border" style="background-color:#eef6ff; border-color:#cfe2ff !important;">
+        <div class="fw-bold text-primary small mb-1"><i class="bi bi-bookmark-star-fill me-1"></i>หัวข้อเรียงความ (คุณครูกำหนด)</div>
+        <div id="essayTopicText" class="fs-5 fw-semibold text-dark">
+          <span class="text-muted fst-italic fs-6">กำลังโหลดหัวข้อ...</span>
+        </div>
       </div>
 
       <!-- Instructions -->
@@ -210,6 +223,11 @@ require_once 'header.php';
   color: white !important;
   box-shadow: 0 4px 15px rgba(25,135,84,0.35);
 }
+.draft-btn.active-draft {
+  background-color: #0d3b66 !important;
+  border-color: #0d3b66 !important;
+  color: #fff !important;
+}
 #essayContent::placeholder { color: #adb5bd; }
 .essay-content-preview {
   white-space: pre-wrap;
@@ -232,20 +250,54 @@ require_once 'header.php';
 <script>
 const phaseLabels = {
   pretest:  'ก่อนเรียน (Pretest)',
-  task1:    'ภารงาน หน่วยที่ 1',
-  task2:    'ภารงาน หน่วยที่ 2',
+  task1_d1: 'ภาระงาน หน่วยที่ 1 · ร่างที่ 1 (D1)',
+  task1_d2: 'ภาระงาน หน่วยที่ 1 · ร่างที่ 2 (D2)',
+  task2_d1: 'ภาระงาน หน่วยที่ 2 · ร่างที่ 1 (D1)',
+  task2_d2: 'ภาระงาน หน่วยที่ 2 · ร่างที่ 2 (D2)',
   posttest: 'หลังเรียน (Posttest)'
 };
 const phaseBadgeColors = {
   pretest: 'bg-primary',
-  task1: 'bg-success',
-  task2: 'bg-warning text-dark',
+  task1_d1: 'bg-success', task1_d2: 'bg-success',
+  task2_d1: 'bg-warning text-dark', task2_d2: 'bg-warning text-dark',
   posttest: 'bg-danger'
 };
 
-let currentEssayPhase = 'task1';
+// แยกสถานะเป็น 2 ระดับ: หน่วย (pretest/task1/task2/posttest) และร่าง (d1/d2 เฉพาะภาระงาน)
+let currentUnit = 'task1';
+let currentDraft = 'd1';
+let currentEssayPhase = 'task1_d1';
 let autoSaveTimer = null;
 let bodyParagraphCount = 0;
+
+// รวมหน่วย + ร่าง เป็นคีย์ essay_phase: ภาระงานมีร่าง (task1_d1) ส่วนก่อน/หลังเรียนไม่มีร่าง
+function computeEssayPhase(unit, draft) {
+  return (unit === 'task1' || unit === 'task2') ? (unit + '_' + draft) : unit;
+}
+
+// หัวข้อที่ครูกำหนด (map: pretest/task1/task2/posttest → หัวข้อ) — ภาระงานใช้หัวข้อเดียวกันทั้ง D1/D2
+let essayTopics = {};
+async function loadEssayTopics() {
+  try {
+    const res = await fetch('api.php?action=get_essay_topics');
+    const data = await res.json();
+    if (data.success) essayTopics = data.topics || {};
+  } catch (e) { essayTopics = {}; }
+  updateTopicDisplay();
+}
+function updateTopicDisplay() {
+  const el = document.getElementById('essayTopicText');
+  if (!el) return;
+  const topic = (essayTopics[currentUnit] || '').trim();
+  el.innerHTML = topic
+    ? escapeHtmlWriter(topic)
+    : '<span class="text-muted fst-italic fs-6">คุณครูยังไม่กำหนดหัวข้อสำหรับงานนี้</span>';
+}
+function escapeHtmlWriter(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
 
 function addBodyParagraph(content = "") {
   bodyParagraphCount++;
@@ -292,23 +344,54 @@ function reindexBodyParagraphs() {
   });
 }
 
-function setEssayPhase(phase) {
-  currentEssayPhase = phase;
+// เลือกหน่วยการเรียน — ภาระงานจะเปิดแถบเลือกร่าง (D1/D2) ให้ด้วย
+function setEssayUnit(unit) {
+  currentUnit = unit;
+  const isTask = (unit === 'task1' || unit === 'task2');
 
-  // update button states
-  document.querySelectorAll('.essay-phase-btn').forEach(b => {
-    b.classList.remove('active-phase');
-  });
-  const activeBtn = document.querySelector(`.essay-phase-btn[data-phase="${phase}"]`);
+  // แสดง/ซ่อนแถบเลือกร่าง เฉพาะภาระงาน
+  const draftSel = document.getElementById('draftSelector');
+  if (draftSel) draftSel.classList.toggle('d-none', !isTask);
+
+  // ไฮไลต์ปุ่มหน่วยที่เลือก
+  document.querySelectorAll('.essay-phase-btn').forEach(b => b.classList.remove('active-phase'));
+  const activeBtn = document.querySelector(`.essay-phase-btn[data-unit="${unit}"]`);
   if (activeBtn) activeBtn.classList.add('active-phase');
 
-  // update header badge
-  const badge = document.getElementById('currentPhaseBadge');
-  badge.textContent = phaseLabels[phase] || phase;
-  badge.className = 'badge ' + (phaseBadgeColors[phase] || 'bg-secondary');
+  currentEssayPhase = computeEssayPhase(unit, currentDraft);
+  updatePhaseBadge();
+  updateTopicDisplay();
+  loadEssayForPhase(currentEssayPhase);
+}
 
-  // load saved essay for this phase
-  loadEssayForPhase(phase);
+// เลือกร่าง (D1/D2) ของภาระงานหน่วยปัจจุบัน
+function setEssayDraft(draft) {
+  currentDraft = draft;
+  document.querySelectorAll('.draft-btn').forEach(b => b.classList.remove('active-draft'));
+  const activeBtn = document.querySelector(`.draft-btn[data-draft="${draft}"]`);
+  if (activeBtn) activeBtn.classList.add('active-draft');
+
+  currentEssayPhase = computeEssayPhase(currentUnit, draft);
+  updatePhaseBadge();
+  loadEssayForPhase(currentEssayPhase);
+}
+
+function updatePhaseBadge() {
+  const badge = document.getElementById('currentPhaseBadge');
+  badge.textContent = phaseLabels[currentEssayPhase] || currentEssayPhase;
+  badge.className = 'badge ' + (phaseBadgeColors[currentEssayPhase] || 'bg-secondary');
+}
+
+// เปิดแก้ไขจากรายการที่บันทึกไว้ (แปลงคีย์ phase → หน่วย + ร่าง)
+function openEssayPhase(phase) {
+  const m = /^(task[12])_(d[12])$/.exec(phase);
+  if (m) {
+    currentDraft = m[2];
+    document.querySelectorAll('.draft-btn').forEach(b => b.classList.toggle('active-draft', b.getAttribute('data-draft') === m[2]));
+    setEssayUnit(m[1]);
+  } else {
+    setEssayUnit(phase);
+  }
 }
 
 async function loadEssayForPhase(phase) {
@@ -325,7 +408,6 @@ async function loadEssayForPhase(phase) {
     container.innerHTML = '';
 
     if (data.success && data.found) {
-      document.getElementById('essayTitle').value = data.data.essay_title || '';
       const contentStr = data.data.essay_content || '';
       
       try {
@@ -358,7 +440,6 @@ async function loadEssayForPhase(phase) {
       statusBadge.textContent = '✓ มีข้อมูลบันทึกไว้แล้ว';
       statusBadge.className = 'badge bg-success small';
     } else {
-      document.getElementById('essayTitle').value = '';
       document.getElementById('essayIntro').value = '';
       document.getElementById('essayConclusion').value = '';
       addBodyParagraph();
@@ -431,25 +512,21 @@ async function saveEssay() {
     return;
   }
 
-  const essayContentObj = {
-    introduction: intro,
-    body: bodyParagraphs,
-    conclusion: conclusion
-  };
-
   const btn = document.getElementById('saveBtn');
   const origHTML = btn.innerHTML;
   btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>กำลังบันทึก...`;
   btn.disabled = true;
 
   try {
+    // ส่งเนื้อหาแยกเป็น 3 ส่วน (ส่วนนำ/เนื้อหาหลายย่อหน้า/สรุป) — ไม่มีชื่อเรื่องจากนักเรียน
     const res = await fetch('api.php?action=save_essay', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        essay_phase:   currentEssayPhase,
-        essay_title:   document.getElementById('essayTitle').value.trim(),
-        essay_content: JSON.stringify(essayContentObj)
+        essay_phase:  currentEssayPhase,
+        introduction: intro,
+        body:         bodyParagraphs,
+        conclusion:   conclusion
       })
     });
     const data = await res.json();
@@ -479,7 +556,6 @@ async function saveEssay() {
 
 function clearEssay() {
   if (!confirm('คุณต้องการล้างข้อความบนหน้าจอนี้ใช่ไหม? (ไม่ได้ลบข้อมูลที่บันทึกแล้วในระบบ)')) return;
-  document.getElementById('essayTitle').value = '';
   document.getElementById('essayIntro').value = '';
   document.getElementById('essayConclusion').value = '';
   const container = document.getElementById('bodyParagraphsContainer');
@@ -492,7 +568,7 @@ async function loadSavedList() {
   const container = document.getElementById('savedEssayList');
   container.innerHTML = '<div class="text-center text-muted py-3"><span class="spinner-border spinner-border-sm me-2"></span>กำลังโหลด...</div>';
 
-  const phases = ['pretest', 'task1', 'task2', 'posttest'];
+  const phases = ['pretest', 'task1_d1', 'task1_d2', 'task2_d1', 'task2_d2', 'posttest'];
   const results = await Promise.all(
     phases.map(ph => fetch(`api.php?action=get_essay&essay_phase=${ph}`).then(r => r.json()).catch(() => ({ success: false })))
   );
@@ -537,7 +613,7 @@ async function loadSavedList() {
               <span class="badge bg-primary-subtle text-primary rounded-pill px-2 py-1 small">
                 <i class="bi bi-fonts me-1"></i>${(item.data.word_count || 0).toLocaleString('th-TH')} คำ
               </span>
-              <button class="btn btn-sm btn-outline-primary rounded-pill px-3" onclick="setEssayPhase('${item.phase}')">
+              <button class="btn btn-sm btn-outline-primary rounded-pill px-3" onclick="openEssayPhase('${item.phase}')">
                 <i class="bi bi-pencil me-1"></i>แก้ไข
               </button>
             </div>
@@ -556,7 +632,9 @@ async function loadSavedList() {
 
 // Init
 (async function() {
-  setEssayPhase('task1');
+  await loadEssayTopics();          // โหลดหัวข้อที่ครูกำหนด
+  // ค่าเริ่มต้น: ภาระงานหน่วยที่ 1 · ร่างที่ 1 (D1)
+  setEssayUnit('task1');
   await loadSavedList();
 })();
 </script>

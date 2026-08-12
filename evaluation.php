@@ -26,6 +26,10 @@ if ($mode_param === 'self') {
 require_once 'header.php';
 ?>
 
+<?php /* ปิด container หลักจาก header.php เพื่อใช้เลย์เอาต์เต็มความกว้างจอ (ซ้าย = แบบประเมิน / ขวา = เรียงความ) */ ?>
+</div>
+
+<div class="eval-fullwidth px-3 px-xl-4 my-4 flex-grow-1">
 <div id="view-evaluation" class="text-start">
   <div class="mb-3">
     <a href="index.php" class="btn btn-link text-decoration-none text-secondary fw-bold p-0">
@@ -64,15 +68,15 @@ require_once 'header.php';
         <div class="<?php echo $phaseColClass; ?>">
           <button type="button" class="phase-btn w-100 btn btn-outline-success rounded-3 p-3 text-center fw-bold" data-phase="task1" onclick="selectPhase('task1')">
             <div class="fs-2 mb-2">📚</div>
-            <div class="fw-bold">ภารงาน หน่วยที่ 1</div>
-            <div class="text-muted small">Task Unit 1</div>
+            <div class="fw-bold">ภาระงาน หน่วยที่ 1</div>
+            <div class="text-muted small">ให้คะแนนจากร่างที่ 2 (D2)</div>
           </button>
         </div>
         <div class="<?php echo $phaseColClass; ?>">
           <button type="button" class="phase-btn w-100 btn btn-outline-warning rounded-3 p-3 text-center fw-bold" data-phase="task2" onclick="selectPhase('task2')">
             <div class="fs-2 mb-2">📖</div>
-            <div class="fw-bold">ภารงาน หน่วยที่ 2</div>
-            <div class="text-muted small">Task Unit 2</div>
+            <div class="fw-bold">ภาระงาน หน่วยที่ 2</div>
+            <div class="text-muted small">ให้คะแนนจากร่างที่ 2 (D2)</div>
           </button>
         </div>
         <?php if (!$isStudentEval): ?>
@@ -113,16 +117,14 @@ require_once 'header.php';
       <div class="card border-0 rounded-3 p-4 mb-4" style="background-color: var(--light-blue);">
         <div class="row align-items-end">
           <div class="col-md-8 col-sm-12">
-            <?php if ($mode_param === 'teacher' || $mode_param === 'peer'): ?>
-            <!-- เลือกกลุ่มด้วยปุ่ม (ต้องเลือกกลุ่มก่อนจึงจะระบุรหัสนักเรียนได้) — เครื่องหมาย * อยู่ด้านบนสุด -->
+            <?php if ($mode_param === 'peer'): ?>
+            <!-- โหมดเพื่อนประเมิน (นักเรียน): เลือกกลุ่มด้วยปุ่มในฟอร์ม เพราะนักเรียนไม่มีปุ่มกลุ่มบน navbar -->
             <div class="mb-3">
               <label class="form-label fw-bold text-secondary small text-uppercase tracking-wider d-block mb-2">
-                เลือกกลุ่ม (รายชื่อจะแสดงเฉพาะกลุ่มที่เลือก) <?php if ($mode_param === 'teacher'): ?><span class="text-danger">*</span><?php endif; ?>
+                เลือกกลุ่ม (รายชื่อจะแสดงเฉพาะกลุ่มที่เลือก)
               </label>
               <div id="groupFilterButtons" class="d-flex flex-wrap gap-2">
-                <?php if ($mode_param === 'peer'): ?>
                 <button type="button" class="btn btn-outline-secondary rounded-3 fw-bold group-btn active" data-group="">ทุกกลุ่ม</button>
-                <?php endif; ?>
                 <button type="button" class="btn btn-outline-primary rounded-3 fw-bold group-btn" data-group="กลุ่มทดลอง">🧪 กลุ่มทดลอง</button>
                 <button type="button" class="btn btn-outline-primary rounded-3 fw-bold group-btn" data-group="กลุ่มตัวอย่าง">📋 กลุ่มตัวอย่าง</button>
               </div>
@@ -130,12 +132,13 @@ require_once 'header.php';
             </div>
             <?php endif; ?>
 
-            <!-- ระบุรหัสนักเรียนเป้าหมาย แล้วข้อมูลจะปรากฏขึ้น -->
-            <label for="targetStudentInput" class="form-label fw-bold text-secondary small text-uppercase tracking-wider">ระบุรหัสนักเรียนที่เป็นเป้าหมายผู้ถูกประเมิน <span class="text-danger">*</span></label>
-            <div class="input-group input-group-lg">
-              <span class="input-group-text bg-white border-2"><i class="bi bi-person-vcard text-primary"></i></span>
-              <input type="text" id="targetStudentInput" list="targetStudentOptions" autocomplete="off" required class="form-control border-2 fw-semibold text-dark" placeholder="พิมพ์รหัสนักเรียนที่ต้องการประเมิน แล้วกด แสดงข้อมูล">
-              <button type="button" id="loadStudentBtn" class="btn btn-primary fw-bold px-4"><i class="bi bi-search"></i> แสดงข้อมูล</button>
+            <!-- ระบุรหัสหรือชื่อนักเรียนเป้าหมาย แล้วข้อมูลจะปรากฏขึ้น -->
+            <label for="targetStudentInput" class="form-label fw-bold text-secondary small text-uppercase tracking-wider">ระบุรหัสหรือชื่อนักเรียนที่เป็นเป้าหมายผู้ถูกประเมิน <span class="text-danger">*</span></label>
+            <!-- ช่องเดียว: คลิกเพื่อเลือกจากรายการ (dropdown) หรือพิมพ์ค้นหาด้วยรหัส/ชื่อก็ได้ -->
+            <div class="input-group input-group-lg shadow-sm">
+              <span class="input-group-text bg-white border-2 border-end-0"><i class="bi bi-person-vcard text-primary"></i></span>
+              <input type="text" id="targetStudentInput" list="targetStudentOptions" autocomplete="off" class="form-control border-2 border-start-0 fw-semibold text-dark" placeholder="คลิกเพื่อเลือกนักเรียน หรือพิมพ์ค้นหาด้วยรหัส/ชื่อ...">
+              <button type="button" id="loadStudentBtn" class="btn btn-primary fw-bold px-4"><i class="bi bi-box-arrow-in-down me-1"></i> แสดงข้อมูล</button>
             </div>
             <datalist id="targetStudentOptions"></datalist>
             <div id="targetStudentResolved" class="mt-2 small fw-bold text-success d-none"></div>
@@ -147,10 +150,12 @@ require_once 'header.php';
             <?php endif; ?>
             <?php if ($mode_param === 'peer'): ?>
             <p id="peerLockNotice" class="mt-2 text-success small fw-bold mb-0 d-none">
-              <i class="bi bi-lock-fill"></i> ระบบได้จับคู่ผู้ถูกประเมินให้คุณโดยคุณครูแล้ว (ล็อกอัตโนมัติ) ไม่ต้องระบุเอง
+              <i class="bi bi-lock-fill"></i> ระบบล็อกผู้ถูกประเมินตามคู่ที่คุณจับกับเพื่อนไว้แล้ว (จับคู่ไป-กลับอัตโนมัติ) ไม่ต้องระบุเอง
             </p>
             <p id="peerFallbackNotice" class="mt-2 text-danger small fw-bold mb-0 d-none">
-              <i class="bi bi-exclamation-triangle-fill"></i> ยังไม่มีการจับคู่สำหรับรอบนี้ กรุณาระบุรหัสเพื่อนที่ต้องการประเมินด้วยตนเอง
+              <i class="bi bi-exclamation-triangle-fill"></i> ยังไม่มีการจับคู่สำหรับหน่วยนี้ กรุณาไปที่หน้า
+              <a href="peer_matching.php" class="fw-bold text-decoration-underline">🤝 จับคู่ประเมินเพื่อน</a>
+              เพื่อส่งคำขอจับคู่กับเพื่อนก่อน แล้วจึงกลับมาประเมิน
             </p>
             <?php endif; ?>
             <?php if ($mode_param === 'expert'): ?>
@@ -285,7 +290,27 @@ require_once 'header.php';
       </div>
     </form>
   </div>
+
+  <!-- ส่วนเนื้อหาเรียงความ: แยกออกจาก evalSection เป็น section ลอย (fixed) ฝั่งขวา เต็มครึ่งจอ ติดตามหน้าจอเสมอเวลาเลื่อน -->
+  <aside id="essayFloating" class="card border-0 shadow-lg d-none" style="overflow: hidden; border: 1px solid #e7e5e4 !important;">
+    <div class="d-flex align-items-center justify-content-between gap-2 px-4 py-3 border-bottom" style="background-color: #fffdf0;">
+      <h6 class="fw-bold text-dark mb-0"><i class="bi bi-file-earmark-text text-primary me-2"></i>เนื้อหาเรียงความที่นักเรียนบันทึกไว้ (Student Essay Content)</h6>
+      <span class="badge bg-primary-subtle text-primary rounded-pill px-3 py-1 font-mono small flex-shrink-0" id="essayPanelWordCount">0 คำ</span>
+    </div>
+    <div class="essay-doc-scroll">
+      <div class="essay-sheet">
+        <!-- หัวกระดาษแบบข้อสอบ: ชื่อแบบวัด → ชื่อเรื่อง → ชื่อ/ชั้น/รหัสประจำตัวนักเรียน เจ้าของผลงาน -->
+        <div class="essay-doc-formtitle" id="essayPanelFormTitle">แบบวัดความสามารถก่อนเรียน</div>
+        <h1 class="essay-doc-title" id="essayPanelTitle">—</h1>
+        <div class="essay-doc-author" id="essayPanelAuthor"></div>
+        <div class="essay-doc-content" id="essayPanelContent">
+          <!-- เนื้อหาเรียงความ (พร้อมเส้นบรรทัดและเลขบรรทัดทุกบรรทัด) -->
+        </div>
+      </div>
+    </div>
+  </aside>
 </div>
+
 <style>
 .phase-btn:hover, .phase-btn.active {
   transform: translateY(-3px);
@@ -295,6 +320,126 @@ require_once 'header.php';
 .phase-btn {
   transition: all 0.2s ease;
   min-height: 130px;
+}
+
+/* ใช้เลย์เอาต์เต็มความกว้างจอสำหรับหน้าประเมิน */
+.eval-fullwidth { width: 100%; }
+
+/* ส่วนเนื้อหาเรียงความ — section ลอย (fixed) ฝั่งขวา เต็มครึ่งจอ ติดตามหน้าจอเสมอเวลาเลื่อน (แสดงแบบเอกสารเหมือน essay_print.php) */
+#essayFloating {
+  background: #ffffff;
+  margin-top: 1.5rem;   /* จอเล็ก/กลาง: แสดงเป็นบล็อกปกติใต้แบบประเมิน */
+}
+.essay-doc-scroll {
+  max-height: 70vh;
+  overflow-y: auto;
+  background: #eceff3;           /* พื้นเทาอ่อนเพื่อให้แผ่นกระดาษ A4 สีขาวเด่นเหมือนโปรแกรมดูเอกสาร */
+  padding: 16px 10px;
+}
+/* จอใหญ่ (lg ขึ้นไป): แบ่งครึ่งจอ ซ้าย = แบบประเมิน / ขวา = เรียงความ (ลอยติดขอบขวา ตามการเลื่อนเสมอ) ให้กว้างเท่า ๆ กัน */
+@media (min-width: 992px) {
+  #essayFloating {
+    position: fixed;
+    top: 66px;
+    right: 0;
+    width: 50vw;
+    height: calc(100vh - 66px);
+    margin-top: 0;
+    z-index: 1019;
+    border-radius: 0;
+    border-left: 3px solid var(--primary-navy, #0d3b66) !important;
+  }
+  .essay-doc-scroll { max-height: calc(100vh - 66px - 62px); }
+  /* เว้นครึ่งขวาไว้ให้กล่องเรียงความ แบบประเมินจึงกว้างเท่ากันในครึ่งซ้าย */
+  #view-evaluation.essay-open { padding-right: calc(50vw + 1.5rem); }
+}
+/* แผ่นกระดาษสัดส่วน A4 (210:297 ≈ 1:1.414) — ขยายให้กว้างขึ้นด้านละ ~1 นิ้ว มีระยะขอบเหมือนกระดาษจริง */
+.essay-sheet {
+  width: 100%;
+  max-width: 832px;             /* กว้างขึ้นจากเดิม 640px ≈ ด้านละ 1 นิ้ว (96px) */
+  min-height: 1176px;           /* ≈ 832 × 1.414 ให้ได้สัดส่วน A4 */
+  margin: 0 auto;
+  padding: 56px 52px 64px;      /* ระยะขอบกระดาษ */
+  background: #ffffff;
+  color: #1a1a1a;
+  box-shadow: 0 3px 14px rgba(0,0,0,0.14);
+  border: 1px solid #dfe3e8;
+  font-family: "TH Sarabun New", "Sarabun", "Leelawadee UI", "Tahoma", sans-serif;
+}
+/* ชื่อแบบวัด (หัวกระดาษบนสุด) — 22px */
+.essay-doc-formtitle {
+  text-align: center;
+  font-size: 22px;
+  font-weight: 700;
+  color: #0d3b66;
+  margin: 0 0 0.3rem;
+}
+/* ชื่อเรื่อง — 20px */
+.essay-doc-title {
+  text-align: center;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #1a1a1a;
+  margin: 0 0 0.4rem;
+}
+/* บรรทัดเจ้าของผลงาน: ชื่อ / ชั้น / รหัสประจำตัวนักเรียน — 18px */
+.essay-doc-author {
+  text-align: center;
+  font-size: 18px;
+  font-weight: 600;
+  color: #444;
+  margin: 0 0 1rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 2px solid #e7e5e4;
+}
+.essay-doc-author:empty { display: none; }
+/* เนื้อความแบบกระดาษมีเส้นบรรทัด (ruled paper) + เว้นที่ซ้ายสำหรับเลขบรรทัด + เว้นที่ขวาสำหรับป้ายส่วน */
+.essay-doc-content {
+  position: relative;
+  padding-left: 2.8em;
+  padding-right: 2.6em;        /* เว้นที่ริมขวาไว้ให้ป้ายบอกส่วน (คำนำ/เนื้อเรื่อง/สรุป) แบบไม่กระทบเนื้อหา */
+  font-size: 20px;             /* ขนาดเนื้อหาบนกระดาษ A4 */
+  line-height: 36px;          /* ต้องตรงกับ LH ในสคริปต์สร้างเลขบรรทัด */
+  text-align: justify;
+  background-image: linear-gradient(to bottom, transparent 0, transparent 35px, #e3e7ec 35px, #e3e7ec 36px);
+  background-size: 100% 36px;
+  background-position: 0 0;
+}
+/* ป้ายบอกส่วน (คำนำ/เนื้อเรื่อง/สรุป) — แอบเล็ก ๆ ที่ริมขวา ไม่รบกวนการอ่าน */
+.essay-doc-content .section-tag {
+  position: absolute;
+  right: 0;
+  width: 2.4em;
+  text-align: left;
+  color: #cbd0d8;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  user-select: none;
+  pointer-events: none;
+}
+.essay-doc-content .essay-para {
+  margin: 0;
+  text-indent: 2.5em;
+}
+.essay-doc-content .lnum {
+  position: absolute;
+  left: 0;
+  width: 2.1em;
+  text-align: right;
+  color: #9aa1ac;
+  font-size: 0.9rem;
+  font-family: "Tahoma", sans-serif;
+  user-select: none;
+}
+.essay-doc-content .no-content {
+  color: #888;
+  font-style: italic;
+  text-indent: 0;
+  text-align: center;
+  padding: 2rem 0;
+  background: none;
 }
 </style>
 
@@ -436,20 +581,44 @@ require_once 'header.php';
     }
   ];
 
-  // โหมดครูต้องเลือกกลุ่มก่อนเสมอ รายชื่อจึงจะแสดง (แยกกลุ่มไม่ให้ปนกัน)
-  function groupRequired() { return modeParam === 'teacher'; }
+  // ไม่บังคับเลือกกลุ่มในฟอร์มอีกต่อไป — โหมดครูควบคุมกลุ่มจากปุ่มบน navbar (จุดเดียวของทั้งระบบ)
+  function groupRequired() { return false; }
 
-  // ค่ากลุ่มที่เลือกจากปุ่ม (อ่านจากปุ่มที่ active เพื่อให้คงค่าแม้ form.reset())
+  // ค่ากลุ่มที่ใช้กรองรายชื่อ
+  //  - โหมดครู: ใช้กลุ่มที่เลือกจากปุ่มบน navbar (ค่ากลาง TEG)
+  //  - โหมดเพื่อน (นักเรียน): ใช้ปุ่มเลือกกลุ่มในฟอร์ม
   function getGroupValue() {
+    if (modeParam === 'teacher') return (window.TEG ? TEG.filterValue() : '');
     const active = document.querySelector('#groupFilterButtons .group-btn.active');
     if (active) return active.dataset.group || '';
     const el = document.getElementById('groupFilterValue');
     return el ? el.value : '';
   }
-  // รหัสนักเรียนเป้าหมายที่ผู้ใช้พิมพ์
+  // แปลงข้อความที่พิมพ์ (รหัส / "รหัส - ชื่อ" / ชื่อ) → รหัสนักเรียนที่ตรงกัน (ค้นได้ทั้งรหัสและชื่อ)
+  function resolveStudentId(raw) {
+    const q = (raw || '').trim();
+    if (!q) return '';
+    if (studentDB[q]) return q;                          // ตรงรหัสพอดี
+    const prefix = q.split(' - ')[0].trim();             // รูปแบบ "รหัส - ชื่อ" จากรายการแนะนำ
+    if (studentDB[prefix]) return prefix;
+    const lower = q.toLowerCase();
+    const exact = Object.keys(studentDB).filter(id => (studentDB[id] || '').toLowerCase() === lower);
+    if (exact.length === 1) return exact[0];             // ชื่อตรงทั้งหมดและมีคนเดียว
+    const partial = Object.keys(studentDB).filter(id => (studentDB[id] || '').toLowerCase().includes(lower));
+    if (partial.length === 1) return partial[0];         // ชื่อบางส่วนและเหลือผลเดียว
+    return '';
+  }
+
+  // รหัสนักเรียนเป้าหมาย — ตีความจากช่องเดียว (เลือกจากรายการ หรือพิมพ์รหัส/ชื่อ)
   function getTargetId() {
     const el = document.getElementById('targetStudentInput');
-    return el ? el.value.trim() : '';
+    return resolveStudentId(el ? el.value : '');
+  }
+
+  // ตั้งค่าช่องเป้าหมายให้แสดงเป็น "รหัส - ชื่อ"
+  function syncTargetSelection(id) {
+    const inp = document.getElementById('targetStudentInput');
+    if (inp && studentDB[id] !== undefined) inp.value = `${id} - ${studentDB[id]}`;
   }
 
   // โหลดรายชื่อนักเรียนจาก API
@@ -477,18 +646,16 @@ require_once 'header.php';
     }
   }
 
-  // เติมรายชื่อนักเรียนลงใน datalist (ช่วยแนะนำรหัสขณะพิมพ์)
+  // เติมรายชื่อนักเรียนลงใน datalist ของช่องเดียว (คลิกเพื่อเลือก หรือพิมพ์ค้นด้วยรหัส/ชื่อ)
   function populateStudentDatalist() {
     const dl = document.getElementById('targetStudentOptions');
     if (!dl) return;
-    dl.innerHTML = '';
-    // ครูยังไม่เลือกกลุ่ม → ยังไม่มีรายชื่อให้แนะนำ
-    if (groupRequired() && !getGroupValue()) return;
     const sortedKeys = Object.keys(studentDB).sort();
+    dl.innerHTML = '';
     sortedKeys.forEach(id => {
       const option = document.createElement('option');
-      option.value = id;
-      option.label = `${id} - ${studentDB[id]}`;
+      // value = "รหัส - ชื่อ" เพื่อให้พิมพ์ค้นได้ทั้งรหัสและชื่อ และเลือกจากรายการได้
+      option.value = `${id} - ${studentDB[id]}`;
       dl.appendChild(option);
     });
   }
@@ -503,30 +670,29 @@ require_once 'header.php';
 
   // ตรวจสอบรหัสนักเรียนที่พิมพ์ แล้วโหลดข้อมูล (ข้อมูลจะปรากฏเมื่อรหัสถูกต้อง)
   function resolveTargetStudent() {
-    const id = getTargetId();
     const resolvedEl = document.getElementById('targetStudentResolved');
     const errEl = document.getElementById('targetStudentError');
     if (resolvedEl) resolvedEl.classList.add('d-none');
     if (errEl) errEl.classList.add('d-none');
 
+    // อ่านสิ่งที่ผู้ใช้ระบุจากช่องเดียว (เลือกจากรายการ หรือพิมพ์รหัส/ชื่อ)
+    const inp = document.getElementById('targetStudentInput');
+    const rawTyped = inp ? inp.value.trim() : '';
+    const hasTyped = rawTyped !== '';
+    const id = getTargetId();
+
     if (!id) {
-      if (errEl) { errEl.textContent = '⚠️ กรุณาพิมพ์รหัสนักเรียนก่อน'; errEl.classList.remove('d-none'); }
+      if (errEl) {
+        errEl.textContent = hasTyped
+          ? `⚠️ ไม่พบนักเรียนที่ตรงกับ "${rawTyped}" (ลองพิมพ์รหัส หรือ ชื่อให้ชัดเจนขึ้น)`
+          : '⚠️ กรุณาเลือกนักเรียนจากรายการ หรือพิมพ์ค้นหาด้วยรหัส/ชื่อก่อน';
+        errEl.classList.remove('d-none');
+      }
       dimRubric();
       return;
     }
-    // ครูต้องเลือกกลุ่มก่อน
-    if (groupRequired() && !getGroupValue()) {
-      if (errEl) { errEl.textContent = '⚠️ กรุณาเลือกกลุ่มก่อนระบุรหัสนักเรียน'; errEl.classList.remove('d-none'); }
-      dimRubric();
-      return;
-    }
-    // รหัสไม่พบในกลุ่มที่เลือก
-    if (!studentDB[id]) {
-      if (errEl) { errEl.textContent = '⚠️ ไม่พบรหัสนักเรียนนี้ในกลุ่มที่เลือก กรุณาตรวจสอบรหัสอีกครั้ง'; errEl.classList.remove('d-none'); }
-      dimRubric();
-      return;
-    }
-    // พบแล้ว → แสดงชื่อและโหลดเกณฑ์/ข้อมูลเดิม
+    // พบแล้ว → ซิงก์ทั้ง dropdown และช่องค้นหา แล้วแสดงชื่อ/โหลดข้อมูลเดิม
+    syncTargetSelection(id);
     if (resolvedEl) {
       resolvedEl.textContent = `✓ ผู้ถูกประเมิน: ${id} - ${studentDB[id]}`;
       resolvedEl.classList.remove('d-none');
@@ -685,46 +851,112 @@ require_once 'header.php';
     }
   }
 
+  // แปลงเนื้อหาเรียงความให้แสดงเป็นย่อหน้าเรียงความล้วน (คล้ายเอกสารใน essay_print.php)
+  // ไม่มีกล่องสีหรือป้ายกำกับส่วน เพื่อให้ผู้ประเมินอ่านได้เหมือนเรียงความจริง
+  function escapeHTML(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function nl2brSafe(s) {
+    return escapeHTML(s).replace(/\n/g, '<br>');
+  }
   function formatEssayHTML(contentStr) {
-    if (!contentStr) return '<em class="text-muted">ไม่มีเนื้อหาเรียงความ</em>';
-    try {
-      const obj = JSON.parse(contentStr);
-      if (obj && typeof obj === 'object' && obj.introduction !== undefined) {
-        let html = '';
-        if (obj.introduction) {
-          html += `
-            <div class="mb-3">
-              <span class="badge bg-primary bg-opacity-10 text-primary fw-bold mb-1"><i class="bi bi-pencil-fill me-1"></i>ส่วนคำนำ (Introduction)</span>
-              <div class="p-2.5 bg-light rounded-3 text-dark style-sarabun" style="white-space:pre-wrap; line-height:1.7;">${obj.introduction.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
-            </div>`;
+    // เก็บย่อหน้าพร้อม "ส่วน" (intro/body/concl) เพื่อทำป้ายบอกส่วนแบบแอบ ๆ
+    const paras = []; // { text, sec }  (sec = 'intro' | 'body' | 'concl' | '')
+    if (contentStr) {
+      let parsed = null;
+      try { parsed = JSON.parse(contentStr); } catch (e) { parsed = null; }
+      if (parsed && typeof parsed === 'object' && parsed.introduction !== undefined) {
+        if (parsed.introduction && parsed.introduction.trim()) paras.push({ text: parsed.introduction, sec: 'intro' });
+        if (Array.isArray(parsed.body)) {
+          parsed.body.forEach(p => { if (p && p.trim()) paras.push({ text: p, sec: 'body' }); });
         }
-        if (obj.body && Array.isArray(obj.body)) {
-          obj.body.forEach((paraText, i) => {
-            if (paraText) {
-              html += `
-                <div class="mb-3">
-                  <span class="badge bg-success bg-opacity-10 text-success fw-bold mb-1"><i class="bi bi-book-fill me-1"></i>ส่วนเนื้อเรื่อง ย่อหน้าที่ ${i+1} (Body Paragraph)</span>
-                  <div class="p-2.5 bg-light rounded-3 text-dark style-sarabun" style="white-space:pre-wrap; line-height:1.7;">${paraText.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
-                </div>`;
-            }
-          });
-        }
-        if (obj.conclusion) {
-          html += `
-            <div class="mb-0">
-              <span class="badge bg-danger bg-opacity-10 text-danger fw-bold mb-1"><i class="bi bi-award-fill me-1"></i>ส่วนสรุป (Conclusion)</span>
-              <div class="p-2.5 bg-light rounded-3 text-dark style-sarabun" style="white-space:pre-wrap; line-height:1.7;">${obj.conclusion.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
-            </div>`;
-        }
-        return html;
+        if (parsed.conclusion && parsed.conclusion.trim()) paras.push({ text: parsed.conclusion, sec: 'concl' });
+      } else {
+        // ข้อความล้วน — แยกย่อหน้าด้วยการเว้นบรรทัด (ตรวจส่วนไม่ได้)
+        String(contentStr).split(/\n{2,}/).forEach(p => { if (p.trim()) paras.push({ text: p, sec: '' }); });
       }
-    } catch(e) {}
-    return `<div class="p-2.5 bg-light rounded-3 text-dark style-sarabun" style="white-space:pre-wrap; line-height:1.7;">${contentStr.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`;
+    }
+    if (!paras.length) return '<div class="no-content">— ยังไม่มีเนื้อหาเรียงความ —</div>';
+    // ทำเครื่องหมาย data-sec เฉพาะย่อหน้า "แรก" ของแต่ละส่วน เพื่อวางป้ายเพียงจุดเดียวต่อส่วน
+    let seenBody = false;
+    return paras.map(p => {
+      let mark = '';
+      if (p.sec === 'intro') mark = ' data-sec="intro"';
+      else if (p.sec === 'concl') mark = ' data-sec="concl"';
+      else if (p.sec === 'body' && !seenBody) { mark = ' data-sec="body"'; seenBody = true; }
+      return `<p class="essay-para"${mark}>${nl2brSafe(p.text)}</p>`;
+    }).join('');
   }
 
+  // วางป้ายบอกส่วน (คำนำ/เนื้อเรื่อง/สรุป) แบบแอบเล็ก ๆ ที่ริมขวา ตรงกับย่อหน้าแรกของแต่ละส่วน
+  function addEssaySectionTags() {
+    const box = document.getElementById('essayPanelContent');
+    if (!box) return;
+    box.querySelectorAll('.section-tag').forEach(el => el.remove());
+    const labelMap = { intro: 'คำนำ', body: 'เนื้อเรื่อง', concl: 'สรุป' };
+    box.querySelectorAll('.essay-para[data-sec]').forEach(p => {
+      const key = p.getAttribute('data-sec');
+      if (!labelMap[key]) return;
+      const tag = document.createElement('span');
+      tag.className = 'section-tag';
+      tag.textContent = labelMap[key];
+      tag.style.top = p.offsetTop + 'px'; // จัดให้ตรงกับย่อหน้า
+      box.appendChild(tag);
+    });
+  }
+
+  // สร้างเลขบรรทัด "ทุกบรรทัด" (1, 2, 3, ...) ที่ขอบซ้ายของเนื้อความ ให้ตรงกับเส้นบรรทัดของกระดาษ
+  // คำนวณจำนวนบรรทัดจริงหลังจัดหน้าเสร็จ แล้ววางตัวเลขตามระยะบรรทัด (LH)
+  function addEssayLineNumbers() {
+    const box = document.getElementById('essayPanelContent');
+    if (!box) return;
+    box.querySelectorAll('.lnum').forEach(el => el.remove());
+    if (box.querySelector('.no-content')) return; // ไม่มีเนื้อหา → ไม่ต้องใส่เลขบรรทัด
+    const LH = parseFloat(getComputedStyle(box).lineHeight) || 36; // ต้องตรงกับ line-height ของ .essay-doc-content
+    const lines = Math.round(box.clientHeight / LH);
+    for (let i = 1; i <= lines; i++) {
+      const s = document.createElement('span');
+      s.className = 'lnum';
+      s.textContent = i;
+      s.style.top = ((i - 1) * LH) + 'px';
+      box.appendChild(s);
+    }
+  }
+
+  // คำนวณเลขบรรทัดใหม่เมื่อปรับขนาดหน้าจอ (ความกว้างเปลี่ยน จำนวนบรรทัดเปลี่ยน)
+  let essayLnumTimer = null;
+  window.addEventListener('resize', () => {
+    const essay = document.getElementById('essayFloating');
+    if (!essay || essay.classList.contains('d-none')) return;
+    clearTimeout(essayLnumTimer);
+    essayLnumTimer = setTimeout(() => { addEssayLineNumbers(); addEssaySectionTags(); }, 150);
+  });
+
+  // แสดง/ซ่อน section เรียงความแบบลอย (fixed) ฝั่งขวา และเว้นที่ฝั่งขวาของแบบประเมินไม่ให้ถูกทับ
+  // มีเรียงความ → แสดงกล่องลอยฝั่งขวา ติดตามหน้าจอเสมอ | ไม่มีเรียงความ → ซ่อน และแบบประเมินเต็มความกว้างตามเดิม
+  function toggleEssayColumn(show) {
+    const essay = document.getElementById('essayFloating');
+    const view = document.getElementById('view-evaluation');
+    if (essay) essay.classList.toggle('d-none', !show);
+    if (view) view.classList.toggle('essay-open', show);
+  }
+
+  // ชื่อหัวกระดาษตามรอบการประเมิน
+  const essayFormTitleByPhase = {
+    pretest:  'แบบวัดความสามารถก่อนเรียน',
+    posttest: 'แบบวัดความสามารถหลังเรียน',
+    task1:    'แบบฝึกภาระงาน หน่วยที่ 1',
+    task2:    'แบบฝึกภาระงาน หน่วยที่ 2'
+  };
+
+  // ภาระงานมีร่าง D1/D2 แต่ให้คะแนนเฉพาะร่างที่ 2 (D2) — จึงดึงเรียงความร่าง D2 มาแสดงเวลาประเมินหน่วยภาระงาน
+  // (คะแนนยังบันทึกภายใต้รอบ task1/task2 ตามเดิม เพื่อไม่ให้กระทบแดชบอร์ด/การส่งออก)
+  const gradingEssayPhase = { pretest: 'pretest', task1: 'task1_d2', task2: 'task2_d2', posttest: 'posttest' };
+
   async function fetchStudentEssayForEvaluation(studentId, testPhase) {
-    const panel = document.getElementById('studentEssayPanel');
+    const formTitleEl = document.getElementById('essayPanelFormTitle');
     const titleEl = document.getElementById('essayPanelTitle');
+    const authorEl = document.getElementById('essayPanelAuthor');
     const contentEl = document.getElementById('essayPanelContent');
     const countEl = document.getElementById('essayPanelWordCount');
     
@@ -732,25 +964,40 @@ require_once 'header.php';
     stopEssaySpeech(); // หยุดการอ่านออกเสียงของเรียงความเดิมก่อนโหลดใหม่
 
     if (!studentId) {
-      panel.classList.add('d-none');
+      toggleEssayColumn(false);
       return;
     }
-    
+
     try {
-      const response = await fetch(`api.php?action=get_essay&studentId=${studentId}&essay_phase=${testPhase}`);
+      const fetchPhase = gradingEssayPhase[testPhase] || testPhase;
+      const response = await fetch(`api.php?action=get_essay&studentId=${studentId}&essay_phase=${fetchPhase}`);
       const data = await response.json();
-      
+
       if (data.success && data.found) {
+        // หัวกระดาษ: ชื่อแบบวัดตามรอบ
+        if (formTitleEl) formTitleEl.textContent = essayFormTitleByPhase[testPhase] || 'แบบวัดความสามารถ';
+        // ชื่อเรื่อง
         titleEl.textContent = data.data.essay_title || 'ไม่มีชื่อเรื่อง';
+        // ชื่อ / ชั้น / รหัสประจำตัวนักเรียน ของเจ้าของผลงาน
+        const ownerName = studentDB[studentId] || data.data.student_name || '';
+        const ownerRoom = data.data.classroom || '';
+        if (authorEl) {
+          authorEl.textContent =
+            `ชื่อ ${ownerName || '—'}` +
+            `   ชั้น ${ownerRoom || '—'}` +
+            `   รหัสประจำตัวนักเรียน ${studentId}`;
+        }
         contentEl.innerHTML = formatEssayHTML(data.data.essay_content);
         countEl.textContent = `${data.data.word_count || 0} คำ`;
-        panel.classList.remove('d-none');
+        toggleEssayColumn(true);
+        // รอให้จัดหน้าเสร็จก่อนคำนวณ/วางเลขบรรทัดและป้ายบอกส่วน (กล่องเพิ่งแสดง)
+        requestAnimationFrame(() => requestAnimationFrame(() => { addEssayLineNumbers(); addEssaySectionTags(); }));
       } else {
-        panel.classList.add('d-none');
+        toggleEssayColumn(false);
       }
     } catch (err) {
       console.error("Error fetching student essay for evaluation:", err);
-      panel.classList.add('d-none');
+      toggleEssayColumn(false);
     }
   }
 
@@ -832,12 +1079,27 @@ require_once 'header.php';
       input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') { e.preventDefault(); resolveTargetStudent(); }
       });
-      // เลือกจากรายการแนะนำ (datalist) ให้โหลดข้อมูลทันที
+      // เลือกจากรายการ (datalist) ให้โหลดข้อมูลทันที
       input.addEventListener('change', () => {
-        if (studentDB[getTargetId()]) resolveTargetStudent();
+        if (getTargetId()) resolveTargetStudent();
       });
     }
   })();
+
+  // ปุ่มเลือกกลุ่มบน navbar เปลี่ยน (เฉพาะโหมดครู) → โหลดรายชื่อกลุ่มใหม่แล้วรีเซ็ตเป้าหมาย
+  window.onTEGChange = async function() {
+    if (modeParam !== 'teacher' || !window.TEG) return; // โหมดอื่นไม่ยุ่งกับกลุ่ม
+    await loadStudents();
+    populateStudentDatalist();
+    // รีเซ็ตการระบุเป้าหมายเพราะรายชื่ออาจเปลี่ยนกลุ่ม
+    const tInput = document.getElementById('targetStudentInput');
+    if (tInput) tInput.value = '';
+    const resolvedEl = document.getElementById('targetStudentResolved');
+    const errEl = document.getElementById('targetStudentError');
+    if (resolvedEl) resolvedEl.classList.add('d-none');
+    if (errEl) errEl.classList.add('d-none');
+    dimRubric();
+  };
 
   // เลือกกลุ่มด้วยปุ่ม → โหลดรายชื่อใหม่แล้วรีเซ็ตการระบุรหัสเป้าหมาย
   (function bindGroupFilter() {
@@ -849,6 +1111,8 @@ require_once 'header.php';
         btn.classList.add('active');
         const hidden = document.getElementById('groupFilterValue');
         if (hidden) hidden.value = btn.dataset.group || '';
+        // โหมดครู: จำค่ากลุ่มไว้ให้ทุกหน้าครูใช้ร่วมกัน
+        if (modeParam === 'teacher' && window.TEG) TEG.set((btn.dataset.group || '') === '' ? 'all' : btn.dataset.group);
 
         await loadStudents();
         populateStudentDatalist();
@@ -859,7 +1123,7 @@ require_once 'header.php';
           applyPeerPairing(phase);
           return;
         }
-        // โหมดอื่น: รีเซ็ตการระบุรหัสเป้าหมาย
+        // โหมดอื่น: รีเซ็ตการระบุเป้าหมาย
         const tInput = document.getElementById('targetStudentInput');
         if (tInput) { tInput.value = ''; tInput.disabled = false; }
         const resolvedEl = document.getElementById('targetStudentResolved');
@@ -874,8 +1138,8 @@ require_once 'header.php';
   // phase picker functions
   const phaseLabels = {
     pretest:  'ก่อนเรียน (Pretest - T1)',
-    task1:    'ภารงาน หน่วยที่ 1 (Task 1)',
-    task2:    'ภารงาน หน่วยที่ 2 (Task 2)',
+    task1:    'ภาระงาน หน่วยที่ 1 (Task 1)',
+    task2:    'ภาระงาน หน่วยที่ 2 (Task 2)',
     posttest: 'หลังเรียน (Posttest - T2)'
   };
   function selectPhase(phase) {
@@ -927,14 +1191,15 @@ require_once 'header.php';
     try {
       const res = await (await fetch(`api.php?action=get_my_peer_partner&round=${phase}&_t=${Date.now()}`)).json();
       if (res.success && res.partner && studentDB[res.partner]) {
-        // มีคู่ → ตั้งค่าและล็อกช่องระบุรหัส
-        if (tInput) { tInput.value = res.partner; tInput.disabled = true; }
+        // มีคู่ → ตั้งค่าและล็อกช่องระบุเป้าหมาย
+        syncTargetSelection(res.partner);
+        if (tInput) tInput.disabled = true;
         if (loadBtn) loadBtn.disabled = true;
         if (resolvedEl) { resolvedEl.textContent = `✓ ผู้ถูกประเมิน: ${res.partner} - ${studentDB[res.partner]}`; resolvedEl.classList.remove('d-none'); }
         if (lockNotice) lockNotice.classList.remove('d-none');
         checkExistingEvaluation(res.partner);
       } else {
-        // ไม่มีคู่ → เปิดช่องให้ระบุรหัสเองพร้อมข้อความเตือน (fallback)
+        // ไม่มีคู่ → เปิดช่องให้ระบุเองพร้อมข้อความเตือน (fallback)
         if (tInput) { tInput.disabled = false; tInput.value = ''; }
         if (loadBtn) loadBtn.disabled = false;
         if (resolvedEl) resolvedEl.classList.add('d-none');
@@ -1032,6 +1297,8 @@ require_once 'header.php';
 
   // ทำการทำงานเริ่มต้นแบบเงียบ
   (async function init() {
+    // โหมดครูใช้กลุ่มจากปุ่มบน navbar อัตโนมัติ (ผ่าน getGroupValue → TEG) จึงไม่ต้องตั้งค่าปุ่มในฟอร์ม
+
     await loadStudents();
     populateStudentDatalist();
     buildRubric();
@@ -1041,8 +1308,8 @@ require_once 'header.php';
     const resolvedEl = document.getElementById('targetStudentResolved');
 
     if (modeParam === 'self') {
-      // โหมดประเมินตนเอง → ล็อกรหัสเป็นของตนเองและโหลดข้อมูลทันที
-      if (tInput) { tInput.value = currentUser.id; tInput.disabled = true; }
+      // โหมดประเมินตนเอง → ล็อกเป้าหมายเป็นของตนเองและโหลดข้อมูลทันที
+      if (tInput) { tInput.value = `${currentUser.id} - ${studentDB[currentUser.id] || ''}`; tInput.disabled = true; }
       if (loadBtn) loadBtn.disabled = true;
       if (resolvedEl && studentDB[currentUser.id]) {
         resolvedEl.textContent = `✓ ผู้ถูกประเมิน: ${currentUser.id} - ${studentDB[currentUser.id]}`;

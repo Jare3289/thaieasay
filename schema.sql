@@ -167,3 +167,23 @@ CREATE TABLE IF NOT EXISTS peer_pairs (
     UNIQUE KEY unique_peer_pair (round, student_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 9. ตารางคำขอจับคู่ประเมินเพื่อน (Peer Matching Requests per round)
+-- นักเรียนจับคู่กันเอง: ฝ่ายหนึ่งส่งคำขอ อีกฝ่ายกดรับ แล้วระบบสร้างคู่ไป-กลับใน peer_pairs อัตโนมัติ
+-- requester_code: ผู้ส่งคำขอ (A)   target_code: ผู้รับคำขอ (B)
+-- status: 'pending' (รอตอบรับ), 'accepted' (รับแล้ว), 'declined' (ปฏิเสธ), 'cancelled' (ยกเลิก)
+-- แยกตามรอบ/หน่วย (round) — พอขึ้นรอบใหม่ต้องส่งคำขอกันใหม่
+CREATE TABLE IF NOT EXISTS peer_requests (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    round VARCHAR(20) NOT NULL,
+    requester_code VARCHAR(10) NOT NULL,
+    target_code VARCHAR(10) NOT NULL,
+    status VARCHAR(10) NOT NULL DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    responded_at TIMESTAMP NULL DEFAULT NULL,
+    FOREIGN KEY (requester_code) REFERENCES students(student_id) ON DELETE CASCADE,
+    FOREIGN KEY (target_code) REFERENCES students(student_id) ON DELETE CASCADE,
+    UNIQUE KEY unique_peer_request (round, requester_code, target_code),
+    INDEX idx_req_round_target (round, target_code),
+    INDEX idx_req_round_requester (round, requester_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+

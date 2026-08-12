@@ -61,6 +61,80 @@ function safe_ddl(PDO $pdo, $sql) {
     }
 }
 
+// ---- ตัวช่วยจับคู่ประเมินเพื่อน (นักเรียนจับคู่กันเอง) ----
+
+// สร้างคู่ประเมินแบบไป-กลับ (A↔B) ในรอบที่กำหนด: A ตรวจ B และ B ตรวจ A
+// พร้อมทำเครื่องหมายคำขอที่เกี่ยวข้องเป็น accepted และยกเลิกคำขอค้างอื่น ๆ ของทั้งสองคน
+// เรียกจากภายใน transaction ที่เปิดไว้แล้ว (ไม่ commit เอง)
+function peer_match_create_pair(PDO $pdo, $round, $a, $b) {
+    // จับคู่ไป-กลับ (ทับของเดิมถ้ามี ด้วย unique key round+student_code)
+    $ins = $pdo->prepare('
+        INSERT INTO peer_pairs (round, student_code, partner_code)
+        VALUES (?, ?, ?)
+        ON DUPLICATE KEY UPDATE partner_code = VALUES(partner_code)
+    ');
+    $ins->execute([$round, $a, $b]);
+    $ins->execute([$round, $b, $a]);
+
+    // คำขอระหว่างสองคนนี้ → accepted
+    $acc = $pdo->prepare('
+        UPDATE peer_requests SET status = "accepted", responded_at = NOW()
+        WHERE round = ? AND status = "pending"
+          AND ((requester_code = ? AND target_code = ?) OR (requester_code = ? AND target_code = ?))
+    ');
+    $acc->execute([$round, $a, $b, $b, $a]);
+
+    // ยกเลิกคำขอค้างอื่น ๆ ที่เกี่ยวกับสองคนนี้ (ทั้งที่ส่งออกและเข้ามา) เพราะจับคู่แล้ว
+    $canc = $pdo->prepare('
+        UPDATE peer_requests SET status = "cancelled", responded_at = NOW()
+        WHERE round = ? AND status = "pending"
+          AND (requester_code IN (?, ?) OR target_code IN (?, ?))
+    ');
+    $canc->execute([$round, $a, $b, $a, $b]);
+}
+
+// ---- ตัวช่วยเกี่ยวกับเรียงความ (คอลัมน์แยกส่วน + หัวข้อที่ครูกำหนด) ----
+
+// แผนที่รอบเรียงความ → รอบหัวข้อ: ภาระงานมีร่าง D1/D2 แต่ใช้หัวข้อเดียวกันต่อหน่วย (task1_d1/task1_d2 → task1)
+function essay_topic_phase($phase) {
+    $phase = (string)$phase;
+    if (strpos($phase, 'task1') === 0) return 'task1';
+    if (strpos($phase, 'task2') === 0) return 'task2';
+    return $phase; // pretest / posttest
+}
+
+// ประกอบเนื้อหาเรียงความจากคอลัมน์แยกส่วน (ส่วนนำ/เนื้อหา(หลายย่อหน้า)/สรุป) กลับเป็น JSON รูปแบบเดิม
+// เพื่อความเข้ากันได้กับส่วนแสดงผล/ค้นหา/ส่งออกที่ยังอ่าน essay_content แบบ JSON
+function essay_compose_content($intro, $bodyJson, $conclusion) {
+    $body = [];
+    if ($bodyJson !== null && $bodyJson !== '') {
+        $decoded = json_decode((string)$bodyJson, true);
+        if (is_array($decoded)) {
+            $body = $decoded;
+        } elseif (trim((string)$bodyJson) !== '') {
+            $body = [(string)$bodyJson];
+        }
+    }
+    $body = array_values(array_filter(array_map('strval', $body), function ($p) { return trim($p) !== ''; }));
+    return json_encode([
+        'introduction' => (string)($intro ?? ''),
+        'body'         => $body,
+        'conclusion'   => (string)($conclusion ?? ''),
+    ], JSON_UNESCAPED_UNICODE);
+}
+
+// ดึงหัวข้อที่ครูกำหนดทุกรอบเป็น map [phase => topic] (มี cache ต่อ 1 request)
+function essay_topics_map(PDO $pdo) {
+    static $cache = null;
+    if ($cache !== null) return $cache;
+    $cache = ['pretest' => '', 'task1' => '', 'task2' => '', 'posttest' => ''];
+    try {
+        $rows = $pdo->query("SELECT phase, topic FROM essay_topics")->fetchAll();
+        foreach ($rows as $r) { $cache[$r['phase']] = (string)($r['topic'] ?? ''); }
+    } catch (Exception $e) { /* ตารางอาจยังไม่ถูกสร้าง */ }
+    return $cache;
+}
+
 // ตรวจสอบแบบเบา ๆ ว่าโครงสร้างตารางถูกติดตั้งครบและมีข้อมูลนักเรียนแล้วหรือยัง
 // ถ้าครบแล้วให้ข้ามขั้นตอน migration ทั้งหมด เพื่อลดภาระฐานข้อมูลในทุก request (สำคัญมากบนโฮสต์ฟรี)
 $needs_migration = true;
@@ -243,9 +317,10 @@ if ($needs_migration) {
         CREATE TABLE IF NOT EXISTS student_essays (
             id INT AUTO_INCREMENT PRIMARY KEY,
             student_id VARCHAR(10) NOT NULL,
-            essay_phase VARCHAR(20) NOT NULL DEFAULT 'task1',
-            essay_title VARCHAR(255) DEFAULT NULL,
-            essay_content LONGTEXT,
+            essay_phase VARCHAR(20) NOT NULL DEFAULT 'task1_d1',
+            intro_content TEXT NULL,
+            body_content LONGTEXT NULL,
+            conclusion_content TEXT NULL,
             word_count INT DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -292,6 +367,104 @@ try {
                 UNIQUE KEY unique_peer_pair (round, student_code)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         ");
+    }
+} catch (Exception $e) {
+    // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
+}
+
+// ตารางคำขอจับคู่ประเมินเพื่อน (peer_requests) — นักเรียนขอจับคู่กันเอง
+// นักเรียนฝ่ายหนึ่งส่งคำขอ (requester) อีกฝ่ายกดรับ (target) แล้วระบบจะสร้างคู่ไป-กลับ
+// ใน peer_pairs ให้อัตโนมัติ แยกตามรอบ/หน่วย พอขึ้นรอบใหม่ต้องขอกันใหม่
+try {
+    $has_req = $pdo->query("SHOW TABLES LIKE 'peer_requests'");
+    if (!$has_req || $has_req->rowCount() === 0) {
+        safe_ddl($pdo, "
+            CREATE TABLE IF NOT EXISTS peer_requests (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                round VARCHAR(20) NOT NULL,
+                requester_code VARCHAR(10) NOT NULL,
+                target_code VARCHAR(10) NOT NULL,
+                status VARCHAR(10) NOT NULL DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                responded_at TIMESTAMP NULL DEFAULT NULL,
+                FOREIGN KEY (requester_code) REFERENCES students(student_id) ON DELETE CASCADE,
+                FOREIGN KEY (target_code) REFERENCES students(student_id) ON DELETE CASCADE,
+                UNIQUE KEY unique_peer_request (round, requester_code, target_code),
+                INDEX idx_req_round_target (round, target_code),
+                INDEX idx_req_round_requester (round, requester_code)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+    }
+} catch (Exception $e) {
+    // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
+}
+
+// Migration ย่อย: รองรับร่าง D1/D2 ของภาระงาน (Task Unit Drafts) — ตรวจแยกจาก migration หลัก
+// ภาระงานรุ่นเก่าถูกเก็บเป็น 'task1'/'task2' (มีร่างเดียว) จึงย้ายให้เป็น "ร่างที่ 1 (D1)" = task1_d1 / task2_d1
+// เพื่อให้เข้ากับคอลัมน์ D1/D2 ใหม่ในหน้า Essay Viewer และตัวเขียนเรียงความ
+// ใช้ SELECT ... LIMIT 1 ตรวจก่อน จึงเบามาก — เมื่อย้ายครบแล้วจะไม่ทำงานอีก
+try {
+    $legacyEssay = $pdo->query("SELECT 1 FROM student_essays WHERE essay_phase IN ('task1','task2') LIMIT 1");
+    if ($legacyEssay && $legacyEssay->fetch()) {
+        // UPDATE IGNORE กันชนกับแถว _d1 ที่อาจมีอยู่แล้ว (unique student_id+essay_phase)
+        safe_ddl($pdo, "UPDATE IGNORE student_essays SET essay_phase = 'task1_d1' WHERE essay_phase = 'task1'");
+        safe_ddl($pdo, "UPDATE IGNORE student_essays SET essay_phase = 'task2_d1' WHERE essay_phase = 'task2'");
+    }
+} catch (Exception $e) {
+    // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
+}
+
+// Migration ย่อย: แยกเนื้อหาเรียงความออกเป็นคอลัมน์ ส่วนนำ / เนื้อหา / สรุป
+// - intro_content        = ส่วนนำ (Introduction)
+// - body_content         = ส่วนเนื้อหา (เก็บทุกย่อหน้าเป็น JSON array ไว้ในคอลัมน์เดียว)
+// - conclusion_content   = ส่วนสรุป (Conclusion)
+// พร้อมย้ายข้อมูลเดิมจากคอลัมน์ essay_content (JSON) มาใส่คอลัมน์ใหม่ (backfill ด้วย PHP เพื่อความเข้ากันได้ทุกโฮสต์)
+try {
+    $col = $pdo->query("SHOW COLUMNS FROM student_essays LIKE 'body_content'");
+    if (!$col || $col->rowCount() === 0) {
+        safe_ddl($pdo, "ALTER TABLE student_essays ADD COLUMN intro_content TEXT NULL AFTER essay_phase");
+        safe_ddl($pdo, "ALTER TABLE student_essays ADD COLUMN body_content LONGTEXT NULL AFTER intro_content");
+        safe_ddl($pdo, "ALTER TABLE student_essays ADD COLUMN conclusion_content TEXT NULL AFTER body_content");
+
+        // backfill จาก essay_content เดิม (ถ้ามีคอลัมน์นั้น)
+        try {
+            $hasOld = $pdo->query("SHOW COLUMNS FROM student_essays LIKE 'essay_content'");
+            if ($hasOld && $hasOld->rowCount() > 0) {
+                $rows = $pdo->query("SELECT id, essay_content FROM student_essays WHERE essay_content IS NOT NULL AND essay_content <> ''")->fetchAll();
+                $up = $pdo->prepare("UPDATE student_essays SET intro_content = ?, body_content = ?, conclusion_content = ? WHERE id = ?");
+                foreach ($rows as $r) {
+                    $obj = json_decode((string)$r['essay_content'], true);
+                    if (is_array($obj) && isset($obj['introduction'])) {
+                        $intro = (string)($obj['introduction'] ?? '');
+                        $body  = (isset($obj['body']) && is_array($obj['body'])) ? array_values($obj['body']) : [];
+                        $conc  = (string)($obj['conclusion'] ?? '');
+                    } else {
+                        // ข้อความล้วนรุ่นเก่า → ใส่ไว้ที่ส่วนนำ
+                        $intro = (string)$r['essay_content']; $body = []; $conc = '';
+                    }
+                    $up->execute([$intro, json_encode($body, JSON_UNESCAPED_UNICODE), $conc, $r['id']]);
+                }
+            }
+        } catch (Exception $e) { /* เงียบไว้ */ }
+    }
+} catch (Exception $e) {
+    // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
+}
+
+// ตารางหัวข้อเรียงความที่ครูกำหนดต่อรอบ (ก่อนเรียน/หน่วยที่ 1/หน่วยที่ 2/หลังเรียน)
+// นักเรียนไม่ต้องกรอกชื่อเรื่องเอง — ใช้หัวข้อที่ครูกำหนดของแต่ละงานแทน
+try {
+    $tp = $pdo->query("SHOW TABLES LIKE 'essay_topics'");
+    if (!$tp || $tp->rowCount() === 0) {
+        safe_ddl($pdo, "
+            CREATE TABLE IF NOT EXISTS essay_topics (
+                phase VARCHAR(20) PRIMARY KEY,
+                topic VARCHAR(500) DEFAULT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+        // เตรียมแถวว่างของ 4 รอบหลักไว้ล่วงหน้า (ครูมากรอกหัวข้อภายหลัง)
+        safe_ddl($pdo, "INSERT IGNORE INTO essay_topics (phase, topic) VALUES ('pretest', NULL), ('task1', NULL), ('task2', NULL), ('posttest', NULL)");
     }
 } catch (Exception $e) {
     // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
