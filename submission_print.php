@@ -1,12 +1,19 @@
 <?php
 // submission_print.php
 // เอกสาร "รายงานการส่งงานรายบุคคล" สำหรับดูตัวอย่างก่อนพิมพ์/บันทึกเป็น PDF
-// ทำงานฝั่งเซิร์ฟเวอร์ ดึงข้อมูลจากฐานข้อมูลตรง ๆ แล้วย่อให้พอดี "กระดาษแผ่นเดียว หน้าเดียว" (A4 แนวนอน)
+// ทำงานฝั่งเซิร์ฟเวอร์ ดึงข้อมูลจากฐานข้อมูลตรง ๆ แล้วย่อให้พอดี "กระดาษแผ่นเดียว หน้าเดียว" (A4 แนวตั้ง)
 
 require_once 'auth_helper.php';
 require_login('teacher');
 
 $hh = function ($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); };
+
+// เอาเฉพาะ "ชื่อ" (ตัดคำนำหน้าและนามสกุลออก) — หัวตารางแคบ ๆ จะได้อ่านง่าย
+$firstNameOnly = function ($name) {
+    $n = formatNamePrefix($name);
+    $parts = preg_split('/\s+/u', trim($n));
+    return ($parts && $parts[0] !== '') ? $parts[0] : $n;
+};
 
 // ---- ตัวกรองกลุ่มการวิจัย (ให้ตรงกับปุ่มเลือกกลุ่มบนหน้ารายงาน) ----
 $groupParam = isset($_GET['group']) ? trim($_GET['group']) : '';
@@ -73,7 +80,7 @@ foreach ($stuRows as $s) {
     $sid = $s['student_id'];
     $report[] = [
         'student_id'   => $sid,
-        'student_name' => formatNamePrefix($s['student_name']),
+        'student_name' => $firstNameOnly($s['student_name']),
         'classroom'    => $s['classroom'],
         'pretest'      => isset($essaySet['pretest'][$sid]),
         'd1_1'         => isset($essaySet['task1_d1'][$sid]),
@@ -124,7 +131,7 @@ $mark = function ($on) { return $on ? '✓' : ''; };
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>รายงานการส่งงานรายบุคคล</title>
 <style>
-  @page { size: A4 landscape; margin: 7mm; }
+  @page { size: A4 portrait; margin: 7mm; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: #eceff3; }
   body {
@@ -146,10 +153,10 @@ $mark = function ($on) { return $on ? '✓' : ''; };
   }
   .toolbar a.tb-close { background: transparent; color: #fff; border: 1px solid rgba(255,255,255,.5); }
 
-  /* กระดาษ A4 แนวนอน (พอดีหน้าเดียว) */
+  /* กระดาษ A4 แนวตั้ง (พอดีหน้าเดียว) */
   .paper {
-    width: 1063px;        /* ≈ 281mm ที่ 96dpi (A4 แนวนอน หักขอบ) */
-    height: 733px;        /* ≈ 194mm */
+    width: 740px;         /* ≈ 196mm ที่ 96dpi (A4 แนวตั้ง หักขอบ) */
+    height: 1069px;       /* ≈ 283mm */
     margin: 18px auto;
     background: #fff;
     box-shadow: 0 3px 16px rgba(0,0,0,0.18);
@@ -162,14 +169,27 @@ $mark = function ($on) { return $on ? '✓' : ''; };
   .doc-sub   { text-align: center; font-size: 16px; color: #333; margin: 0 0 8px; }
   .doc-meta  { display: flex; flex-wrap: wrap; gap: 2px 22px; font-size: 16px; margin-bottom: 8px; }
 
-  table.report { width: 100%; border-collapse: collapse; }
-  table.report th, table.report td { border: 1px solid #444; padding: 3px 5px; font-size: 15px; text-align: center; }
+  table.report { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  table.report th, table.report td { border: 1px solid #444; padding: 3px 4px; font-size: 15px; text-align: center; }
   table.report thead th { background: #e8eef5; font-weight: 700; }
   table.report thead th.u1 { background: #dbe8fb; }
   table.report thead th.u2 { background: #e2e0fb; }
-  table.report td.idx { width: 34px; color: #444; }
-  table.report td.sid { white-space: nowrap; font-variant-numeric: tabular-nums; }
-  table.report td.name { text-align: left; white-space: nowrap; }
+
+  /* หัวตารางแนวตั้ง — ช่องแคบ ไม่กินพื้นที่แนวนอน */
+  table.report thead th.vh { height: 108px; padding: 4px 0; vertical-align: bottom; }
+  table.report thead th.vh > span {
+    display: inline-block;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    white-space: nowrap;
+    line-height: 1.05;
+    font-weight: 700;
+  }
+  table.report col.c-status { width: 26px; }
+
+  table.report td.idx { width: 30px; color: #444; }
+  table.report td.sid { width: 78px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  table.report td.name { text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   table.report td.mark { font-weight: 700; color: #0a6b2e; }
   table.report td.u1 { background: #f4f8ff; }
   table.report td.u2 { background: #f6f5ff; }
@@ -187,7 +207,7 @@ $mark = function ($on) { return $on ? '✓' : ''; };
 </head>
 <body>
   <div class="toolbar">
-    <span>👀 ดูตัวอย่างก่อนพิมพ์ — ข้อมูลถูกย่อให้พอดีกระดาษแผ่นเดียว (A4 แนวนอน) · กดปุ่ม "พิมพ์ / บันทึก PDF" เมื่อพร้อม</span>
+    <span>👀 ดูตัวอย่างก่อนพิมพ์ — ข้อมูลถูกย่อให้พอดีกระดาษแผ่นเดียว (A4 แนวตั้ง) · กดปุ่ม "พิมพ์ / บันทึก PDF" เมื่อพร้อม</span>
     <div class="tb-actions">
       <button onclick="window.print()">🖨️ พิมพ์ / บันทึก PDF</button>
       <a class="tb-close" href="submission_report.php">ปิด</a>
@@ -210,27 +230,34 @@ $mark = function ($on) { return $on ? '✓' : ''; };
         <div class="empty"><div style="font-size:40px">📭</div>ไม่พบนักเรียนในกลุ่มที่เลือก</div>
       <?php else: ?>
       <table class="report">
+        <colgroup>
+          <col><col><col>
+          <col class="c-status">
+          <col class="c-status"><col class="c-status"><col class="c-status"><col class="c-status"><col class="c-status">
+          <col class="c-status"><col class="c-status"><col class="c-status"><col class="c-status"><col class="c-status">
+          <col class="c-status">
+        </colgroup>
         <thead>
           <tr>
             <th rowspan="2">ที่</th>
             <th rowspan="2">รหัส</th>
-            <th rowspan="2" style="text-align:left;">ชื่อ-สกุล</th>
-            <th rowspan="2">ก่อน<br>เรียน</th>
+            <th rowspan="2" style="text-align:left;">ชื่อ</th>
+            <th rowspan="2" class="vh"><span>ก่อนเรียน</span></th>
             <th colspan="5" class="u1">หน่วยการเรียนที่ 1</th>
             <th colspan="5" class="u2">หน่วยการเรียนที่ 2</th>
-            <th rowspan="2">หลัง<br>เรียน</th>
+            <th rowspan="2" class="vh"><span>หลังเรียน</span></th>
           </tr>
           <tr>
-            <th class="u1">D1.1</th>
-            <th class="u1">D1.2</th>
-            <th class="u1">ปัญหา<br>การเขียน</th>
-            <th class="u1">ตรวจสอบ<br>ตนเอง</th>
-            <th class="u1">สะท้อน<br>เรียนรู้</th>
-            <th class="u2">D2.1</th>
-            <th class="u2">D2.2</th>
-            <th class="u2">ปัญหา<br>การเขียน</th>
-            <th class="u2">ตรวจสอบ<br>ตนเอง</th>
-            <th class="u2">สะท้อน<br>เรียนรู้</th>
+            <th class="u1 vh"><span>D1.1</span></th>
+            <th class="u1 vh"><span>D1.2</span></th>
+            <th class="u1 vh"><span>ปัญหาการเขียน</span></th>
+            <th class="u1 vh"><span>ตรวจสอบตนเอง</span></th>
+            <th class="u1 vh"><span>สะท้อนการเรียนรู้</span></th>
+            <th class="u2 vh"><span>D2.1</span></th>
+            <th class="u2 vh"><span>D2.2</span></th>
+            <th class="u2 vh"><span>ปัญหาการเขียน</span></th>
+            <th class="u2 vh"><span>ตรวจสอบตนเอง</span></th>
+            <th class="u2 vh"><span>สะท้อนการเรียนรู้</span></th>
           </tr>
         </thead>
         <tbody>
@@ -272,7 +299,7 @@ $mark = function ($on) { return $on ? '✓' : ''; };
     // ย่อเนื้อหาให้พอดี "กระดาษแผ่นเดียว หน้าเดียว" — คำนวณอัตราส่วนจากพื้นที่พิมพ์จริงของ A4 แนวนอน
     // ใช้ CSS zoom (ไม่ใช่ transform) เพื่อให้ขนาดกล่องหดจริง จะได้ไม่ล้นไปเป็นหน้าที่สองตอนพิมพ์
     (function () {
-      var PAGE_W = 1063, PAGE_H = 733; // พิกเซลพื้นที่พิมพ์ (A4 แนวนอน หักขอบ ~7mm)
+      var PAGE_W = 740, PAGE_H = 1069; // พิกเซลพื้นที่พิมพ์ (A4 แนวตั้ง หักขอบ ~7mm)
       function fitOnePage() {
         var inner = document.getElementById('paperInner');
         if (!inner) return;
