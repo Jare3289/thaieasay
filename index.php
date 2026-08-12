@@ -253,20 +253,20 @@ require_once 'header.php';
       <a href="manage_students.php" class="btn menu-card w-100 py-5 text-decoration-none">
         <div class="text-center w-100">
           <div class="fs-1 mb-3">👨‍👩‍👧‍👦</div>
-          <h4 class="fw-bold text-dark mb-2">จัดการข้อมูลนักเรียน</h4>
-          <p class="text-muted small font-light">นำเข้ารายชื่อจากไฟล์ CSV เพิ่มทีละคน และแบ่งกลุ่มทดลอง/กลุ่มตัวอย่าง</p>
+          <h4 class="fw-bold text-dark mb-2">จัดการนักเรียน &amp; จับคู่</h4>
+          <p class="text-muted small font-light">นำเข้ารายชื่อ แบ่งกลุ่มทดลอง/ตัวอย่าง และกำหนดคู่ประเมินเพื่อนในหน้าเดียว</p>
         </div>
         <span class="text-primary text-center fw-bold small mt-3 d-block">เปิดหน้าจัดการนักเรียน &rarr;</span>
       </a>
     </div>
     <div class="col-md-4 col-sm-12">
-      <a href="peer_pairing.php" class="btn menu-card w-100 py-5 text-decoration-none">
+      <a href="submission_report.php" class="btn menu-card w-100 py-5 text-decoration-none">
         <div class="text-center w-100">
-          <div class="fs-1 mb-3">🤝</div>
-          <h4 class="fw-bold text-dark mb-2">จับคู่ประเมินเพื่อน</h4>
-          <p class="text-muted small font-light">กำหนดคู่นักเรียนสำหรับการประเมินเพื่อนในแต่ละรอบ หรือสุ่มจับคู่อัตโนมัติแล้วปรับแก้เอง</p>
+          <div class="fs-1 mb-3">🧾</div>
+          <h4 class="fw-bold text-dark mb-2">รายงานการส่งงาน</h4>
+          <p class="text-muted small font-light">ติดตามสถานะการส่งเรียงความก่อน/หลังเรียน ร่าง D1/D2 และเครื่องมือสะท้อนคิดรายบุคคล</p>
         </div>
-        <span class="text-primary text-center fw-bold small mt-3 d-block">เปิดหน้าจับคู่ประเมิน &rarr;</span>
+        <span class="text-primary text-center fw-bold small mt-3 d-block">เปิดรายงานการส่งงาน &rarr;</span>
       </a>
     </div>
     <div class="col-md-4 col-sm-12">
