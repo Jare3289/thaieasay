@@ -1,9 +1,13 @@
 :root {
   --primary-navy: #0f172a;       /* สีกรมท่าลึก หรูหราเป็นทางการ */
   --secondary-blue: #1e3a8a;     /* สีน้ำเงินหลวง มั่นคง น่าเชื่อถือ */
-  --accent-teal: #0d9488;        /* สีเทล/เขียวหัวเป็ด วิชาการและการเติบโต */
+  --accent-teal: #0d9488;        /* คงไว้สำหรับสีคะแนนรูบริก (ไม่ใช่สีธีมหลัก) */
   --accent-teal-dark: #0f766e;
-  --light-blue: #f0f9ff;
+  /* สีเน้นหลักของธีม = น้ำเงิน (ตามที่กำหนด ไม่ใช้เขียว) */
+  --accent-blue: #2563eb;        /* น้ำเงินสดใสสำหรับไฮไลต์ */
+  --accent-blue-dark: #1e3a8a;   /* น้ำเงินหลวงเข้ม */
+  --light-blue: #eff6ff;
+  --light-blue-2: #f0f7ff;
   --light-teal: #f0fdfa;
   --light-slate: #f4f6fb;
   --border-gray: #e6eaf2;
@@ -123,13 +127,13 @@ body {
   flex-shrink: 0;
 }
 .sidebar-link:hover {
-  background: var(--light-teal);
-  color: var(--accent-teal-dark);
+  background: var(--light-blue);
+  color: var(--accent-blue-dark);
 }
 .sidebar-link.active {
-  background: linear-gradient(135deg, var(--accent-teal) 0%, var(--accent-teal-dark) 100%);
+  background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-blue-dark) 100%);
   color: #ffffff;
-  box-shadow: 0 6px 16px rgba(13, 148, 136, 0.28);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.30);
 }
 .sidebar-link.active i { color: #ffffff; }
 
@@ -155,7 +159,7 @@ body {
   justify-content: center;
   font-weight: 700;
   color: #fff;
-  background: linear-gradient(135deg, var(--secondary-blue) 0%, var(--accent-teal) 100%);
+  background: linear-gradient(135deg, var(--accent-blue) 0%, var(--primary-navy) 100%);
 }
 .sidebar-user-info { flex: 1; min-width: 0; }
 .sidebar-user-name {
@@ -247,10 +251,10 @@ body {
   white-space: nowrap;
   transition: all 0.18s ease;
 }
-.teg-group-filter button:hover { color: var(--accent-teal-dark); }
+.teg-group-filter button:hover { color: var(--accent-blue-dark); }
 .teg-group-filter button.active {
   background: #ffffff;
-  color: var(--accent-teal-dark);
+  color: var(--accent-blue-dark);
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
 }
 
@@ -262,7 +266,7 @@ body {
   padding: 2px 12px 8px;
 }
 /* กล่องเนื้อหาหลักของแต่ละหน้า ให้มีพื้นขาวโค้งมนแบบการ์ดใหญ่ */
-.app-content > .content-card,
+.content-card,
 .app-content .page-panel {
   background: #ffffff;
   border-radius: var(--shell-radius);
@@ -276,8 +280,8 @@ body {
    ========================================================================= */
 .auth-body {
   background:
-    radial-gradient(1000px 500px at 100% 0%, rgba(13, 148, 136, 0.08), transparent 60%),
-    radial-gradient(900px 500px at 0% 100%, rgba(30, 58, 138, 0.08), transparent 60%),
+    radial-gradient(1000px 500px at 100% 0%, rgba(37, 99, 235, 0.10), transparent 60%),
+    radial-gradient(900px 500px at 0% 100%, rgba(15, 23, 42, 0.08), transparent 60%),
     var(--light-slate);
 }
 .auth-shell {
@@ -412,7 +416,7 @@ body {
 }
 .menu-card:hover {
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08);
-  border-color: var(--accent-teal);
+  border-color: var(--accent-blue);
   transform: translateY(-3px);
 }
 
@@ -527,6 +531,6 @@ body {
   .app-shell { padding: 8px; }
   .app-topbar { padding: 12px 14px; border-radius: 16px; }
   .teg-group-filter button { padding: 6px 8px; font-size: 0.72rem; }
-  .app-content > .content-card,
+  .content-card,
   .app-content .page-panel { padding: 16px; }
 }

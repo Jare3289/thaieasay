@@ -8,7 +8,7 @@ require_once 'header.php';
 <div id="view-submission-report" class="text-start">
 
   <!-- แถบสรุปด้านบน (Stat cards) -->
-  <div class="row g-3 mb-3">
+  <div class="row g-3 mb-3 no-print">
     <div class="col-md-3 col-6">
       <div class="stat-card">
         <div class="stat-label"><span class="stat-icon badge-blue">👥</span> นักเรียนทั้งหมด</div>
@@ -18,7 +18,7 @@ require_once 'header.php';
     </div>
     <div class="col-md-3 col-6">
       <div class="stat-card">
-        <div class="stat-label"><span class="stat-icon badge-teal">✅</span> ส่งครบทุกชิ้น</div>
+        <div class="stat-label"><span class="stat-icon badge-blue">✅</span> ส่งครบทุกชิ้น</div>
         <div class="stat-value" id="statComplete">-</div>
         <div class="stat-foot">ครบ 9 ชิ้นงาน</div>
       </div>
@@ -40,15 +40,22 @@ require_once 'header.php';
   </div>
 
   <!-- ตารางรายงานการส่งงาน -->
-  <div class="content-card">
+  <div class="content-card" id="reportPrintArea">
+   <div id="reportPrintInner">
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
       <div>
         <h5 class="fw-bold mb-1" style="color:var(--primary-navy)"><i class="bi bi-table me-2"></i>รายงานการส่งงานรายบุคคล</h5>
-        <p class="text-muted small mb-0">ติดตามสถานะการส่งเรียงความและเครื่องมือสะท้อนคิดของนักเรียนแต่ละคน (ใช้ตัวเลือกกลุ่มการวิจัยที่แถบด้านบน)</p>
+        <p class="text-muted small mb-0 report-desc">ติดตามสถานะการส่งเรียงความและเครื่องมือสะท้อนคิดของนักเรียนแต่ละคน (ใช้ตัวเลือกกลุ่มการวิจัยที่แถบด้านบน)</p>
+        <div class="print-only print-meta" id="printMeta"></div>
       </div>
-      <button class="btn btn-success btn-sm rounded-pill px-3 fw-bold shadow-sm" onclick="exportSubmissionCSV()">
-        <i class="bi bi-download me-1"></i> ส่งออก CSV
-      </button>
+      <div class="d-flex gap-2 no-print">
+        <button class="btn btn-outline-primary btn-sm rounded-pill px-3 fw-bold" onclick="exportSubmissionCSV()">
+          <i class="bi bi-filetype-csv me-1"></i> ส่งออก CSV
+        </button>
+        <button class="btn btn-primary btn-sm rounded-pill px-3 fw-bold shadow-sm" onclick="exportSubmissionPDF()">
+          <i class="bi bi-filetype-pdf me-1"></i> ส่งออก PDF (แนวนอน)
+        </button>
+      </div>
     </div>
 
     <div class="table-responsive">
@@ -82,6 +89,7 @@ require_once 'header.php';
         </tbody>
       </table>
     </div>
+   </div><!-- /#reportPrintInner -->
   </div>
 </div>
 
@@ -94,15 +102,56 @@ require_once 'header.php';
     border-bottom: 2px solid var(--border-gray);
     vertical-align: middle;
   }
-  .report-table thead .grp-unit1 { background: #eef6ff; color: #1d4ed8; }
-  .report-table thead .grp-unit2 { background: #f0fdf4; color: #15803d; }
+  .report-table thead .grp-unit1 { background: #eff6ff; color: #1d4ed8; }
+  .report-table thead .grp-unit2 { background: #eef2ff; color: #3730a3; }
   .report-table tbody td { border-bottom: 1px solid var(--border-gray); }
   .report-table .sticky-col, .report-table .sticky-col-2 { text-align: left !important; }
   .report-table tbody .stu-id { font-family: monospace; color: #64748b; font-weight: 600; }
   .report-table tbody .stu-name { font-weight: 600; color: var(--primary-navy); text-align: left; }
-  .sub-yes { color: #0d9488; font-size: 1.05rem; }
+  .sub-yes { color: #2563eb; font-size: 1.05rem; }
   .sub-no  { color: #cbd5e1; font-size: 1.05rem; }
-  .report-table tbody tr:hover td { background: var(--light-teal); }
+  .report-table tbody tr:hover td { background: var(--light-blue); }
+
+  /* องค์ประกอบที่แสดงเฉพาะตอนพิมพ์ PDF */
+  .print-only { display: none; }
+  .print-meta { font-size: 0.9rem; color: #334155; margin-top: 4px; }
+
+  /* ===================== โหมดพิมพ์ PDF (แนวนอน 1 หน้า) ===================== */
+  @media print {
+    @page { size: A4 landscape; margin: 8mm; }
+
+    /* ซ่อนเปลือกระบบทั้งหมด เหลือเฉพาะตารางรายงาน */
+    .app-sidebar, .app-topbar, .sidebar-backdrop, .no-print, .report-desc { display: none !important; }
+    .app-shell { display: block !important; padding: 0 !important; }
+    .app-main { gap: 0 !important; }
+    .app-content { padding: 0 !important; }
+    body { background: #fff !important; }
+
+    .content-card {
+      box-shadow: none !important;
+      border: none !important;
+      padding: 0 !important;
+      border-radius: 0 !important;
+    }
+    .print-only { display: block; }
+
+    /* คลายกล่องเลื่อนแนวนอนให้พิมพ์เห็นทุกคอลัมน์ */
+    .table-responsive { overflow: visible !important; border: none !important; }
+    .report-table { min-width: 0 !important; width: 100% !important; }
+    .report-table th, .report-table td {
+      font-size: 8pt !important;
+      padding: 2px 4px !important;
+    }
+    .sub-yes, .sub-no { font-size: 9pt !important; }
+    /* พิมพ์สีพื้นหัวตาราง/สถานะให้ครบ */
+    .report-table thead th, .report-table thead .grp-unit1, .report-table thead .grp-unit2 {
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+    .sub-yes { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+    /* กล่องย่อ-ขยายให้พอดี 1 หน้า (กำหนดขนาดจริงด้วย JS ก่อนพิมพ์) */
+    #reportPrintInner { transform-origin: top left; }
+  }
 </style>
 
 <script>
@@ -206,6 +255,53 @@ require_once 'header.php';
     a.click();
     URL.revokeObjectURL(url);
   }
+
+  // ส่งออก PDF แนวนอน พอดี 1 หน้ากระดาษ (ใช้การพิมพ์ของเบราว์เซอร์ → เลือก "บันทึกเป็น PDF")
+  function exportSubmissionPDF() {
+    if (!submissionData.length) { showToast('ยังไม่มีข้อมูลให้ส่งออก', 'error'); return; }
+
+    // เติมข้อมูลหัวรายงานสำหรับพิมพ์ (กลุ่ม + วันที่)
+    const g = (window.TEG ? TEG.get() : 'all');
+    const groupText = (g === 'all') ? 'ทุกกลุ่มการวิจัย' : g;
+    const today = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+    document.getElementById('printMeta').innerHTML =
+      'กลุ่ม: <b>' + groupText + '</b> · จำนวน ' + submissionData.length + ' คน · พิมพ์เมื่อ ' + today;
+
+    const inner = document.getElementById('reportPrintInner');
+    const area = document.getElementById('reportPrintArea');
+
+    // คำนวณอัตราย่อ-ขยายให้เนื้อหาพอดีกระดาษ A4 แนวนอน (≈ 1050 × 715 px ที่ 96dpi หลังหักขอบ)
+    inner.style.transform = 'none';
+    area.style.width = ''; area.style.height = '';
+    const cw = inner.scrollWidth || 1;
+    const ch = inner.scrollHeight || 1;
+    const pageW = 1052, pageH = 715;
+    const scale = Math.min(pageW / cw, pageH / ch, 1.15);
+
+    const applyScale = () => {
+      inner.style.transform = 'scale(' + scale + ')';
+      // ล็อกขนาดกล่องนอกให้เท่าเนื้อหาที่ย่อแล้ว → บังคับให้อยู่หน้าเดียว
+      area.style.width = (cw * scale) + 'px';
+      area.style.height = (ch * scale) + 'px';
+    };
+    const clearScale = () => {
+      inner.style.transform = 'none';
+      area.style.width = ''; area.style.height = '';
+    };
+
+    applyScale();
+    // เผื่อการ reflow ของฟอนต์/ตารางก่อนเปิดกล่องพิมพ์
+    setTimeout(() => {
+      window.print();
+      clearScale();
+    }, 120);
+  }
+  window.addEventListener('afterprint', () => {
+    const inner = document.getElementById('reportPrintInner');
+    const area = document.getElementById('reportPrintArea');
+    if (inner) inner.style.transform = 'none';
+    if (area) { area.style.width = ''; area.style.height = ''; }
+  });
 
   // ให้ตัวกรองกลุ่มบนแถบบนสั่งโหลดใหม่โดยไม่รีเฟรชทั้งหน้า
   window.onTEGChange = loadSubmissionReport;
