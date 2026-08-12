@@ -193,6 +193,22 @@ try {
             echo json_encode(['success' => true]);
             break;
 
+        // 4.2.1 ลบนักเรียนทีละคน (ครูเท่านั้น) — ข้อมูลที่เกี่ยวข้องถูกลบตาม FK ON DELETE CASCADE
+        case 'delete_student':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'ต้องเป็นคุณครู']);
+                exit;
+            }
+            $sid = isset($request_data['student_id']) ? trim($request_data['student_id']) : '';
+            if ($sid === '') {
+                echo json_encode(['success' => false, 'error' => 'ต้องระบุรหัสนักเรียน']);
+                exit;
+            }
+            $stmt = $pdo->prepare('DELETE FROM students WHERE student_id = ?');
+            $stmt->execute([$sid]);
+            echo json_encode(['success' => true, 'deleted' => $stmt->rowCount()]);
+            break;
+
         // 4.3 นำเข้ารายชื่อนักเรียนจากไฟล์ CSV (ครูเท่านั้น) — คอลัมน์: รหัส, ชื่อ, ห้อง, กลุ่ม
         case 'import_students_csv':
             if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
@@ -734,15 +750,16 @@ try {
                 exit;
             }
             $p = isset($request_data['problems']) ? $request_data['problems'] : [];
-            
+            $unit = (isset($request_data['unit']) && intval($request_data['unit']) === 2) ? 2 : 1;
+
             $stmt = $pdo->prepare('
                 INSERT INTO writing_problems (
-                    student_id,
+                    student_id, task_unit,
                     prob_1_1, sol_1_1, prob_1_2, sol_1_2, prob_1_3, sol_1_3,
                     prob_2_1, sol_2_1, prob_2_2, sol_2_2,
                     prob_3_1, sol_3_1, prob_3_2, sol_3_2, prob_3_3, sol_3_3,
                     prob_4_1, sol_4_1, prob_4_2, sol_4_2, prob_4_3, sol_4_3
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE
                     prob_1_1 = VALUES(prob_1_1), sol_1_1 = VALUES(sol_1_1),
                     prob_1_2 = VALUES(prob_1_2), sol_1_2 = VALUES(sol_1_2),
@@ -757,7 +774,7 @@ try {
                     prob_4_3 = VALUES(prob_4_3), sol_4_3 = VALUES(sol_4_3)
             ');
             $stmt->execute([
-                $studentId,
+                $studentId, $unit,
                 isset($p['prob_1_1']) ? $p['prob_1_1'] : null, isset($p['sol_1_1']) ? $p['sol_1_1'] : null,
                 isset($p['prob_1_2']) ? $p['prob_1_2'] : null, isset($p['sol_1_2']) ? $p['sol_1_2'] : null,
                 isset($p['prob_1_3']) ? $p['prob_1_3'] : null, isset($p['sol_1_3']) ? $p['sol_1_3'] : null,
@@ -779,8 +796,9 @@ try {
                 echo json_encode(['success' => false, 'error' => 'Student ID is required']);
                 exit;
             }
-            $stmt = $pdo->prepare('SELECT * FROM writing_problems WHERE student_id = ?');
-            $stmt->execute([$studentId]);
+            $unit = (isset($_GET['unit']) && intval($_GET['unit']) === 2) ? 2 : 1;
+            $stmt = $pdo->prepare('SELECT * FROM writing_problems WHERE student_id = ? AND task_unit = ?');
+            $stmt->execute([$studentId, $unit]);
             $row = $stmt->fetch();
             echo json_encode(['success' => true, 'data' => $row ? $row : null]);
             break;
@@ -793,16 +811,17 @@ try {
             }
             $c = isset($request_data['checklist']) ? $request_data['checklist'] : [];
             $notes = isset($request_data['notes']) ? $request_data['notes'] : '';
-            
+            $unit = (isset($request_data['unit']) && intval($request_data['unit']) === 2) ? 2 : 1;
+
             $stmt = $pdo->prepare('
                 INSERT INTO self_checklists (
-                    student_id,
+                    student_id, task_unit,
                     check_1_1, check_1_2, check_1_3,
                     check_2_1, check_2_2,
                     check_3_1, check_3_2, check_3_3,
                     check_4_1, check_4_2, check_4_3,
                     notes
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE
                     check_1_1 = VALUES(check_1_1), check_1_2 = VALUES(check_1_2), check_1_3 = VALUES(check_1_3),
                     check_2_1 = VALUES(check_2_1), check_2_2 = VALUES(check_2_2),
@@ -811,7 +830,7 @@ try {
                     notes = VALUES(notes)
             ');
             $stmt->execute([
-                $studentId,
+                $studentId, $unit,
                 isset($c['1.1']) ? $c['1.1'] : 'ต้องปรับปรุง',
                 isset($c['1.2']) ? $c['1.2'] : 'ต้องปรับปรุง',
                 isset($c['1.3']) ? $c['1.3'] : 'ต้องปรับปรุง',
@@ -834,8 +853,9 @@ try {
                 echo json_encode(['success' => false, 'error' => 'Student ID is required']);
                 exit;
             }
-            $stmt = $pdo->prepare('SELECT * FROM self_checklists WHERE student_id = ?');
-            $stmt->execute([$studentId]);
+            $unit = (isset($_GET['unit']) && intval($_GET['unit']) === 2) ? 2 : 1;
+            $stmt = $pdo->prepare('SELECT * FROM self_checklists WHERE student_id = ? AND task_unit = ?');
+            $stmt->execute([$studentId, $unit]);
             $row = $stmt->fetch();
             echo json_encode(['success' => true, 'data' => $row ? $row : null]);
             break;
@@ -1354,18 +1374,19 @@ try {
             $lm = isset($request_data['language_mechanics']) ? $request_data['language_mechanics'] : '';
             $fa = isset($request_data['feedback_applied']) ? $request_data['feedback_applied'] : '';
             $fg = isset($request_data['future_goals']) ? $request_data['future_goals'] : '';
-            
+            $unit = (isset($request_data['unit']) && intval($request_data['unit']) === 2) ? 2 : 1;
+
             $stmt = $pdo->prepare('
                 INSERT INTO learning_reflections (
-                    student_id, content_structure, language_mechanics, feedback_applied, future_goals
-                ) VALUES (?, ?, ?, ?, ?)
+                    student_id, task_unit, content_structure, language_mechanics, feedback_applied, future_goals
+                ) VALUES (?, ?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE
                     content_structure = VALUES(content_structure),
                     language_mechanics = VALUES(language_mechanics),
                     feedback_applied = VALUES(feedback_applied),
                     future_goals = VALUES(future_goals)
             ');
-            $stmt->execute([$studentId, $cs, $lm, $fa, $fg]);
+            $stmt->execute([$studentId, $unit, $cs, $lm, $fa, $fg]);
             echo json_encode(['success' => true]);
             break;
 
@@ -1375,8 +1396,9 @@ try {
                 echo json_encode(['success' => false, 'error' => 'Student ID is required']);
                 exit;
             }
-            $stmt = $pdo->prepare('SELECT * FROM learning_reflections WHERE student_id = ?');
-            $stmt->execute([$studentId]);
+            $unit = (isset($_GET['unit']) && intval($_GET['unit']) === 2) ? 2 : 1;
+            $stmt = $pdo->prepare('SELECT * FROM learning_reflections WHERE student_id = ? AND task_unit = ?');
+            $stmt->execute([$studentId, $unit]);
             $row = $stmt->fetch();
             echo json_encode(['success' => true, 'data' => $row ? $row : null]);
             break;
@@ -1396,11 +1418,11 @@ try {
             $stmt->execute($grpParam);
             $total_students_res = $stmt->fetchColumn();
 
-            $stmt = $pdo->prepare('SELECT COUNT(*) FROM writing_problems wp JOIN students s ON wp.student_id = s.student_id' . $grpWhere('s'));
+            $stmt = $pdo->prepare('SELECT COUNT(DISTINCT wp.student_id) FROM writing_problems wp JOIN students s ON wp.student_id = s.student_id' . $grpWhere('s'));
             $stmt->execute($grpParam);
             $prob_count = $stmt->fetchColumn();
 
-            $stmt = $pdo->prepare('SELECT COUNT(*) FROM self_checklists chk JOIN students s ON chk.student_id = s.student_id' . $grpWhere('s'));
+            $stmt = $pdo->prepare('SELECT COUNT(DISTINCT chk.student_id) FROM self_checklists chk JOIN students s ON chk.student_id = s.student_id' . $grpWhere('s'));
             $stmt->execute($grpParam);
             $chk_count = $stmt->fetchColumn();
 
@@ -1408,7 +1430,7 @@ try {
             $stmt->execute($grpParam);
             $peer_count = $stmt->fetchColumn();
 
-            $stmt = $pdo->prepare('SELECT COUNT(*) FROM learning_reflections lr JOIN students s ON lr.student_id = s.student_id' . $grpWhere('s'));
+            $stmt = $pdo->prepare('SELECT COUNT(DISTINCT lr.student_id) FROM learning_reflections lr JOIN students s ON lr.student_id = s.student_id' . $grpWhere('s'));
             $stmt->execute($grpParam);
             $ref_count = $stmt->fetchColumn();
 
@@ -1450,9 +1472,9 @@ try {
                     chk.notes AS checklist_notes,
                     ref.content_structure, ref.language_mechanics, ref.feedback_applied, ref.future_goals
                 FROM students s
-                LEFT JOIN writing_problems wp ON s.student_id = wp.student_id
-                LEFT JOIN self_checklists chk ON s.student_id = chk.student_id
-                LEFT JOIN learning_reflections ref ON s.student_id = ref.student_id' . $grpWhere('s') . '
+                LEFT JOIN writing_problems wp ON s.student_id = wp.student_id AND wp.task_unit = 1
+                LEFT JOIN self_checklists chk ON s.student_id = chk.student_id AND chk.task_unit = 1
+                LEFT JOIN learning_reflections ref ON s.student_id = ref.student_id AND ref.task_unit = 1' . $grpWhere('s') . '
                 ORDER BY s.student_id ASC
             ');
             $stmt_all->execute($grpParam);
@@ -1562,8 +1584,9 @@ try {
                 echo json_encode(['success' => false, 'error' => 'Student ID required']);
                 exit;
             }
-            $stmt = $pdo->prepare('SELECT * FROM learning_reflections WHERE student_id = ?');
-            $stmt->execute([$studentId]);
+            $unit = (isset($_GET['unit']) && intval($_GET['unit']) === 2) ? 2 : 1;
+            $stmt = $pdo->prepare('SELECT * FROM learning_reflections WHERE student_id = ? AND task_unit = ?');
+            $stmt->execute([$studentId, $unit]);
             $row = $stmt->fetch();
             if ($row) {
                 echo json_encode([
@@ -1793,16 +1816,24 @@ try {
                 if (isset($essaySet[$ph])) $essaySet[$ph][$r['student_id']] = true;
             }
 
-            // เครื่องมือสะท้อนคิด (เก็บ 1 แถวต่อคน) — มีแถว = ส่งแล้ว
-            $flagSet = ['problems' => [], 'checklist' => [], 'reflection' => []];
+            // เครื่องมือสะท้อนคิด — เก็บแยกตามหน่วยการเรียน (task_unit = 1 หรือ 2)
+            // มีแถวของหน่วยใด = ส่งของหน่วยนั้นแล้ว
+            $flagSet = [
+                'problems'   => [1 => [], 2 => []],
+                'checklist'  => [1 => [], 2 => []],
+                'reflection' => [1 => [], 2 => []],
+            ];
             foreach ([
                 'problems'   => 'writing_problems',
                 'checklist'  => 'self_checklists',
                 'reflection' => 'learning_reflections',
             ] as $key => $tbl) {
                 try {
-                    $q = $pdo->query("SELECT student_id FROM `$tbl`");
-                    while ($sid = $q->fetchColumn()) { $flagSet[$key][$sid] = true; }
+                    $q = $pdo->query("SELECT student_id, task_unit FROM `$tbl`");
+                    while ($r = $q->fetch()) {
+                        $u = (intval($r['task_unit']) === 2) ? 2 : 1;
+                        $flagSet[$key][$u][$r['student_id']] = true;
+                    }
                 } catch (Exception $e) { /* ตารางอาจยังไม่ถูกสร้าง — ปล่อยว่าง */ }
             }
 
@@ -1817,9 +1848,13 @@ try {
                     'pretest'       => isset($essaySet['pretest'][$sid]),
                     'd1_1'          => isset($essaySet['task1_d1'][$sid]),
                     'd1_2'          => isset($essaySet['task1_d2'][$sid]),
-                    'problems'      => isset($flagSet['problems'][$sid]),
-                    'checklist'     => isset($flagSet['checklist'][$sid]),
-                    'reflection'    => isset($flagSet['reflection'][$sid]),
+                    // สะท้อนคิดแยกรายหน่วย: *1 = หน่วยที่ 1, *2 = หน่วยที่ 2
+                    'problems1'     => isset($flagSet['problems'][1][$sid]),
+                    'checklist1'    => isset($flagSet['checklist'][1][$sid]),
+                    'reflection1'   => isset($flagSet['reflection'][1][$sid]),
+                    'problems2'     => isset($flagSet['problems'][2][$sid]),
+                    'checklist2'    => isset($flagSet['checklist'][2][$sid]),
+                    'reflection2'   => isset($flagSet['reflection'][2][$sid]),
                     'd2_1'          => isset($essaySet['task2_d1'][$sid]),
                     'd2_2'          => isset($essaySet['task2_d2'][$sid]),
                     'posttest'      => isset($essaySet['posttest'][$sid]),

@@ -1,5 +1,5 @@
 <?php
-$page_title = 'บันทึกเรียงความ - ระบบประเมินเรียงความอัจฉริยะ';
+$page_title = 'บันทึกเรียงความ - ระบบประเมินเรียงความ';
 require_once 'auth_helper.php';
 require_login('student');
 require_once 'header.php';

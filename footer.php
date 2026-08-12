@@ -13,6 +13,17 @@
   <!-- โหลด Bootstrap 5 JS Bundle ผ่าน CDN -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
+  <!-- ลงทะเบียน Service Worker เพื่อรองรับการติดตั้งเป็นแอป (PWA) -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('sw.js').catch(function (err) {
+          console.warn('SW register failed:', err);
+        });
+      });
+    }
+  </script>
+
   <script>
     // ข้อมูลผู้ใช้งานที่ล็อกอินปัจจุบัน (แชร์ค่าผ่าน PHP session)
     let currentUser = <?php echo isset($_SESSION['user']) ? json_encode($_SESSION['user']) : 'null'; ?>;

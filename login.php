@@ -7,7 +7,7 @@ if (isset($_SESSION['user'])) {
     exit;
 }
 
-$page_title = 'ลงชื่อเข้าใช้งาน - ระบบประเมินเรียงความอัจฉริยะ';
+$page_title = 'ลงชื่อเข้าใช้งาน - ระบบประเมินเรียงความ';
 require_once 'header.php';
 ?>
 

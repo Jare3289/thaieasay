@@ -1,5 +1,5 @@
 <?php
-$page_title = 'รายงานการส่งงาน - ระบบประเมินเรียงความอัจฉริยะ';
+$page_title = 'รายงานการส่งงาน - ระบบประเมินเรียงความ';
 require_once 'auth_helper.php';
 require_login('teacher');
 require_once 'header.php';
@@ -158,18 +158,18 @@ require_once 'header.php';
   let submissionData = [];
 
   const REPORT_COLS = [
-    { key: 'pretest',    label: 'ก่อนเรียน' },
-    { key: 'd1_1',       label: 'D1.1' },
-    { key: 'd1_2',       label: 'D1.2' },
-    { key: 'problems',   label: 'ปัญหาการเขียน (หน่วย 1)' },
-    { key: 'checklist',  label: 'ตรวจสอบตนเอง (หน่วย 1)' },
-    { key: 'reflection', label: 'สะท้อนการเรียนรู้ (หน่วย 1)' },
-    { key: 'd2_1',       label: 'D2.1' },
-    { key: 'd2_2',       label: 'D2.2' },
-    { key: 'problems',   label: 'ปัญหาการเขียน (หน่วย 2)' },
-    { key: 'checklist',  label: 'ตรวจสอบตนเอง (หน่วย 2)' },
-    { key: 'reflection', label: 'สะท้อนการเรียนรู้ (หน่วย 2)' },
-    { key: 'posttest',   label: 'หลังเรียน' },
+    { key: 'pretest',     label: 'ก่อนเรียน' },
+    { key: 'd1_1',        label: 'D1.1' },
+    { key: 'd1_2',        label: 'D1.2' },
+    { key: 'problems1',   label: 'ปัญหาการเขียน (หน่วย 1)' },
+    { key: 'checklist1',  label: 'ตรวจสอบตนเอง (หน่วย 1)' },
+    { key: 'reflection1', label: 'สะท้อนการเรียนรู้ (หน่วย 1)' },
+    { key: 'd2_1',        label: 'D2.1' },
+    { key: 'd2_2',        label: 'D2.2' },
+    { key: 'problems2',   label: 'ปัญหาการเขียน (หน่วย 2)' },
+    { key: 'checklist2',  label: 'ตรวจสอบตนเอง (หน่วย 2)' },
+    { key: 'reflection2', label: 'สะท้อนการเรียนรู้ (หน่วย 2)' },
+    { key: 'posttest',    label: 'หลังเรียน' },
   ];
 
   function cellIcon(on) {

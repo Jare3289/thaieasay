@@ -1,5 +1,5 @@
 <?php
-$page_title = 'ระบบวิเคราะห์สถิติงานวิจัย (ICC & Paired t-test) - ระบบประเมินเรียงความอัจฉริยะ';
+$page_title = 'ระบบวิเคราะห์สถิติงานวิจัย (ICC & Paired t-test) - ระบบประเมินเรียงความ';
 require_once 'auth_helper.php';
 require_login('teacher'); // ครูเท่านั้น
 require_once 'header.php';
@@ -79,70 +79,6 @@ require_once 'header.php';
           <i class="bi bi-cloud-download-fill"></i> ส่งออกรายงาน
         </a>
       </div>
-
-      <!-- 📥 ศูนย์ส่งออกชุดข้อมูลรายงาน (Report Export Center) -->
-      <section id="section-export" class="mb-5" style="scroll-margin-top: 84px;">
-        <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
-          <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-3 flex-wrap gap-2">
-            <h6 class="fw-bold mb-0 text-white"><i class="bi bi-cloud-download-fill text-info"></i> ศูนย์ส่งออกชุดข้อมูลรายงานเพื่อการวิเคราะห์ (Report Export Center)</h6>
-            <span class="badge bg-info text-dark fw-bold">Word / Google Docs · CSV</span>
-          </div>
-          <div class="card-body p-4">
-            <p class="text-muted small mb-4" style="line-height:1.7;">
-              สร้าง <strong>รายงานผลการวิจัยฉบับสมบูรณ์</strong> จากผลที่ระบบวิเคราะห์ให้ในหน้านี้ — ค่า <strong>ICC</strong>, <strong>Paired t-test</strong>,
-              สถิติเชิงพรรณนา และผลการวิเคราะห์เชิงคุณภาพ — จัดรูปแบบมี <strong>ปก · คำนำ · สารบัญ</strong> และเรียบเรียงไล่ทั้งกระบวนการวิจัย
-              พร้อมบทวิเคราะห์และสรุปผล ไฟล์เปิดได้ทันทีใน <strong>Microsoft Word</strong> หรืออัปโหลดเปิดใน <strong>Google Docs</strong>
-            </p>
-
-            <!-- ปุ่มหลัก: ส่งรายงานเข้า Google Docs โดยตรง -->
-            <div class="text-center mb-2">
-              <button onclick="sendReportToGoogleDocs()" id="genReportBtn" class="btn btn-dark btn-lg fw-bold rounded-pill px-5 py-3 shadow-sm">
-                <i class="bi bi-google text-info"></i> ส่งรายงานเข้า Google Docs โดยตรง
-              </button>
-              <div class="mt-2">
-                <button onclick="generateResearchReportDoc()" id="dlDocBtn" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
-                  <i class="bi bi-download"></i> หรือดาวน์โหลดเป็นไฟล์ .doc
-                </button>
-              </div>
-              <div class="small text-muted mt-2"><i class="bi bi-info-circle"></i> ครั้งแรกระบบจะพาไปเชื่อมต่อบัญชี Google เพื่ออนุญาตให้บันทึกไฟล์ลง Google Drive ของคุณครู · ข้อมูลรวบรวมให้อัตโนมัติ (ICC จากกลุ่มทดลอง, ส่วนอื่นจากกลุ่มตัวอย่าง)</div>
-              <div id="googleStatusBox" class="small mt-2"></div>
-            </div>
-
-            <hr class="my-4">
-
-            <!-- ข้อมูลดิบรายตาราง (CSV) สำหรับผู้ที่ต้องการวิเคราะห์เอง -->
-            <div class="border rounded-3 p-3 bg-light">
-              <div class="fw-bold text-secondary mb-1"><i class="bi bi-filetype-csv me-1"></i>ดาวน์โหลดข้อมูลดิบรายตาราง (CSV)</div>
-              <p class="text-muted small mb-3">สำหรับนำไปวิเคราะห์เองใน Excel / SPSS / R / Python — ไฟล์ฝัง UTF-8 BOM รองรับภาษาไทย และป้องกัน CSV formula injection</p>
-              <div class="row g-2 align-items-end mb-3">
-                <div class="col-md-4 col-sm-6">
-                  <label class="form-label small fw-semibold text-secondary mb-1"><i class="bi bi-people-fill me-1"></i>กรองตามกลุ่ม</label>
-                  <select id="exportGroupFilter" class="form-select form-select-sm rounded-3">
-                    <option value="">ทุกกลุ่ม</option>
-                    <option value="กลุ่มทดลอง">กลุ่มทดลอง (Experimental)</option>
-                    <option value="กลุ่มตัวอย่าง">กลุ่มตัวอย่าง (Control/Sample)</option>
-                  </select>
-                </div>
-                <div class="col-md-4 col-sm-6">
-                  <label class="form-label small fw-semibold text-secondary mb-1"><i class="bi bi-door-open-fill me-1"></i>กรองตามห้องเรียน</label>
-                  <input type="text" id="exportClassroomFilter" class="form-control form-control-sm rounded-3" placeholder="เช่น 606 (เว้นว่าง = ทุกห้อง)">
-                </div>
-              </div>
-              <div class="d-flex flex-wrap gap-2" id="csvQuickLinks">
-              <button onclick="doExport('summary','csv')" class="btn btn-link btn-sm text-decoration-none p-1 small"><i class="bi bi-filetype-csv"></i> สรุปคะแนน</button>
-              <button onclick="doExport('class_stats','csv')" class="btn btn-link btn-sm text-decoration-none p-1 small"><i class="bi bi-filetype-csv"></i> สถิติระดับชั้น</button>
-              <button onclick="doExport('evaluations','csv')" class="btn btn-link btn-sm text-decoration-none p-1 small"><i class="bi bi-filetype-csv"></i> ผลประเมิน</button>
-              <button onclick="doExport('writing_problems','csv')" class="btn btn-link btn-sm text-decoration-none p-1 small"><i class="bi bi-filetype-csv"></i> ปัญหาการเขียน</button>
-              <button onclick="doExport('self_checklists','csv')" class="btn btn-link btn-sm text-decoration-none p-1 small"><i class="bi bi-filetype-csv"></i> ตรวจสอบตนเอง</button>
-              <button onclick="doExport('peer_reviews','csv')" class="btn btn-link btn-sm text-decoration-none p-1 small"><i class="bi bi-filetype-csv"></i> ประเมินเพื่อน</button>
-              <button onclick="doExport('reflections','csv')" class="btn btn-link btn-sm text-decoration-none p-1 small"><i class="bi bi-filetype-csv"></i> สะท้อนการเรียนรู้</button>
-              <button onclick="doExport('essays','csv')" class="btn btn-link btn-sm text-decoration-none p-1 small"><i class="bi bi-filetype-csv"></i> เรียงความ</button>
-              <button onclick="doExport('peer_pairs','csv')" class="btn btn-link btn-sm text-decoration-none p-1 small"><i class="bi bi-filetype-csv"></i> การจับคู่</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
 
         <!-- ส่วนที่ 1: ICC -->
         <section id="section-icc" class="mb-5">
@@ -478,6 +414,74 @@ require_once 'header.php';
             </div>
           </div>
         </section>
+
+      <!-- 📥 ศูนย์ส่งออกชุดข้อมูลรายงาน (Report Export Center) — ย้ายมาไว้ท้ายสุดของหน้า -->
+      <section id="section-export" class="mb-5" style="scroll-margin-top: 84px;">
+        <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom border-dark border-2">
+          <span class="badge bg-dark fs-6">5</span>
+          <h5 class="fw-bold text-dark mb-0"><i class="bi bi-cloud-download-fill"></i> ส่งออกรายงานเพื่อการวิเคราะห์ (Report Export Center)</h5>
+        </div>
+        <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+          <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-3 flex-wrap gap-2">
+            <h6 class="fw-bold mb-0 text-white"><i class="bi bi-cloud-download-fill text-info"></i> ศูนย์ส่งออกชุดข้อมูลรายงานเพื่อการวิเคราะห์ (Report Export Center)</h6>
+            <span class="badge bg-info text-dark fw-bold">Word / Google Docs · CSV</span>
+          </div>
+          <div class="card-body p-4">
+            <p class="text-muted small mb-4" style="line-height:1.7;">
+              สร้าง <strong>รายงานผลการวิจัยฉบับสมบูรณ์</strong> จากผลที่ระบบวิเคราะห์ให้ในหน้านี้ — ค่า <strong>ICC</strong>, <strong>Paired t-test</strong>,
+              สถิติเชิงพรรณนา และผลการวิเคราะห์เชิงคุณภาพ — จัดรูปแบบมี <strong>ปก · คำนำ · สารบัญ</strong> และเรียบเรียงไล่ทั้งกระบวนการวิจัย
+              พร้อมบทวิเคราะห์และสรุปผล ไฟล์เปิดได้ทันทีใน <strong>Microsoft Word</strong> หรืออัปโหลดเปิดใน <strong>Google Docs</strong>
+            </p>
+
+            <!-- ปุ่มหลัก: ส่งรายงานเข้า Google Docs โดยตรง -->
+            <div class="text-center mb-2">
+              <button onclick="sendReportToGoogleDocs()" id="genReportBtn" class="btn btn-dark btn-lg fw-bold rounded-pill px-5 py-3 shadow-sm">
+                <i class="bi bi-google text-info"></i> ส่งรายงานเข้า Google Docs โดยตรง
+              </button>
+              <div class="mt-2">
+                <button onclick="generateResearchReportDoc()" id="dlDocBtn" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+                  <i class="bi bi-download"></i> หรือดาวน์โหลดเป็นไฟล์ .doc
+                </button>
+              </div>
+              <div class="small text-muted mt-2"><i class="bi bi-info-circle"></i> ครั้งแรกระบบจะพาไปเชื่อมต่อบัญชี Google เพื่ออนุญาตให้บันทึกไฟล์ลง Google Drive ของคุณครู · ข้อมูลรวบรวมให้อัตโนมัติ (ICC จากกลุ่มทดลอง, ส่วนอื่นจากกลุ่มตัวอย่าง)</div>
+              <div id="googleStatusBox" class="small mt-2"></div>
+            </div>
+
+            <hr class="my-4">
+
+            <!-- ข้อมูลดิบรายตาราง (CSV) สำหรับผู้ที่ต้องการวิเคราะห์เอง -->
+            <div class="border rounded-3 p-3 bg-light">
+              <div class="fw-bold text-secondary mb-1"><i class="bi bi-filetype-csv me-1"></i>ดาวน์โหลดข้อมูลดิบรายตาราง (CSV)</div>
+              <p class="text-muted small mb-3">สำหรับนำไปวิเคราะห์เองใน Excel / SPSS / R / Python — ไฟล์ฝัง UTF-8 BOM รองรับภาษาไทย และป้องกัน CSV formula injection</p>
+              <div class="row g-2 align-items-end mb-3">
+                <div class="col-md-4 col-sm-6">
+                  <label class="form-label small fw-semibold text-secondary mb-1"><i class="bi bi-people-fill me-1"></i>กรองตามกลุ่ม</label>
+                  <select id="exportGroupFilter" class="form-select form-select-sm rounded-3">
+                    <option value="">ทุกกลุ่ม</option>
+                    <option value="กลุ่มทดลอง">กลุ่มทดลอง (Experimental)</option>
+                    <option value="กลุ่มตัวอย่าง">กลุ่มตัวอย่าง (Control/Sample)</option>
+                  </select>
+                </div>
+                <div class="col-md-4 col-sm-6">
+                  <label class="form-label small fw-semibold text-secondary mb-1"><i class="bi bi-door-open-fill me-1"></i>กรองตามห้องเรียน</label>
+                  <input type="text" id="exportClassroomFilter" class="form-control form-control-sm rounded-3" placeholder="เช่น 606 (เว้นว่าง = ทุกห้อง)">
+                </div>
+              </div>
+              <div class="d-flex flex-wrap gap-2" id="csvQuickLinks">
+              <button onclick="doExport('summary','csv')" class="btn btn-link btn-sm text-decoration-none p-1 small"><i class="bi bi-filetype-csv"></i> สรุปคะแนน</button>
+              <button onclick="doExport('class_stats','csv')" class="btn btn-link btn-sm text-decoration-none p-1 small"><i class="bi bi-filetype-csv"></i> สถิติระดับชั้น</button>
+              <button onclick="doExport('evaluations','csv')" class="btn btn-link btn-sm text-decoration-none p-1 small"><i class="bi bi-filetype-csv"></i> ผลประเมิน</button>
+              <button onclick="doExport('writing_problems','csv')" class="btn btn-link btn-sm text-decoration-none p-1 small"><i class="bi bi-filetype-csv"></i> ปัญหาการเขียน</button>
+              <button onclick="doExport('self_checklists','csv')" class="btn btn-link btn-sm text-decoration-none p-1 small"><i class="bi bi-filetype-csv"></i> ตรวจสอบตนเอง</button>
+              <button onclick="doExport('peer_reviews','csv')" class="btn btn-link btn-sm text-decoration-none p-1 small"><i class="bi bi-filetype-csv"></i> ประเมินเพื่อน</button>
+              <button onclick="doExport('reflections','csv')" class="btn btn-link btn-sm text-decoration-none p-1 small"><i class="bi bi-filetype-csv"></i> สะท้อนการเรียนรู้</button>
+              <button onclick="doExport('essays','csv')" class="btn btn-link btn-sm text-decoration-none p-1 small"><i class="bi bi-filetype-csv"></i> เรียงความ</button>
+              <button onclick="doExport('peer_pairs','csv')" class="btn btn-link btn-sm text-decoration-none p-1 small"><i class="bi bi-filetype-csv"></i> การจับคู่</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
     </div>
   </div>

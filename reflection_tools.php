@@ -7,7 +7,7 @@ require_once 'header.php';
 $role = $sessionUser['role'];
 ?>
 
-<div class="container py-4 text-start">
+<div class="container-fluid px-0 py-2 text-start">
   <!-- หัวข้อใหญ่และปุ่มย้อนกลับ -->
   <div class="mb-3">
     <a href="index.php" class="btn btn-link text-decoration-none text-secondary fw-bold p-0">
@@ -33,6 +33,23 @@ $role = $sessionUser['role'];
         <!-- ==========================================
              STUDENT VIEW (แบบฟอร์มบันทึกของนักเรียน)
              ========================================== -->
+
+        <!-- ตัวเลือกหน่วยการเรียน: บันทึกของหน่วยที่ 1 หรือ 2 (แยกข้อมูลกันคนละชุด) -->
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4 p-3 rounded-4 border" style="background: var(--light-blue);">
+          <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-journal-bookmark-fill fs-5 text-primary"></i>
+            <span class="fw-bold" style="color:var(--primary-navy)">เลือกหน่วยการเรียนที่จะบันทึก</span>
+          </div>
+          <div class="btn-group" role="group" aria-label="เลือกหน่วยการเรียน" id="reflectionUnitPicker">
+            <button type="button" class="btn btn-primary fw-bold px-4" data-unit="1" onclick="setReflectionUnit(1)">
+              <i class="bi bi-1-circle-fill me-1"></i> หน่วยที่ 1
+            </button>
+            <button type="button" class="btn btn-outline-primary fw-bold px-4" data-unit="2" onclick="setReflectionUnit(2)">
+              <i class="bi bi-2-circle-fill me-1"></i> หน่วยที่ 2
+            </button>
+          </div>
+        </div>
+
         <ul class="nav nav-pills nav-fill mb-4 p-1 bg-light rounded-pill" id="studentTabs" role="tablist">
           <li class="nav-item" role="presentation">
             <button class="nav-link active rounded-pill fw-bold" id="obstacles-tab" data-bs-toggle="tab" data-bs-target="#obstacles" type="button" role="tab" aria-controls="obstacles" aria-selected="true">
@@ -741,6 +758,7 @@ $role = $sessionUser['role'];
   // ตรวจสอบบทบาทจาก Session ฝั่ง PHP
   const userRole = "<?php echo $role; ?>";
   const currentUserId = "<?php echo $sessionUser['id']; ?>";
+  let currentReflectionUnit = 1; // หน่วยการเรียนที่นักเรียนกำลังบันทึก (1 หรือ 2)
   let loadTeacherDashboardSummary = function() {}; // Global placeholder to prevent ReferenceError
 
   // โหลดรายชื่อนักเรียน
@@ -1030,7 +1048,7 @@ $role = $sessionUser['role'];
     // 1. โหลดข้อมูลแบบปัญหาการเขียนเดิม
     async function loadStudentWritingProblems() {
       try {
-        const response = await fetch(`api.php?action=get_writing_problems&studentId=${currentUserId}&_t=${new Date().getTime()}`);
+        const response = await fetch(`api.php?action=get_writing_problems&studentId=${currentUserId}&unit=${currentReflectionUnit}&_t=${new Date().getTime()}`);
         const res = await response.json();
         if (res.success && res.data) {
           const d = res.data;
@@ -1060,7 +1078,7 @@ $role = $sessionUser['role'];
     // 2. โหลดข้อมูลเช็คลิสต์ตนเองเดิม
     async function loadStudentChecklist() {
       try {
-        const response = await fetch(`api.php?action=get_self_checklist&studentId=${currentUserId}&_t=${new Date().getTime()}`);
+        const response = await fetch(`api.php?action=get_self_checklist&studentId=${currentUserId}&unit=${currentReflectionUnit}&_t=${new Date().getTime()}`);
         const res = await response.json();
         if (res.success && res.data) {
           const d = res.data;
@@ -1085,7 +1103,7 @@ $role = $sessionUser['role'];
     // 3. โหลดบันทึกการสะท้อนคิดเดิม
     async function loadStudentReflection() {
       try {
-        const response = await fetch(`api.php?action=get_learning_reflection&studentId=${currentUserId}&_t=${new Date().getTime()}`);
+        const response = await fetch(`api.php?action=get_learning_reflection&studentId=${currentUserId}&unit=${currentReflectionUnit}&_t=${new Date().getTime()}`);
         const res = await response.json();
         if (res.success && res.data) {
           const d = res.data;
@@ -1100,6 +1118,38 @@ $role = $sessionUser['role'];
         console.error(err);
       }
     }
+
+    // รีเซ็ตฟอร์มนักเรียนทั้งหมด (ใช้ตอนสลับหน่วยการเรียน เพื่อไม่ให้ข้อมูลคนละหน่วยปนกัน)
+    function resetStudentForms() {
+      const fO = document.getElementById('formObstacles');
+      if (fO) {
+        fO.reset();
+        PROB_ROW_KEYS.forEach(rowKey => {
+          const toggle = document.getElementById('toggle_' + rowKey);
+          if (toggle) toggle.checked = false;
+          setProbRowEnabled(rowKey, false);
+        });
+        updateProbSelectedCount();
+      }
+      const fC = document.getElementById('formChecklist');
+      if (fC) fC.reset();
+      const fR = document.getElementById('formReflection');
+      if (fR) fR.reset();
+    }
+
+    // สลับหน่วยการเรียน แล้วโหลดข้อมูลบันทึกของหน่วยนั้นมาแสดง (ผูกกับปุ่มผ่าน onclick)
+    window.setReflectionUnit = async function(u) {
+      currentReflectionUnit = (parseInt(u, 10) === 2) ? 2 : 1;
+      document.querySelectorAll('#reflectionUnitPicker [data-unit]').forEach(b => {
+        const on = (parseInt(b.getAttribute('data-unit'), 10) === currentReflectionUnit);
+        b.classList.toggle('btn-primary', on);
+        b.classList.toggle('btn-outline-primary', !on);
+      });
+      resetStudentForms();
+      await loadStudentWritingProblems();
+      await loadStudentChecklist();
+      await loadStudentReflection();
+    };
 
     // Event listeners สำหรับการกดปุ่มส่งแบบบันทึกต่าง ๆ
     document.getElementById('formObstacles').addEventListener('submit', async (e) => {
@@ -1126,12 +1176,13 @@ $role = $sessionUser['role'];
           body: JSON.stringify({
             action: 'save_writing_problems',
             studentId: currentUserId,
+            unit: currentReflectionUnit,
             problems: problems
           })
         });
         const res = await response.json();
         if (res.success) {
-          alert('บันทึกอุปสรรคปัญหาการเขียนจากร่างแรกเสร็จสมบูรณ์!');
+          alert('บันทึกอุปสรรคปัญหาการเขียน (หน่วยที่ ' + currentReflectionUnit + ') เสร็จสมบูรณ์!');
         } else {
           alert('เกิดข้อผิดพลาด: ' + res.error);
         }
@@ -1162,13 +1213,14 @@ $role = $sessionUser['role'];
           body: JSON.stringify({
             action: 'save_self_checklist',
             studentId: currentUserId,
+            unit: currentReflectionUnit,
             checklist: checklist,
             notes: notes
           })
         });
         const res = await response.json();
         if (res.success) {
-          alert('บันทึกแบบรายการตรวจสอบตนเอง (Self-Checklist) เรียบร้อย!');
+          alert('บันทึกแบบรายการตรวจสอบตนเอง (หน่วยที่ ' + currentReflectionUnit + ') เรียบร้อย!');
         } else {
           alert('เกิดข้อผิดพลาด: ' + res.error);
         }
@@ -1240,6 +1292,7 @@ $role = $sessionUser['role'];
           body: JSON.stringify({
             action: 'save_learning_reflection',
             studentId: currentUserId,
+            unit: currentReflectionUnit,
             content_structure: data.content_structure,
             language_mechanics: data.language_mechanics,
             feedback_applied: data.feedback_applied,
@@ -1248,7 +1301,7 @@ $role = $sessionUser['role'];
         });
         const res = await response.json();
         if (res.success) {
-          alert('บันทึกแบบสะท้อนการเรียนรู้ฉบับสมบูรณ์เรียบร้อย!');
+          alert('บันทึกแบบสะท้อนการเรียนรู้ (หน่วยที่ ' + currentReflectionUnit + ') เรียบร้อย!');
         } else {
           alert('เกิดข้อผิดพลาด: ' + res.error);
         }
