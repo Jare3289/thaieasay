@@ -106,6 +106,17 @@ if ($sessionUser) {
 
   <!-- โหลดไฟล์ CSS สไตล์หลัก -->
   <link href="index.css?v=2.0" rel="stylesheet">
+
+  <!-- ========== Progressive Web App (PWA) — ไอคอนดินสอสีน้ำเงิน ========== -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#2563eb">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="ประเมินเรียงความ">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
 </head>
 <body class="<?php echo $sessionUser ? 'has-sidebar' : 'auth-body'; ?>">
 
@@ -175,7 +186,7 @@ if ($sessionUser) {
     <aside class="app-sidebar">
       <div class="sidebar-brand">
         <span class="sidebar-logo">📝</span>
-        <span class="sidebar-brand-text">ระบบประเมิน<br><small>เรียงความอัจฉริยะ</small></span>
+        <span class="sidebar-brand-text">ระบบประเมิน<br><small>เรียงความ</small></span>
       </div>
 
       <nav class="sidebar-nav">
@@ -251,9 +262,5 @@ if ($sessionUser) {
 <?php else: ?>
   <!-- ===================== เลย์เอาต์สำหรับหน้าที่ยังไม่ล็อกอิน ===================== -->
   <div class="auth-shell">
-    <div class="auth-brand">
-      <span class="sidebar-logo">📝</span>
-      <span>ระบบประเมินเรียงความอัจฉริยะ</span>
-    </div>
     <div class="auth-content container">
 <?php endif; ?>

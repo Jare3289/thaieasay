@@ -1,5 +1,5 @@
 <?php
-$page_title = 'จัดการนักเรียน & จับคู่ประเมิน - ระบบประเมินเรียงความอัจฉริยะ';
+$page_title = 'จัดการนักเรียน & จับคู่ประเมิน - ระบบประเมินเรียงความ';
 require_once 'auth_helper.php';
 require_login('teacher'); // ครูเท่านั้น
 require_once 'header.php';
@@ -53,12 +53,13 @@ require_once 'header.php';
       <!-- เพิ่มทีละคน -->
       <div class="col-lg-5 col-12">
         <div class="card border-0 shadow-sm rounded-4 h-100">
-          <div class="card-header bg-success text-white fw-bold rounded-top-4 py-3">➕ เพิ่ม/แก้ไขทีละคน</div>
+          <div class="card-header bg-success text-white fw-bold rounded-top-4 py-3" id="addStudentHeader">➕ เพิ่ม/แก้ไขทีละคน</div>
           <div class="card-body p-4">
             <form id="addStudentForm">
               <div class="mb-2">
                 <label class="form-label small fw-bold text-secondary mb-1">รหัสนักเรียน</label>
                 <input type="text" id="fSid" required class="form-control" placeholder="เช่น 34317">
+                <div class="form-text" id="editHint" style="display:none;">กำลังแก้ไขข้อมูลของนักเรียนคนนี้ — ไม่ควรเปลี่ยนรหัส (ถ้าเปลี่ยนจะกลายเป็นนักเรียนคนใหม่)</div>
               </div>
               <div class="mb-2">
                 <label class="form-label small fw-bold text-secondary mb-1">ชื่อ-นามสกุล</label>
@@ -78,7 +79,10 @@ require_once 'header.php';
                   </select>
                 </div>
               </div>
-              <button type="submit" class="btn btn-success fw-bold w-100 rounded-pill">บันทึกนักเรียน</button>
+              <div class="d-flex gap-2">
+                <button type="submit" id="saveStudentBtn" class="btn btn-success fw-bold flex-grow-1 rounded-pill">บันทึกนักเรียน</button>
+                <button type="button" id="cancelEditBtn" class="btn btn-outline-secondary fw-bold rounded-pill px-3" style="display:none;" onclick="cancelEdit()">ยกเลิก</button>
+              </div>
             </form>
           </div>
         </div>
@@ -110,10 +114,11 @@ require_once 'header.php';
                     <th class="px-3 py-2">ชื่อ-นามสกุล</th>
                     <th class="px-3 py-2 text-center">ห้อง</th>
                     <th class="px-3 py-2 text-center">กลุ่ม</th>
+                    <th class="px-3 py-2 text-center">จัดการ</th>
                   </tr>
                 </thead>
                 <tbody id="studentTableBody">
-                  <tr><td colspan="4" class="text-center text-muted py-4">กำลังโหลด...</td></tr>
+                  <tr><td colspan="5" class="text-center text-muted py-4">กำลังโหลด...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -233,20 +238,69 @@ require_once 'header.php';
 
     document.getElementById('studentCount').textContent = list.length;
     if (list.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">ไม่มีข้อมูล</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">ไม่มีข้อมูล</td></tr>';
       return;
     }
     tbody.innerHTML = list.map(s => {
       const grpBadge = s.student_group
         ? `<span class="badge ${s.student_group === 'กลุ่มทดลอง' ? 'bg-primary' : 'bg-warning text-dark'} rounded-pill">${s.student_group}</span>`
         : '<span class="text-muted small">-</span>';
+      const sidAttr = encodeURIComponent(s.student_id);
       return `<tr>
         <td class="px-3 font-monospace">${s.student_id}</td>
         <td class="px-3">${escapeHtml(s.student_name)}</td>
         <td class="px-3 text-center">${s.classroom || '<span class="text-muted">-</span>'}</td>
         <td class="px-3 text-center">${grpBadge}</td>
+        <td class="px-3 text-center text-nowrap">
+          <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-2 me-1" title="แก้ไข" onclick="editStudent('${sidAttr}')"><i class="bi bi-pencil-fill"></i></button>
+          <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-2" title="ลบ" onclick="deleteStudent('${sidAttr}')"><i class="bi bi-trash-fill"></i></button>
+        </td>
       </tr>`;
     }).join('');
+  }
+
+  // เติมข้อมูลนักเรียนลงในฟอร์มด้านบนเพื่อแก้ไข
+  function editStudent(encId) {
+    const id = decodeURIComponent(encId);
+    const s = allStudents.find(x => String(x.student_id) === String(id));
+    if (!s) { showToast('ไม่พบข้อมูลนักเรียน', 'error'); return; }
+    document.getElementById('fSid').value = s.student_id;
+    document.getElementById('fName').value = s.student_name || '';
+    document.getElementById('fRoom').value = s.classroom || '';
+    document.getElementById('fGroup').value = s.student_group || '';
+    document.getElementById('addStudentHeader').innerHTML = '✏️ กำลังแก้ไข: ' + escapeHtml(String(s.student_id));
+    document.getElementById('saveStudentBtn').textContent = 'บันทึกการแก้ไข';
+    document.getElementById('cancelEditBtn').style.display = '';
+    document.getElementById('editHint').style.display = '';
+    document.getElementById('addStudentForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  // ยกเลิกโหมดแก้ไข กลับเป็นเพิ่มใหม่
+  function cancelEdit() {
+    document.getElementById('addStudentForm').reset();
+    document.getElementById('addStudentHeader').innerHTML = '➕ เพิ่ม/แก้ไขทีละคน';
+    document.getElementById('saveStudentBtn').textContent = 'บันทึกนักเรียน';
+    document.getElementById('cancelEditBtn').style.display = 'none';
+    document.getElementById('editHint').style.display = 'none';
+  }
+
+  // ลบนักเรียนออกจากระบบ (พร้อมข้อมูลที่เกี่ยวข้องทั้งหมด)
+  async function deleteStudent(encId) {
+    const id = decodeURIComponent(encId);
+    const s = allStudents.find(x => String(x.student_id) === String(id));
+    const label = s ? `${s.student_id} - ${s.student_name}` : id;
+    if (!confirm(`ยืนยันการลบนักเรียน "${label}" ?\n\nคำเตือน: ข้อมูลเรียงความ ผลการประเมิน และบันทึกสะท้อนคิดของนักเรียนคนนี้จะถูกลบทั้งหมด และไม่สามารถกู้คืนได้`)) return;
+    try {
+      const res = await (await fetch('api.php?action=delete_student', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ student_id: id })
+      })).json();
+      if (res.success) {
+        showToast('ลบนักเรียนเรียบร้อยแล้ว', 'success');
+        cancelEdit();
+        loadStudents();
+        pairLoadStudents();
+      } else { showToast(res.error || 'ลบไม่สำเร็จ', 'error'); }
+    } catch (err) { showToast('เกิดข้อผิดพลาด: ' + err.message, 'error'); }
   }
 
   function downloadTemplate() {
@@ -305,7 +359,7 @@ require_once 'header.php';
       })).json();
       if (res.success) {
         showToast('บันทึกนักเรียนแล้ว', 'success');
-        document.getElementById('addStudentForm').reset();
+        cancelEdit(); // รีเซ็ตฟอร์มและออกจากโหมดแก้ไข
         loadStudents();
         pairLoadStudents(); // อัปเดตรายชื่อในแท็บจับคู่ด้วย
       } else { showToast(res.error || 'บันทึกไม่สำเร็จ', 'error'); }

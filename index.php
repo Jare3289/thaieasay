@@ -1,5 +1,5 @@
 <?php
-$page_title = 'เมนูหลัก - ระบบประเมินเรียงความอัจฉริยะ';
+$page_title = 'เมนูหลัก - ระบบประเมินเรียงความ';
 require_once 'auth_helper.php';
 require_login(); // ต้องล็อกอินก่อนเข้าหน้านี้
 
@@ -228,7 +228,7 @@ require_once 'header.php';
             <div class="stat-label"><span class="stat-icon badge-blue">👥</span> นักเรียนทั้งหมด</div>
             <a href="manage_students.php" class="text-decoration-none text-muted"><i class="bi bi-arrow-up-right"></i></a>
           </div>
-          <div class="stat-value" id="dTotal">-</div>
+          <div class="stat-value" id="dTotal">0</div>
           <div class="stat-foot" id="dGroup">ทุกกลุ่มการวิจัย</div>
         </div>
       </div>
@@ -238,7 +238,7 @@ require_once 'header.php';
             <div class="stat-label"><span class="stat-icon badge-blue">✍️</span> เรียงความส่งแล้ว</div>
             <a href="essay_viewer.php" class="text-decoration-none text-muted"><i class="bi bi-arrow-up-right"></i></a>
           </div>
-          <div class="stat-value" id="dEssays">-</div>
+          <div class="stat-value" id="dEssays">0</div>
           <div class="stat-foot">รวมทุกรอบ (6 ชิ้น/คน)</div>
         </div>
       </div>
@@ -248,8 +248,8 @@ require_once 'header.php';
             <div class="stat-label"><span class="stat-icon badge-blue">✅</span> ส่งครบทุกชิ้น</div>
             <a href="submission_report.php" class="text-decoration-none text-muted"><i class="bi bi-arrow-up-right"></i></a>
           </div>
-          <div class="stat-value" id="dComplete">-</div>
-          <div class="stat-foot" id="dCompleteFoot">จากทั้งหมด - คน</div>
+          <div class="stat-value" id="dComplete">0</div>
+          <div class="stat-foot" id="dCompleteFoot">จากทั้งหมด 0 คน</div>
         </div>
       </div>
       <div class="col-md-3 col-6">
@@ -258,48 +258,13 @@ require_once 'header.php';
             <div class="stat-label"><span class="stat-icon badge-blue">📊</span> อัตราการส่งงาน</div>
             <a href="submission_report.php" class="text-decoration-none text-muted"><i class="bi bi-arrow-up-right"></i></a>
           </div>
-          <div class="stat-value" id="dRate">-</div>
+          <div class="stat-value" id="dRate">0%</div>
           <div class="stat-foot">เฉลี่ยทั้งชั้น</div>
         </div>
       </div>
     </div>
 
-    <!-- 2) กราฟการส่งงานรายรอบ + วงแหวนความคืบหน้า -->
-    <div class="row g-3 mb-3">
-      <div class="col-lg-8 col-12">
-        <div class="content-card h-100">
-          <div class="d-flex justify-content-between align-items-center mb-3">
-            <div>
-              <h5 class="fw-bold mb-0" style="color:var(--primary-navy)">ภาพรวมการส่งงานแต่ละรอบ</h5>
-              <span class="text-muted small">จำนวนนักเรียนที่ส่งงานในแต่ละรอบ</span>
-            </div>
-            <a href="submission_report.php" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold">ดูรายงาน</a>
-          </div>
-          <div style="height:260px;position:relative"><canvas id="chartRounds"></canvas></div>
-        </div>
-      </div>
-      <div class="col-lg-4 col-12">
-        <div class="content-card h-100 d-flex flex-column">
-          <h5 class="fw-bold mb-1" style="color:var(--primary-navy)">ความคืบหน้าการส่งงาน</h5>
-          <span class="text-muted small mb-2">สัดส่วนนักเรียนที่ส่งงานครบทุกชิ้น</span>
-          <div class="flex-grow-1 d-flex align-items-center justify-content-center">
-            <div style="position:relative;width:210px;height:210px">
-              <canvas id="chartProgress"></canvas>
-              <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none">
-                <div class="fw-extrabold" style="font-size:2.2rem;color:var(--primary-navy);line-height:1" id="progressPct">-</div>
-                <div class="text-muted small">ส่งครบทุกชิ้น</div>
-              </div>
-            </div>
-          </div>
-          <div class="d-flex justify-content-center gap-3 small mt-2">
-            <span><i class="bi bi-circle-fill" style="color:var(--accent-blue)"></i> ส่งครบ</span>
-            <span><i class="bi bi-circle-fill" style="color:#e2e8f0"></i> ยังไม่ครบ</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 3) เมนูด่วน + ทางลัดงานวิจัย -->
+    <!-- 2) เมนูด่วน + ทางลัดงานวิจัย -->
     <div class="row g-3">
       <div class="col-lg-8 col-12">
         <div class="content-card h-100">
@@ -366,13 +331,13 @@ require_once 'header.php';
 
   <script>
     (function () {
-      let chartRounds = null, chartProgress = null;
-      const BLUE = '#2563eb', NAVY = '#1e3a8a', LIGHT = '#e2e8f0';
-
       function fmtGroupName() {
         const g = (window.TEG ? TEG.get() : 'all');
         return (g === 'all') ? 'ทุกกลุ่มการวิจัย' : g;
       }
+      // ตัวช่วยเซ็ตข้อความแบบปลอดภัย (ไม่ให้พังทั้งชุดหากหา element ไม่เจอ)
+      function setText(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
+      function setWidth(id, val) { const el = document.getElementById(id); if (el) el.style.width = val; }
 
       async function loadTeacherDashboard() {
         const param = window.TEG ? TEG.param() : '';
@@ -384,69 +349,28 @@ require_once 'header.php';
 
         const total = report.length;
         const sum = k => report.reduce((a, s) => a + (s[k] ? 1 : 0), 0);
-        const rounds = { pretest: sum('pretest'), d1_1: sum('d1_1'), d1_2: sum('d1_2'), d2_1: sum('d2_1'), d2_2: sum('d2_2'), posttest: sum('posttest') };
-        const essays = rounds.pretest + rounds.d1_1 + rounds.d1_2 + rounds.d2_1 + rounds.d2_2 + rounds.posttest;
+        const essays = ['pretest','d1_1','d1_2','d2_1','d2_2','posttest'].reduce((a,k)=>a+sum(k),0);
 
-        const COLS = ['pretest','d1_1','d1_2','problems','checklist','reflection','d2_1','d2_2','posttest'];
-        // ส่งครบ = ครบทุกช่องใน 12 คอลัมน์ของรายงาน (เรียงความ 6 + สะท้อนคิด×2หน่วย 6)
+        // ส่งครบ = ครบทุกช่องใน 12 รายการ (เรียงความ 6 + สะท้อนคิดแยกหน่วย 6)
         let complete = 0, cellsDone = 0;
         const cellsTotal = total * 12;
         report.forEach(s => {
-          let d = 0;
-          d += ['pretest','d1_1','d1_2','d2_1','d2_2','posttest'].reduce((a,k)=>a+(s[k]?1:0),0);
-          d += 2 * ((s.problems?1:0) + (s.checklist?1:0) + (s.reflection?1:0));
+          let d = ['pretest','d1_1','d1_2','d2_1','d2_2','posttest'].reduce((a,k)=>a+(s[k]?1:0),0);
+          d += ['problems1','checklist1','reflection1','problems2','checklist2','reflection2'].reduce((a,k)=>a+(s[k]?1:0),0);
           cellsDone += d;
           if (d === 12) complete++;
         });
         const rate = cellsTotal ? Math.round(cellsDone / cellsTotal * 100) : 0;
-        const completePct = total ? Math.round(complete / total * 100) : 0;
 
-        // เติมค่าในการ์ดสถิติ
-        document.getElementById('dTotal').textContent = total;
-        document.getElementById('dGroup').textContent = fmtGroupName();
-        document.getElementById('dEssays').textContent = essays;
-        document.getElementById('dComplete').textContent = complete;
-        document.getElementById('dCompleteFoot').textContent = 'จากทั้งหมด ' + total + ' คน';
-        document.getElementById('dRate').textContent = rate + '%';
-        document.getElementById('dRate2').textContent = rate + '%';
-        document.getElementById('dRateBar').style.width = rate + '%';
-        document.getElementById('progressPct').textContent = completePct + '%';
-
-        renderRoundsChart(rounds);
-        renderProgressChart(complete, total - complete);
-      }
-
-      function renderRoundsChart(r) {
-        const ctx = document.getElementById('chartRounds');
-        if (!ctx) return;
-        const data = [r.pretest, r.d1_1, r.d1_2, r.d2_1, r.d2_2, r.posttest];
-        if (chartRounds) { chartRounds.data.datasets[0].data = data; chartRounds.update(); return; }
-        chartRounds = new Chart(ctx, {
-          type: 'bar',
-          data: {
-            labels: ['ก่อนเรียน', 'D1.1', 'D1.2', 'D2.1', 'D2.2', 'หลังเรียน'],
-            datasets: [{ data, backgroundColor: [NAVY, BLUE, BLUE, BLUE, BLUE, NAVY], borderRadius: 10, borderSkipped: false, maxBarThickness: 46 }]
-          },
-          options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' ส่งแล้ว ' + c.parsed.y + ' คน' } } },
-            scales: {
-              y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#eef2f7' } },
-              x: { grid: { display: false } }
-            }
-          }
-        });
-      }
-
-      function renderProgressChart(done, remain) {
-        const ctx = document.getElementById('chartProgress');
-        if (!ctx) return;
-        if (chartProgress) { chartProgress.data.datasets[0].data = [done, remain]; chartProgress.update(); return; }
-        chartProgress = new Chart(ctx, {
-          type: 'doughnut',
-          data: { datasets: [{ data: [done, remain], backgroundColor: [BLUE, LIGHT], borderWidth: 0 }] },
-          options: { cutout: '74%', plugins: { legend: { display: false }, tooltip: { enabled: false } } }
-        });
+        // เติมค่าในการ์ดสถิติ (ค่าเริ่มต้นเป็น 0 อยู่แล้ว จึงไม่มีสถานะค้าง "-")
+        setText('dTotal', total);
+        setText('dGroup', fmtGroupName());
+        setText('dEssays', essays);
+        setText('dComplete', complete);
+        setText('dCompleteFoot', 'จากทั้งหมด ' + total + ' คน');
+        setText('dRate', rate + '%');
+        setText('dRate2', rate + '%');
+        setWidth('dRateBar', rate + '%');
       }
 
       window.onTEGChange = loadTeacherDashboard;

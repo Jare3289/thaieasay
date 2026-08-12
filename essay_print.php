@@ -149,7 +149,7 @@ if (!$isSingle && $fMode === 'summary') {
 
       <div class="sheet">
         <h1 class="doc-title">รายงานสรุปการส่งเรียงความ</h1>
-        <div class="doc-sub">ระบบประเมินเรียงความอัจฉริยะ</div>
+        <div class="doc-sub">ระบบประเมินเรียงความ</div>
         <div class="doc-meta">
           <span><strong>กลุ่ม:</strong> <?php echo $hh($groupLabel); ?></span>
           <span><strong>ห้องเรียน:</strong> <?php echo $hh($roomLabel); ?></span>

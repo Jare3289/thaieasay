@@ -1,5 +1,5 @@
 <?php
-$page_title = 'แบบประเมิน - ระบบประเมินเรียงความอัจฉริยะ';
+$page_title = 'แบบประเมิน - ระบบประเมินเรียงความ';
 require_once 'auth_helper.php';
 
 // ดึงโหมดที่ระบุมา
@@ -26,16 +26,108 @@ if ($mode_param === 'self') {
 require_once 'header.php';
 ?>
 
-<?php /* ปิด container หลักจาก header.php เพื่อใช้เลย์เอาต์เต็มความกว้างจอ (ซ้าย = แบบประเมิน / ขวา = เรียงความ) */ ?>
-</div>
-
-<div class="eval-fullwidth px-3 px-xl-4 my-4 flex-grow-1">
+<?php /* เนื้อหาหน้าประเมินอยู่ภายใน .app-content ตามปกติ เพื่อให้แถบบน (topbar) และเลย์เอาต์แถบข้างวางถูกตำแหน่ง */ ?>
+<div class="eval-fullwidth">
 <div id="view-evaluation" class="text-start">
   <div class="mb-3">
     <a href="index.php" class="btn btn-link text-decoration-none text-secondary fw-bold p-0">
       <i class="bi bi-arrow-left-short"></i> กลับหน้าเมนูหลัก
     </a>
   </div>
+
+<?php if ($sessionUser['role'] === 'teacher'): ?>
+  <!-- แดชบอร์ดการส่งงาน (ยุบ/ขยายได้) — ช่วยให้คุณครูเห็นสถานะการส่งงานของนักเรียนขณะให้คะแนน -->
+  <div class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden">
+    <button type="button" class="w-100 border-0 text-start px-4 py-3 d-flex align-items-center justify-content-between"
+            style="background: linear-gradient(135deg, var(--primary-navy) 0%, var(--secondary-blue) 100%); color:#fff;"
+            data-bs-toggle="collapse" data-bs-target="#evalSubDash" aria-expanded="false" onclick="loadEvalSubmissionDash()">
+      <span class="fw-bold"><i class="bi bi-table me-2"></i>แดชบอร์ดการส่งงานของนักเรียน</span>
+      <span class="d-flex align-items-center gap-2">
+        <span class="badge bg-light text-dark" id="evalDashRate">-</span>
+        <i class="bi bi-chevron-down"></i>
+      </span>
+    </button>
+    <div class="collapse" id="evalSubDash">
+      <div class="p-3">
+        <div class="row g-2 mb-3" id="evalDashStats">
+          <div class="col-6 col-md-3"><div class="p-2 rounded-3 bg-light text-center"><div class="small text-muted">นักเรียนทั้งหมด</div><div class="fw-bold fs-5" id="evalDashTotal">-</div></div></div>
+          <div class="col-6 col-md-3"><div class="p-2 rounded-3 bg-light text-center"><div class="small text-muted">ส่งครบทุกชิ้น</div><div class="fw-bold fs-5 text-success" id="evalDashComplete">-</div></div></div>
+          <div class="col-6 col-md-3"><div class="p-2 rounded-3 bg-light text-center"><div class="small text-muted">ยังไม่ครบ</div><div class="fw-bold fs-5 text-warning" id="evalDashPartial">-</div></div></div>
+          <div class="col-6 col-md-3"><div class="p-2 rounded-3 bg-light text-center"><div class="small text-muted">อัตราการส่ง</div><div class="fw-bold fs-5 text-primary" id="evalDashRate2">-</div></div></div>
+        </div>
+        <div class="table-responsive" style="max-height: 340px; overflow-y:auto;">
+          <table class="table table-sm table-hover align-middle mb-0" style="min-width: 720px;">
+            <thead class="table-light" style="position:sticky; top:0; z-index:1;">
+              <tr class="text-center small">
+                <th class="text-start">รหัส</th>
+                <th class="text-start">ชื่อ-สกุล</th>
+                <th>ก่อนเรียน</th><th>D1.1</th><th>D1.2</th><th>D2.1</th><th>D2.2</th><th>หลังเรียน</th>
+                <th>สะท้อนคิด<br>ห1</th><th>สะท้อนคิด<br>ห2</th><th>รวม</th>
+              </tr>
+            </thead>
+            <tbody id="evalDashBody">
+              <tr><td colspan="11" class="text-center text-muted py-3">กดเพื่อโหลดข้อมูล...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="text-end mt-2">
+          <a href="submission_report.php" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold">เปิดรายงานฉบับเต็ม <i class="bi bi-box-arrow-up-right"></i></a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // โหลดข้อมูลแดชบอร์ดการส่งงานแบบครั้งเดียว (lazy) เมื่อกดเปิด และรีเฟรชเมื่อเปลี่ยนกลุ่มการวิจัย
+    let evalDashLoaded = false;
+    async function loadEvalSubmissionDash(force) {
+      if (evalDashLoaded && !force) return;
+      evalDashLoaded = true;
+      const body = document.getElementById('evalDashBody');
+      const param = (window.TEG ? TEG.param() : '');
+      try {
+        const res = await (await fetch('api.php?action=get_submission_report' + param)).json();
+        if (!res.success) { body.innerHTML = '<tr><td colspan="11" class="text-center text-danger py-3">' + (res.error || 'โหลดข้อมูลไม่สำเร็จ') + '</td></tr>'; return; }
+        const rows = res.report || [];
+        const ic = on => on ? '<i class="bi bi-check-circle-fill text-primary"></i>' : '<i class="bi bi-dash-circle text-secondary opacity-50"></i>';
+        const CELLS = ['pretest','d1_1','d1_2','d2_1','d2_2','posttest'];
+        const REFL = ['problems1','checklist1','reflection1','problems2','checklist2','reflection2'];
+        let complete = 0, doneCells = 0;
+        const totalCells = rows.length * 12;
+        const html = rows.map(s => {
+          const essayDone = CELLS.reduce((a,k)=>a+(s[k]?1:0),0);
+          const r1 = ['problems1','checklist1','reflection1'].every(k=>s[k]);
+          const r2 = ['problems2','checklist2','reflection2'].every(k=>s[k]);
+          const d = essayDone + REFL.reduce((a,k)=>a+(s[k]?1:0),0);
+          doneCells += d;
+          if (d === 12) complete++;
+          return '<tr class="text-center small">' +
+            '<td class="text-start font-monospace">' + s.student_id + '</td>' +
+            '<td class="text-start">' + (s.student_name || '-') + '</td>' +
+            CELLS.map(k => '<td>' + ic(!!s[k]) + '</td>').join('') +
+            '<td>' + ic(r1) + '</td><td>' + ic(r2) + '</td>' +
+            '<td><span class="badge ' + (d===12?'bg-success':'bg-secondary') + ' rounded-pill">' + d + '/12</span></td>' +
+          '</tr>';
+        }).join('');
+        body.innerHTML = html || '<tr><td colspan="11" class="text-center text-muted py-3">ไม่พบข้อมูลนักเรียนในกลุ่มนี้</td></tr>';
+        const total = rows.length;
+        const rate = totalCells ? Math.round(doneCells / totalCells * 100) : 0;
+        document.getElementById('evalDashTotal').textContent = total;
+        document.getElementById('evalDashComplete').textContent = complete;
+        document.getElementById('evalDashPartial').textContent = total - complete;
+        document.getElementById('evalDashRate2').textContent = rate + '%';
+        document.getElementById('evalDashRate').textContent = 'ส่งครบ ' + complete + '/' + total;
+      } catch (e) {
+        body.innerHTML = '<tr><td colspan="11" class="text-center text-danger py-3">เกิดข้อผิดพลาดในการเชื่อมต่อ</td></tr>';
+      }
+    }
+    // เมื่อเปลี่ยนกลุ่มการวิจัยบนแถบบน ให้รีเฟรชแดชบอร์ดถ้าเปิดอยู่
+    (function(){
+      const prev = window.onTEGChange;
+      window.onTEGChange = function(){ if (typeof prev === 'function') prev(); if (evalDashLoaded) loadEvalSubmissionDash(true); };
+    })();
+  </script>
+<?php endif; ?>
 
   <!-- Phase Picker Overlay (แสดงก่อนเริ่มกรอกแบบประเมิน) -->
   <div id="phasePicker" class="card border-0 shadow-lg rounded-4 overflow-hidden mb-5 <?php echo ($sessionUser['role'] === 'expert') ? 'd-none' : ''; ?>">
@@ -1251,6 +1343,8 @@ require_once 'header.php';
     }
   })();
 </script>
+
+</div><!-- /.eval-fullwidth -->
 
 <?php
 require_once 'footer.php';

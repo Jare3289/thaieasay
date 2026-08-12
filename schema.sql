@@ -79,7 +79,8 @@ ON DUPLICATE KEY UPDATE student_name = VALUES(student_name);
 
 -- 4. ตารางบันทึกปัญหาการเขียน (Writing Obstacles Record)
 CREATE TABLE IF NOT EXISTS writing_problems (
-    student_id VARCHAR(10) PRIMARY KEY,
+    student_id VARCHAR(10) NOT NULL,
+    task_unit TINYINT NOT NULL DEFAULT 1, -- หน่วยการเรียน (1 หรือ 2)
     prob_1_1 TEXT, sol_1_1 TEXT,
     prob_1_2 TEXT, sol_1_2 TEXT,
     prob_1_3 TEXT, sol_1_3 TEXT,
@@ -92,12 +93,14 @@ CREATE TABLE IF NOT EXISTS writing_problems (
     prob_4_2 TEXT, sol_4_2 TEXT,
     prob_4_3 TEXT, sol_4_3 TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (student_id, task_unit),
     FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 5. ตารางรายการตรวจสอบตนเอง (Self-Checklist)
 CREATE TABLE IF NOT EXISTS self_checklists (
-    student_id VARCHAR(10) PRIMARY KEY,
+    student_id VARCHAR(10) NOT NULL,
+    task_unit TINYINT NOT NULL DEFAULT 1, -- หน่วยการเรียน (1 หรือ 2)
     check_1_1 VARCHAR(50) NOT NULL, -- 'ครบถ้วน', 'บางส่วน', 'ต้องปรับปรุง'
     check_1_2 VARCHAR(50) NOT NULL,
     check_1_3 VARCHAR(50) NOT NULL,
@@ -111,6 +114,7 @@ CREATE TABLE IF NOT EXISTS self_checklists (
     check_4_3 VARCHAR(50) NOT NULL,
     notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (student_id, task_unit),
     FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -143,12 +147,14 @@ CREATE TABLE IF NOT EXISTS peer_reviews (
 
 -- 7. ตารางบันทึกการสะท้อนการเรียนรู้ (Learning Reflections)
 CREATE TABLE IF NOT EXISTS learning_reflections (
-    student_id VARCHAR(10) PRIMARY KEY,
+    student_id VARCHAR(10) NOT NULL,
+    task_unit TINYINT NOT NULL DEFAULT 1, -- หน่วยการเรียน (1 หรือ 2)
     content_structure TEXT,  -- ด้านเนื้อหาสาระและองค์ประกอบ
     language_mechanics TEXT, -- ด้านการใช้สำนวนภาษาและอักขรวิธี
     feedback_applied TEXT,   -- การนำข้อเสนอแนะไปปรับปรุงงาน
     future_goals TEXT,       -- การประยุกต์ใช้และเป้าหมายในอนาคต
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (student_id, task_unit),
     FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

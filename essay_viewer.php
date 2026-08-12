@@ -1,5 +1,5 @@
 <?php
-$page_title = 'เรียงความนักเรียน (Essay Viewer) - ระบบประเมินเรียงความอัจฉริยะ';
+$page_title = 'เรียงความนักเรียน (Essay Viewer) - ระบบประเมินเรียงความ';
 require_once 'auth_helper.php';
 require_login(); // ต้องล็อกอินก่อนเข้าหน้านี้
 
