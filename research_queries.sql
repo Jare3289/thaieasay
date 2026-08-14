@@ -47,7 +47,6 @@ ORDER BY student_id ASC;
 -- 1) ข้อมูลดิบสำหรับคำนวณ ICC (Inter-rater Reliability)
 --    คะแนนรวม + 4 ด้าน ที่ให้โดยผู้ตรวจ 3 คน (ครูผู้สอน + ผู้เชี่ยวชาญ 2 ท่าน)
 --    เฉพาะนักเรียนห้อง 606 ที่มีผลตรวจครบทั้ง 3 คนในภาระงานเดียวกัน
---    เปลี่ยนค่า test_phase ด้านล่างเป็น 'task2' เพื่อดูภาระงานหน่วยที่ 2
 -- --------------------------------------------------------------------------
 SELECT
     s.student_id,
@@ -81,7 +80,7 @@ SELECT
 FROM students s
 JOIN evaluations e ON e.student_id = s.student_id
 WHERE s.classroom = '606'
-  AND e.test_phase = 'task1'                      -- เปลี่ยนเป็น 'task2' สำหรับภาระงานหน่วยที่ 2
+  AND e.test_phase = 'task1'                      -- ภาระงานหน่วยที่ 1
   AND e.evaluator_type IN ('ครูประเมิน', 'ผู้เชี่ยวชาญประเมิน')
 GROUP BY s.student_id, s.student_name
 HAVING teacher_total IS NOT NULL

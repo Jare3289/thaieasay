@@ -42,18 +42,30 @@ require_once 'header.php';
         </button>
         <?php endif; ?>
       </div>
+      <?php if ($isTeacher): ?>
+      <div class="alert alert-info border-0 rounded-3 small py-2 mb-3">
+        <i class="bi bi-info-circle-fill me-1"></i>เปิด/ปิด "รับการส่งงาน" ของแต่ละรอบได้ที่สวิตช์ในแต่ละช่อง — นักเรียนจะส่งได้เฉพาะรอบที่คุณครูเปิดรับเท่านั้น (บันทึกทันทีเมื่อสลับ)
+      </div>
+      <?php endif; ?>
       <div class="row g-3">
         <?php
           $topicFields = [
             'pretest'  => ['ก่อนเรียน', 'bi-pencil', 'text-primary'],
             'task1'    => ['หน่วยที่ 1', 'bi-journal-text', 'text-success'],
-            'task2'    => ['หน่วยที่ 2', 'bi-journal-text', 'text-warning'],
             'posttest' => ['หลังเรียน', 'bi-mortarboard', 'text-danger'],
           ];
           foreach ($topicFields as $ph => $meta):
         ?>
         <div class="col-md-6">
-          <label class="form-label fw-semibold small mb-1 <?php echo $meta[2]; ?>"><i class="bi <?php echo $meta[1]; ?> me-1"></i><?php echo $meta[0]; ?></label>
+          <div class="d-flex align-items-center justify-content-between mb-1 gap-2">
+            <label class="form-label fw-semibold small mb-0 <?php echo $meta[2]; ?>"><i class="bi <?php echo $meta[1]; ?> me-1"></i><?php echo $meta[0]; ?></label>
+            <div class="form-check form-switch mb-0" title="เปิด/ปิดรับการส่งงานของรอบนี้">
+              <input class="form-check-input essay-open-switch" type="checkbox" role="switch"
+                id="open_<?php echo $ph; ?>" data-phase="<?php echo $ph; ?>"
+                <?php echo $isTeacher ? 'onchange="saveEssayPhaseOpen(this)"' : 'disabled'; ?>>
+              <label class="form-check-label small text-muted" for="open_<?php echo $ph; ?>" id="openLabel_<?php echo $ph; ?>">รับการส่ง</label>
+            </div>
+          </div>
           <input type="text" id="topic_<?php echo $ph; ?>" maxlength="500"
             class="form-control form-control-sm border-2 rounded-3"
             placeholder="กำหนดหัวข้อสำหรับ<?php echo $meta[0]; ?>..."
@@ -112,7 +124,7 @@ require_once 'header.php';
       </div>
 
       <!-- แถบสรุปตัวเลข: จำนวนนักเรียน และจำนวนที่ส่งในแต่ละรอบ -->
-      <div class="row g-3 mb-4 row-cols-2 row-cols-md-5" id="essaySummaryRow">
+      <div class="row g-3 mb-4 row-cols-2 row-cols-md-4" id="essaySummaryRow">
         <div class="col">
           <div class="card border-0 rounded-3 p-3 text-center bg-light">
             <div class="fs-4 fw-bold text-primary" id="essayStatStudents">-</div>
@@ -129,12 +141,6 @@ require_once 'header.php';
           <div class="card border-0 rounded-3 p-3 text-center bg-light">
             <div class="fs-4 fw-bold text-success" id="essayStatT1">-</div>
             <div class="text-muted small">ส่งหน่วยที่ 1 (D2)</div>
-          </div>
-        </div>
-        <div class="col">
-          <div class="card border-0 rounded-3 p-3 text-center bg-light">
-            <div class="fs-4 fw-bold text-warning" id="essayStatT2">-</div>
-            <div class="text-muted small">ส่งหน่วยที่ 2 (D2)</div>
           </div>
         </div>
         <div class="col">
@@ -162,16 +168,14 @@ require_once 'header.php';
 
   const IS_TEACHER = <?php echo ($_SESSION['user']['role'] === 'teacher') ? 'true' : 'false'; ?>;
 
-  // คอลัมน์ในตาราง: ก่อนเรียน · หน่วยที่ 1 (D1,D2) · หน่วยที่ 2 (D1,D2) · หลังเรียน
+  // คอลัมน์ในตาราง: ก่อนเรียน · หน่วยที่ 1 (D1,D2) · หลังเรียน
   // ภาระงานแต่ละหน่วยแตกเป็น 2 ร่าง: D1 = ร่างที่ 1, D2 = ร่างที่ 2 (ให้คะแนนเฉพาะ D2)
-  const ESSAY_PHASE_KEYS = ['pretest', 'task1_d1', 'task1_d2', 'task2_d1', 'task2_d2', 'posttest'];
+  const ESSAY_PHASE_KEYS = ['pretest', 'task1_d1', 'task1_d2', 'posttest'];
 
   const essayPhaseLabels = {
     pretest:  'ก่อนเรียน (Pretest)',
     task1_d1: 'ภาระงาน หน่วยที่ 1 · ร่างที่ 1 (D1)',
     task1_d2: 'ภาระงาน หน่วยที่ 1 · ร่างที่ 2 (D2)',
-    task2_d1: 'ภาระงาน หน่วยที่ 2 · ร่างที่ 1 (D1)',
-    task2_d2: 'ภาระงาน หน่วยที่ 2 · ร่างที่ 2 (D2)',
     posttest: 'หลังเรียน (Posttest)'
   };
 
@@ -324,7 +328,6 @@ require_once 'header.php';
     setEl('essayStatStudents', students.length);
     setEl('essayStatPre',  cnt('pretest'));
     setEl('essayStatT1',   cnt('task1_d2'));
-    setEl('essayStatT2',   cnt('task2_d2'));
     setEl('essayStatPost', cnt('posttest'));
 
     if (students.length === 0) {
@@ -341,8 +344,6 @@ require_once 'header.php';
         ${buildPhaseCell(rec, 'pretest', false)}
         ${buildPhaseCell(rec, 'task1_d1', false)}
         ${buildPhaseCell(rec, 'task1_d2', true)}
-        ${buildPhaseCell(rec, 'task2_d1', false)}
-        ${buildPhaseCell(rec, 'task2_d2', true)}
         ${buildPhaseCell(rec, 'posttest', false)}
       </tr>`;
     }).join('');
@@ -357,12 +358,9 @@ require_once 'header.php';
             <th rowspan="2" class="align-middle text-nowrap text-start">ชื่อสกุล</th>
             <th rowspan="2" class="align-middle text-nowrap">ก่อนเรียน</th>
             <th colspan="2" class="text-nowrap">หน่วยที่ 1</th>
-            <th colspan="2" class="text-nowrap">หน่วยที่ 2</th>
             <th rowspan="2" class="align-middle text-nowrap">หลังเรียน</th>
           </tr>
           <tr>
-            <th class="text-center small text-nowrap">D1</th>
-            <th class="${d2Head}" title="ร่างที่ให้คะแนน">D2 <i class="bi bi-star-fill text-warning"></i></th>
             <th class="text-center small text-nowrap">D1</th>
             <th class="${d2Head}" title="ร่างที่ให้คะแนน">D2 <i class="bi bi-star-fill text-warning"></i></th>
           </tr>
@@ -455,19 +453,67 @@ require_once 'header.php';
   };
 
   // ===== หัวข้อเรียงความที่ครูกำหนด =====
-  const TOPIC_PHASES = ['pretest', 'task1', 'task2', 'posttest'];
+  const TOPIC_PHASES = ['pretest', 'task1', 'posttest'];
 
   async function loadEssayTopics() {
     try {
       const res = await fetch('api.php?action=get_essay_topics');
       const data = await res.json();
-      if (data.success && data.topics) {
+      if (data.success) {
+        const topics = data.topics || {};
+        const open   = data.open   || {};
         TOPIC_PHASES.forEach(ph => {
           const el = document.getElementById('topic_' + ph);
-          if (el) el.value = data.topics[ph] || '';
+          if (el) el.value = topics[ph] || '';
+          // สวิตช์เปิด/ปิดรับการส่ง (ค่าเริ่มต้น = เปิดรับ หากไม่ระบุ)
+          const sw = document.getElementById('open_' + ph);
+          if (sw) {
+            sw.checked = (open[ph] !== false);
+            paintOpenSwitch(ph);
+          }
         });
       }
     } catch (e) { /* เงียบไว้ */ }
+  }
+
+  // อัปเดตป้ายกำกับสวิตช์ตามสถานะ (เปิดรับ = เขียว / ปิดรับ = แดง)
+  function paintOpenSwitch(ph) {
+    const sw = document.getElementById('open_' + ph);
+    const lb = document.getElementById('openLabel_' + ph);
+    if (!sw || !lb) return;
+    if (sw.checked) {
+      lb.textContent = 'เปิดรับการส่ง';
+      lb.className = 'form-check-label small text-success fw-semibold';
+    } else {
+      lb.textContent = 'ปิดรับการส่ง';
+      lb.className = 'form-check-label small text-danger fw-semibold';
+    }
+  }
+
+  // ครูสลับสถานะเปิด/ปิดรับการส่งของรอบหนึ่ง — บันทึกทันที
+  async function saveEssayPhaseOpen(sw) {
+    const ph = sw.getAttribute('data-phase');
+    paintOpenSwitch(ph);
+    sw.disabled = true;
+    try {
+      const res = await fetch('api.php?action=save_essay_phase_open', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phase: ph, is_open: sw.checked ? 1 : 0 })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(sw.checked ? 'เปิดรับการส่งงานรอบนี้แล้ว' : 'ปิดรับการส่งงานรอบนี้แล้ว', 'success');
+      } else {
+        sw.checked = !sw.checked; paintOpenSwitch(ph);
+        showToast('บันทึกสถานะไม่สำเร็จ: ' + (data.error || ''), 'error');
+      }
+    } catch (e) {
+      sw.checked = !sw.checked; paintOpenSwitch(ph);
+      showToast('บันทึกสถานะไม่สำเร็จ', 'error');
+    } finally {
+      sw.disabled = false;
+    }
   }
 
   async function saveEssayTopics() {

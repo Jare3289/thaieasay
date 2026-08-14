@@ -37,8 +37,7 @@ try {
 
 // ---- เรียงความที่ส่งแล้ว (มีเนื้อหา หรือ word_count > 0) ----
 $essaySet = [
-    'pretest' => [], 'task1_d1' => [], 'task1_d2' => [],
-    'task2_d1' => [], 'task2_d2' => [], 'posttest' => [],
+    'pretest' => [], 'task1_d1' => [], 'task1_d2' => [], 'posttest' => [],
 ];
 try {
     $esStmt = $pdo->query("
@@ -54,11 +53,11 @@ try {
     }
 } catch (Exception $e) { /* ปล่อยว่าง */ }
 
-// ---- เครื่องมือสะท้อนคิด แยกตามหน่วยการเรียน (task_unit) ----
+// ---- เครื่องมือสะท้อนคิด (เหลือเฉพาะหน่วยการเรียนที่ 1) ----
 $flagSet = [
-    'problems'   => [1 => [], 2 => []],
-    'checklist'  => [1 => [], 2 => []],
-    'reflection' => [1 => [], 2 => []],
+    'problems'   => [1 => []],
+    'checklist'  => [1 => []],
+    'reflection' => [1 => []],
 ];
 foreach ([
     'problems'   => 'writing_problems',
@@ -68,8 +67,8 @@ foreach ([
     try {
         $q = $pdo->query("SELECT student_id, task_unit FROM `$tbl`");
         while ($r = $q->fetch()) {
-            $u = (intval($r['task_unit']) === 2) ? 2 : 1;
-            $flagSet[$key][$u][$r['student_id']] = true;
+            // นับเฉพาะหน่วยที่ 1 (หน่วยที่ 2 ถูกยกเลิกแล้ว)
+            $flagSet[$key][1][$r['student_id']] = true;
         }
     } catch (Exception $e) { /* ตารางอาจยังไม่มี */ }
 }
@@ -88,21 +87,15 @@ foreach ($stuRows as $s) {
         'problems1'    => isset($flagSet['problems'][1][$sid]),
         'checklist1'   => isset($flagSet['checklist'][1][$sid]),
         'reflection1'  => isset($flagSet['reflection'][1][$sid]),
-        'd2_1'         => isset($essaySet['task2_d1'][$sid]),
-        'd2_2'         => isset($essaySet['task2_d2'][$sid]),
-        'problems2'    => isset($flagSet['problems'][2][$sid]),
-        'checklist2'   => isset($flagSet['checklist'][2][$sid]),
-        'reflection2'  => isset($flagSet['reflection'][2][$sid]),
         'posttest'     => isset($essaySet['posttest'][$sid]),
     ];
 }
 
-// คอลัมน์สถานะ 12 ช่อง (ตามลำดับการแสดงผล) พร้อมคลาสสีตามหน่วยการเรียน
-$statusCols = ['pretest','d1_1','d1_2','problems1','checklist1','reflection1','d2_1','d2_2','problems2','checklist2','reflection2','posttest'];
+// คอลัมน์สถานะ 7 ช่อง (ตามลำดับการแสดงผล) พร้อมคลาสสีตามหน่วยการเรียน
+$statusCols = ['pretest','d1_1','d1_2','problems1','checklist1','reflection1','posttest'];
 $colUnitClass = [
     'pretest' => '', 'posttest' => '',
     'd1_1' => 'u1', 'd1_2' => 'u1', 'problems1' => 'u1', 'checklist1' => 'u1', 'reflection1' => 'u1',
-    'd2_1' => 'u2', 'd2_2' => 'u2', 'problems2' => 'u2', 'checklist2' => 'u2', 'reflection2' => 'u2',
 ];
 
 // สรุปยอด
@@ -229,7 +222,6 @@ $mark = function ($on) { return $on ? '✓' : ''; };
             <th class="fit" rowspan="2" style="text-align:left;">ชื่อ</th>
             <th rowspan="2">ก่อนเรียน</th>
             <th colspan="5" class="u1">หน่วยการเรียนที่ 1</th>
-            <th colspan="5" class="u2">หน่วยการเรียนที่ 2</th>
             <th rowspan="2">หลังเรียน</th>
           </tr>
           <tr>
@@ -238,11 +230,6 @@ $mark = function ($on) { return $on ? '✓' : ''; };
             <th class="u1">ปัญหา<br>การเขียน</th>
             <th class="u1">ตรวจสอบ<br>ตนเอง</th>
             <th class="u1">สะท้อน<br>การเรียนรู้</th>
-            <th class="u2">D2.1</th>
-            <th class="u2">D2.2</th>
-            <th class="u2">ปัญหา<br>การเขียน</th>
-            <th class="u2">ตรวจสอบ<br>ตนเอง</th>
-            <th class="u2">สะท้อน<br>การเรียนรู้</th>
           </tr>
         </thead>
         <tbody>
@@ -257,11 +244,6 @@ $mark = function ($on) { return $on ? '✓' : ''; };
             <td class="mark u1"><?php echo $mark($r['problems1']); ?></td>
             <td class="mark u1"><?php echo $mark($r['checklist1']); ?></td>
             <td class="mark u1"><?php echo $mark($r['reflection1']); ?></td>
-            <td class="mark u2"><?php echo $mark($r['d2_1']); ?></td>
-            <td class="mark u2"><?php echo $mark($r['d2_2']); ?></td>
-            <td class="mark u2"><?php echo $mark($r['problems2']); ?></td>
-            <td class="mark u2"><?php echo $mark($r['checklist2']); ?></td>
-            <td class="mark u2"><?php echo $mark($r['reflection2']); ?></td>
             <td class="mark"><?php echo $mark($r['posttest']); ?></td>
           </tr>
           <?php endforeach; ?>

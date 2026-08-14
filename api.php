@@ -926,7 +926,7 @@ try {
             break;
 
         // ============================================================
-        //  ระบบจับคู่ประเมินเพื่อน (Peer Pairing)  รอบ: pretest/task1/task2/posttest
+        //  ระบบจับคู่ประเมินเพื่อน (Peer Pairing)  รอบ: pretest/task1/posttest
         // ============================================================
 
         // ดึงคู่ของนักเรียนที่ล็อกอินอยู่ ตามรอบที่เลือก (ใช้ในหน้า evaluation.php?mode=peer)
@@ -936,7 +936,7 @@ try {
                 exit;
             }
             $round = isset($_GET['round']) ? trim($_GET['round']) : '';
-            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
+            if (!in_array($round, ['pretest', 'task1', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
                 exit;
             }
@@ -959,7 +959,7 @@ try {
                 exit;
             }
             $round = isset($_GET['round']) ? trim($_GET['round']) : '';
-            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
+            if (!in_array($round, ['pretest', 'task1', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
                 exit;
             }
@@ -979,7 +979,7 @@ try {
                 exit;
             }
             $round = isset($request_data['round']) ? trim($request_data['round']) : '';
-            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
+            if (!in_array($round, ['pretest', 'task1', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
                 exit;
             }
@@ -1016,7 +1016,7 @@ try {
                 exit;
             }
             $round = isset($request_data['round']) ? trim($request_data['round']) : '';
-            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
+            if (!in_array($round, ['pretest', 'task1', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
                 exit;
             }
@@ -1096,7 +1096,7 @@ try {
                 exit;
             }
             $round = isset($_GET['round']) ? trim($_GET['round']) : '';
-            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
+            if (!in_array($round, ['pretest', 'task1', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
                 exit;
             }
@@ -1182,7 +1182,7 @@ try {
             }
             $round  = isset($request_data['round']) ? trim($request_data['round']) : '';
             $target = isset($request_data['target']) ? trim($request_data['target']) : '';
-            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
+            if (!in_array($round, ['pretest', 'task1', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
                 exit;
             }
@@ -1261,7 +1261,7 @@ try {
             $round     = isset($request_data['round']) ? trim($request_data['round']) : '';
             $requester = isset($request_data['requester']) ? trim($request_data['requester']) : '';
             $decision  = isset($request_data['decision']) ? trim($request_data['decision']) : '';
-            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
+            if (!in_array($round, ['pretest', 'task1', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
                 exit;
             }
@@ -1319,7 +1319,7 @@ try {
             }
             $round  = isset($request_data['round']) ? trim($request_data['round']) : '';
             $target = isset($request_data['target']) ? trim($request_data['target']) : '';
-            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
+            if (!in_array($round, ['pretest', 'task1', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
                 exit;
             }
@@ -1336,7 +1336,7 @@ try {
                 exit;
             }
             $round = isset($request_data['round']) ? trim($request_data['round']) : '';
-            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
+            if (!in_array($round, ['pretest', 'task1', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
                 exit;
             }
@@ -1657,6 +1657,15 @@ try {
             $studentId    = $_SESSION['user']['id'];
             $essayPhase   = isset($request_data['essay_phase'])   ? trim($request_data['essay_phase'])   : 'task1_d1';
 
+            // ครูต้อง "เปิดรับ" รอบนั้นก่อน นักเรียนจึงจะส่งได้ (กันการส่งผิดรอบ)
+            // essay_phase เช่น task1_d2 จับคู่กับรอบหัวข้อ task1 เพื่อตรวจสถานะเปิด/ปิดรับ
+            $openMap = essay_open_map($pdo);
+            $topicPhaseForSave = essay_topic_phase($essayPhase);
+            if (array_key_exists($topicPhaseForSave, $openMap) && $openMap[$topicPhaseForSave] === false) {
+                echo json_encode(['success' => false, 'error' => 'คุณครูยังไม่เปิดรับการส่งงานรอบนี้ กรุณาตรวจสอบรอบที่เปิดรับอีกครั้ง']);
+                exit;
+            }
+
             // เนื้อหาแยกเป็น 3 ส่วน: ส่วนนำ / เนื้อหา (หลายย่อหน้า) / สรุป — ไม่มีชื่อเรื่องจากนักเรียนแล้ว
             $intro      = isset($request_data['introduction']) ? trim((string)$request_data['introduction']) : '';
             $bodyArr    = (isset($request_data['body']) && is_array($request_data['body'])) ? $request_data['body'] : null;
@@ -1694,13 +1703,13 @@ try {
             echo json_encode(['success' => true, 'word_count' => $wordCount]);
             break;
 
-        // Essay: หัวข้อเรียงความที่ครูกำหนดต่อรอบ (ก่อนเรียน/หน่วยที่ 1/หน่วยที่ 2/หลังเรียน)
+        // Essay: หัวข้อเรียงความที่ครูกำหนดต่อรอบ (ก่อนเรียน/หน่วยที่ 1/หลังเรียน)
         case 'get_essay_topics':
             if (!isset($_SESSION['user'])) {
                 echo json_encode(['success' => false, 'error' => 'Not logged in']);
                 exit;
             }
-            echo json_encode(['success' => true, 'topics' => essay_topics_map($pdo)]);
+            echo json_encode(['success' => true, 'topics' => essay_topics_map($pdo), 'open' => essay_open_map($pdo)]);
             break;
 
         // Essay: ครูบันทึกหัวข้อเรียงความของรอบใดรอบหนึ่ง
@@ -1711,7 +1720,7 @@ try {
             }
             $tPhase = isset($request_data['phase']) ? trim((string)$request_data['phase']) : '';
             $tTopic = isset($request_data['topic']) ? trim((string)$request_data['topic']) : '';
-            if (!in_array($tPhase, ['pretest', 'task1', 'task2', 'posttest'], true)) {
+            if (!in_array($tPhase, ['pretest', 'task1', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'รอบไม่ถูกต้อง']);
                 exit;
             }
@@ -1721,6 +1730,27 @@ try {
                 ON DUPLICATE KEY UPDATE topic = VALUES(topic), updated_at = CURRENT_TIMESTAMP
             ');
             $stmt->execute([$tPhase, $tTopic]);
+            echo json_encode(['success' => true]);
+            break;
+
+        // Essay: ครูเปิด/ปิดรับการส่งเรียงความของรอบใดรอบหนึ่ง (นักเรียนส่งได้เฉพาะรอบที่เปิดรับ)
+        case 'save_essay_phase_open':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'เฉพาะครูเท่านั้นที่กำหนดการเปิด/ปิดรับได้']);
+                exit;
+            }
+            $oPhase = isset($request_data['phase']) ? trim((string)$request_data['phase']) : '';
+            $oOpen  = !empty($request_data['is_open']) ? 1 : 0;
+            if (!in_array($oPhase, ['pretest', 'task1', 'posttest'], true)) {
+                echo json_encode(['success' => false, 'error' => 'รอบไม่ถูกต้อง']);
+                exit;
+            }
+            // สร้างแถวรอบนี้ไว้ก่อนหากยังไม่มี แล้วอัปเดตสถานะเปิด/ปิดรับ
+            $stmt = $pdo->prepare('
+                INSERT INTO essay_topics (phase, is_open) VALUES (?, ?)
+                ON DUPLICATE KEY UPDATE is_open = VALUES(is_open), updated_at = CURRENT_TIMESTAMP
+            ');
+            $stmt->execute([$oPhase, $oOpen]);
             echo json_encode(['success' => true]);
             break;
 
@@ -1801,8 +1831,7 @@ try {
             // ชุดรหัสนักเรียนที่ "ส่งแล้ว" ของแต่ละชิ้นงาน (ดึงทีเดียวแล้วแมปในหน่วยความจำ ประหยัด query)
             // เรียงความ: นับว่าส่งแล้วเมื่อมีเนื้อหาอย่างน้อยหนึ่งส่วน หรือ word_count > 0
             $essaySet = [
-                'pretest' => [], 'task1_d1' => [], 'task1_d2' => [],
-                'task2_d1' => [], 'task2_d2' => [], 'posttest' => [],
+                'pretest' => [], 'task1_d1' => [], 'task1_d2' => [], 'posttest' => [],
             ];
             $esStmt = $pdo->query("
                 SELECT student_id, essay_phase FROM student_essays
@@ -1816,12 +1845,11 @@ try {
                 if (isset($essaySet[$ph])) $essaySet[$ph][$r['student_id']] = true;
             }
 
-            // เครื่องมือสะท้อนคิด — เก็บแยกตามหน่วยการเรียน (task_unit = 1 หรือ 2)
-            // มีแถวของหน่วยใด = ส่งของหน่วยนั้นแล้ว
+            // เครื่องมือสะท้อนคิด — เหลือเฉพาะหน่วยการเรียนที่ 1 (หน่วยที่ 2 ถูกยกเลิกแล้ว)
             $flagSet = [
-                'problems'   => [1 => [], 2 => []],
-                'checklist'  => [1 => [], 2 => []],
-                'reflection' => [1 => [], 2 => []],
+                'problems'   => [1 => []],
+                'checklist'  => [1 => []],
+                'reflection' => [1 => []],
             ];
             foreach ([
                 'problems'   => 'writing_problems',
@@ -1831,8 +1859,8 @@ try {
                 try {
                     $q = $pdo->query("SELECT student_id, task_unit FROM `$tbl`");
                     while ($r = $q->fetch()) {
-                        $u = (intval($r['task_unit']) === 2) ? 2 : 1;
-                        $flagSet[$key][$u][$r['student_id']] = true;
+                        // นับเฉพาะหน่วยที่ 1 (ข้อมูลหน่วยอื่นถือเป็นหน่วยที่ 1 ตามค่าเริ่มต้น)
+                        $flagSet[$key][1][$r['student_id']] = true;
                     }
                 } catch (Exception $e) { /* ตารางอาจยังไม่ถูกสร้าง — ปล่อยว่าง */ }
             }
@@ -1848,15 +1876,10 @@ try {
                     'pretest'       => isset($essaySet['pretest'][$sid]),
                     'd1_1'          => isset($essaySet['task1_d1'][$sid]),
                     'd1_2'          => isset($essaySet['task1_d2'][$sid]),
-                    // สะท้อนคิดแยกรายหน่วย: *1 = หน่วยที่ 1, *2 = หน่วยที่ 2
+                    // สะท้อนคิดหน่วยที่ 1 (หน่วยที่ 2 ถูกยกเลิกแล้ว)
                     'problems1'     => isset($flagSet['problems'][1][$sid]),
                     'checklist1'    => isset($flagSet['checklist'][1][$sid]),
                     'reflection1'   => isset($flagSet['reflection'][1][$sid]),
-                    'problems2'     => isset($flagSet['problems'][2][$sid]),
-                    'checklist2'    => isset($flagSet['checklist'][2][$sid]),
-                    'reflection2'   => isset($flagSet['reflection'][2][$sid]),
-                    'd2_1'          => isset($essaySet['task2_d1'][$sid]),
-                    'd2_2'          => isset($essaySet['task2_d2'][$sid]),
                     'posttest'      => isset($essaySet['posttest'][$sid]),
                 ];
             }

@@ -44,9 +44,6 @@ $role = $sessionUser['role'];
             <button type="button" class="btn btn-primary fw-bold px-4" data-unit="1" onclick="setReflectionUnit(1)">
               <i class="bi bi-1-circle-fill me-1"></i> หน่วยที่ 1
             </button>
-            <button type="button" class="btn btn-outline-primary fw-bold px-4" data-unit="2" onclick="setReflectionUnit(2)">
-              <i class="bi bi-2-circle-fill me-1"></i> หน่วยที่ 2
-            </button>
           </div>
         </div>
 
