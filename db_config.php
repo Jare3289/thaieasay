@@ -370,6 +370,66 @@ if ($needs_migration) {
     safe_ddl($pdo, "ALTER TABLE learning_reflections ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
 }
 
+// ให้ตารางเครื่องมือสะท้อนคิด 3 ตารางมีอยู่เสมอ — ตรวจแยกจาก migration หลัก
+// (สำคัญมาก: การสร้างตารางเหล่านี้เดิมอยู่ในบล็อก $needs_migration เท่านั้น
+//  ถ้าฐานข้อมูลผ่าน migration หลักไปแล้วแต่ตารางเหล่านี้ยังไม่ถูกสร้าง/เคยถูกลบ
+//  จะไม่มีวันถูกสร้างอีกเลย ทำให้ INSERT ตอนนักเรียนกดบันทึกล้มเหลว = ข้อมูลไม่เข้า DB)
+//  ใช้ CREATE TABLE IF NOT EXISTS จึงปลอดภัยกับข้อมูลเดิม รันซ้ำได้
+safe_ddl($pdo, "
+    CREATE TABLE IF NOT EXISTS writing_problems (
+        student_id VARCHAR(10) NOT NULL,
+        task_unit TINYINT NOT NULL DEFAULT 1,
+        prob_1_1 TEXT, sol_1_1 TEXT,
+        prob_1_2 TEXT, sol_1_2 TEXT,
+        prob_1_3 TEXT, sol_1_3 TEXT,
+        prob_2_1 TEXT, sol_2_1 TEXT,
+        prob_2_2 TEXT, sol_2_2 TEXT,
+        prob_3_1 TEXT, sol_3_1 TEXT,
+        prob_3_2 TEXT, sol_3_2 TEXT,
+        prob_3_3 TEXT, sol_3_3 TEXT,
+        prob_4_1 TEXT, sol_4_1 TEXT,
+        prob_4_2 TEXT, sol_4_2 TEXT,
+        prob_4_3 TEXT, sol_4_3 TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (student_id, task_unit),
+        FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+");
+safe_ddl($pdo, "
+    CREATE TABLE IF NOT EXISTS self_checklists (
+        student_id VARCHAR(10) NOT NULL,
+        task_unit TINYINT NOT NULL DEFAULT 1,
+        check_1_1 VARCHAR(50) NOT NULL,
+        check_1_2 VARCHAR(50) NOT NULL,
+        check_1_3 VARCHAR(50) NOT NULL,
+        check_2_1 VARCHAR(50) NOT NULL,
+        check_2_2 VARCHAR(50) NOT NULL,
+        check_3_1 VARCHAR(50) NOT NULL,
+        check_3_2 VARCHAR(50) NOT NULL,
+        check_3_3 VARCHAR(50) NOT NULL,
+        check_4_1 VARCHAR(50) NOT NULL,
+        check_4_2 VARCHAR(50) NOT NULL,
+        check_4_3 VARCHAR(50) NOT NULL,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (student_id, task_unit),
+        FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+");
+safe_ddl($pdo, "
+    CREATE TABLE IF NOT EXISTS learning_reflections (
+        student_id VARCHAR(10) NOT NULL,
+        task_unit TINYINT NOT NULL DEFAULT 1,
+        content_structure TEXT,
+        language_mechanics TEXT,
+        feedback_applied TEXT,
+        future_goals TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (student_id, task_unit),
+        FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+");
+
 // เพิ่มมิติ "หน่วยการเรียน" (task_unit) ให้เครื่องมือสะท้อนคิด — ตรวจแยกจาก migration หลัก
 // (สำคัญมาก: ต้องรันแม้ระบบเดิมที่ migration หลักผ่านไปแล้ว มิฉะนั้นคิวรีที่อ้าง task_unit จะพัง)
 // ทำ DDL จริงเพียงครั้งเดียว โดยเช็ค SHOW COLUMNS ก่อน แล้วเปลี่ยนคีย์หลักเป็น (student_id, task_unit)
