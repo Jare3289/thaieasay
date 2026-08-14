@@ -1149,7 +1149,7 @@ $role = $sessionUser['role'];
     };
 
     // Event listeners สำหรับการกดปุ่มส่งแบบบันทึกต่าง ๆ
-    document.getElementById('formObstacles').addEventListener('submit', async (e) => {
+    document.getElementById('formObstacles')?.addEventListener('submit', async (e) => {
       e.preventDefault();
       const form = e.target;
       // ส่งเฉพาะแถวที่ติ๊กสวิตช์ไว้และมีข้อมูลจริง แถวที่ไม่ได้เลือกจะถูกล้างค่า (null) ในฐานข้อมูล
@@ -1188,7 +1188,7 @@ $role = $sessionUser['role'];
       }
     });
 
-    document.getElementById('formChecklist').addEventListener('submit', async (e) => {
+    document.getElementById('formChecklist')?.addEventListener('submit', async (e) => {
       e.preventDefault();
       const formData = new FormData(e.target);
       const checklist = {};
@@ -1226,55 +1226,7 @@ $role = $sessionUser['role'];
       }
     });
 
-    document.getElementById('formPeer').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const formData = new FormData(e.target);
-      const targetId = document.getElementById('peerTargetStudent').value;
-      if (!targetId) {
-        alert('กรุณาเลือกชื่อเพื่อนก่อนส่งแบบประเมิน');
-        return;
-      }
-      
-      const scores = {};
-      let strength = '', improvement = '', encouragement = '';
-      formData.forEach((value, key) => {
-        if (key === 'strength') strength = value;
-        else if (key === 'improvement') improvement = value;
-        else if (key === 'encouragement') encouragement = value;
-        else if (key.startsWith('peer_')) {
-          // peer_1_1 -> 1.1
-          const realKey = key.substring(5).replace('_', '.');
-          scores[realKey] = value;
-        }
-      });
-
-      try {
-        const response = await fetch('api.php', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'save_peer_review',
-            studentId: targetId,
-            reviewerId: currentUserId,
-            scores: scores,
-            strength: strength,
-            improvement: improvement,
-            encouragement: encouragement
-          })
-        });
-        const res = await response.json();
-        if (res.success) {
-          alert('ส่งการประเมินและสะท้อนข้อมูลกลับไปยังเพื่อนสำเร็จ!');
-          e.target.reset();
-        } else {
-          alert('เกิดข้อผิดพลาด: ' + res.error);
-        }
-      } catch (err) {
-        alert('เกิดข้อผิดพลาดทางเทคนิคเครือข่าย');
-      }
-    });
-
-    document.getElementById('formReflection').addEventListener('submit', async (e) => {
+    document.getElementById('formReflection')?.addEventListener('submit', async (e) => {
       e.preventDefault();
       const formData = new FormData(e.target);
       const data = {};
