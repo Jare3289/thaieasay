@@ -214,7 +214,9 @@ body {
 }
 .topbar-subtitle { font-size: 0.78rem; color: #94a3b8; }
 .topbar-menu-btn {
-  display: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid var(--border-gray);
   background: var(--light-slate);
   color: var(--primary-navy);
@@ -223,7 +225,10 @@ body {
   border-radius: 12px;
   font-size: 1.3rem;
   flex-shrink: 0;
+  cursor: pointer;
+  transition: all 0.18s ease;
 }
+.topbar-menu-btn:hover { background: var(--light-blue); color: var(--accent-blue-dark); }
 .topbar-right { display: flex; align-items: center; gap: 14px; }
 
 .topbar-user { display: flex; align-items: center; gap: 10px; }
@@ -502,6 +507,11 @@ body {
   inset: 0;
   background: rgba(15, 23, 42, 0.45);
   z-index: 1039;
+}
+
+/* ยุบแถบข้างบนจอใหญ่ (เดสก์ท็อป) เพื่อคืนพื้นที่ให้เนื้อหา — สลับด้วยปุ่มเมนูบนแถบบน */
+@media (min-width: 992px) {
+  body.sidebar-collapsed .app-sidebar { display: none; }
 }
 
 /* =========================================================================

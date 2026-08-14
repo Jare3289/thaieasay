@@ -33,28 +33,21 @@ require_once 'header.php';
   <div class="card border-0 shadow-sm rounded-4 mb-4 bg-white p-4">
     <h6 class="fw-bold text-dark mb-3"><i class="bi bi-journal-bookmark text-primary me-2"></i>เลือกหน่วยการเรียน / รอบที่ต้องการบันทึก</h6>
     <div class="row g-2">
-      <div class="col-6 col-md-3">
+      <div class="col-6 col-md-4">
         <button class="essay-phase-btn btn btn-outline-primary w-100 rounded-3 py-3 fw-bold" data-unit="pretest" onclick="setEssayUnit('pretest')">
           <div class="fs-4 mb-1">📝</div>
           <div class="small">ก่อนเรียน</div>
           <div class="text-muted" style="font-size:0.72rem;">Pretest</div>
         </button>
       </div>
-      <div class="col-6 col-md-3">
+      <div class="col-6 col-md-4">
         <button class="essay-phase-btn btn btn-outline-success w-100 rounded-3 py-3 fw-bold active-phase" data-unit="task1" onclick="setEssayUnit('task1')">
           <div class="fs-4 mb-1">📚</div>
           <div class="small">ภาระงาน หน่วยที่ 1</div>
           <div class="text-muted" style="font-size:0.72rem;">Task Unit 1</div>
         </button>
       </div>
-      <div class="col-6 col-md-3">
-        <button class="essay-phase-btn btn btn-outline-warning w-100 rounded-3 py-3 fw-bold" data-unit="task2" onclick="setEssayUnit('task2')">
-          <div class="fs-4 mb-1">📖</div>
-          <div class="small">ภาระงาน หน่วยที่ 2</div>
-          <div class="text-muted" style="font-size:0.72rem;">Task Unit 2</div>
-        </button>
-      </div>
-      <div class="col-6 col-md-3">
+      <div class="col-6 col-md-4">
         <button class="essay-phase-btn btn btn-outline-danger w-100 rounded-3 py-3 fw-bold" data-unit="posttest" onclick="setEssayUnit('posttest')">
           <div class="fs-4 mb-1">🎓</div>
           <div class="small">หลังเรียน</div>
@@ -63,7 +56,7 @@ require_once 'header.php';
       </div>
     </div>
 
-    <!-- ตัวเลือกร่าง (แสดงเฉพาะภาระงานหน่วยที่ 1/2): D1 = ร่างที่ 1, D2 = ร่างที่ 2 -->
+    <!-- ตัวเลือกร่าง (แสดงเฉพาะภาระงานหน่วยที่ 1): D1 = ร่างที่ 1, D2 = ร่างที่ 2 -->
     <div id="draftSelector" class="mt-3 d-none">
       <div class="d-flex align-items-center flex-wrap gap-2 bg-light border rounded-3 p-2">
         <span class="fw-bold text-secondary small ms-1 me-1"><i class="bi bi-layers-half me-1"></i>เลือกร่างของภาระงาน:</span>
@@ -100,6 +93,12 @@ require_once 'header.php';
         <div id="essayTopicText" class="fs-5 fw-semibold text-dark">
           <span class="text-muted fst-italic fs-6">กำลังโหลดหัวข้อ...</span>
         </div>
+      </div>
+
+      <!-- แจ้งเตือนเมื่อคุณครูปิดรับการส่งงานของรอบที่เลือกอยู่ -->
+      <div id="phaseClosedNotice" class="alert alert-warning border-0 rounded-3 small mb-3 py-2 d-none" role="alert">
+        <i class="bi bi-lock-fill me-2"></i>
+        คุณครูยังไม่เปิดรับการส่งงานของรอบนี้ คุณดูหรือแก้ไขร่างไว้ก่อนได้ แต่จะยังบันทึกส่งไม่ได้จนกว่าคุณครูจะเปิดรับ
       </div>
 
       <!-- Instructions -->
@@ -216,6 +215,7 @@ require_once 'header.php';
 
 <style>
 .essay-phase-btn { transition: all 0.2s ease; min-height: 90px; }
+.essay-phase-btn .phase-closed-tag { font-size: 0.62rem; }
 .essay-phase-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.1); }
 .essay-phase-btn.active-phase {
   background-color: var(--bs-success) !important;
@@ -252,18 +252,15 @@ const phaseLabels = {
   pretest:  'ก่อนเรียน (Pretest)',
   task1_d1: 'ภาระงาน หน่วยที่ 1 · ร่างที่ 1 (D1)',
   task1_d2: 'ภาระงาน หน่วยที่ 1 · ร่างที่ 2 (D2)',
-  task2_d1: 'ภาระงาน หน่วยที่ 2 · ร่างที่ 1 (D1)',
-  task2_d2: 'ภาระงาน หน่วยที่ 2 · ร่างที่ 2 (D2)',
   posttest: 'หลังเรียน (Posttest)'
 };
 const phaseBadgeColors = {
   pretest: 'bg-primary',
   task1_d1: 'bg-success', task1_d2: 'bg-success',
-  task2_d1: 'bg-warning text-dark', task2_d2: 'bg-warning text-dark',
   posttest: 'bg-danger'
 };
 
-// แยกสถานะเป็น 2 ระดับ: หน่วย (pretest/task1/task2/posttest) และร่าง (d1/d2 เฉพาะภาระงาน)
+// แยกสถานะเป็น 2 ระดับ: หน่วย (pretest/task1/posttest) และร่าง (d1/d2 เฉพาะภาระงาน)
 let currentUnit = 'task1';
 let currentDraft = 'd1';
 let currentEssayPhase = 'task1_d1';
@@ -272,18 +269,55 @@ let bodyParagraphCount = 0;
 
 // รวมหน่วย + ร่าง เป็นคีย์ essay_phase: ภาระงานมีร่าง (task1_d1) ส่วนก่อน/หลังเรียนไม่มีร่าง
 function computeEssayPhase(unit, draft) {
-  return (unit === 'task1' || unit === 'task2') ? (unit + '_' + draft) : unit;
+  return (unit === 'task1') ? (unit + '_' + draft) : unit;
 }
 
-// หัวข้อที่ครูกำหนด (map: pretest/task1/task2/posttest → หัวข้อ) — ภาระงานใช้หัวข้อเดียวกันทั้ง D1/D2
+// หัวข้อที่ครูกำหนด (map: pretest/task1/posttest → หัวข้อ) — ภาระงานใช้หัวข้อเดียวกันทั้ง D1/D2
 let essayTopics = {};
+// สถานะเปิด/ปิดรับการส่งของแต่ละรอบที่ครูกำหนด (map: pretest/task1/posttest → bool)
+let essayOpen = {};
 async function loadEssayTopics() {
   try {
     const res = await fetch('api.php?action=get_essay_topics');
     const data = await res.json();
-    if (data.success) essayTopics = data.topics || {};
-  } catch (e) { essayTopics = {}; }
+    if (data.success) { essayTopics = data.topics || {}; essayOpen = data.open || {}; }
+  } catch (e) { essayTopics = {}; essayOpen = {}; }
+  applyPhaseOpenState();
   updateTopicDisplay();
+  updateSubmitAvailability();
+}
+
+// รอบนี้ครูเปิดรับการส่งหรือไม่ (unit = pretest/task1/posttest ตรงกับคีย์สถานะโดยตรง)
+function isUnitOpen(unit) {
+  return essayOpen[unit] !== false;
+}
+
+// ติดป้าย "ปิดรับ" บนปุ่มหน่วยที่ครูปิดรับ เพื่อให้นักเรียนเห็นชัดว่าส่งรอบไหนได้
+function applyPhaseOpenState() {
+  document.querySelectorAll('.essay-phase-btn').forEach(btn => {
+    const unit = btn.getAttribute('data-unit');
+    const open = isUnitOpen(unit);
+    let tag = btn.querySelector('.phase-closed-tag');
+    if (!open) {
+      if (!tag) {
+        tag = document.createElement('div');
+        tag.className = 'phase-closed-tag badge bg-danger mt-1';
+        tag.innerHTML = '<i class="bi bi-lock-fill me-1"></i>ปิดรับ';
+        btn.appendChild(tag);
+      }
+    } else if (tag) {
+      tag.remove();
+    }
+  });
+}
+
+// เปิด/ปิดปุ่มบันทึกตามสถานะรอบที่เลือกอยู่ พร้อมแสดงข้อความแจ้งเมื่อรอบถูกปิดรับ
+function updateSubmitAvailability() {
+  const open = isUnitOpen(currentUnit);
+  const saveBtn = document.getElementById('saveBtn');
+  const notice  = document.getElementById('phaseClosedNotice');
+  if (saveBtn) saveBtn.disabled = !open;
+  if (notice)  notice.classList.toggle('d-none', open);
 }
 function updateTopicDisplay() {
   const el = document.getElementById('essayTopicText');
@@ -347,7 +381,7 @@ function reindexBodyParagraphs() {
 // เลือกหน่วยการเรียน — ภาระงานจะเปิดแถบเลือกร่าง (D1/D2) ให้ด้วย
 function setEssayUnit(unit) {
   currentUnit = unit;
-  const isTask = (unit === 'task1' || unit === 'task2');
+  const isTask = (unit === 'task1');
 
   // แสดง/ซ่อนแถบเลือกร่าง เฉพาะภาระงาน
   const draftSel = document.getElementById('draftSelector');
@@ -361,6 +395,7 @@ function setEssayUnit(unit) {
   currentEssayPhase = computeEssayPhase(unit, currentDraft);
   updatePhaseBadge();
   updateTopicDisplay();
+  updateSubmitAvailability();
   loadEssayForPhase(currentEssayPhase);
 }
 
@@ -384,7 +419,7 @@ function updatePhaseBadge() {
 
 // เปิดแก้ไขจากรายการที่บันทึกไว้ (แปลงคีย์ phase → หน่วย + ร่าง)
 function openEssayPhase(phase) {
-  const m = /^(task[12])_(d[12])$/.exec(phase);
+  const m = /^(task1)_(d[12])$/.exec(phase);
   if (m) {
     currentDraft = m[2];
     document.querySelectorAll('.draft-btn').forEach(b => b.classList.toggle('active-draft', b.getAttribute('data-draft') === m[2]));
@@ -495,6 +530,11 @@ function updateWordCount() {
 }
 
 async function saveEssay() {
+  // รอบที่ครูปิดรับ — บล็อกการส่งไว้ก่อน (ฝั่งเซิร์ฟเวอร์ตรวจซ้ำอีกชั้น)
+  if (!isUnitOpen(currentUnit)) {
+    showToast('คุณครูยังไม่เปิดรับการส่งงานรอบนี้ กรุณาเลือกรอบที่เปิดรับ', 'error');
+    return;
+  }
   const intro = document.getElementById('essayIntro').value.trim();
   const conclusion = document.getElementById('essayConclusion').value.trim();
   const bodyParagraphs = Array.from(document.querySelectorAll('.body-para-textarea')).map(ta => ta.value.trim()).filter(Boolean);
@@ -568,7 +608,7 @@ async function loadSavedList() {
   const container = document.getElementById('savedEssayList');
   container.innerHTML = '<div class="text-center text-muted py-3"><span class="spinner-border spinner-border-sm me-2"></span>กำลังโหลด...</div>';
 
-  const phases = ['pretest', 'task1_d1', 'task1_d2', 'task2_d1', 'task2_d2', 'posttest'];
+  const phases = ['pretest', 'task1_d1', 'task1_d2', 'posttest'];
   const results = await Promise.all(
     phases.map(ph => fetch(`api.php?action=get_essay&essay_phase=${ph}`).then(r => r.json()).catch(() => ({ success: false })))
   );

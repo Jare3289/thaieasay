@@ -99,7 +99,6 @@ function peer_match_create_pair(PDO $pdo, $round, $a, $b) {
 function essay_topic_phase($phase) {
     $phase = (string)$phase;
     if (strpos($phase, 'task1') === 0) return 'task1';
-    if (strpos($phase, 'task2') === 0) return 'task2';
     return $phase; // pretest / posttest
 }
 
@@ -127,11 +126,26 @@ function essay_compose_content($intro, $bodyJson, $conclusion) {
 function essay_topics_map(PDO $pdo) {
     static $cache = null;
     if ($cache !== null) return $cache;
-    $cache = ['pretest' => '', 'task1' => '', 'task2' => '', 'posttest' => ''];
+    $cache = ['pretest' => '', 'task1' => '', 'posttest' => ''];
     try {
         $rows = $pdo->query("SELECT phase, topic FROM essay_topics")->fetchAll();
         foreach ($rows as $r) { $cache[$r['phase']] = (string)($r['topic'] ?? ''); }
     } catch (Exception $e) { /* ตารางอาจยังไม่ถูกสร้าง */ }
+    return $cache;
+}
+
+// ดึงสถานะเปิด/ปิดรับการส่งเรียงความของแต่ละรอบเป็น map [phase => bool]
+// ค่าเริ่มต้น = เปิดรับ (true) เพื่อไม่ให้ระบบเดิมที่ยังไม่มีคอลัมน์ is_open ปิดกั้นการส่งโดยไม่ตั้งใจ
+function essay_open_map(PDO $pdo) {
+    static $cache = null;
+    if ($cache !== null) return $cache;
+    $cache = ['pretest' => true, 'task1' => true, 'posttest' => true];
+    try {
+        $rows = $pdo->query("SELECT phase, is_open FROM essay_topics")->fetchAll();
+        foreach ($rows as $r) {
+            if (array_key_exists($r['phase'], $cache)) $cache[$r['phase']] = ((int)$r['is_open'] === 1);
+        }
+    } catch (Exception $e) { /* ตาราง/คอลัมน์อาจยังไม่ถูกสร้าง — ถือว่าเปิดรับทั้งหมด */ }
     return $cache;
 }
 
@@ -423,15 +437,14 @@ try {
 }
 
 // Migration ย่อย: รองรับร่าง D1/D2 ของภาระงาน (Task Unit Drafts) — ตรวจแยกจาก migration หลัก
-// ภาระงานรุ่นเก่าถูกเก็บเป็น 'task1'/'task2' (มีร่างเดียว) จึงย้ายให้เป็น "ร่างที่ 1 (D1)" = task1_d1 / task2_d1
+// ภาระงานรุ่นเก่าถูกเก็บเป็น 'task1' (มีร่างเดียว) จึงย้ายให้เป็น "ร่างที่ 1 (D1)" = task1_d1
 // เพื่อให้เข้ากับคอลัมน์ D1/D2 ใหม่ในหน้า Essay Viewer และตัวเขียนเรียงความ
 // ใช้ SELECT ... LIMIT 1 ตรวจก่อน จึงเบามาก — เมื่อย้ายครบแล้วจะไม่ทำงานอีก
 try {
-    $legacyEssay = $pdo->query("SELECT 1 FROM student_essays WHERE essay_phase IN ('task1','task2') LIMIT 1");
+    $legacyEssay = $pdo->query("SELECT 1 FROM student_essays WHERE essay_phase = 'task1' LIMIT 1");
     if ($legacyEssay && $legacyEssay->fetch()) {
         // UPDATE IGNORE กันชนกับแถว _d1 ที่อาจมีอยู่แล้ว (unique student_id+essay_phase)
         safe_ddl($pdo, "UPDATE IGNORE student_essays SET essay_phase = 'task1_d1' WHERE essay_phase = 'task1'");
-        safe_ddl($pdo, "UPDATE IGNORE student_essays SET essay_phase = 'task2_d1' WHERE essay_phase = 'task2'");
     }
 } catch (Exception $e) {
     // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
@@ -474,8 +487,9 @@ try {
     // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
 }
 
-// ตารางหัวข้อเรียงความที่ครูกำหนดต่อรอบ (ก่อนเรียน/หน่วยที่ 1/หน่วยที่ 2/หลังเรียน)
+// ตารางหัวข้อเรียงความที่ครูกำหนดต่อรอบ (ก่อนเรียน/หน่วยที่ 1/หลังเรียน)
 // นักเรียนไม่ต้องกรอกชื่อเรื่องเอง — ใช้หัวข้อที่ครูกำหนดของแต่ละงานแทน
+// คอลัมน์ is_open = ครูเปิด/ปิดรับการส่งเรียงความของรอบนั้น (1 = เปิดรับ, 0 = ปิดรับ)
 try {
     $tp = $pdo->query("SHOW TABLES LIKE 'essay_topics'");
     if (!$tp || $tp->rowCount() === 0) {
@@ -483,11 +497,18 @@ try {
             CREATE TABLE IF NOT EXISTS essay_topics (
                 phase VARCHAR(20) PRIMARY KEY,
                 topic VARCHAR(500) DEFAULT NULL,
+                is_open TINYINT NOT NULL DEFAULT 1,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         ");
-        // เตรียมแถวว่างของ 4 รอบหลักไว้ล่วงหน้า (ครูมากรอกหัวข้อภายหลัง)
-        safe_ddl($pdo, "INSERT IGNORE INTO essay_topics (phase, topic) VALUES ('pretest', NULL), ('task1', NULL), ('task2', NULL), ('posttest', NULL)");
+        // เตรียมแถวว่างของรอบหลักไว้ล่วงหน้า (ครูมากรอกหัวข้อภายหลัง)
+        safe_ddl($pdo, "INSERT IGNORE INTO essay_topics (phase, topic) VALUES ('pretest', NULL), ('task1', NULL), ('posttest', NULL)");
+    } else {
+        // ฐานข้อมูลเดิม: เพิ่มคอลัมน์ is_open หากยังไม่มี
+        $hasOpen = $pdo->query("SHOW COLUMNS FROM essay_topics LIKE 'is_open'");
+        if (!$hasOpen || $hasOpen->rowCount() === 0) {
+            safe_ddl($pdo, "ALTER TABLE essay_topics ADD COLUMN is_open TINYINT NOT NULL DEFAULT 1");
+        }
     }
 } catch (Exception $e) {
     // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ

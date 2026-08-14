@@ -164,13 +164,30 @@ if ($sessionUser) {
       }
     }
 
-    // เปิด/ปิดแถบข้างบนจอมือถือ
+    // ปุ่มเมนู: จอใหญ่ = ยุบ/ขยายแถบข้างถาวร (จำค่าไว้ให้คืนพื้นที่หน้าจอ) · จอเล็ก = เปิด/ปิดแบบชั่วคราว
+    var SIDEBAR_COLLAPSE_KEY = 'thaieasay_sidebar_collapsed';
+    function tegIsDesktop() {
+      return window.matchMedia('(min-width: 992px)').matches;
+    }
     function tegToggleSidebar() {
-      document.body.classList.toggle('sidebar-open');
+      if (tegIsDesktop()) {
+        var collapsed = document.body.classList.toggle('sidebar-collapsed');
+        try { localStorage.setItem(SIDEBAR_COLLAPSE_KEY, collapsed ? '1' : '0'); } catch (e) {}
+      } else {
+        document.body.classList.toggle('sidebar-open');
+      }
     }
     function tegCloseSidebar() {
       document.body.classList.remove('sidebar-open');
     }
+    // คืนค่าสถานะยุบแถบข้าง (เฉพาะจอใหญ่) จากครั้งก่อน — ทำทันทีเพื่อลดการกระพริบ
+    (function () {
+      try {
+        if (localStorage.getItem(SIDEBAR_COLLAPSE_KEY) === '1' && tegIsDesktop()) {
+          document.body.classList.add('sidebar-collapsed');
+        }
+      } catch (e) {}
+    })();
 
     document.addEventListener('DOMContentLoaded', tegPaintNavButtons);
   </script>
@@ -228,7 +245,7 @@ if ($sessionUser) {
       <!-- แถบบน (Topbar) -->
       <header class="app-topbar">
         <div class="topbar-left">
-          <button class="topbar-menu-btn" onclick="tegToggleSidebar()" aria-label="เมนู">
+          <button class="topbar-menu-btn" onclick="tegToggleSidebar()" aria-label="ยุบ/ขยายแถบเมนู" title="ยุบ/ขยายแถบเมนู">
             <i class="bi bi-list"></i>
           </button>
           <div>

@@ -10,7 +10,6 @@
 
 -- 1) ภาระงานรุ่นเก่า (ร่างเดียว) → ร่างที่ 1 (D1)
 UPDATE IGNORE student_essays SET essay_phase = 'task1_d1' WHERE essay_phase = 'task1';
-UPDATE IGNORE student_essays SET essay_phase = 'task2_d1' WHERE essay_phase = 'task2';
 
 -- 2) เพิ่มคอลัมน์แยกส่วนเนื้อหา
 --    intro_content = ส่วนนำ, body_content = ส่วนเนื้อหา (หลายย่อหน้าเก็บเป็น JSON array), conclusion_content = ส่วนสรุป
@@ -40,7 +39,7 @@ CREATE TABLE IF NOT EXISTS essay_topics (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT IGNORE INTO essay_topics (phase, topic) VALUES
-    ('pretest', NULL), ('task1', NULL), ('task2', NULL), ('posttest', NULL);
+    ('pretest', NULL), ('task1', NULL), ('posttest', NULL);
 
 -- 5) (ทางเลือก) เมื่อยืนยันว่าข้อมูลย้ายครบแล้ว จะลบคอลัมน์เดิมที่ไม่ใช้แล้วก็ได้
 --    ยกเลิกคอมเมนต์เพื่อรัน:

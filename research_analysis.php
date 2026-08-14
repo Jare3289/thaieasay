@@ -91,7 +91,6 @@ require_once 'header.php';
               <span class="input-group-text bg-white small border-end-0 text-nowrap"><i class="bi bi-calendar-check"></i> ภาระงานที่ใช้คำนวณ ICC</span>
               <select id="iccTaskPhaseSelector" class="form-select form-select-sm bg-white border-start-0 small" onchange="switchICCTaskPhase()">
                 <option value="task1" selected>หน่วยที่ 1</option>
-                <option value="task2">หน่วยที่ 2</option>
               </select>
             </div>
           </div>
@@ -369,7 +368,6 @@ require_once 'header.php';
                 <option value="all">ทุกรอบ</option>
                 <option value="pretest">ก่อนเรียน</option>
                 <option value="task1">ภาระงาน หน่วยที่ 1</option>
-                <option value="task2">ภาระงาน หน่วยที่ 2</option>
                 <option value="posttest">หลังเรียน</option>
               </select>
               <input type="text" id="essaySearchInput" onkeyup="filterEssayViewer()" class="form-control form-control-sm border-2 rounded-pill" placeholder="ค้นหาชื่อหรือเนื้อหา..." style="width:220px;">
@@ -608,7 +606,7 @@ require_once 'header.php';
     });
 
     // ================= เชิงปริมาณ (กลุ่มตัวอย่าง) =================
-    const phaseKeys = [['pretest', 'ก่อนเรียน (Pretest)'], ['task1', 'ภาระงานหน่วยที่ 1'], ['task2', 'ภาระงานหน่วยที่ 2'], ['posttest', 'หลังเรียน (Posttest)']];
+    const phaseKeys = [['pretest', 'ก่อนเรียน (Pretest)'], ['task1', 'ภาระงานหน่วยที่ 1'], ['posttest', 'หลังเรียน (Posttest)']];
     const teacherScoresByPhase = (phase, getter) => evals
       .filter(e => sampleIds.has(e.student_id) && e.test_phase === phase && e.evaluator_type === 'teacher')
       .map(getter);
@@ -688,7 +686,7 @@ require_once 'header.php';
     P.push('<h2>1.1 ความเป็นมาและวัตถุประสงค์</h2>');
     P.push('<p>รายงานฉบับนี้จัดทำขึ้นเพื่อรวบรวมและวิเคราะห์ผลการประเมินความสามารถในการเขียนเรียงความของนักเรียน โดยใช้ข้อมูลที่บันทึกผ่านระบบประเมินเรียงความ ครอบคลุมทั้งการวิเคราะห์เชิงปริมาณ (สถิติเชิงพรรณนา การทดสอบพัฒนาการ และค่าความสอดคล้องระหว่างผู้ตรวจ) และเชิงคุณภาพ (ปัญหาการเขียน ข้อเสนอแนะจากเพื่อน และการสะท้อนการเรียนรู้) เพื่อตรวจสอบพัฒนาการของผู้เรียนและคุณภาพของเครื่องมือประเมิน</p>');
     P.push('<h2>1.2 แบบแผนการวิจัย</h2>');
-    P.push('<p>การวิจัยใช้แบบแผน <b>กลุ่มทดลองกลุ่มเดียว ทดสอบก่อน–หลัง (One-Group Pretest–Posttest Design)</b> เก็บข้อมูลการประเมิน 4 รอบ ได้แก่ ก่อนเรียน (Pretest) ภาระงานหน่วยที่ 1 หน่วยที่ 2 และหลังเรียน (Posttest)</p>');
+    P.push('<p>การวิจัยใช้แบบแผน <b>กลุ่มทดลองกลุ่มเดียว ทดสอบก่อน–หลัง (One-Group Pretest–Posttest Design)</b> เก็บข้อมูลการประเมิน 3 รอบ ได้แก่ ก่อนเรียน (Pretest) ภาระงานหน่วยที่ 1 และหลังเรียน (Posttest)</p>');
     P.push('<h2>1.3 กลุ่มเป้าหมายในการวิเคราะห์</h2>');
     P.push('<p>ผลการวิเคราะห์เชิงปริมาณ เชิงคุณภาพ และผลงานเรียงความ ใช้ข้อมูลของ<b>กลุ่มตัวอย่าง จำนวน ' + sampleStudents.length + ' คน</b> ส่วนการตรวจสอบความสอดคล้องระหว่างผู้ตรวจ (ICC) ใช้ข้อมูลของ<b>กลุ่มทดลอง (นักเรียนห้อง ' + esc(EXPERIMENTAL_CLASSROOM) + ') จำนวน ' + expStudents.length + ' คน</b> ซึ่งได้รับการตรวจโดยผู้ประเมิน 3 คน</p>');
     P.push('<h2>1.4 เครื่องมือที่ใช้ในการวิจัย</h2>');
@@ -1082,7 +1080,7 @@ require_once 'header.php';
 
     const studentEvals = {};
     studentsList.forEach(s => {
-      studentEvals[s.student_id] = { task1: [], task2: [] };
+      studentEvals[s.student_id] = { task1: [] };
     });
     evaluations.forEach(ev => {
       if (studentEvals[ev.student_id] && studentEvals[ev.student_id][ev.test_phase] !== undefined) {
@@ -1979,13 +1977,11 @@ require_once 'header.php';
   const essayPhaseLabels = {
     pretest:  'ก่อนเรียน (Pretest)',
     task1:    'ภาระงาน หน่วยที่ 1',
-    task2:    'ภาระงาน หน่วยที่ 2',
     posttest: 'หลังเรียน (Posttest)'
   };
   const essayPhaseBadgeClass = {
     pretest: 'bg-primary',
     task1: 'bg-success',
-    task2: 'bg-warning text-dark',
     posttest: 'bg-danger'
   };
 

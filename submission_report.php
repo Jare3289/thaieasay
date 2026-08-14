@@ -20,7 +20,7 @@ require_once 'header.php';
       <div class="stat-card">
         <div class="stat-label"><span class="stat-icon badge-blue">✅</span> ส่งครบทุกชิ้น</div>
         <div class="stat-value" id="statComplete">-</div>
-        <div class="stat-foot">ครบ 9 ชิ้นงาน</div>
+        <div class="stat-foot">ครบ 7 ชิ้นงาน</div>
       </div>
     </div>
     <div class="col-md-3 col-6">
@@ -66,7 +66,6 @@ require_once 'header.php';
             <th rowspan="2" class="sticky-col-2 text-start align-middle">ชื่อ-สกุลผู้เรียน</th>
             <th rowspan="2" class="align-middle">ก่อนเรียน</th>
             <th colspan="5" class="grp-unit1">หน่วยการเรียนที่ 1</th>
-            <th colspan="5" class="grp-unit2">หน่วยการเรียนที่ 2</th>
             <th rowspan="2" class="align-middle">หลังเรียน</th>
           </tr>
           <tr class="report-head-sub">
@@ -75,15 +74,10 @@ require_once 'header.php';
             <th class="grp-unit1">ปัญหาการเขียน</th>
             <th class="grp-unit1">ตรวจสอบตนเอง</th>
             <th class="grp-unit1">สะท้อนการเรียนรู้</th>
-            <th class="grp-unit2">D2.1</th>
-            <th class="grp-unit2">D2.2</th>
-            <th class="grp-unit2">ปัญหาการเขียน</th>
-            <th class="grp-unit2">ตรวจสอบตนเอง</th>
-            <th class="grp-unit2">สะท้อนการเรียนรู้</th>
           </tr>
         </thead>
         <tbody id="reportBody">
-          <tr><td colspan="14" class="text-center text-muted py-5">
+          <tr><td colspan="9" class="text-center text-muted py-5">
             <div class="spinner-border spinner-border-sm me-2" role="status"></div> กำลังโหลดข้อมูล...
           </td></tr>
         </tbody>
@@ -164,11 +158,6 @@ require_once 'header.php';
     { key: 'problems1',   label: 'ปัญหาการเขียน (หน่วย 1)' },
     { key: 'checklist1',  label: 'ตรวจสอบตนเอง (หน่วย 1)' },
     { key: 'reflection1', label: 'สะท้อนการเรียนรู้ (หน่วย 1)' },
-    { key: 'd2_1',        label: 'D2.1' },
-    { key: 'd2_2',        label: 'D2.2' },
-    { key: 'problems2',   label: 'ปัญหาการเขียน (หน่วย 2)' },
-    { key: 'checklist2',  label: 'ตรวจสอบตนเอง (หน่วย 2)' },
-    { key: 'reflection2', label: 'สะท้อนการเรียนรู้ (หน่วย 2)' },
     { key: 'posttest',    label: 'หลังเรียน' },
   ];
 
@@ -185,20 +174,20 @@ require_once 'header.php';
       const res = await fetch('api.php?action=get_submission_report' + group);
       const data = await res.json();
       if (!data.success) {
-        body.innerHTML = '<tr><td colspan="14" class="text-center text-danger py-4">' + (data.error || 'โหลดข้อมูลไม่สำเร็จ') + '</td></tr>';
+        body.innerHTML = '<tr><td colspan="9" class="text-center text-danger py-4">' + (data.error || 'โหลดข้อมูลไม่สำเร็จ') + '</td></tr>';
         return;
       }
       submissionData = data.report || [];
       renderReport();
     } catch (err) {
-      body.innerHTML = '<tr><td colspan="14" class="text-center text-danger py-4">เกิดข้อผิดพลาดในการเชื่อมต่อ</td></tr>';
+      body.innerHTML = '<tr><td colspan="9" class="text-center text-danger py-4">เกิดข้อผิดพลาดในการเชื่อมต่อ</td></tr>';
     }
   }
 
   function renderReport() {
     const body = document.getElementById('reportBody');
     if (!submissionData.length) {
-      body.innerHTML = '<tr><td colspan="14" class="text-center text-muted py-5">ไม่พบข้อมูลนักเรียนในกลุ่มนี้</td></tr>';
+      body.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-5">ไม่พบข้อมูลนักเรียนในกลุ่มนี้</td></tr>';
       updateStats(0, 0, 0, 0);
       return;
     }
