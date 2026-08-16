@@ -1782,10 +1782,26 @@ try {
             break;
 
         // Essay: ดึงเรียงความทั้งชั้น (สำหรับครู/แดชบอร์ด)
+        // light=1 : โหมดเบา — คืนเฉพาะสถานะการส่ง (ไม่รวมเนื้อหาเต็ม) เพื่อให้หน้า Essay Viewer โหลดเร็ว
         case 'get_all_essays':
             if (!isset($_SESSION['user']) || !in_array($_SESSION['user']['role'], ['teacher', 'expert'])) {
                 echo json_encode(['success' => false, 'error' => 'ต้องเป็นครูหรือผู้เชี่ยวชาญ']);
                 exit;
+            }
+            // โหมดเบา: ไม่ดึงคอลัมน์เนื้อหา (intro/body/conclusion ที่เป็น LONGTEXT) ลดขนาดข้อมูลลงมาก
+            if (isset($_GET['light']) && $_GET['light'] == '1') {
+                $stmt = $pdo->query('
+                    SELECT se.student_id, se.essay_phase, se.word_count, se.updated_at, se.created_at,
+                           s.student_name, s.classroom, s.student_group
+                    FROM student_essays se
+                    LEFT JOIN students s ON se.student_id = s.student_id
+                    ORDER BY s.classroom ASC, se.essay_phase ASC, s.student_id ASC
+                ');
+                $essays = $stmt->fetchAll();
+                foreach ($essays as &$e) { $e['student_name'] = formatNamePrefix($e['student_name']); }
+                unset($e);
+                echo json_encode(['success' => true, 'essays' => $essays, 'light' => true]);
+                break;
             }
             $stmt = $pdo->query('
                 SELECT se.*, s.student_name, s.classroom, s.student_group

@@ -10,6 +10,7 @@ if (!isset($_SESSION['user']) || !in_array($_SESSION['user']['role'], ['teacher'
     header('Location: index.php');
     exit;
 }
+$isTeacher = ($_SESSION['user']['role'] === 'teacher'); // ครูแก้ไข/ลบเรียงความในหน้านี้ได้
 
 $phaseLabels = [
     'pretest'  => 'ก่อนเรียน (Pretest)',
@@ -362,8 +363,44 @@ $genAt = date('d/m/Y H:i');
   .no-content { color: #888; font-style: italic; text-indent: 0; }
   .empty { text-align: center; padding: 60px 20px; color: #94a3b8; font-family: "Tahoma", sans-serif; }
 
+  /* แถบเครื่องมือครู (แก้ไข/ลบ) — แสดงบนจอเท่านั้น ไม่พิมพ์ลง PDF */
+  .editbar {
+    display: flex; gap: 8px; justify-content: flex-end; margin: 4px 0 6px;
+    font-family: "Tahoma", sans-serif;
+  }
+  .editbar button {
+    border: 1px solid #cbd5e1; background: #fff; border-radius: 999px;
+    padding: 4px 14px; font-size: 14px; font-weight: 700; cursor: pointer;
+  }
+  .editbar button.b-edit { color: #0d3b66; border-color: #0d3b66; }
+  .editbar button.b-del  { color: #c0392b; border-color: #c0392b; }
+  .editbar button:hover  { filter: brightness(0.96); }
+  .editpanel {
+    border: 1px dashed #94a3b8; border-radius: 10px; padding: 14px 16px; margin: 4px 0 10px;
+    background: #f8fafc; font-family: "Tahoma", sans-serif;
+  }
+  .editpanel label { display: block; font-weight: 700; font-size: 14px; color: #0d3b66; margin: 8px 0 3px; }
+  .editpanel textarea {
+    width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 10px;
+    font-family: inherit; font-size: 15px; resize: vertical;
+  }
+  .editpanel .body-para { display: flex; gap: 6px; align-items: flex-start; margin-bottom: 6px; }
+  .editpanel .body-para textarea { flex: 1; }
+  .editpanel .mini {
+    border: 1px solid #cbd5e1; background: #fff; border-radius: 8px; padding: 4px 10px;
+    font-size: 13px; font-weight: 700; cursor: pointer; flex-shrink: 0;
+  }
+  .editpanel .mini.del { color: #c0392b; border-color: #e5a29a; }
+  .editpanel .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+  .editpanel .actions button {
+    border: 0; border-radius: 999px; padding: 6px 18px; font-size: 14px; font-weight: 700; cursor: pointer;
+  }
+  .editpanel .actions .save   { background: #0d3b66; color: #fff; }
+  .editpanel .actions .cancel { background: #e2e8f0; color: #334155; }
+
   @media print {
     .toolbar { display: none !important; }
+    .editbar, .editpanel { display: none !important; }
     .sheet { max-width: none; padding: 0; }
   }
 </style>
@@ -381,12 +418,43 @@ $genAt = date('d/m/Y H:i');
     <?php if (empty($rows)): ?>
       <div class="empty"><div style="font-size:40px">📭</div>ไม่พบเรียงความที่ตรงกับเงื่อนไข</div>
     <?php else: ?>
-      <?php foreach ($rows as $e):
-        $room = trim((string)($e['classroom'] ?? ''));
-        $grp  = trim((string)($e['student_group'] ?? ''));
-        $phaseText = $phaseLabels[$e['essay_phase']] ?? $e['essay_phase'];
+      <?php
+        // ป้ายรอบการประเมินแบบเต็ม (รวมร่าง D1/D2)
+        $phaseTextFull = [
+          'pretest'  => 'ก่อนเรียน (Pretest)',
+          'task1_d1' => 'ภาระงาน หน่วยที่ 1 · ร่างที่ 1 (D1)',
+          'task1_d2' => 'ภาระงาน หน่วยที่ 1 · ร่างที่ 2 (D2)',
+          'posttest' => 'หลังเรียน (Posttest)',
+        ];
+        $editData = []; // ข้อมูลสำหรับให้ครูแก้ไข (ต่อเรียงความหนึ่งชิ้น)
+        $fi = 0;
+        foreach ($rows as $e):
+          $room = trim((string)($e['classroom'] ?? ''));
+          $grp  = trim((string)($e['student_group'] ?? ''));
+          $phaseText = $phaseTextFull[$e['essay_phase']] ?? ($phaseLabels[$e['essay_phase']] ?? $e['essay_phase']);
+          // แยกส่วนเนื้อหาเพื่อใช้เติมในฟอร์มแก้ไข
+          $eObj  = json_decode((string)($e['essay_content'] ?? ''), true);
+          $eIntro = is_array($eObj) ? (string)($eObj['introduction'] ?? '') : '';
+          $eBody  = (is_array($eObj) && isset($eObj['body']) && is_array($eObj['body'])) ? array_values($eObj['body']) : [];
+          $eConc  = is_array($eObj) ? (string)($eObj['conclusion'] ?? '') : '';
+          if ($isTeacher) {
+            $editData[$fi] = [
+              'sid'   => (string)$e['student_id'],
+              'phase' => (string)$e['essay_phase'],
+              'phaseText' => $phaseText,
+              'intro' => $eIntro,
+              'body'  => $eBody,
+              'conc'  => $eConc,
+            ];
+          }
       ?>
       <div class="form">
+        <?php if ($isTeacher): ?>
+        <div class="editbar">
+          <button type="button" class="b-edit" onclick="toggleEdit(<?php echo $fi; ?>)"><span id="editLbl_<?php echo $fi; ?>">✏️ แก้ไข</span></button>
+          <button type="button" class="b-del" onclick="deleteEssay(<?php echo $fi; ?>)">🗑️ ลบ</button>
+        </div>
+        <?php endif; ?>
         <h1 class="form-title">แบบเขียนเรียงความ</h1>
         <div class="info">
           <span class="lead">ชื่อ-สกุล</span><span class="fill name"><?php echo $h($e['student_name']); ?></span>
@@ -397,9 +465,24 @@ $genAt = date('d/m/Y H:i');
           <span class="lead">หัวข้อ :</span><span class="fill"><?php echo $h($e['essay_title']); ?></span>
         </div>
         <div class="meta">รอบการประเมิน: <?php echo $h($phaseText); ?><?php if ($grp !== ''): ?> · กลุ่ม: <?php echo $h($grp); ?><?php endif; ?></div>
-        <div class="content"><?php echo essayParagraphs($e['essay_content'] ?? '', $h); ?></div>
+        <div class="content" id="content_<?php echo $fi; ?>"><?php echo essayParagraphs($e['essay_content'] ?? '', $h); ?></div>
+        <?php if ($isTeacher): ?>
+        <div class="editpanel" id="panel_<?php echo $fi; ?>" style="display:none;">
+          <label>ส่วนคำนำ (Introduction)</label>
+          <textarea id="intro_<?php echo $fi; ?>" rows="3"></textarea>
+          <label>ส่วนเนื้อเรื่อง (Body) — แยกเป็นย่อหน้า</label>
+          <div id="bodyList_<?php echo $fi; ?>"></div>
+          <button type="button" class="mini" onclick="addPara(<?php echo $fi; ?>, '')">+ เพิ่มย่อหน้า</button>
+          <label>ส่วนสรุป (Conclusion)</label>
+          <textarea id="conc_<?php echo $fi; ?>" rows="3"></textarea>
+          <div class="actions">
+            <button type="button" class="cancel" onclick="toggleEdit(<?php echo $fi; ?>)">ยกเลิก</button>
+            <button type="button" class="save" onclick="saveEssay(<?php echo $fi; ?>)">💾 บันทึก</button>
+          </div>
+        </div>
+        <?php endif; ?>
       </div>
-      <?php endforeach; ?>
+      <?php $fi++; endforeach; ?>
     <?php endif; ?>
   </div>
 
@@ -422,10 +505,87 @@ $genAt = date('d/m/Y H:i');
       }
     }
     // เอกสารนี้ไม่มีทรัพยากรภายนอก จึงพร้อมพิมพ์ได้ทันที
+    // ครูที่เปิดเรียงความชิ้นเดียวเพื่อจัดการ (แก้ไข/ลบ) จะไม่เปิดกล่องพิมพ์อัตโนมัติ
+    var AUTO_PRINT = <?php echo (!($isTeacher && $isSingle)) ? 'true' : 'false'; ?>;
     window.addEventListener('load', function () {
       addLineNumbers();
-      setTimeout(function () { window.print(); }, 200);
+      if (AUTO_PRINT) setTimeout(function () { window.print(); }, 200);
     });
   </script>
+
+  <?php if ($isTeacher): ?>
+  <script>
+    // ===== ครูแก้ไข/ลบเรียงความในหน้าเอกสาร =====
+    var ESSAY_EDIT = <?php echo json_encode($editData ?? [], JSON_UNESCAPED_UNICODE); ?>;
+
+    // เปิด/ปิดแผงแก้ไข (เติมเนื้อหาเดิมครั้งแรกที่เปิด)
+    function toggleEdit(i) {
+      var panel = document.getElementById('panel_' + i);
+      var lbl   = document.getElementById('editLbl_' + i);
+      if (!panel) return;
+      var opening = (panel.style.display === 'none' || panel.style.display === '');
+      if (opening) {
+        var d = ESSAY_EDIT[i] || {};
+        document.getElementById('intro_' + i).value = d.intro || '';
+        document.getElementById('conc_' + i).value  = d.conc  || '';
+        var list = document.getElementById('bodyList_' + i);
+        list.innerHTML = '';
+        var body = Array.isArray(d.body) ? d.body : [];
+        if (body.length) body.forEach(function (p) { addPara(i, p); });
+        else addPara(i, '');
+        panel.style.display = 'block';
+        if (lbl) lbl.textContent = '✕ ปิดการแก้ไข';
+      } else {
+        panel.style.display = 'none';
+        if (lbl) lbl.textContent = '✏️ แก้ไข';
+      }
+    }
+
+    // เพิ่มช่องย่อหน้าเนื้อเรื่องหนึ่งช่อง
+    function addPara(i, text) {
+      var list = document.getElementById('bodyList_' + i);
+      if (!list) return;
+      var row = document.createElement('div');
+      row.className = 'body-para';
+      var ta = document.createElement('textarea');
+      ta.rows = 2; ta.value = text || ''; ta.placeholder = 'ย่อหน้าเนื้อเรื่อง...';
+      var del = document.createElement('button');
+      del.type = 'button'; del.className = 'mini del'; del.textContent = 'ลบ';
+      del.onclick = function () { row.remove(); };
+      row.appendChild(ta); row.appendChild(del);
+      list.appendChild(row);
+    }
+
+    // บันทึกการแก้ไข → เขียนทับเรียงความเดิม แล้วรีเฟรชหน้า
+    function saveEssay(i) {
+      var d = ESSAY_EDIT[i]; if (!d) return;
+      var intro = (document.getElementById('intro_' + i).value || '').trim();
+      var conc  = (document.getElementById('conc_' + i).value  || '').trim();
+      var body  = [].slice.call(document.querySelectorAll('#bodyList_' + i + ' textarea'))
+                    .map(function (t) { return t.value.trim(); }).filter(function (t) { return t !== ''; });
+      if (!intro && !conc && body.length === 0) { alert('กรุณากรอกเนื้อหาอย่างน้อยหนึ่งส่วน'); return; }
+      fetch('api.php?action=admin_save_essay', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ student_id: d.sid, essay_phase: d.phase, introduction: intro, body: body, conclusion: conc })
+      }).then(function (r) { return r.json(); }).then(function (res) {
+        if (res.success) { alert('บันทึกเรียงความเรียบร้อยแล้ว'); location.reload(); }
+        else { alert('บันทึกไม่สำเร็จ: ' + (res.error || '')); }
+      }).catch(function () { alert('บันทึกไม่สำเร็จ'); });
+    }
+
+    // ลบเรียงความชิ้นนี้ → กลับไปหน้ารายการ
+    function deleteEssay(i) {
+      var d = ESSAY_EDIT[i]; if (!d) return;
+      if (!confirm('ต้องการลบเรียงความรอบ "' + (d.phaseText || d.phase) + '" ของนักเรียนรหัส ' + d.sid + ' ใช่หรือไม่?\nการลบไม่สามารถย้อนกลับได้')) return;
+      fetch('api.php?action=admin_delete_essay', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ student_id: d.sid, essay_phase: d.phase })
+      }).then(function (r) { return r.json(); }).then(function (res) {
+        if (res.success) { alert('ลบเรียงความเรียบร้อยแล้ว'); window.location.href = 'essay_viewer.php'; }
+        else { alert('ลบไม่สำเร็จ: ' + (res.error || '')); }
+      }).catch(function () { alert('ลบไม่สำเร็จ'); });
+    }
+  </script>
+  <?php endif; ?>
 </body>
 </html>
