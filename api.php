@@ -936,7 +936,7 @@ try {
                 exit;
             }
             $round = isset($_GET['round']) ? trim($_GET['round']) : '';
-            if (!in_array($round, ['pretest', 'task1', 'posttest'], true)) {
+            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
                 exit;
             }
@@ -959,7 +959,7 @@ try {
                 exit;
             }
             $round = isset($_GET['round']) ? trim($_GET['round']) : '';
-            if (!in_array($round, ['pretest', 'task1', 'posttest'], true)) {
+            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
                 exit;
             }
@@ -979,7 +979,7 @@ try {
                 exit;
             }
             $round = isset($request_data['round']) ? trim($request_data['round']) : '';
-            if (!in_array($round, ['pretest', 'task1', 'posttest'], true)) {
+            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
                 exit;
             }
@@ -1016,7 +1016,7 @@ try {
                 exit;
             }
             $round = isset($request_data['round']) ? trim($request_data['round']) : '';
-            if (!in_array($round, ['pretest', 'task1', 'posttest'], true)) {
+            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
                 exit;
             }
@@ -1096,7 +1096,7 @@ try {
                 exit;
             }
             $round = isset($_GET['round']) ? trim($_GET['round']) : '';
-            if (!in_array($round, ['pretest', 'task1', 'posttest'], true)) {
+            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
                 exit;
             }
@@ -1182,7 +1182,7 @@ try {
             }
             $round  = isset($request_data['round']) ? trim($request_data['round']) : '';
             $target = isset($request_data['target']) ? trim($request_data['target']) : '';
-            if (!in_array($round, ['pretest', 'task1', 'posttest'], true)) {
+            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
                 exit;
             }
@@ -1261,7 +1261,7 @@ try {
             $round     = isset($request_data['round']) ? trim($request_data['round']) : '';
             $requester = isset($request_data['requester']) ? trim($request_data['requester']) : '';
             $decision  = isset($request_data['decision']) ? trim($request_data['decision']) : '';
-            if (!in_array($round, ['pretest', 'task1', 'posttest'], true)) {
+            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
                 exit;
             }
@@ -1319,7 +1319,7 @@ try {
             }
             $round  = isset($request_data['round']) ? trim($request_data['round']) : '';
             $target = isset($request_data['target']) ? trim($request_data['target']) : '';
-            if (!in_array($round, ['pretest', 'task1', 'posttest'], true)) {
+            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
                 exit;
             }
@@ -1336,7 +1336,7 @@ try {
                 exit;
             }
             $round = isset($request_data['round']) ? trim($request_data['round']) : '';
-            if (!in_array($round, ['pretest', 'task1', 'posttest'], true)) {
+            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
                 exit;
             }
@@ -1408,6 +1408,9 @@ try {
             $refGroup = isset($_GET['group']) ? trim($_GET['group']) : '';
             $hasRefGroup = ($refGroup !== '');
 
+            // ตัวกรองหน่วยการเรียน (task_unit) — แดชบอร์ดครูดูแยกหน่วยที่ 1 / หน่วยที่ 2 ได้ (ค่าเริ่มต้น = 1)
+            $refUnit = (isset($_GET['unit']) && intval($_GET['unit']) === 2) ? 2 : 1;
+
             // ตัวช่วยสร้างเงื่อนไข WHERE ตามกลุ่มบนตาราง students ที่ระบุ alias
             $grpWhere = function($alias) use ($hasRefGroup) {
                 return $hasRefGroup ? (" WHERE {$alias}.student_group = ?") : '';
@@ -1418,20 +1421,28 @@ try {
             $stmt->execute($grpParam);
             $total_students_res = $stmt->fetchColumn();
 
-            $stmt = $pdo->prepare('SELECT COUNT(DISTINCT wp.student_id) FROM writing_problems wp JOIN students s ON wp.student_id = s.student_id' . $grpWhere('s'));
-            $stmt->execute($grpParam);
+            // ตัวช่วยสร้าง WHERE ที่รวมเงื่อนไขหน่วยการเรียน (task_unit) + กลุ่ม สำหรับตารางสะท้อนคิด
+            // $col = ชื่อคอลัมน์ task_unit พร้อม alias (เช่น 'wp.task_unit')
+            $unitGrpWhere = function($col) use ($hasRefGroup) {
+                return " WHERE {$col} = ?" . ($hasRefGroup ? ' AND s.student_group = ?' : '');
+            };
+            $unitGrpParam = array_merge([$refUnit], $grpParam);
+
+            $stmt = $pdo->prepare('SELECT COUNT(DISTINCT wp.student_id) FROM writing_problems wp JOIN students s ON wp.student_id = s.student_id' . $unitGrpWhere('wp.task_unit'));
+            $stmt->execute($unitGrpParam);
             $prob_count = $stmt->fetchColumn();
 
-            $stmt = $pdo->prepare('SELECT COUNT(DISTINCT chk.student_id) FROM self_checklists chk JOIN students s ON chk.student_id = s.student_id' . $grpWhere('s'));
-            $stmt->execute($grpParam);
+            $stmt = $pdo->prepare('SELECT COUNT(DISTINCT chk.student_id) FROM self_checklists chk JOIN students s ON chk.student_id = s.student_id' . $unitGrpWhere('chk.task_unit'));
+            $stmt->execute($unitGrpParam);
             $chk_count = $stmt->fetchColumn();
 
+            // การประเมินเพื่อน (peer_reviews) ไม่ได้แยกตามหน่วยการเรียน — นับรวมทุกหน่วยตามเดิม
             $stmt = $pdo->prepare('SELECT COUNT(DISTINCT pr.student_id) FROM peer_reviews pr JOIN students s ON pr.student_id = s.student_id' . $grpWhere('s'));
             $stmt->execute($grpParam);
             $peer_count = $stmt->fetchColumn();
 
-            $stmt = $pdo->prepare('SELECT COUNT(DISTINCT lr.student_id) FROM learning_reflections lr JOIN students s ON lr.student_id = s.student_id' . $grpWhere('s'));
-            $stmt->execute($grpParam);
+            $stmt = $pdo->prepare('SELECT COUNT(DISTINCT lr.student_id) FROM learning_reflections lr JOIN students s ON lr.student_id = s.student_id' . $unitGrpWhere('lr.task_unit'));
+            $stmt->execute($unitGrpParam);
             $ref_count = $stmt->fetchColumn();
 
             // ปัญหาล่าสุด
@@ -1472,12 +1483,12 @@ try {
                     chk.notes AS checklist_notes,
                     ref.content_structure, ref.language_mechanics, ref.feedback_applied, ref.future_goals
                 FROM students s
-                LEFT JOIN writing_problems wp ON s.student_id = wp.student_id AND wp.task_unit = 1
-                LEFT JOIN self_checklists chk ON s.student_id = chk.student_id AND chk.task_unit = 1
-                LEFT JOIN learning_reflections ref ON s.student_id = ref.student_id AND ref.task_unit = 1' . $grpWhere('s') . '
+                LEFT JOIN writing_problems wp ON s.student_id = wp.student_id AND wp.task_unit = ?
+                LEFT JOIN self_checklists chk ON s.student_id = chk.student_id AND chk.task_unit = ?
+                LEFT JOIN learning_reflections ref ON s.student_id = ref.student_id AND ref.task_unit = ?' . $grpWhere('s') . '
                 ORDER BY s.student_id ASC
             ');
-            $stmt_all->execute($grpParam);
+            $stmt_all->execute(array_merge([$refUnit, $refUnit, $refUnit], $grpParam));
             $students_details = $stmt_all->fetchAll();
 
             echo json_encode([
@@ -1720,7 +1731,7 @@ try {
             }
             $tPhase = isset($request_data['phase']) ? trim((string)$request_data['phase']) : '';
             $tTopic = isset($request_data['topic']) ? trim((string)$request_data['topic']) : '';
-            if (!in_array($tPhase, ['pretest', 'task1', 'posttest'], true)) {
+            if (!in_array($tPhase, ['pretest', 'task1', 'task2', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'รอบไม่ถูกต้อง']);
                 exit;
             }
@@ -1741,7 +1752,7 @@ try {
             }
             $oPhase = isset($request_data['phase']) ? trim((string)$request_data['phase']) : '';
             $oOpen  = !empty($request_data['is_open']) ? 1 : 0;
-            if (!in_array($oPhase, ['pretest', 'task1', 'posttest'], true)) {
+            if (!in_array($oPhase, ['pretest', 'task1', 'task2', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'รอบไม่ถูกต้อง']);
                 exit;
             }
@@ -1834,7 +1845,7 @@ try {
                 echo json_encode(['success' => false, 'error' => 'กรุณาระบุนักเรียน']);
                 exit;
             }
-            if (!in_array($aPhase, ['pretest', 'task1_d1', 'task1_d2', 'posttest'], true)) {
+            if (!in_array($aPhase, ['pretest', 'task1_d1', 'task1_d2', 'task2_d1', 'task2_d2', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
                 exit;
             }
@@ -1878,7 +1889,7 @@ try {
             }
             $dStudentId = isset($request_data['student_id'])  ? trim((string)$request_data['student_id'])  : '';
             $dPhase     = isset($request_data['essay_phase']) ? trim((string)$request_data['essay_phase']) : '';
-            if ($dStudentId === '' || !in_array($dPhase, ['pretest', 'task1_d1', 'task1_d2', 'posttest'], true)) {
+            if ($dStudentId === '' || !in_array($dPhase, ['pretest', 'task1_d1', 'task1_d2', 'task2_d1', 'task2_d2', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'ข้อมูลไม่ถูกต้อง']);
                 exit;
             }

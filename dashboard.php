@@ -146,6 +146,7 @@ require_once 'header.php';
               <span class="input-group-text bg-white text-secondary border-end-0"><i class="bi bi-pie-chart"></i> มุมมองกราฟ</span>
               <select id="dashboardViewMode" onchange="switchDashboardViewMode()" class="form-select bg-white border-start-0 font-semibold text-primary" title="เลือกชุดข้อมูลที่จะใช้แสดงในกราฟสถิติและบทวิเคราะห์ด้านบน">
                 <option value="task1" selected>กราฟ: ภาระงาน หน่วยที่ 1</option>
+                <option value="task2">กราฟ: ภาระงาน หน่วยที่ 2</option>
                 <option value="prepost">กราฟ: ก่อนเรียน vs หลังเรียน</option>
               </select>
             </div>
@@ -154,23 +155,25 @@ require_once 'header.php';
         <p class="text-muted small mb-0 mt-2"><i class="bi bi-info-circle"></i> ตัวเลือก "มุมมองกราฟ" ใช้กับกราฟสถิติและบทวิเคราะห์ด้านบนเท่านั้น ส่วนตาราง 2 ตารางด้านล่างแสดงข้อมูลครบทุกหน่วยเสมอ</p>
       </div>
 
-      <!-- ตารางที่ 1: สรุปคะแนนภาระงาน (หน่วยที่ 1) -->
+      <!-- ตารางที่ 1: สรุปคะแนนภาระงาน (หน่วยที่ 1 และ หน่วยที่ 2) -->
       <div class="px-3 pt-4 pb-2">
-        <h6 class="fw-bold text-primary-emphasis mb-1"><i class="bi bi-clipboard-check"></i> ตารางที่ 1 &nbsp;สรุปคะแนนภาระงานในหน่วยเรียน (หน่วยที่ 1)</h6>
+        <h6 class="fw-bold text-primary-emphasis mb-1"><i class="bi bi-clipboard-check"></i> ตารางที่ 1 &nbsp;สรุปคะแนนภาระงานในหน่วยเรียน (หน่วยที่ 1 และ หน่วยที่ 2)</h6>
         <p class="text-muted small mb-0">คะแนนเฉลี่ยจากการประเมินรอบด้าน 360° (เต็มหน่วยละ 60 คะแนน) พร้อมค่าสถิติพื้นฐานเพื่อการวิจัยที่ท้ายตาราง</p>
       </div>
       <div class="table-responsive">
         <table class="table table-hover align-middle mb-0 text-start table-classroom">
           <thead class="table-light text-secondary small fw-bold text-uppercase">
             <tr>
-              <th class="px-3 py-3" style="width: 15%">รหัสนักเรียน</th>
-              <th class="px-3 py-3" style="width: 40%">ชื่อ-สกุลผู้เรียน</th>
-              <th class="px-3 py-3 text-center text-primary-emphasis" style="width: 25%">หน่วยที่ 1<br><span class="fw-normal text-muted" style="font-size:.7rem">(เฉลี่ย 360°)</span></th>
-              <th class="px-3 py-3 text-end" style="width: 20%">การจัดการ</th>
+              <th class="px-3 py-3" style="width: 12%">รหัสนักเรียน</th>
+              <th class="px-3 py-3" style="width: 28%">ชื่อ-สกุลผู้เรียน</th>
+              <th class="px-3 py-3 text-center text-primary-emphasis" style="width: 15%">หน่วยที่ 1<br><span class="fw-normal text-muted" style="font-size:.7rem">(เฉลี่ย 360°)</span></th>
+              <th class="px-3 py-3 text-center text-primary-emphasis" style="width: 15%">หน่วยที่ 2<br><span class="fw-normal text-muted" style="font-size:.7rem">(เฉลี่ย 360°)</span></th>
+              <th class="px-3 py-3 text-center" style="width: 15%">เฉลี่ยรวม 2 หน่วย</th>
+              <th class="px-3 py-3 text-end" style="width: 15%">การจัดการ</th>
             </tr>
           </thead>
           <tbody id="taskTableBody" class="small">
-            <tr><td colspan="4" class="text-center text-muted py-5 fw-bold">กำลังประมวลผลสรุปคะแนนภาระงาน...</td></tr>
+            <tr><td colspan="6" class="text-center text-muted py-5 fw-bold">กำลังประมวลผลสรุปคะแนนภาระงาน...</td></tr>
           </tbody>
           <tfoot id="taskTableFoot" class="small border-top border-2"></tfoot>
         </table>
@@ -231,6 +234,7 @@ require_once 'header.php';
       <label for="studentPhaseSelector" class="small text-white-50 text-nowrap mb-0">รอบประเมิน:</label>
       <select id="studentPhaseSelector" class="form-select form-select-sm bg-white text-dark font-semibold border-0" style="width:160px;" onchange="switchStudentPhase()">
         <option value="task1" selected>ภาระงาน หน่วยที่ 1</option>
+        <option value="task2">ภาระงาน หน่วยที่ 2</option>
         <option value="posttest">หลังเรียน (T2)</option>
         <option value="pretest">ก่อนเรียน (T1)</option>
       </select>
@@ -649,6 +653,7 @@ require_once 'header.php';
       studentEvals[s.student_id] = {
         pretest: [],
         task1:   [],
+        task2:   [],
         posttest: []
       };
     });
@@ -662,9 +667,9 @@ require_once 'header.php';
 
     const summaryData = {};
 
-    if (currentDashboardViewMode === 'task1') {
-      // --- 1. โหมดรายงานภาระงานในหน่วยเรียน (Task 1) ---
-      const taskPhaseKey = currentDashboardViewMode; // 'task1'
+    if (currentDashboardViewMode === 'task1' || currentDashboardViewMode === 'task2') {
+      // --- 1. โหมดรายงานภาระงานในหน่วยเรียน (Task 1 หรือ Task 2) ---
+      const taskPhaseKey = currentDashboardViewMode; // 'task1' or 'task2'
       studentsList.forEach(s => {
         const id = s.student_id;
         const evs = studentEvals[id][taskPhaseKey] || [];
@@ -821,7 +826,7 @@ require_once 'header.php';
     return html;
   }
 
-  // วาดตารางสรุป 2 ตาราง: (1) คะแนนภาระงาน หน่วยที่ 1 และ (2) ก่อนเรียน–หลังเรียน พร้อมค่าสถิติท้ายตาราง
+  // วาดตารางสรุป 2 ตาราง: (1) คะแนนภาระงานทั้ง 2 หน่วย และ (2) ก่อนเรียน–หลังเรียน พร้อมค่าสถิติท้ายตาราง
   function renderSplitSummaryTables(studentEvals) {
     const taskBody = document.getElementById('taskTableBody');
     const taskFoot = document.getElementById('taskTableFoot');
@@ -839,12 +844,18 @@ require_once 'header.php';
       return sum / evs.length;
     };
 
-    // ---------- ตารางที่ 1: ภาระงาน หน่วยที่ 1 ----------
-    const unit1Vals = [];
+    // ---------- ตารางที่ 1: ภาระงาน 2 หน่วย ----------
+    const unit1Vals = [], unit2Vals = [], combinedVals = [];
     let taskHtml = '';
     sortedKeys.forEach(id => {
       const u1 = unitAvg(id, 'task1');
+      const u2 = unitAvg(id, 'task2');
+      const present = [u1, u2].filter(v => v !== null);
+      const combined = present.length > 0 ? present.reduce((a, b) => a + b, 0) / present.length : null;
+
       if (u1 !== null) unit1Vals.push(u1);
+      if (u2 !== null) unit2Vals.push(u2);
+      if (combined !== null) combinedVals.push(combined);
 
       const cell = (v, extra) => v !== null
         ? `<td class="px-3 py-3 text-center font-mono fw-semibold ${extra || ''}">${v.toFixed(2)}</td>`
@@ -854,14 +865,16 @@ require_once 'header.php';
         <tr class="hover-row cursor-pointer" onclick="viewStudentDetail('${id}')">
           <td class="px-3 py-3 font-mono fw-bold text-secondary">${id}</td>
           <td class="px-3 py-3 fw-bold text-dark text-start">${studentDB[id]}</td>
-          ${cell(u1, u1 !== null ? 'text-primary bg-light-blue fw-extrabold' : '')}
+          ${cell(u1)}
+          ${cell(u2)}
+          ${cell(combined, combined !== null ? 'text-primary bg-light-blue fw-extrabold' : '')}
           <td class="px-3 py-3 text-end">
              <button class="btn btn-outline-primary btn-sm fw-bold rounded-pill px-3" onclick="event.stopPropagation(); viewStudentDetail('${id}')">วิเคราะห์</button>
           </td>
         </tr>`;
     });
-    taskBody.innerHTML = taskHtml || '<tr><td colspan="4" class="text-center text-muted py-5 fw-bold">ยังไม่มีข้อมูลนักเรียนในกลุ่มนี้</td></tr>';
-    if (taskFoot) taskFoot.innerHTML = buildStatsFooter([unit1Vals], 2, 1);
+    taskBody.innerHTML = taskHtml || '<tr><td colspan="6" class="text-center text-muted py-5 fw-bold">ยังไม่มีข้อมูลนักเรียนในกลุ่มนี้</td></tr>';
+    if (taskFoot) taskFoot.innerHTML = buildStatsFooter([unit1Vals, unit2Vals, combinedVals], 2, 1);
 
     // ---------- ตารางที่ 2: ก่อนเรียน–หลังเรียน ----------
     const preVals = [], postVals = [], gainVals = [];
@@ -904,7 +917,7 @@ require_once 'header.php';
   }
 
   // สร้างแผนที่คะแนนเฉลี่ยรายด้านต่อคน สำหรับกราฟแมงมุม
-  //  - mode 'task'    : รวมการประเมิน Task 1 จากผู้ประเมินทุกฝ่าย แล้วเฉลี่ย
+  //  - mode 'task'    : รวมการประเมิน Task 1 + Task 2 จากผู้ประเมินทุกฝ่าย แล้วเฉลี่ย
   //  - mode 'prepost' : ใช้คะแนนครูประเมิน เลือกหลังเรียนก่อน ถ้าไม่มีจึงใช้ก่อนเรียน
   function buildDimMapFromEvals(studentEvals, mode) {
     const map = {};
@@ -912,7 +925,7 @@ require_once 'header.php';
     Object.keys(studentEvals).forEach(id => {
       let evs = [];
       if (mode === 'task') {
-        evs = (studentEvals[id]['task1'] || []);
+        evs = (studentEvals[id]['task1'] || []).concat(studentEvals[id]['task2'] || []);
       } else {
         const post = (studentEvals[id]['posttest'] || []).find(e => e.evaluator_type === 'teacher');
         const pre = (studentEvals[id]['pretest'] || []).find(e => e.evaluator_type === 'teacher');
@@ -952,7 +965,7 @@ require_once 'header.php';
     sortedKeys.forEach(id => {
       const sData = data[id] || {};
 
-      if (currentDashboardViewMode === 'task1') {
+      if (currentDashboardViewMode === 'task1' || currentDashboardViewMode === 'task2') {
         if (sData.avgScore > 0) {
           const avg = Number(sData.avgScore);
           totalSumScores += avg;
@@ -1024,7 +1037,7 @@ require_once 'header.php';
     
     // In prepost mode, completion means having both pre and post evaluations from the teacher
     let completionPercentage = 0;
-    if (currentDashboardViewMode === 'task1') {
+    if (currentDashboardViewMode === 'task1' || currentDashboardViewMode === 'task2') {
       completionPercentage = totalRegistered > 0 ? Math.round((activeEvaluationSetCount / totalRegistered) * 100) : 0;
     } else {
       // นับเฉพาะนักเรียนในกลุ่มที่เลือก เพื่อให้ตรงกับจำนวนผู้เรียนที่ใช้เป็นตัวหาร (totalRegistered)
@@ -1428,7 +1441,7 @@ require_once 'header.php';
     const filterVal = filter.value;
 
     // คอลัมน์คะแนนที่ใช้เป็นตัวชี้วัดความครบถ้วนของแต่ละตาราง (ระบุด้วยดัชนีเซลล์)
-    //  - ตารางภาระงาน: หน่วยที่ 1 (cell 2)
+    //  - ตารางภาระงาน: หน่วยที่ 1 (cell 2) / หน่วยที่ 2 (cell 3)
     //  - ตารางก่อน/หลังเรียน: ก่อนเรียน (cell 2) / หลังเรียน (cell 3)
     const applyToBody = (bodyId, scoreCells) => {
       document.querySelectorAll(`#${bodyId} tr`).forEach(row => {
@@ -1456,7 +1469,7 @@ require_once 'header.php';
       });
     };
 
-    applyToBody('taskTableBody', [2]);
+    applyToBody('taskTableBody', [2, 3]);
     applyToBody('prepostTableBody', [2, 3]);
   }
 

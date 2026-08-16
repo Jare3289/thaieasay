@@ -80,7 +80,7 @@ ON DUPLICATE KEY UPDATE student_name = VALUES(student_name);
 -- 4. ตารางบันทึกปัญหาการเขียน (Writing Obstacles Record)
 CREATE TABLE IF NOT EXISTS writing_problems (
     student_id VARCHAR(10) NOT NULL,
-    task_unit TINYINT NOT NULL DEFAULT 1, -- หน่วยการเรียน (หน่วยที่ 1)
+    task_unit TINYINT NOT NULL DEFAULT 1, -- หน่วยการเรียน (1 หรือ 2)
     prob_1_1 TEXT, sol_1_1 TEXT,
     prob_1_2 TEXT, sol_1_2 TEXT,
     prob_1_3 TEXT, sol_1_3 TEXT,
@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS writing_problems (
 -- 5. ตารางรายการตรวจสอบตนเอง (Self-Checklist)
 CREATE TABLE IF NOT EXISTS self_checklists (
     student_id VARCHAR(10) NOT NULL,
-    task_unit TINYINT NOT NULL DEFAULT 1, -- หน่วยการเรียน (หน่วยที่ 1)
+    task_unit TINYINT NOT NULL DEFAULT 1, -- หน่วยการเรียน (1 หรือ 2)
     check_1_1 VARCHAR(50) NOT NULL, -- 'ครบถ้วน', 'บางส่วน', 'ต้องปรับปรุง'
     check_1_2 VARCHAR(50) NOT NULL,
     check_1_3 VARCHAR(50) NOT NULL,
@@ -148,7 +148,7 @@ CREATE TABLE IF NOT EXISTS peer_reviews (
 -- 7. ตารางบันทึกการสะท้อนการเรียนรู้ (Learning Reflections)
 CREATE TABLE IF NOT EXISTS learning_reflections (
     student_id VARCHAR(10) NOT NULL,
-    task_unit TINYINT NOT NULL DEFAULT 1, -- หน่วยการเรียน (หน่วยที่ 1)
+    task_unit TINYINT NOT NULL DEFAULT 1, -- หน่วยการเรียน (1 หรือ 2)
     content_structure TEXT,  -- ด้านเนื้อหาสาระและองค์ประกอบ
     language_mechanics TEXT, -- ด้านการใช้สำนวนภาษาและอักขรวิธี
     feedback_applied TEXT,   -- การนำข้อเสนอแนะไปปรับปรุงงาน
@@ -159,7 +159,7 @@ CREATE TABLE IF NOT EXISTS learning_reflections (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 8. ตารางจับคู่นักเรียนสำหรับการประเมินเพื่อน (Peer Pairing per round)
--- round: รอบการประเมิน เช่น 'pretest', 'task1', 'posttest'
+-- round: รอบการประเมิน เช่น 'pretest', 'task1', 'task2', 'posttest'
 -- student_code: รหัสนักเรียนผู้ประเมิน (ผู้ให้คะแนน)
 -- partner_code: รหัสนักเรียนคู่ที่ถูกประเมิน (เจ้าของผลงาน)
 CREATE TABLE IF NOT EXISTS peer_pairs (

@@ -15,6 +15,7 @@ $isTeacher = ($_SESSION['user']['role'] === 'teacher'); // ครูแก้ไ
 $phaseLabels = [
     'pretest'  => 'ก่อนเรียน (Pretest)',
     'task1'    => 'ภาระงาน หน่วยที่ 1',
+    'task2'    => 'ภาระงาน หน่วยที่ 2',
     'posttest' => 'หลังเรียน (Posttest)',
 ];
 
@@ -31,7 +32,7 @@ $isSingle   = ($oneStudent !== '');
 // เอกสาร PDF อย่างเป็นทางการ: แต่ละแถว = นักเรียนหนึ่งคน, แต่ละช่องรอบ = ส่งแล้ว (✓) / ยังไม่ส่ง (ว่าง)
 if (!$isSingle && $fMode === 'summary') {
     // คอลัมน์รายงาน: ภาระงานแต่ละหน่วยแตกเป็นร่าง D1/D2 (ให้คะแนนเฉพาะ D2)
-    $sumCols = ['pretest', 'task1_d1', 'task1_d2', 'posttest'];
+    $sumCols = ['pretest', 'task1_d1', 'task1_d2', 'task2_d1', 'task2_d2', 'posttest'];
 
     $sconds  = [];
     $sparams = [];
@@ -162,7 +163,7 @@ if (!$isSingle && $fMode === 'summary') {
         <?php else: ?>
         <?php
           // คอลัมน์ที่เป็นร่างให้คะแนน (D2) — ไฮไลต์ในตาราง
-          $isD2 = function ($key) { return $key === 'task1_d2'; };
+          $isD2 = function ($key) { return $key === 'task1_d2' || $key === 'task2_d2'; };
         ?>
         <table class="report">
           <thead>
@@ -172,9 +173,12 @@ if (!$isSingle && $fMode === 'summary') {
               <th rowspan="2" style="text-align:left;">ชื่อสกุล</th>
               <th rowspan="2">ก่อนเรียน</th>
               <th colspan="2">หน่วยที่ 1</th>
+              <th colspan="2">หน่วยที่ 2</th>
               <th rowspan="2">หลังเรียน</th>
             </tr>
             <tr>
+              <th>D1</th>
+              <th class="d2col">D2 ★</th>
               <th>D1</th>
               <th class="d2col">D2 ★</th>
             </tr>
