@@ -1805,6 +1805,72 @@ try {
             echo json_encode(['success' => true, 'essays' => $essays]);
             break;
 
+        // Essay: ครูเพิ่ม/แก้ไขเรียงความของนักเรียนคนใดก็ได้ (ทุกรอบ) — ครูเท่านั้น
+        // ใช้ในหน้า Essay Viewer เพื่อให้คุณครูจัดการเนื้อหาเรียงความแทนนักเรียนได้
+        case 'admin_save_essay':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'เฉพาะครูเท่านั้นที่แก้ไขเรียงความได้']);
+                exit;
+            }
+            $aStudentId = isset($request_data['student_id'])  ? trim((string)$request_data['student_id'])  : '';
+            $aPhase     = isset($request_data['essay_phase']) ? trim((string)$request_data['essay_phase']) : '';
+            if ($aStudentId === '') {
+                echo json_encode(['success' => false, 'error' => 'กรุณาระบุนักเรียน']);
+                exit;
+            }
+            if (!in_array($aPhase, ['pretest', 'task1_d1', 'task1_d2', 'posttest'], true)) {
+                echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
+                exit;
+            }
+            // ต้องมีนักเรียนคนนี้อยู่จริงในระบบก่อน จึงจะบันทึกเรียงความให้ได้
+            $chk = $pdo->prepare('SELECT student_id FROM students WHERE student_id = ?');
+            $chk->execute([$aStudentId]);
+            if (!$chk->fetch()) {
+                echo json_encode(['success' => false, 'error' => 'ไม่พบนักเรียนรหัสนี้ในระบบ']);
+                exit;
+            }
+
+            // เนื้อหาแยกเป็น 3 ส่วน: ส่วนนำ / เนื้อหา (หลายย่อหน้า) / สรุป — เหมือน save_essay ของนักเรียน
+            $aIntro      = isset($request_data['introduction']) ? trim((string)$request_data['introduction']) : '';
+            $aBodyArr    = (isset($request_data['body']) && is_array($request_data['body'])) ? $request_data['body'] : [];
+            $aConclusion = isset($request_data['conclusion']) ? trim((string)$request_data['conclusion']) : '';
+            $aBodyArr  = array_values(array_filter(array_map(function ($p) { return trim((string)$p); }, $aBodyArr), function ($p) { return $p !== ''; }));
+            $aBodyJson = json_encode($aBodyArr, JSON_UNESCAPED_UNICODE);
+
+            $aAllText   = trim($aIntro . "\n" . implode("\n", $aBodyArr) . "\n" . $aConclusion);
+            $aWordCount = $aAllText !== '' ? count(preg_split('/[\s\n\r]+/u', $aAllText, -1, PREG_SPLIT_NO_EMPTY)) : 0;
+
+            $stmt = $pdo->prepare('
+                INSERT INTO student_essays (student_id, essay_phase, intro_content, body_content, conclusion_content, word_count)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                    intro_content      = VALUES(intro_content),
+                    body_content       = VALUES(body_content),
+                    conclusion_content = VALUES(conclusion_content),
+                    word_count         = VALUES(word_count),
+                    updated_at         = CURRENT_TIMESTAMP
+            ');
+            $stmt->execute([$aStudentId, $aPhase, $aIntro, $aBodyJson, $aConclusion, $aWordCount]);
+            echo json_encode(['success' => true, 'word_count' => $aWordCount]);
+            break;
+
+        // Essay: ครูลบเรียงความของนักเรียน (รอบใดรอบหนึ่ง) — ครูเท่านั้น
+        case 'admin_delete_essay':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'เฉพาะครูเท่านั้นที่ลบเรียงความได้']);
+                exit;
+            }
+            $dStudentId = isset($request_data['student_id'])  ? trim((string)$request_data['student_id'])  : '';
+            $dPhase     = isset($request_data['essay_phase']) ? trim((string)$request_data['essay_phase']) : '';
+            if ($dStudentId === '' || !in_array($dPhase, ['pretest', 'task1_d1', 'task1_d2', 'posttest'], true)) {
+                echo json_encode(['success' => false, 'error' => 'ข้อมูลไม่ถูกต้อง']);
+                exit;
+            }
+            $stmt = $pdo->prepare('DELETE FROM student_essays WHERE student_id = ? AND essay_phase = ?');
+            $stmt->execute([$dStudentId, $dPhase]);
+            echo json_encode(['success' => true, 'deleted' => $stmt->rowCount()]);
+            break;
+
         // ==========================================
         // รายงานการส่งงานรายบุคคล (Submission Report) — ครูเท่านั้น
         // แสดงสถานะการส่งงานแต่ละชิ้น: ก่อนเรียน / D1.1 / D1.2 / เครื่องมือสะท้อนคิด / D2.1 / D2.2 / หลังเรียน
