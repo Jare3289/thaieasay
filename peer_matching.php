@@ -21,6 +21,7 @@ $me = $_SESSION['user'];
     <label class="form-label small fw-bold text-secondary mb-2">เลือกหน่วยการเรียน (รอบการประเมิน)</label>
     <div id="roundButtons" class="d-flex flex-wrap gap-2">
       <button type="button" class="btn btn-outline-primary fw-bold rounded-3 round-btn active" data-round="task1">📚 ภาระงาน หน่วยที่ 1</button>
+      <button type="button" class="btn btn-outline-primary fw-bold rounded-3 round-btn" data-round="task2">📗 ภาระงาน หน่วยที่ 2</button>
     </div>
   </div>
 </div>

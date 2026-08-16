@@ -142,6 +142,7 @@ require_once 'header.php';
             <label class="form-label small fw-bold text-secondary mb-1">รอบการประเมิน</label>
             <select id="roundSelect" class="form-select">
               <option value="task1">ภาระงาน หน่วยที่ 1 (Task 1)</option>
+              <option value="task2">ภาระงาน หน่วยที่ 2 (Task 2)</option>
             </select>
           </div>
           <div class="col-lg-3 col-md-6 col-12">

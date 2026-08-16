@@ -936,7 +936,7 @@ try {
                 exit;
             }
             $round = isset($_GET['round']) ? trim($_GET['round']) : '';
-            if (!in_array($round, ['pretest', 'task1', 'posttest'], true)) {
+            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
                 exit;
             }
@@ -959,7 +959,7 @@ try {
                 exit;
             }
             $round = isset($_GET['round']) ? trim($_GET['round']) : '';
-            if (!in_array($round, ['pretest', 'task1', 'posttest'], true)) {
+            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
                 exit;
             }
@@ -979,7 +979,7 @@ try {
                 exit;
             }
             $round = isset($request_data['round']) ? trim($request_data['round']) : '';
-            if (!in_array($round, ['pretest', 'task1', 'posttest'], true)) {
+            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
                 exit;
             }
@@ -1016,7 +1016,7 @@ try {
                 exit;
             }
             $round = isset($request_data['round']) ? trim($request_data['round']) : '';
-            if (!in_array($round, ['pretest', 'task1', 'posttest'], true)) {
+            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
                 exit;
             }
@@ -1096,7 +1096,7 @@ try {
                 exit;
             }
             $round = isset($_GET['round']) ? trim($_GET['round']) : '';
-            if (!in_array($round, ['pretest', 'task1', 'posttest'], true)) {
+            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
                 exit;
             }
@@ -1182,7 +1182,7 @@ try {
             }
             $round  = isset($request_data['round']) ? trim($request_data['round']) : '';
             $target = isset($request_data['target']) ? trim($request_data['target']) : '';
-            if (!in_array($round, ['pretest', 'task1', 'posttest'], true)) {
+            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
                 exit;
             }
@@ -1261,7 +1261,7 @@ try {
             $round     = isset($request_data['round']) ? trim($request_data['round']) : '';
             $requester = isset($request_data['requester']) ? trim($request_data['requester']) : '';
             $decision  = isset($request_data['decision']) ? trim($request_data['decision']) : '';
-            if (!in_array($round, ['pretest', 'task1', 'posttest'], true)) {
+            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
                 exit;
             }
@@ -1319,7 +1319,7 @@ try {
             }
             $round  = isset($request_data['round']) ? trim($request_data['round']) : '';
             $target = isset($request_data['target']) ? trim($request_data['target']) : '';
-            if (!in_array($round, ['pretest', 'task1', 'posttest'], true)) {
+            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
                 exit;
             }
@@ -1336,7 +1336,7 @@ try {
                 exit;
             }
             $round = isset($request_data['round']) ? trim($request_data['round']) : '';
-            if (!in_array($round, ['pretest', 'task1', 'posttest'], true)) {
+            if (!in_array($round, ['pretest', 'task1', 'task2', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
                 exit;
             }
@@ -1720,7 +1720,7 @@ try {
             }
             $tPhase = isset($request_data['phase']) ? trim((string)$request_data['phase']) : '';
             $tTopic = isset($request_data['topic']) ? trim((string)$request_data['topic']) : '';
-            if (!in_array($tPhase, ['pretest', 'task1', 'posttest'], true)) {
+            if (!in_array($tPhase, ['pretest', 'task1', 'task2', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'รอบไม่ถูกต้อง']);
                 exit;
             }
@@ -1741,7 +1741,7 @@ try {
             }
             $oPhase = isset($request_data['phase']) ? trim((string)$request_data['phase']) : '';
             $oOpen  = !empty($request_data['is_open']) ? 1 : 0;
-            if (!in_array($oPhase, ['pretest', 'task1', 'posttest'], true)) {
+            if (!in_array($oPhase, ['pretest', 'task1', 'task2', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'รอบไม่ถูกต้อง']);
                 exit;
             }
@@ -1834,7 +1834,7 @@ try {
                 echo json_encode(['success' => false, 'error' => 'กรุณาระบุนักเรียน']);
                 exit;
             }
-            if (!in_array($aPhase, ['pretest', 'task1_d1', 'task1_d2', 'posttest'], true)) {
+            if (!in_array($aPhase, ['pretest', 'task1_d1', 'task1_d2', 'task2_d1', 'task2_d2', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
                 exit;
             }
@@ -1878,7 +1878,7 @@ try {
             }
             $dStudentId = isset($request_data['student_id'])  ? trim((string)$request_data['student_id'])  : '';
             $dPhase     = isset($request_data['essay_phase']) ? trim((string)$request_data['essay_phase']) : '';
-            if ($dStudentId === '' || !in_array($dPhase, ['pretest', 'task1_d1', 'task1_d2', 'posttest'], true)) {
+            if ($dStudentId === '' || !in_array($dPhase, ['pretest', 'task1_d1', 'task1_d2', 'task2_d1', 'task2_d2', 'posttest'], true)) {
                 echo json_encode(['success' => false, 'error' => 'ข้อมูลไม่ถูกต้อง']);
                 exit;
             }

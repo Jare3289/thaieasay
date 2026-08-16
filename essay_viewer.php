@@ -52,6 +52,7 @@ require_once 'header.php';
           $topicFields = [
             'pretest'  => ['ก่อนเรียน', 'bi-pencil', 'text-primary'],
             'task1'    => ['หน่วยที่ 1', 'bi-journal-text', 'text-success'],
+            'task2'    => ['หน่วยที่ 2', 'bi-journal-text', 'text-warning'],
             'posttest' => ['หลังเรียน', 'bi-mortarboard', 'text-danger'],
           ];
           foreach ($topicFields as $ph => $meta):
@@ -134,7 +135,7 @@ require_once 'header.php';
       </div>
 
       <!-- แถบสรุปตัวเลข: จำนวนนักเรียน และจำนวนที่ส่งในแต่ละรอบ -->
-      <div class="row g-3 mb-4 row-cols-2 row-cols-md-4" id="essaySummaryRow">
+      <div class="row g-3 mb-4 row-cols-2 row-cols-md-5" id="essaySummaryRow">
         <div class="col">
           <div class="card border-0 rounded-3 p-3 text-center bg-light">
             <div class="fs-4 fw-bold text-primary" id="essayStatStudents">-</div>
@@ -151,6 +152,12 @@ require_once 'header.php';
           <div class="card border-0 rounded-3 p-3 text-center bg-light">
             <div class="fs-4 fw-bold text-success" id="essayStatT1">-</div>
             <div class="text-muted small">ส่งหน่วยที่ 1 (D2)</div>
+          </div>
+        </div>
+        <div class="col">
+          <div class="card border-0 rounded-3 p-3 text-center bg-light">
+            <div class="fs-4 fw-bold text-warning" id="essayStatT2">-</div>
+            <div class="text-muted small">ส่งหน่วยที่ 2 (D2)</div>
           </div>
         </div>
         <div class="col">
@@ -239,14 +246,16 @@ require_once 'header.php';
 
   const IS_TEACHER = <?php echo ($_SESSION['user']['role'] === 'teacher') ? 'true' : 'false'; ?>;
 
-  // คอลัมน์ในตาราง: ก่อนเรียน · หน่วยที่ 1 (D1,D2) · หลังเรียน
+  // คอลัมน์ในตาราง: ก่อนเรียน · หน่วยที่ 1 (D1,D2) · หน่วยที่ 2 (D1,D2) · หลังเรียน
   // ภาระงานแต่ละหน่วยแตกเป็น 2 ร่าง: D1 = ร่างที่ 1, D2 = ร่างที่ 2 (ให้คะแนนเฉพาะ D2)
-  const ESSAY_PHASE_KEYS = ['pretest', 'task1_d1', 'task1_d2', 'posttest'];
+  const ESSAY_PHASE_KEYS = ['pretest', 'task1_d1', 'task1_d2', 'task2_d1', 'task2_d2', 'posttest'];
 
   const essayPhaseLabels = {
     pretest:  'ก่อนเรียน (Pretest)',
     task1_d1: 'ภาระงาน หน่วยที่ 1 · ร่างที่ 1 (D1)',
     task1_d2: 'ภาระงาน หน่วยที่ 1 · ร่างที่ 2 (D2)',
+    task2_d1: 'ภาระงาน หน่วยที่ 2 · ร่างที่ 1 (D1)',
+    task2_d2: 'ภาระงาน หน่วยที่ 2 · ร่างที่ 2 (D2)',
     posttest: 'หลังเรียน (Posttest)'
   };
 
@@ -429,6 +438,7 @@ require_once 'header.php';
     setEl('essayStatStudents', students.length);
     setEl('essayStatPre',  cnt('pretest'));
     setEl('essayStatT1',   cnt('task1_d2'));
+    setEl('essayStatT2',   cnt('task2_d2'));
     setEl('essayStatPost', cnt('posttest'));
 
     if (students.length === 0) {
@@ -445,6 +455,8 @@ require_once 'header.php';
         ${buildPhaseCell(rec, 'pretest', false)}
         ${buildPhaseCell(rec, 'task1_d1', false)}
         ${buildPhaseCell(rec, 'task1_d2', true)}
+        ${buildPhaseCell(rec, 'task2_d1', false)}
+        ${buildPhaseCell(rec, 'task2_d2', true)}
         ${buildPhaseCell(rec, 'posttest', false)}
       </tr>`;
     }).join('');
@@ -459,9 +471,12 @@ require_once 'header.php';
             <th rowspan="2" class="align-middle text-nowrap text-start">ชื่อสกุล</th>
             <th rowspan="2" class="align-middle text-nowrap">ก่อนเรียน</th>
             <th colspan="2" class="text-nowrap">หน่วยที่ 1</th>
+            <th colspan="2" class="text-nowrap">หน่วยที่ 2</th>
             <th rowspan="2" class="align-middle text-nowrap">หลังเรียน</th>
           </tr>
           <tr>
+            <th class="text-center small text-nowrap">D1</th>
+            <th class="${d2Head}" title="ร่างที่ให้คะแนน">D2 <i class="bi bi-star-fill text-warning"></i></th>
             <th class="text-center small text-nowrap">D1</th>
             <th class="${d2Head}" title="ร่างที่ให้คะแนน">D2 <i class="bi bi-star-fill text-warning"></i></th>
           </tr>
@@ -739,7 +754,7 @@ require_once 'header.php';
   }
 
   // ===== หัวข้อเรียงความที่ครูกำหนด =====
-  const TOPIC_PHASES = ['pretest', 'task1', 'posttest'];
+  const TOPIC_PHASES = ['pretest', 'task1', 'task2', 'posttest'];
 
   async function loadEssayTopics() {
     try {
