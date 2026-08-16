@@ -286,7 +286,8 @@ require_once 'header.php';
     const container = document.getElementById('essayViewerContainer');
     container.innerHTML = '<div class="text-center py-5 text-muted"><span class="spinner-border spinner-border-sm me-2"></span>กำลังโหลดเรียงความ...</div>';
     try {
-      const res = await fetch('api.php?action=get_all_essays');
+      // โหมดเบา: โหลดเฉพาะสถานะการส่ง (ไม่รวมเนื้อหาเต็ม) ให้ตารางแสดงเร็วขึ้นมาก
+      const res = await fetch('api.php?action=get_all_essays&light=1');
       const data = await res.json();
       if (data.success) {
         allEssaysCache = data.essays || [];
@@ -405,27 +406,14 @@ require_once 'header.php';
       </td>`;
     }
 
-    // มีเรียงความแล้ว: เปิด PDF ได้เสมอ + ครูแก้/ลบได้
-    const pdfBtn = `<button class="btn btn-sm btn-outline-danger rounded-circle p-0 d-inline-flex align-items-center justify-content-center"
-        style="width:32px;height:32px;" title="เปิด PDF เรียงความ (${label})"
+    // มีเรียงความแล้ว: เปิด PDF (ครูแก้ไข/ลบได้ในหน้าเอกสาร essay_print.php ที่เปิดจากปุ่มนี้)
+    const tip = IS_TEACHER ? 'เปิดเอกสารเรียงความ — แก้ไข/ลบได้ในหน้านี้' : 'เปิด PDF เรียงความ';
+    return `<td class="${cls}">
+      <button class="btn btn-sm btn-outline-danger rounded-circle p-0 d-inline-flex align-items-center justify-content-center"
+        style="width:32px;height:32px;" title="${tip} (${label})"
         onclick='openEssayPdf(${sid}, ${pk})'>
         <i class="bi bi-file-earmark-pdf-fill"></i>
-      </button>`;
-    if (!IS_TEACHER) return `<td class="${cls}">${pdfBtn}</td>`;
-    return `<td class="${cls}">
-      <div class="d-inline-flex gap-1 align-items-center justify-content-center flex-nowrap">
-        ${pdfBtn}
-        <button class="btn btn-sm btn-outline-primary rounded-circle p-0 d-inline-flex align-items-center justify-content-center"
-          style="width:32px;height:32px;" title="แก้ไขเรียงความ (${label})"
-          onclick='openEssayEditor(${sid}, ${pk})'>
-          <i class="bi bi-pencil-fill"></i>
-        </button>
-        <button class="btn btn-sm btn-outline-danger rounded-circle p-0 d-inline-flex align-items-center justify-content-center"
-          style="width:32px;height:32px;" title="ลบเรียงความ (${label})"
-          onclick='deleteEssay(${sid}, ${pk})'>
-          <i class="bi bi-trash-fill"></i>
-        </button>
-      </div>
+      </button>
     </td>`;
   }
 
@@ -518,9 +506,24 @@ require_once 'header.php';
     window.open('essay_print.php?' + params.toString(), '_blank');
   }
 
-  function exportEssaysCSV() {
+  // แคชข้อมูลเนื้อหาเต็ม (โหลดเฉพาะตอนต้องใช้ เช่น ส่งออก CSV) เพื่อไม่ให้หน้าโหลดช้าตั้งแต่แรก
+  let fullEssaysCache = null;
+  async function ensureFullEssays() {
+    if (fullEssaysCache) return fullEssaysCache;
+    const res = await fetch('api.php?action=get_all_essays');
+    const data = await res.json();
+    fullEssaysCache = (data.success && data.essays) ? data.essays : [];
+    return fullEssaysCache;
+  }
+
+  async function exportEssaysCSV() {
     if (!allEssaysCache) { showToast('กรุณาโหลดข้อมูลก่อน', 'error'); return; }
-    const filtered = applyEssayFilters(allEssaysCache);
+    if (applyEssayFilters(allEssaysCache).length === 0) { showToast('ไม่มีเรียงความที่ตรงกับเงื่อนไขให้ส่งออก', 'error'); return; }
+
+    // โหมดเบาไม่มีเนื้อหาเต็ม จึงโหลดเนื้อหาเต็มก่อน (ครั้งเดียว) แล้วจึงสร้างไฟล์ CSV
+    showToast('กำลังเตรียมไฟล์ CSV...', 'success');
+    const full = await ensureFullEssays();
+    const filtered = applyEssayFilters(full);
     if (filtered.length === 0) { showToast('ไม่มีเรียงความที่ตรงกับเงื่อนไขให้ส่งออก', 'error'); return; }
 
     // ป้องกัน CSV formula injection: ค่าที่ขึ้นต้นด้วย = + - @ (หรือ tab/CR) อาจถูกโปรแกรมตารางตีความเป็นสูตร
@@ -722,6 +725,7 @@ require_once 'header.php';
       if (data.success) {
         showToast('บันทึกเรียงความเรียบร้อยแล้ว', 'success');
         if (essayEditorModal) essayEditorModal.hide();
+        fullEssaysCache = null; // ข้อมูลเปลี่ยน — ล้างแคชเนื้อหาเต็มไว้โหลดใหม่ตอนส่งออก
         await loadEssayViewer();
       } else {
         showToast('บันทึกไม่สำเร็จ: ' + (data.error || ''), 'error');
@@ -731,29 +735,6 @@ require_once 'header.php';
     } finally {
       btn.innerHTML = orig;
       btn.disabled = false;
-    }
-  }
-
-  // ลบเรียงความของนักเรียน (รอบที่ระบุ)
-  async function deleteEssay(sid, phase) {
-    if (!IS_TEACHER) return;
-    const label = essayPhaseLabels[phase] || phase;
-    if (!confirm(`ต้องการลบเรียงความรอบ "${label}" ของนักเรียนรหัส ${sid} ใช่หรือไม่?\nการลบไม่สามารถย้อนกลับได้`)) return;
-    try {
-      const res = await fetch('api.php?action=admin_delete_essay', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ student_id: sid, essay_phase: phase })
-      });
-      const data = await res.json();
-      if (data.success) {
-        showToast('ลบเรียงความเรียบร้อยแล้ว', 'success');
-        await loadEssayViewer();
-      } else {
-        showToast('ลบไม่สำเร็จ: ' + (data.error || ''), 'error');
-      }
-    } catch (e) {
-      showToast('ลบไม่สำเร็จ', 'error');
     }
   }
 
