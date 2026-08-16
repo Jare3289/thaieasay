@@ -110,7 +110,17 @@ require_once 'header.php';
           <select id="essayClassroomFilter" onchange="filterEssayViewer()" class="form-select form-select-sm border-2 rounded-pill" style="width:auto;">
             <option value="all">ทุกห้องเรียน</option>
           </select>
+          <select id="essayStatusFilter" onchange="filterEssayViewer()" class="form-select form-select-sm border-2 rounded-pill" style="width:auto;" title="กรองตามสถานะการส่ง">
+            <option value="all">ทุกสถานะการส่ง</option>
+            <option value="complete">ส่งครบทุกรอบ</option>
+            <option value="partial">ส่งบางรอบ</option>
+          </select>
           <input type="text" id="essaySearchInput" onkeyup="filterEssayViewer()" class="form-control form-control-sm border-2 rounded-pill" placeholder="ค้นหาชื่อ หรือรหัสนักเรียน..." style="width:220px;">
+          <?php if ($isTeacher): ?>
+          <button class="btn btn-success btn-sm rounded-pill px-3" onclick="openEssayEditor(null, null)">
+            <i class="bi bi-plus-lg me-1"></i>เพิ่มเรียงความ
+          </button>
+          <?php endif; ?>
           <button class="btn btn-danger btn-sm rounded-pill px-3" onclick="openRoomReport()">
             <i class="bi bi-file-earmark-pdf me-1"></i>ดูรายงานทั้งห้อง (PDF)
           </button>
@@ -160,6 +170,67 @@ require_once 'header.php';
     </div>
   </div>
 </div>
+
+<?php if ($isTeacher): ?>
+<!-- Modal: ครูเพิ่ม/แก้ไขเรียงความของนักเรียน -->
+<div class="modal fade" id="essayEditorModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content border-0 rounded-4 shadow">
+      <div class="modal-header bg-primary text-white rounded-top-4" style="background: linear-gradient(135deg, var(--primary-navy) 0%, var(--secondary-blue) 100%) !important;">
+        <h5 class="modal-title fw-bold" id="essayEditorTitle"><i class="bi bi-pencil-square me-2"></i>แก้ไขเรียงความ</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="ปิด"></button>
+      </div>
+      <div class="modal-body p-4">
+        <input type="hidden" id="editEssayMode" value="edit">
+        <div class="row g-3 mb-3">
+          <div class="col-md-6" id="editStudentWrap">
+            <label class="form-label fw-semibold small mb-1">นักเรียน</label>
+            <select id="editStudentSelect" class="form-select form-select-sm border-2 rounded-3">
+              <option value="">— เลือกนักเรียน —</option>
+            </select>
+            <div class="form-text small" id="editStudentFixed"></div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold small mb-1">รอบการประเมิน</label>
+            <select id="editPhaseSelect" class="form-select form-select-sm border-2 rounded-3">
+              <option value="pretest">ก่อนเรียน (Pretest)</option>
+              <option value="task1_d1">ภาระงาน หน่วยที่ 1 · ร่างที่ 1 (D1)</option>
+              <option value="task1_d2">ภาระงาน หน่วยที่ 1 · ร่างที่ 2 (D2)</option>
+              <option value="posttest">หลังเรียน (Posttest)</option>
+            </select>
+          </div>
+        </div>
+        <div class="alert alert-warning border-0 rounded-3 small py-2 d-none" id="editOverwriteWarn">
+          <i class="bi bi-exclamation-triangle-fill me-1"></i>นักเรียนคนนี้มีเรียงความในรอบนี้อยู่แล้ว — การบันทึกจะเขียนทับของเดิม
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold small mb-1"><i class="bi bi-flag-fill text-primary me-1"></i>ส่วนคำนำ (Introduction)</label>
+          <textarea id="editIntro" rows="3" class="form-control border-2 rounded-3" placeholder="ส่วนคำนำของเรียงความ..."></textarea>
+        </div>
+        <div class="mb-2">
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <label class="form-label fw-semibold small mb-0"><i class="bi bi-body-text text-success me-1"></i>ส่วนเนื้อเรื่อง (Body)</label>
+            <button type="button" class="btn btn-outline-success btn-sm rounded-pill px-3" onclick="addBodyParagraph('')">
+              <i class="bi bi-plus-lg me-1"></i>เพิ่มย่อหน้า
+            </button>
+          </div>
+          <div id="editBodyList" class="d-flex flex-column gap-2"></div>
+        </div>
+        <div class="mb-1">
+          <label class="form-label fw-semibold small mb-1"><i class="bi bi-flag-checkered text-danger me-1"></i>ส่วนสรุป (Conclusion)</label>
+          <textarea id="editConclusion" rows="3" class="form-control border-2 rounded-3" placeholder="ส่วนสรุปของเรียงความ..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">ยกเลิก</button>
+        <button type="button" class="btn btn-primary rounded-pill px-4" id="editSaveBtn" onclick="saveEssayEdit()">
+          <i class="bi bi-save me-1"></i>บันทึกเรียงความ
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
 
 <script>
   // ========== Essay Viewer (ตารางสถานะการส่งเรียงความรายบุคคล) ==========
@@ -301,25 +372,67 @@ require_once 'header.php';
     });
   }
 
+  // กรองตามสถานะการส่ง (หลังยุบรวมเป็นรายคน): ครบทุกรอบ / ส่งบางรอบ
+  function applyStatusFilter(students) {
+    const status = (document.getElementById('essayStatusFilter') || {}).value || 'all';
+    if (status === 'all') return students;
+    return students.filter(rec => {
+      const done = ESSAY_PHASE_KEYS.reduce((n, k) => n + (rec.phases[k] ? 1 : 0), 0);
+      if (status === 'complete') return done === ESSAY_PHASE_KEYS.length;
+      if (status === 'partial')  return done > 0 && done < ESSAY_PHASE_KEYS.length;
+      return true;
+    });
+  }
+
   // ช่องรอบการประเมินหนึ่งช่อง: มีเรียงความ → ไอคอน PDF (กดเปิดเป็นเอกสาร) / ยังไม่มี → เว้นว่าง
   // graded = ร่างที่ให้คะแนน (D2) จะไฮไลต์พื้นหลังอ่อน ๆ
   function buildPhaseCell(rec, phaseKey, graded) {
     const cls = 'text-center' + (graded ? ' table-warning' : '');
     const e = rec.phases[phaseKey];
-    if (!e) return `<td class="${cls} text-muted"></td>`;
+    const sid = JSON.stringify(rec.student_id);
+    const pk  = JSON.stringify(phaseKey);
+    const label = escapeHtml(essayPhaseLabels[phaseKey] || phaseKey);
+
+    // ยังไม่มีเรียงความ: ครูเพิ่มได้ / คนอื่นเห็นช่องว่าง
+    if (!e) {
+      if (!IS_TEACHER) return `<td class="${cls} text-muted"></td>`;
+      return `<td class="${cls}">
+        <button class="btn btn-sm btn-outline-secondary rounded-circle p-0 d-inline-flex align-items-center justify-content-center"
+          style="width:32px;height:32px;" title="เพิ่มเรียงความรอบนี้ (${label})"
+          onclick='openEssayEditor(${sid}, ${pk})'>
+          <i class="bi bi-plus-lg"></i>
+        </button>
+      </td>`;
+    }
+
+    // มีเรียงความแล้ว: เปิด PDF ได้เสมอ + ครูแก้/ลบได้
+    const pdfBtn = `<button class="btn btn-sm btn-outline-danger rounded-circle p-0 d-inline-flex align-items-center justify-content-center"
+        style="width:32px;height:32px;" title="เปิด PDF เรียงความ (${label})"
+        onclick='openEssayPdf(${sid}, ${pk})'>
+        <i class="bi bi-file-earmark-pdf-fill"></i>
+      </button>`;
+    if (!IS_TEACHER) return `<td class="${cls}">${pdfBtn}</td>`;
     return `<td class="${cls}">
-      <button class="btn btn-sm btn-outline-danger rounded-circle p-0 d-inline-flex align-items-center justify-content-center"
-        style="width:36px;height:36px;" title="เปิด PDF เรียงความ (${escapeHtml(essayPhaseLabels[phaseKey] || phaseKey)})"
-        onclick='openEssayPdf(${JSON.stringify(rec.student_id)}, ${JSON.stringify(phaseKey)})'>
-        <i class="bi bi-file-earmark-pdf-fill fs-6"></i>
-      </button>
+      <div class="d-inline-flex gap-1 align-items-center justify-content-center flex-nowrap">
+        ${pdfBtn}
+        <button class="btn btn-sm btn-outline-primary rounded-circle p-0 d-inline-flex align-items-center justify-content-center"
+          style="width:32px;height:32px;" title="แก้ไขเรียงความ (${label})"
+          onclick='openEssayEditor(${sid}, ${pk})'>
+          <i class="bi bi-pencil-fill"></i>
+        </button>
+        <button class="btn btn-sm btn-outline-danger rounded-circle p-0 d-inline-flex align-items-center justify-content-center"
+          style="width:32px;height:32px;" title="ลบเรียงความ (${label})"
+          onclick='deleteEssay(${sid}, ${pk})'>
+          <i class="bi bi-trash-fill"></i>
+        </button>
+      </div>
     </td>`;
   }
 
   function renderEssayViewer(essays) {
     const container = document.getElementById('essayViewerContainer');
     const filtered  = applyEssayFilters(essays);
-    const students  = pivotByStudent(filtered);
+    const students  = applyStatusFilter(pivotByStudent(filtered));
     const multiRoom = ((document.getElementById('essayClassroomFilter') || {}).value || 'all') === 'all';
 
     // แถบสรุป: จำนวนนักเรียน และจำนวนที่ส่ง (ภาระงานนับจากร่างที่ให้คะแนน = D2)
@@ -451,6 +564,198 @@ require_once 'header.php';
     initEssayGroupFromStore();
     filterEssayViewer();
   };
+
+  // ===== ครูเพิ่ม/แก้ไข/ลบเรียงความ =====
+  let essayEditorModal = null;
+  let studentsListCache = null; // รายชื่อนักเรียนทั้งหมด (โหลดครั้งแรกเมื่อ "เพิ่มเรียงความ" แบบเลือกนักเรียนเอง)
+
+  // ดึงเนื้อหาเรียงความ (intro/body[]/conclusion) จากระเบียนชิ้นงานที่แคชไว้
+  function parseEssayParts(e) {
+    let intro = '', body = [], conclusion = '';
+    if (e) {
+      try {
+        const obj = JSON.parse(e.essay_content || '');
+        if (obj && typeof obj === 'object') {
+          intro = obj.introduction || '';
+          body = Array.isArray(obj.body) ? obj.body.slice() : [];
+          conclusion = obj.conclusion || '';
+        }
+      } catch (err) {
+        intro = e.essay_content || '';
+      }
+    }
+    return { intro, body, conclusion };
+  }
+
+  // หาชิ้นงานในแคชตามรหัสนักเรียน + รอบ
+  function findEssayInCache(sid, phase) {
+    if (!allEssaysCache) return null;
+    return allEssaysCache.find(e => (e.student_id || '').trim() === String(sid).trim() && e.essay_phase === phase) || null;
+  }
+
+  // เพิ่มช่องย่อหน้าเนื้อเรื่องหนึ่งช่อง
+  function addBodyParagraph(text) {
+    const list = document.getElementById('editBodyList');
+    if (!list) return;
+    const row = document.createElement('div');
+    row.className = 'd-flex gap-2 align-items-start';
+    const ta = document.createElement('textarea');
+    ta.rows = 2;
+    ta.className = 'form-control border-2 rounded-3 edit-body-para';
+    ta.placeholder = 'ย่อหน้าเนื้อเรื่อง...';
+    ta.value = text || '';
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'btn btn-outline-danger btn-sm rounded-3 flex-shrink-0';
+    del.title = 'ลบย่อหน้านี้';
+    del.innerHTML = '<i class="bi bi-x-lg"></i>';
+    del.onclick = () => row.remove();
+    row.appendChild(ta);
+    row.appendChild(del);
+    list.appendChild(row);
+  }
+
+  // เปิด modal เพื่อเพิ่ม (sid/phase = null → เลือกเอง) หรือแก้ไขเรียงความ
+  async function openEssayEditor(sid, phase) {
+    if (!IS_TEACHER) return;
+    if (!essayEditorModal) essayEditorModal = new bootstrap.Modal(document.getElementById('essayEditorModal'));
+
+    const isEdit = !!(sid && phase && findEssayInCache(sid, phase));
+    document.getElementById('editEssayMode').value = isEdit ? 'edit' : 'add';
+    document.getElementById('essayEditorTitle').innerHTML = isEdit
+      ? '<i class="bi bi-pencil-square me-2"></i>แก้ไขเรียงความ'
+      : '<i class="bi bi-plus-circle me-2"></i>เพิ่มเรียงความ';
+
+    const studentWrap  = document.getElementById('editStudentWrap');
+    const studentSel   = document.getElementById('editStudentSelect');
+    const studentFixed = document.getElementById('editStudentFixed');
+    const phaseSel     = document.getElementById('editPhaseSelect');
+
+    if (sid) {
+      // ระบุนักเรียนมาแล้ว (กดจากในตาราง) — ล็อกนักเรียน แสดงเป็นข้อความ
+      studentSel.classList.add('d-none');
+      const rec = pivotByStudent(allEssaysCache).find(r => r.student_id === String(sid));
+      const nm = rec ? rec.student_name : '';
+      studentFixed.innerHTML = `<span class="fw-semibold">${escapeHtml(sid)}</span> ${escapeHtml(nm)}`;
+      studentSel.value = sid;
+      studentSel.dataset.fixed = sid;
+    } else {
+      // เลือกนักเรียนเอง — โหลดรายชื่อทั้งหมด
+      studentSel.classList.remove('d-none');
+      studentFixed.textContent = '';
+      studentSel.dataset.fixed = '';
+      await ensureStudentsList();
+    }
+
+    phaseSel.value = phase || 'pretest';
+    phaseSel.disabled = isEdit; // แก้ไข = ล็อกรอบไว้ (กันเขียนทับรอบอื่นโดยไม่ตั้งใจ)
+    phaseSel.onchange = updateOverwriteWarn;
+
+    // เติมเนื้อหาเดิมถ้าเป็นการแก้ไข
+    const parts = parseEssayParts(isEdit ? findEssayInCache(sid, phase) : null);
+    document.getElementById('editIntro').value = parts.intro;
+    document.getElementById('editConclusion').value = parts.conclusion;
+    const list = document.getElementById('editBodyList');
+    list.innerHTML = '';
+    if (parts.body.length) parts.body.forEach(p => addBodyParagraph(p));
+    else addBodyParagraph('');
+
+    updateOverwriteWarn();
+    essayEditorModal.show();
+  }
+
+  // โหลดรายชื่อนักเรียนทั้งหมดลง select (ครั้งแรกครั้งเดียว)
+  async function ensureStudentsList() {
+    const sel = document.getElementById('editStudentSelect');
+    if (!studentsListCache) {
+      try {
+        const res = await fetch('api.php?action=get_students_full');
+        const data = await res.json();
+        studentsListCache = (data.success && data.students) ? data.students : [];
+      } catch (e) { studentsListCache = []; }
+    }
+    sel.innerHTML = '<option value="">— เลือกนักเรียน —</option>' +
+      studentsListCache.map(s =>
+        `<option value="${escapeHtml(s.student_id)}">${escapeHtml(s.student_id)} — ${escapeHtml(s.student_name)}${s.classroom ? ' (ห้อง ' + escapeHtml(s.classroom) + ')' : ''}</option>`
+      ).join('');
+    sel.onchange = updateOverwriteWarn;
+    document.getElementById('editPhaseSelect').onchange = updateOverwriteWarn;
+  }
+
+  // เตือนเมื่อจะเขียนทับเรียงความเดิม (นักเรียน+รอบ ที่มีอยู่แล้ว)
+  function updateOverwriteWarn() {
+    const warn = document.getElementById('editOverwriteWarn');
+    if (!warn) return;
+    if (document.getElementById('editEssayMode').value === 'edit') { warn.classList.add('d-none'); return; }
+    const sel = document.getElementById('editStudentSelect');
+    const sid = sel.dataset.fixed || sel.value;
+    const phase = document.getElementById('editPhaseSelect').value;
+    warn.classList.toggle('d-none', !(sid && findEssayInCache(sid, phase)));
+  }
+
+  // บันทึกเรียงความ (เพิ่ม/แก้ไข)
+  async function saveEssayEdit() {
+    const sel = document.getElementById('editStudentSelect');
+    const sid = (sel.dataset.fixed || sel.value || '').trim();
+    const phase = document.getElementById('editPhaseSelect').value;
+    if (!sid) { showToast('กรุณาเลือกนักเรียน', 'error'); return; }
+
+    const intro = document.getElementById('editIntro').value.trim();
+    const conclusion = document.getElementById('editConclusion').value.trim();
+    const body = [...document.querySelectorAll('#editBodyList .edit-body-para')]
+      .map(t => t.value.trim()).filter(t => t !== '');
+    if (!intro && !conclusion && body.length === 0) {
+      showToast('กรุณากรอกเนื้อหาอย่างน้อยหนึ่งส่วน', 'error'); return;
+    }
+
+    const btn = document.getElementById('editSaveBtn');
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>กำลังบันทึก...';
+    btn.disabled = true;
+    try {
+      const res = await fetch('api.php?action=admin_save_essay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ student_id: sid, essay_phase: phase, introduction: intro, body, conclusion })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('บันทึกเรียงความเรียบร้อยแล้ว', 'success');
+        if (essayEditorModal) essayEditorModal.hide();
+        await loadEssayViewer();
+      } else {
+        showToast('บันทึกไม่สำเร็จ: ' + (data.error || ''), 'error');
+      }
+    } catch (e) {
+      showToast('บันทึกไม่สำเร็จ', 'error');
+    } finally {
+      btn.innerHTML = orig;
+      btn.disabled = false;
+    }
+  }
+
+  // ลบเรียงความของนักเรียน (รอบที่ระบุ)
+  async function deleteEssay(sid, phase) {
+    if (!IS_TEACHER) return;
+    const label = essayPhaseLabels[phase] || phase;
+    if (!confirm(`ต้องการลบเรียงความรอบ "${label}" ของนักเรียนรหัส ${sid} ใช่หรือไม่?\nการลบไม่สามารถย้อนกลับได้`)) return;
+    try {
+      const res = await fetch('api.php?action=admin_delete_essay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ student_id: sid, essay_phase: phase })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('ลบเรียงความเรียบร้อยแล้ว', 'success');
+        await loadEssayViewer();
+      } else {
+        showToast('ลบไม่สำเร็จ: ' + (data.error || ''), 'error');
+      }
+    } catch (e) {
+      showToast('ลบไม่สำเร็จ', 'error');
+    }
+  }
 
   // ===== หัวข้อเรียงความที่ครูกำหนด =====
   const TOPIC_PHASES = ['pretest', 'task1', 'posttest'];
