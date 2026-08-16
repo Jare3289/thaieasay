@@ -412,9 +412,24 @@ $role = $sessionUser['role'];
         <div class="tab-content" id="teacherTabContent">
           <!-- 1. แดชบอร์ดภาพรวมกิจกรรมห้องเรียน -->
           <div class="tab-pane fade show active" id="summary" role="tabpanel" aria-labelledby="summary-tab">
-            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-4">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-3">
               <h5 class="fw-bold text-dark mb-0">สถานะการทำงานสะท้อนการประเมินเชิงลึกของนักเรียน</h5>
               <span class="badge bg-primary-subtle text-primary-emphasis fw-bold" id="reflectionGroupBadge">—</span>
+            </div>
+
+            <!-- ตัวเลือกหน่วยการเรียน + ส่งออก PDF: ข้อมูลทุกแท็บด้านล่างจะแสดงตามหน่วยที่เลือก -->
+            <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2 mb-4 p-2 bg-light border rounded-4">
+              <div class="btn-group" role="group" aria-label="เลือกหน่วยการเรียน" id="monitorUnitPicker">
+                <button type="button" class="btn btn-primary fw-bold px-4" data-munit="1" onclick="setMonitorUnit(1)">
+                  <i class="bi bi-1-circle-fill me-1"></i> หน่วยที่ 1
+                </button>
+                <button type="button" class="btn btn-outline-primary fw-bold px-4" data-munit="2" onclick="setMonitorUnit(2)">
+                  <i class="bi bi-2-circle-fill me-1"></i> หน่วยที่ 2
+                </button>
+              </div>
+              <button type="button" class="btn btn-outline-danger fw-bold rounded-pill px-4" onclick="exportReflectionPdf()">
+                <i class="bi bi-file-earmark-pdf me-1"></i> ส่งออก PDF (หน่วยที่ <span id="monitorUnitLabel">1</span>)
+              </button>
             </div>
 
             <div class="row g-4 mb-4">
@@ -446,40 +461,6 @@ $role = $sessionUser['role'];
                   <div class="fw-bold text-secondary small mb-1">ส่งแบบสะท้อนการเรียนรู้</div>
                   <h4 id="statReflections" class="fw-bold text-info mb-0">- / -</h4>
                 </div>
-              </div>
-            </div>
-
-            <!-- ตารางสรุปสถานะการส่งงานรวมในตารางเดียว (ใครส่งแล้ว/ยังไม่ส่ง) -->
-            <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
-              <div class="p-3 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2" style="background: linear-gradient(135deg, var(--primary-navy) 0%, var(--secondary-blue) 100%);">
-                <h6 class="fw-bold text-white mb-0"><i class="bi bi-table"></i> ตารางสรุปสถานะการส่งงานของนักเรียนทั้งหมด</h6>
-                <div class="d-flex align-items-center gap-3 small text-white-50">
-                  <span><i class="bi bi-check-circle-fill text-success"></i> ส่งแล้ว</span>
-                  <span><i class="bi bi-dash-circle text-white-50"></i> ยังไม่ส่ง</span>
-                </div>
-              </div>
-              <div class="card-body p-2 bg-light border-bottom">
-                <div class="input-group input-group-sm">
-                  <span class="input-group-text bg-white text-secondary border-end-0"><i class="bi bi-search"></i></span>
-                  <input type="text" id="reflectionStatusSearch" onkeyup="filterReflectionStatusTable()" class="form-control bg-white border-start-0" placeholder="พิมพ์ชื่อหรือรหัสนักเรียนเพื่อค้นหา...">
-                </div>
-              </div>
-              <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0 text-start">
-                  <thead class="table-light text-secondary small fw-bold text-uppercase">
-                    <tr>
-                      <th class="px-3 py-3" style="width: 14%;">รหัสนักเรียน</th>
-                      <th class="px-3 py-3" style="width: 30%;">ชื่อ-สกุลผู้เรียน</th>
-                      <th class="px-3 py-3 text-center" style="width: 16%;">📝 ปัญหาการเขียน</th>
-                      <th class="px-3 py-3 text-center" style="width: 16%;">📋 ตรวจสอบตนเอง</th>
-                      <th class="px-3 py-3 text-center" style="width: 16%;">💡 สะท้อนการเรียนรู้</th>
-                      <th class="px-3 py-3 text-center" style="width: 8%;">รวม</th>
-                    </tr>
-                  </thead>
-                  <tbody id="reflectionStatusTableBody" class="small">
-                    <tr><td colspan="6" class="text-center text-muted py-5 fw-bold">กำลังโหลดสถานะการส่งงาน...</td></tr>
-                  </tbody>
-                </table>
               </div>
             </div>
 
@@ -539,11 +520,6 @@ $role = $sessionUser['role'];
                 border-left: 4px solid #f59e0b;
                 background: #ffffff;
               }
-              /* ตารางผลรายบุคคล: หมุนลูกศรเมื่อขยายแถว และไม่ให้แถวรายละเอียดมี hover */
-              .indiv-caret { transition: transform 0.2s ease; }
-              .indiv-row[aria-expanded="true"] .indiv-caret { transform: rotate(180deg); }
-              .indiv-row[aria-expanded="true"] { background-color: #eff6ff; }
-              .indiv-detail-row:hover > * { background-color: transparent !important; }
             </style>
 
             <div class="mb-4">
@@ -566,11 +542,6 @@ $role = $sessionUser['role'];
                 <li class="nav-item" role="presentation">
                   <button class="nav-link sub-tab-btn" id="pill-enabling-tab" data-bs-toggle="pill" data-bs-target="#pill-enabling" type="button" role="tab" aria-controls="pill-enabling" aria-selected="false">
                     🌱 4. ขั้นส่งเสริมการเรียนรู้ (Enabling)
-                  </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                  <button class="nav-link sub-tab-btn" id="pill-individual-tab" data-bs-toggle="pill" data-bs-target="#pill-individual" type="button" role="tab" aria-controls="pill-individual" aria-selected="false">
-                    👤 5. ผลรายบุคคล (<span id="countIndividual">0</span> คน)
                   </button>
                 </li>
               </ul>
@@ -627,14 +598,6 @@ $role = $sessionUser['role'];
                   <div id="enablingEmpty" class="text-center py-5 text-muted" style="display: none;">
                     <div class="fs-1 mb-2">🌱</div>
                     <p class="mb-0">ยังไม่มีข้อมูลเพียงพอสำหรับสร้างข้อเสนอแนะขอบเขตการเรียนรู้เพิ่มเติม</p>
-                  </div>
-                </div>
-
-                <!-- Tab 5: ผลรายบุคคล (แสดงข้อมูลครบทุกคนในที่เดียว) -->
-                <div class="tab-pane fade" id="pill-individual" role="tabpanel" aria-labelledby="pill-individual-tab">
-                  <p class="text-muted small mb-3"><i class="bi bi-info-circle"></i> ตารางผลรายบุคคลของนักเรียนทุกคนที่มีข้อมูล คลิกที่แถวเพื่อขยายดูรายละเอียดทั้งหมด (อุปสรรค + ตรวจสอบตนเอง + สะท้อนคิด) โดยไม่ต้องสลับไปแท็บอื่น</p>
-                  <div id="gridIndividual" class="table-responsive">
-                    <div class="text-center py-5 text-muted">กำลังโหลดผลรายบุคคล...</div>
                   </div>
                 </div>
               </div>
@@ -756,7 +719,27 @@ $role = $sessionUser['role'];
   const userRole = "<?php echo $role; ?>";
   const currentUserId = "<?php echo $sessionUser['id']; ?>";
   let currentReflectionUnit = 1; // หน่วยการเรียนที่นักเรียนกำลังบันทึก (1 หรือ 2)
+  let currentMonitorUnit = 1;    // หน่วยการเรียนที่ครูเลือกดูในแดชบอร์ดภาพรวม (1 หรือ 2)
   let loadTeacherDashboardSummary = function() {}; // Global placeholder to prevent ReferenceError
+
+  // ครูสลับหน่วยการเรียนของแดชบอร์ดภาพรวม — ข้อมูลทุกแท็บจะโหลดใหม่ตามหน่วยที่เลือก
+  window.setMonitorUnit = function(u) {
+    currentMonitorUnit = (parseInt(u, 10) === 2) ? 2 : 1;
+    document.querySelectorAll('#monitorUnitPicker [data-munit]').forEach(b => {
+      const on = (parseInt(b.getAttribute('data-munit'), 10) === currentMonitorUnit);
+      b.className = 'btn fw-bold px-4 ' + (on ? 'btn-primary' : 'btn-outline-primary');
+    });
+    const lbl = document.getElementById('monitorUnitLabel');
+    if (lbl) lbl.textContent = currentMonitorUnit;
+    if (typeof loadTeacherDashboardSummary === 'function') loadTeacherDashboardSummary();
+  };
+
+  // ส่งออกรายงานสะท้อนคิดของหน่วยที่เลือกเป็นหน้าพิมพ์ PDF (แบบเดียวกับรายงานการส่งงาน)
+  window.exportReflectionPdf = function() {
+    const grp = (window.TEG ? TEG.get() : 'all');
+    const groupQS = (grp && grp !== 'all') ? ('&group=' + encodeURIComponent(grp)) : '';
+    window.open('reflection_print.php?unit=' + currentMonitorUnit + groupQS, '_blank');
+  };
 
   // โหลดรายชื่อนักเรียน
   async function loadStudents() {
@@ -1279,19 +1262,16 @@ $role = $sessionUser['role'];
         const groupParam = (window.TEG ? TEG.param() : '');
         const gBadge = document.getElementById('reflectionGroupBadge');
         if (gBadge && window.TEG) gBadge.textContent = (TEG.get() === 'all') ? 'ทุกกลุ่มรวมกัน' : TEG.get();
-        const response = await fetch(`api.php?action=get_reflection_summary${groupParam}&_t=${new Date().getTime()}`);
+        const response = await fetch(`api.php?action=get_reflection_summary${groupParam}&unit=${currentMonitorUnit}&_t=${new Date().getTime()}`);
         const res = await response.json();
         if (res.success) {
           const stats = res.stats;
           const total = stats.total_students;
-          
+
           document.getElementById('statProblems').textContent = `${stats.problems_completed} / ${total} คน`;
           document.getElementById('statChecklists').textContent = `${stats.checklists_completed} / ${total} คน`;
           document.getElementById('statPeerReviews').textContent = `${stats.peer_reviews_completed} / ${total} คน`;
           document.getElementById('statReflections').textContent = `${stats.reflections_completed} / ${total} คน`;
-
-          // ตารางสรุปสถานะการส่งงานรวมในตารางเดียว — เห็นได้ทันทีว่าใครส่งแล้ว/ยังไม่ส่ง (รายชื่อครบทุกคนในกลุ่ม)
-          renderReflectionStatusTable(res.students_details || []);
 
           // แสดงรายชื่อการ์ดแยกตามหัวข้อการประเมิน (Topics) และกรองเฉพาะคนที่มีข้อมูล
           const gridObstacles = document.getElementById('gridObstacles');
@@ -1327,10 +1307,6 @@ $role = $sessionUser['role'];
           // ข้อมูลสำหรับข้อเสนอแนะขั้น Enabling
           const obstacleCounts = {}; // key เกณฑ์ → จำนวนนักเรียนที่พบอุปสรรค
           const checklistWeak = {};  // key เกณฑ์ → จำนวนนักเรียนที่ยังต้องปรับปรุง/ทำได้บางส่วน
-
-          // ผลรายบุคคล (แสดงครบทุกคนในที่เดียว)
-          let individualHtml = '';
-          let countIndividualStudentsSet = new Set();
 
           if (res.students_details && res.students_details.length > 0) {
             // 1. หมวดอุปสรรคการเขียน (จัดกลุ่มตาม 11 เกณฑ์)
@@ -1480,105 +1456,6 @@ $role = $sessionUser['role'];
               }
             });
 
-            // 4b. ผลรายบุคคล — รวมข้อมูลทั้งหมดของนักเรียนแต่ละคนไว้ในแอคคอร์เดียนเดียว
-            const chkBadge = (val) => {
-              if (val === 'ครบถ้วน') return '<span class="badge bg-success rounded-pill">ครบถ้วน</span>';
-              if (val === 'บางส่วน') return '<span class="badge bg-warning text-dark rounded-pill">บางส่วน</span>';
-              if (val === 'ต้องปรับปรุง') return '<span class="badge bg-danger rounded-pill">ต้องปรับปรุง</span>';
-              return '<span class="badge bg-light text-muted border rounded-pill">-</span>';
-            };
-            const esc = (s) => (s == null ? '' : String(s).replace(/</g, '&lt;').replace(/>/g, '&gt;'));
-
-            res.students_details.forEach((student, sIdx) => {
-              // ตรวจว่ามีข้อมูลอย่างน้อยหนึ่งประเภทหรือไม่
-              let hasObstacle = false, hasChecklist = false, hasReflection = false;
-              Object.keys(criteriaLabelMap).forEach(key => {
-                if ((student[`prob_${key}`] && student[`prob_${key}`].trim() !== '') ||
-                    (student[`sol_${key}`] && student[`sol_${key}`].trim() !== '')) hasObstacle = true;
-                if (student[`check_${key}`] && student[`check_${key}`].trim() !== '') hasChecklist = true;
-              });
-              ['content_structure', 'language_mechanics', 'feedback_applied', 'future_goals'].forEach(f => {
-                if (student[f] && student[f].trim() !== '') hasReflection = true;
-              });
-              if (!hasObstacle && !hasChecklist && !hasReflection) return;
-              countIndividualStudentsSet.add(student.student_id);
-
-              // ส่วนอุปสรรค
-              let obRows = '';
-              Object.keys(criteriaLabelMap).forEach(key => {
-                const p = student[`prob_${key}`] ? student[`prob_${key}`].trim() : '';
-                const s = student[`sol_${key}`] ? student[`sol_${key}`].trim() : '';
-                if (p !== '' || s !== '') {
-                  obRows += `<tr><td class="fw-bold text-dark small">${criteriaLabelMap[key]}</td><td class="small text-danger">${esc(p) || '-'}</td><td class="small text-success">${esc(s) || '-'}</td></tr>`;
-                }
-              });
-              const obSection = obRows
-                ? `<div class="table-responsive"><table class="table table-sm table-bordered align-middle mb-0"><thead class="table-danger"><tr><th style="width:25%">เกณฑ์</th><th style="width:38%">อุปสรรค</th><th style="width:37%">แผนแก้ปัญหา</th></tr></thead><tbody>${obRows}</tbody></table></div>`
-                : '<p class="text-muted small mb-0">- ยังไม่มีการบันทึกอุปสรรคการเขียน -</p>';
-
-              // ส่วนตรวจสอบตนเอง
-              let chkItems = '';
-              Object.keys(criteriaLabelMap).forEach(key => {
-                const val = student[`check_${key}`];
-                if (val && val.trim() !== '') {
-                  chkItems += `<li class="list-group-item d-flex justify-content-between align-items-center py-1 px-2"><span class="small">${criteriaLabelMap[key]}</span>${chkBadge(val)}</li>`;
-                }
-              });
-              const chkNotes = student.checklist_notes && student.checklist_notes.trim() !== '' ? `<div class="mt-2 p-2 bg-light rounded small text-muted"><strong>บันทึกเพิ่มเติม:</strong> ${esc(student.checklist_notes)}</div>` : '';
-              const chkSection = chkItems
-                ? `<ul class="list-group list-group-flush border rounded">${chkItems}</ul>${chkNotes}`
-                : '<p class="text-muted small mb-0">- ยังไม่มีการตรวจสอบตนเอง -</p>';
-
-              // ส่วนสะท้อนคิด
-              const refMap = [
-                ['content_structure', 'ด้านเนื้อหาสาระและองค์ประกอบ'],
-                ['language_mechanics', 'ด้านการใช้สำนวนภาษาและอักขรวิธี'],
-                ['feedback_applied', 'การนำข้อเสนอแนะไปปรับปรุงงาน'],
-                ['future_goals', 'การประยุกต์ใช้และเป้าหมายในอนาคต']
-              ];
-              let refItems = '';
-              refMap.forEach(([f, label]) => {
-                const v = student[f] ? student[f].trim() : '';
-                if (v !== '') {
-                  refItems += `<div class="col-md-6 col-12"><div class="p-2 bg-light rounded-3 h-100"><strong class="text-secondary small d-block">${label}</strong><span class="small text-dark">${esc(v)}</span></div></div>`;
-                }
-              });
-              const refSection = refItems
-                ? `<div class="row g-2">${refItems}</div>`
-                : '<p class="text-muted small mb-0">- ยังไม่มีบทสะท้อนคิด -</p>';
-
-              // ป้ายสถานะย่อ
-              const statusBadges = `
-                <span class="badge ${hasObstacle ? 'bg-danger' : 'bg-light text-muted border'} rounded-pill">อุปสรรค</span>
-                <span class="badge ${hasChecklist ? 'bg-success' : 'bg-light text-muted border'} rounded-pill">ตรวจสอบตนเอง</span>
-                <span class="badge ${hasReflection ? 'bg-info' : 'bg-light text-muted border'} rounded-pill">สะท้อนคิด</span>`;
-
-              // แถวสรุป (คลิกเพื่อขยาย) + แถวรายละเอียดที่ซ่อนไว้
-              individualHtml += `
-                <tr class="indiv-row" data-bs-toggle="collapse" data-bs-target="#indivDetail${sIdx}" role="button" aria-expanded="false" style="cursor: pointer;">
-                  <td class="fw-bold text-primary small">${student.student_id}</td>
-                  <td class="small text-dark">${student.student_name}</td>
-                  <td class="text-nowrap">${statusBadges}</td>
-                  <td class="text-end"><i class="bi bi-chevron-down indiv-caret text-secondary"></i></td>
-                </tr>
-                <tr class="indiv-detail-row">
-                  <td colspan="4" class="p-0 border-0">
-                    <div id="indivDetail${sIdx}" class="collapse" data-bs-parent="#gridIndividual">
-                      <div class="p-3 border-start border-4 border-primary" style="background-color: #f8fafc;">
-                        <h6 class="fw-bold text-danger-emphasis"><i class="bi bi-exclamation-octagon"></i> 1. อุปสรรคและแผนการแก้ปัญหา</h6>
-                        ${obSection}
-                        <h6 class="fw-bold text-success-emphasis mt-3"><i class="bi bi-patch-check"></i> 2. การตรวจสอบตนเอง</h6>
-                        ${chkSection}
-                        <h6 class="fw-bold text-info-emphasis mt-3"><i class="bi bi-lightbulb"></i> 3. การสะท้อนการเรียนรู้</h6>
-                        ${refSection}
-                        <div class="text-end mt-3">
-                          <a href="javascript:void(0)" onclick="viewStudentDetails('${student.student_id}')" class="btn btn-sm btn-outline-primary rounded-pill"><i class="bi bi-folder2-open"></i> เปิดแฟ้มเต็ม (รวมประเมินเพื่อน)</a>
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                </tr>`;
-            });
           }
 
           // 4. วิเคราะห์คำสำคัญ (Keyword Analytics) — เรียก API ก่อน ถ้าไม่สำเร็จค่อย fallback ฝั่ง client
@@ -1669,29 +1546,11 @@ $role = $sessionUser['role'];
           document.getElementById('countObstacles').textContent = countObstaclesStudentsSet.size;
           document.getElementById('countChecklist').textContent = countChecklistStudentsSet.size;
           document.getElementById('countReflection').textContent = countReflectionStudentsSet.size;
-          const countIndivEl = document.getElementById('countIndividual');
-          if (countIndivEl) countIndivEl.textContent = countIndividualStudentsSet.size;
 
           // แสดงข้อความตกหล่นหรือสถานะว่าง
           gridObstacles.innerHTML = obstaclesHtml || '<div class="text-center py-5 text-muted">ยังไม่มีข้อมูลอุปสรรคการเขียนในกิจกรรมนี้</div>';
           gridChecklist.innerHTML = checklistHtml || '<div class="text-center py-5 text-muted">ยังไม่มีข้อมูลการตรวจสอบตนเองในกิจกรรมนี้</div>';
           gridReflection.innerHTML = reflectionHtml || '<div class="text-center py-5 text-muted">ยังไม่มีข้อมูลการสะท้อนคิดการเรียนรู้ในกิจกรรมนี้</div>';
-          const gridIndividual = document.getElementById('gridIndividual');
-          if (gridIndividual) {
-            gridIndividual.innerHTML = individualHtml
-              ? `<table class="table table-hover align-middle mb-0">
-                   <thead class="table-light">
-                     <tr>
-                       <th style="width: 15%;">รหัส</th>
-                       <th>ชื่อ-สกุล</th>
-                       <th style="width: 38%;">สถานะข้อมูล</th>
-                       <th class="text-end" style="width: 10%;">รายละเอียด</th>
-                     </tr>
-                   </thead>
-                   <tbody>${individualHtml}</tbody>
-                 </table>`
-              : '<div class="text-center py-5 text-muted">ยังไม่มีข้อมูลผลรายบุคคล</div>';
-          }
           if (!res.success) {
             console.error("API error:", res.error || "Unknown error");
             alert("เกิดข้อผิดพลาดในการโหลดข้อมูลห้องเรียน: " + (res.error || "Unknown API error"));
@@ -1715,60 +1574,6 @@ $role = $sessionUser['role'];
         select.value = studentId;
         select.dispatchEvent(new Event('change'));
       }
-    };
-
-    // สร้างตารางสรุปสถานะการส่งงานรวม (ปัญหาการเขียน / ตรวจสอบตนเอง / สะท้อนการเรียนรู้) ของนักเรียนทุกคน
-    function renderReflectionStatusTable(students) {
-      const tbody = document.getElementById('reflectionStatusTableBody');
-      if (!tbody) return;
-
-      const critKeys = ['1_1','1_2','1_3','2_1','2_2','3_1','3_2','3_3','4_1','4_2','4_3'];
-      const notEmpty = (v) => v !== null && v !== undefined && String(v).trim() !== '';
-
-      const yes = '<i class="bi bi-check-circle-fill text-success fs-5" title="ส่งแล้ว"></i>';
-      const no  = '<i class="bi bi-dash-circle text-muted fs-5" title="ยังไม่ส่ง"></i>';
-
-      if (!students || students.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-5 fw-bold">ยังไม่มีรายชื่อนักเรียนในกลุ่มนี้</td></tr>';
-        return;
-      }
-
-      let html = '';
-      students.forEach(st => {
-        const hasProblems = critKeys.some(k => notEmpty(st['prob_' + k]) || notEmpty(st['sol_' + k]));
-        const hasChecklist = critKeys.some(k => notEmpty(st['check_' + k]));
-        const hasReflection = notEmpty(st.content_structure) || notEmpty(st.language_mechanics) || notEmpty(st.feedback_applied) || notEmpty(st.future_goals);
-
-        const submitted = (hasProblems ? 1 : 0) + (hasChecklist ? 1 : 0) + (hasReflection ? 1 : 0);
-        const totalClass = submitted === 3 ? 'text-success' : (submitted === 0 ? 'text-muted' : 'text-warning-emphasis');
-        const rowClass = submitted === 0 ? 'table-warning' : '';
-
-        html += `
-          <tr class="${rowClass}" style="cursor: pointer;" onclick="viewStudentDetails('${st.student_id}')">
-            <td class="px-3 py-3 font-mono fw-bold text-secondary">${st.student_id}</td>
-            <td class="px-3 py-3 fw-bold text-dark text-start">${st.student_name || '-'}</td>
-            <td class="px-3 py-3 text-center">${hasProblems ? yes : no}</td>
-            <td class="px-3 py-3 text-center">${hasChecklist ? yes : no}</td>
-            <td class="px-3 py-3 text-center">${hasReflection ? yes : no}</td>
-            <td class="px-3 py-3 text-center fw-bold ${totalClass}">${submitted}/3</td>
-          </tr>
-        `;
-      });
-      tbody.innerHTML = html;
-    }
-
-    // ค้นหา/กรองแถวในตารางสรุปสถานะการส่งงาน
-    window.filterReflectionStatusTable = function() {
-      const input = document.getElementById('reflectionStatusSearch');
-      const tbody = document.getElementById('reflectionStatusTableBody');
-      if (!input || !tbody) return;
-      const query = input.value.toLowerCase().trim();
-      tbody.querySelectorAll('tr').forEach(row => {
-        if (row.cells.length < 2) return;
-        const id = row.cells[0].textContent.toLowerCase();
-        const name = row.cells[1].textContent.toLowerCase();
-        row.classList.toggle('d-none', !(id.includes(query) || name.includes(query)));
-      });
     };
 
     // 2. โหลดข้อมูลรายบุคคลของนักเรียนที่ครูเลือกส่อง
