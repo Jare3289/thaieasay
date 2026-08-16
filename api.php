@@ -1924,7 +1924,8 @@ try {
             // ชุดรหัสนักเรียนที่ "ส่งแล้ว" ของแต่ละชิ้นงาน (ดึงทีเดียวแล้วแมปในหน่วยความจำ ประหยัด query)
             // เรียงความ: นับว่าส่งแล้วเมื่อมีเนื้อหาอย่างน้อยหนึ่งส่วน หรือ word_count > 0
             $essaySet = [
-                'pretest' => [], 'task1_d1' => [], 'task1_d2' => [], 'posttest' => [],
+                'pretest' => [], 'task1_d1' => [], 'task1_d2' => [],
+                'task2_d1' => [], 'task2_d2' => [], 'posttest' => [],
             ];
             $esStmt = $pdo->query("
                 SELECT student_id, essay_phase FROM student_essays
@@ -1938,11 +1939,11 @@ try {
                 if (isset($essaySet[$ph])) $essaySet[$ph][$r['student_id']] = true;
             }
 
-            // เครื่องมือสะท้อนคิด — เหลือเฉพาะหน่วยการเรียนที่ 1 (หน่วยที่ 2 ถูกยกเลิกแล้ว)
+            // เครื่องมือสะท้อนคิด — แยกตามหน่วยการเรียน (หน่วยที่ 1 / หน่วยที่ 2)
             $flagSet = [
-                'problems'   => [1 => []],
-                'checklist'  => [1 => []],
-                'reflection' => [1 => []],
+                'problems'   => [1 => [], 2 => []],
+                'checklist'  => [1 => [], 2 => []],
+                'reflection' => [1 => [], 2 => []],
             ];
             foreach ([
                 'problems'   => 'writing_problems',
@@ -1952,8 +1953,9 @@ try {
                 try {
                     $q = $pdo->query("SELECT student_id, task_unit FROM `$tbl`");
                     while ($r = $q->fetch()) {
-                        // นับเฉพาะหน่วยที่ 1 (ข้อมูลหน่วยอื่นถือเป็นหน่วยที่ 1 ตามค่าเริ่มต้น)
-                        $flagSet[$key][1][$r['student_id']] = true;
+                        // แยกบันทึกตามหน่วย (ค่าอื่นที่ไม่ใช่ 2 ถือเป็นหน่วยที่ 1 ตามค่าเริ่มต้น)
+                        $u = ((int)$r['task_unit'] === 2) ? 2 : 1;
+                        $flagSet[$key][$u][$r['student_id']] = true;
                     }
                 } catch (Exception $e) { /* ตารางอาจยังไม่ถูกสร้าง — ปล่อยว่าง */ }
             }
@@ -1969,10 +1971,16 @@ try {
                     'pretest'       => isset($essaySet['pretest'][$sid]),
                     'd1_1'          => isset($essaySet['task1_d1'][$sid]),
                     'd1_2'          => isset($essaySet['task1_d2'][$sid]),
-                    // สะท้อนคิดหน่วยที่ 1 (หน่วยที่ 2 ถูกยกเลิกแล้ว)
+                    // สะท้อนคิดหน่วยที่ 1
                     'problems1'     => isset($flagSet['problems'][1][$sid]),
                     'checklist1'    => isset($flagSet['checklist'][1][$sid]),
                     'reflection1'   => isset($flagSet['reflection'][1][$sid]),
+                    // ภาระงาน + สะท้อนคิดหน่วยที่ 2
+                    'd2_1'          => isset($essaySet['task2_d1'][$sid]),
+                    'd2_2'          => isset($essaySet['task2_d2'][$sid]),
+                    'problems2'     => isset($flagSet['problems'][2][$sid]),
+                    'checklist2'    => isset($flagSet['checklist'][2][$sid]),
+                    'reflection2'   => isset($flagSet['reflection'][2][$sid]),
                     'posttest'      => isset($essaySet['posttest'][$sid]),
                 ];
             }

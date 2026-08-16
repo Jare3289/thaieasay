@@ -142,10 +142,10 @@ require_once 'header.php';
     </div>
     <div class="p-4 bg-white">
       <?php
-        // นักเรียนประเมินเฉพาะ หน่วยที่ 1 เท่านั้น (ไม่มี Pretest/Posttest)
-        // ครูยังคงเห็นรอบ ก่อนเรียน/หน่วยที่ 1/หลังเรียน เพื่อใช้วัดผลก่อน-หลังเรียนในงานวิจัย
+        // นักเรียนประเมินเฉพาะ ภาระงานหน่วยที่ 1 / หน่วยที่ 2 (ไม่มี Pretest/Posttest)
+        // ครูยังคงเห็นรอบ ก่อนเรียน/หน่วยที่ 1/หน่วยที่ 2/หลังเรียน เพื่อใช้วัดผลก่อน-หลังเรียนในงานวิจัย
         $isStudentEval = ($sessionUser['role'] === 'student');
-        $phaseColClass = $isStudentEval ? 'col-12' : 'col-md-4 col-6';
+        $phaseColClass = $isStudentEval ? 'col-md-6 col-12' : 'col-md-3 col-6';
       ?>
       <div class="row g-3">
         <?php if (!$isStudentEval): ?>
@@ -161,6 +161,13 @@ require_once 'header.php';
           <button type="button" class="phase-btn w-100 btn btn-outline-success rounded-3 p-3 text-center fw-bold" data-phase="task1" onclick="selectPhase('task1')">
             <div class="fs-2 mb-2">📚</div>
             <div class="fw-bold">ภาระงาน หน่วยที่ 1</div>
+            <div class="text-muted small">ให้คะแนนจากร่างที่ 2 (D2)</div>
+          </button>
+        </div>
+        <div class="<?php echo $phaseColClass; ?>">
+          <button type="button" class="phase-btn w-100 btn btn-outline-success rounded-3 p-3 text-center fw-bold" data-phase="task2" onclick="selectPhase('task2')">
+            <div class="fs-2 mb-2">📗</div>
+            <div class="fw-bold">ภาระงาน หน่วยที่ 2</div>
             <div class="text-muted small">ให้คะแนนจากร่างที่ 2 (D2)</div>
           </button>
         </div>
@@ -1012,12 +1019,13 @@ require_once 'header.php';
   const essayFormTitleByPhase = {
     pretest:  'แบบวัดความสามารถก่อนเรียน',
     posttest: 'แบบวัดความสามารถหลังเรียน',
-    task1:    'แบบฝึกภาระงาน หน่วยที่ 1'
+    task1:    'แบบฝึกภาระงาน หน่วยที่ 1',
+    task2:    'แบบฝึกภาระงาน หน่วยที่ 2'
   };
 
   // ภาระงานมีร่าง D1/D2 แต่ให้คะแนนเฉพาะร่างที่ 2 (D2) — จึงดึงเรียงความร่าง D2 มาแสดงเวลาประเมินหน่วยภาระงาน
   // (คะแนนยังบันทึกภายใต้รอบ task1 ตามเดิม เพื่อไม่ให้กระทบแดชบอร์ด/การส่งออก)
-  const gradingEssayPhase = { pretest: 'pretest', task1: 'task1_d2', posttest: 'posttest' };
+  const gradingEssayPhase = { pretest: 'pretest', task1: 'task1_d2', task2: 'task2_d2', posttest: 'posttest' };
 
   async function fetchStudentEssayForEvaluation(studentId, testPhase) {
     const formTitleEl = document.getElementById('essayPanelFormTitle');
@@ -1152,6 +1160,7 @@ require_once 'header.php';
   const phaseLabels = {
     pretest:  'ก่อนเรียน (Pretest - T1)',
     task1:    'ภาระงาน หน่วยที่ 1 (Task 1)',
+    task2:    'ภาระงาน หน่วยที่ 2 (Task 2)',
     posttest: 'หลังเรียน (Posttest - T2)'
   };
   function selectPhase(phase) {
