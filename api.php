@@ -280,7 +280,19 @@ try {
             $peerStrength    = isset($data['peerStrength'])    ? trim($data['peerStrength'])    : null;
             $peerImprovement = isset($data['peerImprovement']) ? trim($data['peerImprovement']) : null;
             $peerEncouragement = isset($data['peerEncouragement']) ? trim($data['peerEncouragement']) : null;
-            
+            // ข้อเสนอแนะ/หมายเหตุรายข้อเกณฑ์ — รับเป็น map {itemId: note} แล้วเก็บเป็น JSON
+            $itemNotes = null;
+            if (isset($data['itemNotes']) && is_array($data['itemNotes'])) {
+                $cleanNotes = [];
+                foreach ($data['itemNotes'] as $k => $v) {
+                    $t = trim((string)$v);
+                    if ($t !== '') $cleanNotes[$k] = $t;
+                }
+                if (!empty($cleanNotes)) {
+                    $itemNotes = json_encode($cleanNotes, JSON_UNESCAPED_UNICODE);
+                }
+            }
+
             // เตรียมคิวรีและทำการ Upsert
             $sql = 'INSERT INTO evaluations (
                         student_id, evaluator_type, evaluator_name, test_phase,
@@ -289,7 +301,7 @@ try {
                         score_3_1, score_3_2, score_3_3,
                         score_4_1, score_4_2, score_4_3,
                         total_score, quality_level,
-                        peer_strength, peer_improvement, peer_encouragement
+                        peer_strength, peer_improvement, peer_encouragement, item_notes
                     ) VALUES (
                         :student_id, :evaluator_type, :evaluator_name, :test_phase,
                         :s1_1, :s1_2, :s1_3,
@@ -297,7 +309,7 @@ try {
                         :s3_1, :s3_2, :s3_3,
                         :s4_1, :s4_2, :s4_3,
                         :total_score, :quality_level,
-                        :peer_strength, :peer_improvement, :peer_encouragement
+                        :peer_strength, :peer_improvement, :peer_encouragement, :item_notes
                     )
                     ON DUPLICATE KEY UPDATE
                         score_1_1 = VALUES(score_1_1),
@@ -316,6 +328,7 @@ try {
                         peer_strength = VALUES(peer_strength),
                         peer_improvement = VALUES(peer_improvement),
                         peer_encouragement = VALUES(peer_encouragement),
+                        item_notes = VALUES(item_notes),
                         timestamp = CURRENT_TIMESTAMP';
              
             $stmt = $pdo->prepare($sql);
@@ -339,7 +352,8 @@ try {
                 ':quality_level'       => $qualityLevel,
                 ':peer_strength'       => $peerStrength,
                 ':peer_improvement'    => $peerImprovement,
-                ':peer_encouragement'  => $peerEncouragement
+                ':peer_encouragement'  => $peerEncouragement,
+                ':item_notes'          => $itemNotes
             ]);
             
             echo json_encode(['success' => true]);
@@ -425,7 +439,10 @@ try {
                         'strength'     => $row['peer_strength']     ?? '',
                         'improvement'  => $row['peer_improvement']  ?? '',
                         'encouragement'=> $row['peer_encouragement'] ?? ''
-                    ]
+                    ],
+                    'itemNotes' => (isset($row['item_notes']) && $row['item_notes'] !== null && $row['item_notes'] !== '')
+                                    ? (json_decode($row['item_notes'], true) ?: new stdClass())
+                                    : new stdClass()
                 ]);
             } else {
                 echo json_encode(['success' => true, 'found' => false]);

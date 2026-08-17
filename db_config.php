@@ -355,6 +355,9 @@ if ($needs_migration) {
     safe_ddl($pdo, "ALTER TABLE evaluations ADD COLUMN peer_improvement TEXT NULL AFTER peer_strength");
     safe_ddl($pdo, "ALTER TABLE evaluations ADD COLUMN peer_encouragement TEXT NULL AFTER peer_improvement");
 
+    // 2.5) เพิ่มคอลัมน์ข้อเสนอแนะ/หมายเหตุรายข้อเกณฑ์ (เก็บเป็น JSON map: {"1.1":"...","1.2":"..."})
+    safe_ddl($pdo, "ALTER TABLE evaluations ADD COLUMN item_notes TEXT NULL AFTER peer_encouragement");
+
     // 3) เพิ่มคอลัมน์ test_phase และปรับ unique index unique_eval
     safe_ddl($pdo, "ALTER TABLE evaluations ADD COLUMN test_phase VARCHAR(20) DEFAULT 'posttest' AFTER evaluator_name");
     safe_ddl($pdo, "ALTER TABLE evaluations DROP INDEX unique_eval");

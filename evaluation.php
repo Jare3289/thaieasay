@@ -812,15 +812,87 @@ require_once 'header.php';
         });
 
         itemDiv.innerHTML = `
-          <div class="mb-3">
+          <div class="mb-3 d-flex justify-content-between align-items-start gap-2 flex-wrap">
             <h5 class="fw-bold mb-0 text-slate-800">${item.name}</h5>
+            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill note-toggle-btn" data-item="${item.id}"
+                    onclick="toggleItemNote('${item.id}')">
+              <i class="bi bi-chat-left-text"></i> เพิ่มข้อเสนอแนะ/หมายเหตุ
+            </button>
           </div>
           <div class="row row-cols-1 row-cols-md-3 row-cols-lg-5 g-3">${levelsHTML}</div>
+          <div id="note_wrap_${item.id}" class="item-note-wrap d-none mt-3">
+            <label for="note_${item.id}" class="form-label small fw-bold text-secondary mb-1">
+              <i class="bi bi-pencil-square text-primary"></i> ข้อเสนอแนะหรือหมายเหตุสำหรับข้อนี้
+            </label>
+            <textarea id="note_${item.id}" name="note_${item.id}" rows="2"
+                      class="form-control item-note-field" data-item="${item.id}"
+                      placeholder="พิมพ์ความเห็น จุดเด่น จุดที่ควรพัฒนา หรือหมายเหตุประกอบการให้คะแนนข้อนี้ (ไม่บังคับ)"></textarea>
+          </div>
         `;
         cardBody.appendChild(itemDiv);
       });
       sectionDiv.appendChild(cardBody);
       container.appendChild(sectionDiv);
+    });
+  }
+
+  // เปิด/ปิดกล่องข้อเสนอแนะ/หมายเหตุของแต่ละข้อเกณฑ์
+  function toggleItemNote(itemId, forceShow) {
+    const wrap = document.getElementById(`note_wrap_${itemId}`);
+    if (!wrap) return;
+    const show = (typeof forceShow === 'boolean') ? forceShow : wrap.classList.contains('d-none');
+    wrap.classList.toggle('d-none', !show);
+    if (show) {
+      const ta = document.getElementById(`note_${itemId}`);
+      if (ta) ta.focus();
+    }
+    refreshNoteBtn(itemId);
+  }
+
+  // ปรับหน้าตาปุ่มสลับ ให้บอกสถานะว่ามีข้อความ/เปิดอยู่หรือไม่
+  function refreshNoteBtn(itemId) {
+    const btn = document.querySelector(`.note-toggle-btn[data-item="${itemId}"]`);
+    const wrap = document.getElementById(`note_wrap_${itemId}`);
+    const ta = document.getElementById(`note_${itemId}`);
+    if (!btn || !wrap || !ta) return;
+    const hasText = ta.value.trim() !== '';
+    const isOpen = !wrap.classList.contains('d-none');
+    btn.classList.toggle('btn-outline-secondary', !hasText);
+    btn.classList.toggle('btn-primary', hasText);
+    let label;
+    if (hasText) label = '<i class="bi bi-chat-left-text-fill"></i> มีข้อเสนอแนะ/หมายเหตุแล้ว';
+    else if (isOpen) label = '<i class="bi bi-x-lg"></i> ซ่อนช่องข้อเสนอแนะ/หมายเหตุ';
+    else label = '<i class="bi bi-chat-left-text"></i> เพิ่มข้อเสนอแนะ/หมายเหตุ';
+    btn.innerHTML = label;
+  }
+
+  // อัปเดตปุ่มทุกข้อทันทีที่พิมพ์ในช่องหมายเหตุ (มอบหมายอีเวนต์ที่ container)
+  (function bindNoteInput() {
+    const cont = document.getElementById('rubricContainer');
+    if (!cont) return;
+    cont.addEventListener('input', (e) => {
+      const ta = e.target.closest('.item-note-field');
+      if (ta) refreshNoteBtn(ta.dataset.item);
+    });
+  })();
+
+  // เก็บข้อเสนอแนะ/หมายเหตุทุกข้อเป็น map {itemId: note}
+  function collectItemNotes() {
+    const notes = {};
+    document.querySelectorAll('.item-note-field').forEach(ta => {
+      const val = ta.value.trim();
+      if (val) notes[ta.dataset.item] = val;
+    });
+    return notes;
+  }
+
+  // เติมข้อเสนอแนะ/หมายเหตุกลับเข้าฟอร์ม (โหมดแก้ไข) และเปิดกล่องที่มีข้อความไว้ให้เห็น
+  function applyItemNotes(notes) {
+    document.querySelectorAll('.item-note-field').forEach(ta => {
+      const id = ta.dataset.item;
+      const val = (notes && notes[id]) ? notes[id] : '';
+      ta.value = val;
+      toggleItemNote(id, !!val);
     });
   }
 
@@ -901,10 +973,14 @@ require_once 'header.php';
              if(targetRadio) targetRadio.checked = true;
           }
         }
+        // เติมข้อเสนอแนะ/หมายเหตุรายข้อที่บันทึกไว้ (ถ้ามี)
+        applyItemNotes(res.itemNotes || {});
         calculateRealTimeFormScore();
       } else {
         statusBadge.textContent = "✏️ การประเมินผลงานรายการใหม่";
         statusBadge.className = "badge bg-secondary text-white fs-8 px-3 py-2 rounded-pill";
+        // ไม่มีข้อมูลเดิม → ล้างและยุบกล่องหมายเหตุทุกข้อ
+        applyItemNotes({});
       }
       // เติมคำแนะนำเชิงคุณภาพจากเพื่อน (ถ้ามี)
       if (modeParam === 'peer' && res.found && res.peerFeedback) {
@@ -1268,7 +1344,8 @@ require_once 'header.php';
       testPhase: testPhase,
       scores: {},
       totalScore: calcResult.total,
-      qualityLevel: calcResult.levelText
+      qualityLevel: calcResult.levelText,
+      itemNotes: collectItemNotes()
     };
 
     document.querySelectorAll('input[type="radio"].score-radio:checked').forEach(radio => {
