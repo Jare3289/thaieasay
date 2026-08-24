@@ -448,16 +448,29 @@ try {
             $myName = $_SESSION['user']['name'];
 
             $phases = ['pretest', 'task1', 'task2', 'posttest'];
-            // essay_phase ที่ใช้ตรวจว่าเขียนเรียงความของแต่ละรอบครบหรือยัง — ภาระงานตรวจที่ร่างที่ 2 (D2) เพราะเป็นร่างที่ใช้ให้คะแนนจริง
-            $essayPhaseKeyMap = ['pretest' => 'pretest', 'task1' => 'task1_d2', 'task2' => 'task2_d2', 'posttest' => 'posttest'];
+            // essay_phase ที่ต้องตรวจของแต่ละรอบ — ก่อน/หลังเรียนมีฉบับเดียว (plain) ส่วนภาระงานหน่วย 1/2 มี 2 ร่างแยกกัน (D1 ฉบับร่าง, D2 ฉบับปรับปรุงที่ใช้ให้คะแนนจริง)
+            $essayChecks = [
+                'pretest'  => ['plain' => 'pretest'],
+                'task1'    => ['d1' => 'task1_d1', 'd2' => 'task1_d2'],
+                'task2'    => ['d1' => 'task2_d1', 'd2' => 'task2_d2'],
+                'posttest' => ['plain' => 'posttest']
+            ];
 
-            // 1) เรียงความที่เขียนแล้ว (มีคำอย่างน้อย 1 คำ) ของแต่ละรอบ
-            $essayWordCounts = [];
+            // 1) เรียงความที่เขียนแล้ว (มีคำอย่างน้อย 1 คำ) ของแต่ละร่าง/รอบ
+            $essayStatusByPhase = [];
             $stmtEssay = $pdo->prepare('SELECT word_count FROM student_essays WHERE student_id = ? AND essay_phase = ?');
-            foreach ($essayPhaseKeyMap as $phase => $essayPhaseKey) {
-                $stmtEssay->execute([$myId, $essayPhaseKey]);
-                $wc = $stmtEssay->fetchColumn();
-                $essayWordCounts[$phase] = ($wc !== false) ? (int)$wc : 0;
+            foreach ($essayChecks as $phase => $draftMap) {
+                $essayStatusByPhase[$phase] = [];
+                foreach ($draftMap as $draftKey => $essayPhaseKey) {
+                    $stmtEssay->execute([$myId, $essayPhaseKey]);
+                    $wc = $stmtEssay->fetchColumn();
+                    $wc = ($wc !== false) ? (int)$wc : 0;
+                    $essayStatusByPhase[$phase][$draftKey] = [
+                        'done'      => $wc > 0,
+                        'wordCount' => $wc,
+                        'phaseKey'  => $essayPhaseKey
+                    ];
+                }
             }
 
             // 2) การประเมินทั้งหมดของนักเรียนคนนี้ (ทุกผู้ประเมิน ทุกรอบ) ดึงครั้งเดียวแล้วแยกตามรอบ
@@ -517,9 +530,7 @@ try {
             $todoResult = [];
             foreach ($phases as $phase) {
                 $todoResult[$phase] = [
-                    'essayDone'     => $essayWordCounts[$phase] > 0,
-                    'wordCount'     => $essayWordCounts[$phase],
-                    'essayPhaseKey' => $essayPhaseKeyMap[$phase],
+                    'essay'         => $essayStatusByPhase[$phase],
                     'selfDone'      => $evalByPhase[$phase]['self'],
                     'teacherDone'   => $evalByPhase[$phase]['teacher'],
                     'partnerId'     => $peerByPhase[$phase]['partnerId'],

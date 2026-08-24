@@ -369,8 +369,26 @@ require_once 'header.php';
     return `<td class="text-center"><a href="${link}" class="btn btn-sm btn-outline-primary rounded-pill px-2 py-1" style="font-size:0.72rem; white-space:nowrap;">${escToDoText(actionText || 'ไปทำ')}</a></td>`;
   }
 
-  // โหลดสถานะทุกด้าน (บันทึกเรียงความ/ประเมินตนเอง/ประเมินเพื่อน/เครื่องมือสะท้อนคิด 3 หัวข้อ) ทุกรอบในครั้งเดียว
-  // แล้วแสดงเป็นตาราง: คอลัมน์แรก = ชื่อภาระงาน, หัวตารางบน = รอบ (ก่อนเรียน/หน่วย 1/หน่วย 2/หลังเรียน) พร้อมลิงก์ไปทำงานที่ค้างได้ทันที
+  // การ์ดสถิติความคืบหน้า 1 ใบ (ภาพรวม หรือ รายรอบ)
+  function buildStatTile(label, done, total, big) {
+    const pct = total ? Math.round((done / total) * 100) : 0;
+    const barClass = pct === 100 ? 'bg-success' : (pct > 0 ? 'bg-warning' : 'bg-secondary');
+    return `
+      <div class="${big ? 'col-12' : 'col-6 col-md-3'}">
+        <div class="p-3 rounded-3 border bg-light bg-opacity-50 h-100">
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <span class="small fw-bold text-muted">${escToDoText(label)}</span>
+            <span class="small fw-bold text-dark">${done}/${total} <span class="text-muted">(${pct}%)</span></span>
+          </div>
+          <div class="progress" style="height:${big ? 10 : 6}px;">
+            <div class="progress-bar ${barClass}" style="width:${pct}%"></div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // โหลดสถานะทุกด้าน (บันทึกเรียงความ D1/D2, ประเมินตนเอง/เพื่อน, เครื่องมือสะท้อนคิด 3 หัวข้อ) ทุกรอบในครั้งเดียว
+  // แล้วแสดงเป็นสถิติความคืบหน้า + ตาราง: คอลัมน์แรก = ชื่อภาระงาน, หัวตารางบน = รอบ (ก่อนเรียน/หน่วย 1/หน่วย 2/หลังเรียน) พร้อมลิงก์ไปทำงานที่ค้างได้ทันที
   async function loadTodoList() {
     if (!currentUser || currentUser.role !== 'student') return;
 
@@ -388,21 +406,33 @@ require_once 'header.php';
 
       const p = res.phases;
       const reflUnit = (phase) => (phase === 'task1' ? 1 : 2);
+      const essayCell = (phase, draft) => {
+        const e = p[phase].essay[draft];
+        return { done: e.done, link: `essay_writer.php?phase=${encodeURIComponent(e.phaseKey)}`, actionText: 'ไปเขียน' };
+      };
 
-      // นิยามแต่ละแถวของตาราง — onlyUnits: true = มีเฉพาะคอลัมน์หน่วยที่ 1/2 (ก่อนเรียน/หลังเรียน มีแค่บันทึกเรียงความอย่างเดียว)
+      // นิยามแต่ละแถวของตาราง — applicable: รายชื่อรอบที่มีงานนี้จริง (รอบอื่นขึ้นขีดกลาง)
+      const taskUnits = ['task1', 'task2'];
       const rowDefs = [
         {
-          icon: '✍️', label: 'บันทึกเรียงความ',
-          cell: (phase) => ({ done: p[phase].essayDone,
-            link: `essay_writer.php?phase=${encodeURIComponent(p[phase].essayPhaseKey)}`, actionText: 'ไปเขียน' })
+          icon: '✍️', label: 'บันทึกเรียงความ', applicable: ['pretest', 'posttest'],
+          cell: (phase) => essayCell(phase, 'plain')
         },
         {
-          icon: '🙋‍♂️', label: 'ประเมินตนเอง', onlyUnits: true,
+          icon: '📄', label: 'บันทึกเรียงความ D1 (ร่างแรก)', applicable: taskUnits,
+          cell: (phase) => essayCell(phase, 'd1')
+        },
+        {
+          icon: '📝', label: 'บันทึกเรียงความ D2 (ร่างปรับปรุง)', applicable: taskUnits,
+          cell: (phase) => essayCell(phase, 'd2')
+        },
+        {
+          icon: '🙋‍♂️', label: 'ประเมินตนเอง', applicable: taskUnits,
           cell: (phase) => ({ done: p[phase].selfDone,
             link: `evaluation.php?mode=self&phase=${phase}`, actionText: 'ไปประเมิน' })
         },
         {
-          icon: '👥', label: 'ประเมินเพื่อน', onlyUnits: true,
+          icon: '👥', label: 'ประเมินเพื่อน', applicable: taskUnits,
           cell: (phase) => {
             const ph = p[phase];
             if (ph.peerDone) return { done: true };
@@ -411,17 +441,17 @@ require_once 'header.php';
           }
         },
         {
-          icon: '📝', label: 'บันทึกอุปสรรคปัญหาการเขียน', onlyUnits: true,
+          icon: '📝', label: 'บันทึกอุปสรรคปัญหาการเขียน', applicable: taskUnits,
           cell: (phase) => ({ done: p[phase].problemsDone,
             link: `reflection_tools.php?unit=${reflUnit(phase)}`, actionText: 'ไปบันทึก' })
         },
         {
-          icon: '✅', label: 'แบบตรวจสอบตนเอง', onlyUnits: true,
+          icon: '✅', label: 'แบบตรวจสอบตนเอง', applicable: taskUnits,
           cell: (phase) => ({ done: p[phase].checklistDone,
             link: `reflection_tools.php?unit=${reflUnit(phase)}`, actionText: 'ไปบันทึก' })
         },
         {
-          icon: '💭', label: 'แบบสะท้อนการเรียนรู้', onlyUnits: true,
+          icon: '💭', label: 'แบบสะท้อนการเรียนรู้', applicable: taskUnits,
           cell: (phase) => ({ done: p[phase].reflectionDone,
             link: `reflection_tools.php?unit=${reflUnit(phase)}`, actionText: 'ไปบันทึก' })
         }
@@ -434,7 +464,7 @@ require_once 'header.php';
 
       const bodyRowsHTML = rowDefs.map(r => {
         const cellsHTML = todoColumns.map(phase => {
-          if (r.onlyUnits && phase !== 'task1' && phase !== 'task2') return buildTodoCell(null);
+          if (!r.applicable.includes(phase)) return buildTodoCell(null);
           const c = r.cell(phase);
           if (c.done !== null && c.done !== undefined) {
             colProgress[phase].total++;
@@ -451,7 +481,15 @@ require_once 'header.php';
         return `<th class="text-center small">${escToDoText(todoColumnLabels[phase])}<br><span class="text-muted fw-normal" style="font-size:0.72rem;">${cp.done}/${cp.total}</span></th>`;
       }).join('');
 
+      // สถิติความคืบหน้า: ภาพรวม 1 แถบใหญ่ + รายรอบ 4 การ์ดเล็ก
+      const statsHTML = `
+        <div class="row g-2 mb-2">${buildStatTile('ความคืบหน้ารวมทั้งหมด', overallDone, overallTotal, true)}</div>
+        <div class="row g-2 mb-3">
+          ${todoColumns.map(phase => buildStatTile(todoColumnLabels[phase], colProgress[phase].done, colProgress[phase].total)).join('')}
+        </div>`;
+
       containerEl.innerHTML = `
+        ${statsHTML}
         <div class="table-responsive rounded-3 border">
           <table class="table table-sm align-middle mb-0">
             <thead class="table-light">
