@@ -308,11 +308,43 @@ require_once 'header.php';
         <div class="row align-items-center">
           <div class="col-md-8 col-12">
             <div class="progress rounded-pill" style="height: 12px;">
-              <div id="evaluationProgress" class="progress-bar progress-bar-striped progress-bar-animated bg-info" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+              <div id="evaluationProgress" class="progress-bar progress-bar-striped progress-bar-animated bg-info" role="progressbar" style="width: 0%;" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
             </div>
           </div>
           <div class="col-md-4 col-12 text-md-end mt-2 mt-md-0">
             <span id="progressText" class="fw-bold small text-secondary">ตอบแล้ว 0 จาก 11 ข้อ</span>
+          </div>
+        </div>
+
+        <!-- สรุปคะแนนที่คำนวณอัตโนมัติ (แสดงสด) และคะแนน/ระดับเดิมที่เคยประเมินไว้ -->
+        <div class="row g-3 mt-1">
+          <!-- คะแนนที่ระบบคำนวณอัตโนมัติจากตัวเลือกปัจจุบัน -->
+          <div class="col-md-6 col-12">
+            <div class="d-flex align-items-center justify-content-between rounded-3 px-3 py-2 h-100" style="background:#eff6ff; border:1px solid #bfdbfe;">
+              <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-calculator-fill text-primary fs-5"></i>
+                <span class="fw-bold small text-primary-emphasis">คะแนนที่คำนวณอัตโนมัติ</span>
+              </div>
+              <div class="text-end">
+                <span id="liveScoreValue" class="fw-bold fs-5 text-primary">0</span>
+                <span class="text-muted small">/ 60</span>
+                <span id="liveScoreLevel" class="badge bg-primary-subtle text-primary-emphasis ms-1">—</span>
+              </div>
+            </div>
+          </div>
+          <!-- คะแนน/ระดับเดิมที่เคยบันทึกไว้ (โหมดแก้ไข) -->
+          <div class="col-md-6 col-12">
+            <div id="originalScoreBox" class="d-none d-flex align-items-center justify-content-between rounded-3 px-3 py-2 h-100" style="background:#fefce8; border:1px solid #fde68a;">
+              <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-clock-history text-warning fs-5"></i>
+                <span class="fw-bold small" style="color:#92400e;">คะแนนเดิมที่เคยให้</span>
+              </div>
+              <div class="text-end">
+                <span id="originalScoreValue" class="fw-bold fs-5" style="color:#b45309;">0</span>
+                <span class="text-muted small">/ 60</span>
+                <span id="originalScoreLevel" class="badge ms-1" style="background:#fde68a; color:#92400e;">—</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -824,14 +856,23 @@ require_once 'header.php';
     });
   }
 
-  // อัปเดตแถบความคืบหน้า (Progress Bar)
+  // แปลงคะแนนรวมเป็นระดับคุณภาพ (ใช้เกณฑ์เดียวกันทุกบทบาททุกภาระงาน)
+  function scoreLevelText(total) {
+    if (total >= 49) return 'ดีมาก';
+    if (total >= 37) return 'ดี';
+    if (total >= 25) return 'ปานกลาง';
+    if (total >= 13) return 'พอใช้';
+    return 'ต้องปรับปรุง';
+  }
+
+  // อัปเดตแถบความคืบหน้า (Progress Bar) และคะแนนที่คำนวณอัตโนมัติแบบสด
   function calculateRealTimeFormScore() {
     const totalInputs = document.querySelectorAll('input[type="radio"].score-radio:checked');
     const percent = Math.round((totalInputs.length / 11) * 100);
-    
+
     const progress = document.getElementById('evaluationProgress');
     const progressText = document.getElementById('progressText');
-    
+
     if (progress) {
       progress.style.width = `${percent}%`;
       progress.setAttribute('aria-valuenow', percent);
@@ -839,7 +880,18 @@ require_once 'header.php';
     if (progressText) {
       progressText.textContent = `ตอบแล้ว ${totalInputs.length} จาก 11 ข้อ`;
     }
-    
+
+    // อัปเดตคะแนนที่คำนวณอัตโนมัติแบบสด ให้ผู้ประเมินเห็นคะแนน/ระดับทันทีทุกบทบาททุกภาระงาน
+    let liveTotal = 0;
+    totalInputs.forEach(radio => {
+      liveTotal += (parseFloat(radio.value) * parseFloat(radio.dataset.multiplier));
+    });
+    const liveTotalRounded = Math.round(liveTotal * 100) / 100;
+    const liveValueEl = document.getElementById('liveScoreValue');
+    const liveLevelEl = document.getElementById('liveScoreLevel');
+    if (liveValueEl) liveValueEl.textContent = liveTotalRounded;
+    if (liveLevelEl) liveLevelEl.textContent = totalInputs.length > 0 ? scoreLevelText(liveTotal) : '—';
+
     const submitBtn = document.getElementById('submitBtn');
     if (totalInputs.length === 11) {
       submitBtn.disabled = false;
@@ -867,6 +919,9 @@ require_once 'header.php';
     const tInput = document.getElementById('targetStudentInput');
     if (tInput) tInput.value = studentId;
     if(progressCont) progressCont.classList.remove('d-none');
+    // ซ่อนกล่องคะแนนเดิมไว้ก่อน จนกว่าจะพบข้อมูลประเมินเดิมของนักเรียนคนนี้
+    const origBox = document.getElementById('originalScoreBox');
+    if (origBox) origBox.classList.add('d-none');
     calculateRealTimeFormScore(); // รีเซ็ต
 
     statusBadge.textContent = "กำลังค้นหาคะแนนเดิม...";
@@ -891,7 +946,7 @@ require_once 'header.php';
       if(res.success && res.found) {
         statusBadge.textContent = "✓ พบข้อมูลประเมินเดิมแล้ว (โหมดแก้ไข)";
         statusBadge.className = "badge bg-success text-white fs-8 px-3 py-2 rounded-pill";
-        
+
         for (const [itemId, rawValue] of Object.entries(res.scores)) {
           const inputs = document.querySelectorAll(`input[name="item_${itemId}"]`);
           if(inputs.length > 0) {
@@ -901,6 +956,22 @@ require_once 'header.php';
              if(targetRadio) targetRadio.checked = true;
           }
         }
+
+        // แสดงคะแนน/ระดับเดิมที่เคยบันทึกไว้ (อันเดิมให้อะไร ระดับอะไร)
+        // ใช้ค่าที่บันทึกในฐานข้อมูลก่อน ถ้าไม่มีจึงคำนวณจากคะแนนรายข้อ
+        let origTotal = (res.totalScore !== undefined && res.totalScore !== null)
+          ? parseFloat(res.totalScore)
+          : Object.values(res.scores).reduce((sum, v) => sum + parseFloat(v), 0);
+        const origLevel = (res.qualityLevel && String(res.qualityLevel).trim() !== '')
+          ? res.qualityLevel
+          : scoreLevelText(origTotal);
+        const origBox   = document.getElementById('originalScoreBox');
+        const origValEl = document.getElementById('originalScoreValue');
+        const origLvlEl = document.getElementById('originalScoreLevel');
+        if (origValEl) origValEl.textContent = Math.round(origTotal * 100) / 100;
+        if (origLvlEl) origLvlEl.textContent = origLevel;
+        if (origBox)   origBox.classList.remove('d-none');
+
         calculateRealTimeFormScore();
       } else {
         statusBadge.textContent = "✏️ การประเมินผลงานรายการใหม่";
@@ -1081,12 +1152,7 @@ require_once 'header.php';
       total += (parseFloat(radio.value) * parseFloat(radio.dataset.multiplier));
     });
 
-    let levelText = '';
-    if(total >= 49) levelText = 'ดีมาก';
-    else if(total >= 37) levelText = 'ดี';
-    else if(total >= 25) levelText = 'ปานกลาง';
-    else if(total >= 13) levelText = 'พอใช้';
-    else levelText = 'ต้องปรับปรุง';
+    const levelText = scoreLevelText(total);
 
     return { total, levelText };
   }

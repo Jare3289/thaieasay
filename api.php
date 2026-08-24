@@ -421,6 +421,8 @@ try {
                         '3.1' => (float)$row['score_3_1'], '3.2' => (float)$row['score_3_2'], '3.3' => (float)$row['score_3_3'],
                         '4.1' => (float)$row['score_4_1'], '4.2' => (float)$row['score_4_2'], '4.3' => (float)$row['score_4_3']
                     ],
+                    'totalScore'   => (float)$row['total_score'],
+                    'qualityLevel' => $row['quality_level'],
                     'peerFeedback' => [
                         'strength'     => $row['peer_strength']     ?? '',
                         'improvement'  => $row['peer_improvement']  ?? '',
