@@ -2,14 +2,14 @@
    กลยุทธ์แบบระมัดระวัง: แคชเฉพาะไฟล์สแตติก (ไอคอน/CSS) เท่านั้น
    ไม่แคชไฟล์ .php หรือ api.php เพื่อไม่ให้ข้อมูล session/คะแนน ค้างเก่า
    สำหรับการเปิดหน้า (navigation) ขณะออฟไลน์ จะแสดงหน้า offline.html แทน */
-const CACHE = 'teg-static-v2';
+const CACHE = 'teg-static-v3';
 const STATIC_ASSETS = [
   'index.css',
   'offline.html',
-  'icons/icon-192.png',
-  'icons/icon-512.png',
-  'icons/maskable-192.png',
-  'icons/maskable-512.png',
+  'icon.php?f=icon-192.png',
+  'icon.php?f=icon-512.png',
+  'icon.php?f=maskable-192.png',
+  'icon.php?f=maskable-512.png',
   'manifest.json'
 ];
 
@@ -47,8 +47,10 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // ไฟล์ .php อื่น ๆ (เช่น api.php) หรือคำขอที่เป็นพลวัต — ให้ผ่านเครือข่ายตรง ๆ เสมอ ไม่แคช
-  if (url.pathname.endsWith('.php') || url.search.includes('action=')) return;
+  // icon.php เป็นไฟล์ .php แต่จริง ๆ เสิร์ฟรูปไอคอนแบบ static (อ้อมปัญหาเซิร์ฟเวอร์ที่ .png โดนบล็อก)
+  // จึงแคชได้เหมือนไฟล์สแตติกอื่น ๆ — ส่วนไฟล์ .php อื่น (เช่น api.php) หรือคำขอที่เป็นพลวัต ให้ผ่านเครือข่ายตรง ๆ เสมอ ไม่แคช
+  const isIconProxy = url.pathname.endsWith('/icon.php');
+  if ((url.pathname.endsWith('.php') && !isIconProxy) || url.search.includes('action=')) return;
 
   // ไฟล์สแตติก: cache-first แล้วอัปเดตพื้นหลัง
   event.respondWith(
