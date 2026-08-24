@@ -283,9 +283,19 @@
     input.addEventListener('blur', () => finish(true));
   }
 
+  // เช็คว่าข้อความที่ต่อจากนี้ขึ้นต้นด้วย "คำ" จริง ๆ หรือไม่ (ใช้ segmentText ตัวเดียวกับที่ใช้ตัดคำ
+  // เพื่อให้สอดคล้องกับตัวตรวจฝั่งเซิร์ฟเวอร์) — ถ้าขึ้นต้นด้วยช่องว่างหรือเครื่องหมายวรรคตอน
+  // (เช่น "," ",") ถือว่ามีตัวคั่นอยู่แล้ว ไม่ต้องเติมช่องว่างซ้ำ
+  function textStartsWithWord(text) {
+    if (!text) return false;
+    const seg = segmentText(text)[0];
+    return !!(seg && seg.isWord);
+  }
+
   // แก้เว้นวรรครอบ "ๆ" ให้ถูกต้องแบบอัตโนมัติ (ไม่พึ่งให้ผู้ใช้พิมพ์เว้นวรรคเอง เพราะจุดที่ต้องเว้น
   // วรรค "หลัง" ๆ อยู่นอกขอบเขตคำที่ถูกไฮไลต์ — พิมพ์แก้ในช่องแก้คำธรรมดาจะเติมได้แค่ฝั่งหน้าเท่านั้น)
-  // เว้นวรรคให้ทั้งสองด้านเสมอ ทำกับทุกจุดที่เป็นคำเดียวกันในเรียงความทั้งฉบับ
+  // เว้นวรรคให้ทั้งสองด้านเสมอ (เฉพาะฝั่งที่ติดกับ "คำ" จริง ๆ ไม่แทรกซ้ำถ้ามีเครื่องหมายวรรคตอน
+  // คั่นอยู่แล้ว) ทำกับทุกจุดที่เป็นคำเดียวกันในเรียงความทั้งฉบับ
   function fixSpacing(span, actions) {
     actions.remove();
     const word = span.dataset.word;
@@ -304,10 +314,11 @@
       el.replaceWith(frag);
       if (next) {
         if (next.nodeType === Node.TEXT_NODE) {
-          if (!/^[ \t]/.test(next.textContent)) {
+          if (textStartsWithWord(next.textContent)) {
             next.textContent = ' ' + next.textContent;
           }
         } else {
+          // next เป็น element (เช่น span คำที่ถูกไฮไลต์อีกจุด) — เป็นคำเสมอ ต้องเว้นวรรคคั่น
           next.before(document.createTextNode(' '));
         }
       }
