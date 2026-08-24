@@ -73,9 +73,12 @@ jobs:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          # ถ้าผลวินิจฉัยบอกว่าเซิร์ฟเวอร์บังคับ TLS (FTPS ขึ้น 230 แต่ FTP ธรรมดา
-          # โดนปิดกั้น) ให้เอา # ออกจากบรรทัดล่างนี้เพื่อบังคับใช้ FTPS แบบ explicit:
-          # protocol: ftps
+          # เซิร์ฟเวอร์รองรับ FTPS (ยืนยันจากขั้น Diagnose: AUTH SSL successful)
+          # เปิดใช้ explicit FTPS เพื่อลดปัญหา data-socket หลุด (ECONNRESET) ที่พบ
+          # ตอนอัปโหลดด้วย plain FTP ผ่าน ProFTPD
+          protocol: ftps
+          # data socket หลุดได้ง่ายถ้า timeout สั้นเกินไป ยืดเวลาให้โอนไฟล์ใหญ่/เยอะได้
+          timeout: 60000
           # โฟลเดอร์ปลายทางบน Plesk = document root ของ subdomain
           # (ถ้า FTP login แล้วไม่ได้อยู่ที่ home ให้ปรับ path ตรงนี้)
           server-dir: ./thaiessay.chainatpit.com/
