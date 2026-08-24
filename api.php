@@ -497,12 +497,20 @@ try {
                 while ($nrow = $stmtNames->fetch()) { $partnerNames[$nrow['student_id']] = $nrow['student_name']; }
             }
 
-            // 4) สะท้อนคิดการเรียนรู้ (เฉพาะหน่วย 1/2 — ไม่มีในรอบก่อน/หลังเรียน)
-            $stmtRefl = $pdo->prepare('SELECT 1 FROM learning_reflections WHERE student_id = ? AND task_unit = ?');
+            // 4) เครื่องมือสะท้อนคิด (เฉพาะหน่วย 1/2 — ไม่มีในรอบก่อน/หลังเรียน) มี 3 หัวข้อย่อยที่ต้องทำให้ครบ
+            $stmtProblems  = $pdo->prepare('SELECT 1 FROM writing_problems WHERE student_id = ? AND task_unit = ?');
+            $stmtChecklist = $pdo->prepare('SELECT 1 FROM self_checklists WHERE student_id = ? AND task_unit = ?');
+            $stmtRefl      = $pdo->prepare('SELECT 1 FROM learning_reflections WHERE student_id = ? AND task_unit = ?');
             $reflectionByUnit = [];
             foreach ([1, 2] as $unit) {
+                $stmtProblems->execute([$myId, $unit]);
+                $stmtChecklist->execute([$myId, $unit]);
                 $stmtRefl->execute([$myId, $unit]);
-                $reflectionByUnit[$unit] = (bool)$stmtRefl->fetchColumn();
+                $reflectionByUnit[$unit] = [
+                    'problemsDone'  => (bool)$stmtProblems->fetchColumn(),
+                    'checklistDone' => (bool)$stmtChecklist->fetchColumn(),
+                    'reflectionDone'=> (bool)$stmtRefl->fetchColumn()
+                ];
             }
 
             // ประกอบผลลัพธ์ต่อรอบ
@@ -519,8 +527,8 @@ try {
                     'peerDone'      => $peerByPhase[$phase]['peerDone']
                 ];
             }
-            $todoResult['task1']['reflectionDone'] = $reflectionByUnit[1];
-            $todoResult['task2']['reflectionDone'] = $reflectionByUnit[2];
+            $todoResult['task1'] = array_merge($todoResult['task1'], $reflectionByUnit[1]);
+            $todoResult['task2'] = array_merge($todoResult['task2'], $reflectionByUnit[2]);
 
             echo json_encode(['success' => true, 'phases' => $todoResult]);
             break;

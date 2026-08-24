@@ -350,72 +350,27 @@ require_once 'header.php';
 </div>
 
 <script>
-  // ป้ายชื่อรอบ ใช้แสดงหัวตารางความคืบหน้าแยกตามรอบ
-  const todoPhaseLabels = {
-    pretest:  'ก่อนเรียน (Pretest)',
-    task1:    'ภาระงาน หน่วยที่ 1',
-    task2:    'ภาระงาน หน่วยที่ 2',
-    posttest: 'หลังเรียน (Posttest)'
+  // คอลัมน์ตาราง = รอบ/หน่วย เรียงจากซ้ายไปขวาตามลำดับที่เรียน
+  const todoColumns = ['pretest', 'task1', 'task2', 'posttest'];
+  const todoColumnLabels = {
+    pretest:  'ก่อนเรียน',
+    task1:    'หน่วยที่ 1',
+    task2:    'หน่วยที่ 2',
+    posttest: 'หลังเรียน'
   };
   function escToDoText(s) {
     return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
-  // สร้าง 1 แถวในตารางความคืบหน้า
-  // done: true = เสร็จแล้ว, false = ยังไม่เสร็จ (นับในความคืบหน้า + มีปุ่มลิงก์ไปทำ), null = ยังทำเองไม่ได้ตอนนี้ (ไม่นับ ไม่มีปุ่ม)
-  function buildTodoRow(icon, label, done, link, actionText, neutralText) {
-    let statusHTML, actionHTML;
-    if (done === null) {
-      statusHTML = `<span class="badge bg-light text-muted border">${escToDoText(neutralText || '-')}</span>`;
-      actionHTML = '';
-    } else if (done) {
-      statusHTML = `<span class="badge bg-success"><i class="bi bi-check-lg"></i> เสร็จแล้ว</span>`;
-      actionHTML = '';
-    } else {
-      statusHTML = `<span class="badge bg-warning text-dark">ยังไม่เสร็จ</span>`;
-      actionHTML = `<a href="${link}" class="btn btn-sm btn-primary rounded-pill px-3 fw-bold text-decoration-none">${escToDoText(actionText)} &rarr;</a>`;
-    }
-    const html = `
-      <tr>
-        <td class="small"><span class="me-2">${icon}</span>${escToDoText(label)}</td>
-        <td class="text-center">${statusHTML}</td>
-        <td class="text-end">${actionHTML}</td>
-      </tr>`;
-    return { html, done };
+  // เซลล์ 1 ช่อง: done=null → งานนี้ไม่มีในรอบนี้ (ขีดกลาง ไม่นับความคืบหน้า) / true → เสร็จแล้ว / false → ยังไม่เสร็จ (มีปุ่มลิงก์ไปทำ)
+  function buildTodoCell(done, link, actionText) {
+    if (done === null) return `<td class="text-center text-muted">—</td>`;
+    if (done) return `<td class="text-center"><span class="badge bg-success"><i class="bi bi-check-lg"></i></span></td>`;
+    return `<td class="text-center"><a href="${link}" class="btn btn-sm btn-outline-primary rounded-pill px-2 py-1" style="font-size:0.72rem; white-space:nowrap;">${escToDoText(actionText || 'ไปทำ')}</a></td>`;
   }
 
-  // สร้างตารางความคืบหน้า 1 รอบ พร้อมแถบ/ตัวเลขสรุปความคืบหน้าของรอบนั้น
-  function buildTodoPhaseSection(phaseLabel, rows) {
-    const countable = rows.filter(r => r.done !== null);
-    const doneCount = countable.filter(r => r.done).length;
-    const totalCount = countable.length;
-    const pct = totalCount ? Math.round((doneCount / totalCount) * 100) : 0;
-    const barClass = pct === 100 ? 'bg-success' : (pct > 0 ? 'bg-warning' : 'bg-secondary');
-
-    return {
-      doneCount, totalCount,
-      html: `
-        <div class="mb-4">
-          <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
-            <h6 class="fw-bold text-dark mb-0">${escToDoText(phaseLabel)}</h6>
-            <div class="d-flex align-items-center gap-2">
-              <div class="progress" style="width:110px; height:8px;">
-                <div class="progress-bar ${barClass}" style="width:${pct}%"></div>
-              </div>
-              <span class="small text-muted fw-bold" style="min-width:2.5rem;">${doneCount}/${totalCount}</span>
-            </div>
-          </div>
-          <div class="table-responsive rounded-3 border">
-            <table class="table table-sm align-middle mb-0">
-              <tbody>${rows.map(r => r.html).join('')}</tbody>
-            </table>
-          </div>
-        </div>`
-    };
-  }
-
-  // โหลดสถานะทุกด้าน (เขียนเรียงความ/ประเมินตนเอง/ประเมินเพื่อน/สะท้อนคิด) ทุกรอบในครั้งเดียว
-  // แล้วแสดงเป็นตารางความคืบหน้า แยกตามรอบ (ก่อนเรียน/หน่วย 1/หน่วย 2/หลังเรียน) พร้อมลิงก์ไปทำงานที่ค้างได้ทันที
+  // โหลดสถานะทุกด้าน (บันทึกเรียงความ/ประเมินตนเอง/ประเมินเพื่อน/เครื่องมือสะท้อนคิด 3 หัวข้อ) ทุกรอบในครั้งเดียว
+  // แล้วแสดงเป็นตาราง: คอลัมน์แรก = ชื่อภาระงาน, หัวตารางบน = รอบ (ก่อนเรียน/หน่วย 1/หน่วย 2/หลังเรียน) พร้อมลิงก์ไปทำงานที่ค้างได้ทันที
   async function loadTodoList() {
     if (!currentUser || currentUser.role !== 'student') return;
 
@@ -431,44 +386,80 @@ require_once 'header.php';
       if (loadingEl) loadingEl.classList.add('d-none');
       if (!res.success || !res.phases) return;
 
+      const p = res.phases;
+      const reflUnit = (phase) => (phase === 'task1' ? 1 : 2);
+
+      // นิยามแต่ละแถวของตาราง — onlyUnits: true = มีเฉพาะคอลัมน์หน่วยที่ 1/2 (ก่อนเรียน/หลังเรียน มีแค่บันทึกเรียงความอย่างเดียว)
+      const rowDefs = [
+        {
+          icon: '✍️', label: 'บันทึกเรียงความ',
+          cell: (phase) => ({ done: p[phase].essayDone,
+            link: `essay_writer.php?phase=${encodeURIComponent(p[phase].essayPhaseKey)}`, actionText: 'ไปเขียน' })
+        },
+        {
+          icon: '🙋‍♂️', label: 'ประเมินตนเอง', onlyUnits: true,
+          cell: (phase) => ({ done: p[phase].selfDone,
+            link: `evaluation.php?mode=self&phase=${phase}`, actionText: 'ไปประเมิน' })
+        },
+        {
+          icon: '👥', label: 'ประเมินเพื่อน', onlyUnits: true,
+          cell: (phase) => {
+            const ph = p[phase];
+            if (ph.peerDone) return { done: true };
+            if (ph.partnerId) return { done: false, link: `evaluation.php?mode=peer&phase=${phase}`, actionText: 'ไปประเมิน' };
+            return { done: false, link: `peer_matching.php?round=${phase}`, actionText: 'ไปจับคู่' };
+          }
+        },
+        {
+          icon: '📝', label: 'บันทึกอุปสรรคปัญหาการเขียน', onlyUnits: true,
+          cell: (phase) => ({ done: p[phase].problemsDone,
+            link: `reflection_tools.php?unit=${reflUnit(phase)}`, actionText: 'ไปบันทึก' })
+        },
+        {
+          icon: '✅', label: 'แบบตรวจสอบตนเอง', onlyUnits: true,
+          cell: (phase) => ({ done: p[phase].checklistDone,
+            link: `reflection_tools.php?unit=${reflUnit(phase)}`, actionText: 'ไปบันทึก' })
+        },
+        {
+          icon: '💭', label: 'แบบสะท้อนการเรียนรู้', onlyUnits: true,
+          cell: (phase) => ({ done: p[phase].reflectionDone,
+            link: `reflection_tools.php?unit=${reflUnit(phase)}`, actionText: 'ไปบันทึก' })
+        }
+      ];
+
+      // สร้างแถวทีละแถว พร้อมสะสมความคืบหน้าต่อคอลัมน์ (รอบ) และภาพรวมทั้งหมดไปพร้อมกัน
       let overallDone = 0, overallTotal = 0;
-      const sectionsHTML = ['pretest', 'task1', 'task2', 'posttest'].map(phase => {
-        const p = res.phases[phase];
-        if (!p) return '';
-        const isTaskUnit = (phase === 'task1' || phase === 'task2');
-        const rows = [];
+      const colProgress = {};
+      todoColumns.forEach(phase => { colProgress[phase] = { done: 0, total: 0 }; });
 
-        rows.push(buildTodoRow('✍️', 'เขียนเรียงความ', p.essayDone,
-          `essay_writer.php?phase=${encodeURIComponent(p.essayPhaseKey)}`, 'ไปเขียน'));
-
-        rows.push(buildTodoRow('🙋‍♂️', 'ประเมินตนเอง', p.selfDone,
-          `evaluation.php?mode=self&phase=${phase}`, 'ไปประเมิน'));
-
-        if (p.peerDone) {
-          rows.push(buildTodoRow('👥', `ประเมินเพื่อน${p.partnerName ? ' (' + escToDoText(p.partnerName) + ')' : ''}`, true));
-        } else if (p.partnerId) {
-          rows.push(buildTodoRow('👥', `ประเมินเพื่อน (${escToDoText(p.partnerName || p.partnerId)})`, false,
-            `evaluation.php?mode=peer&phase=${phase}`, 'ไปประเมิน'));
-        } else if (isTaskUnit) {
-          rows.push(buildTodoRow('🤝', 'จับคู่เพื่อนประเมิน', false,
-            `peer_matching.php?round=${phase}`, 'ไปจับคู่'));
-        } else {
-          // pretest/posttest ครูเป็นผู้จับคู่ให้เท่านั้น — ยังไม่มีคู่ก็ยังทำอะไรเองไม่ได้ตอนนี้
-          rows.push(buildTodoRow('🤝', 'ประเมินเพื่อน', null, null, null, 'รอครูจับคู่'));
-        }
-
-        if (isTaskUnit) {
-          rows.push(buildTodoRow('🎨', 'สะท้อนคิดการเรียนรู้', p.reflectionDone,
-            `reflection_tools.php?unit=${phase === 'task1' ? 1 : 2}`, 'ไปบันทึก'));
-        }
-
-        const section = buildTodoPhaseSection(todoPhaseLabels[phase], rows);
-        overallDone += section.doneCount;
-        overallTotal += section.totalCount;
-        return section.html;
+      const bodyRowsHTML = rowDefs.map(r => {
+        const cellsHTML = todoColumns.map(phase => {
+          if (r.onlyUnits && phase !== 'task1' && phase !== 'task2') return buildTodoCell(null);
+          const c = r.cell(phase);
+          if (c.done !== null && c.done !== undefined) {
+            colProgress[phase].total++;
+            overallTotal++;
+            if (c.done) { colProgress[phase].done++; overallDone++; }
+          }
+          return buildTodoCell(c.done, c.link, c.actionText);
+        }).join('');
+        return `<tr><td class="small text-nowrap">${r.icon} ${escToDoText(r.label)}</td>${cellsHTML}</tr>`;
       }).join('');
 
-      containerEl.innerHTML = sectionsHTML;
+      const headCellsHTML = todoColumns.map(phase => {
+        const cp = colProgress[phase];
+        return `<th class="text-center small">${escToDoText(todoColumnLabels[phase])}<br><span class="text-muted fw-normal" style="font-size:0.72rem;">${cp.done}/${cp.total}</span></th>`;
+      }).join('');
+
+      containerEl.innerHTML = `
+        <div class="table-responsive rounded-3 border">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+              <tr><th class="small">ภาระงาน</th>${headCellsHTML}</tr>
+            </thead>
+            <tbody>${bodyRowsHTML}</tbody>
+          </table>
+        </div>`;
 
       if (countBadge) {
         countBadge.textContent = `${overallDone}/${overallTotal}`;
