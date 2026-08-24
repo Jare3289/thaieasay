@@ -399,9 +399,18 @@ require_once 'header.php';
 
   <!-- ส่วนเนื้อหาเรียงความ: แยกออกจาก evalSection เป็น section ลอย (fixed) ฝั่งขวา เต็มครึ่งจอ ติดตามหน้าจอเสมอเวลาเลื่อน -->
   <aside id="essayFloating" class="card border-0 shadow-lg d-none" style="overflow: hidden; border: 1px solid #e7e5e4 !important;">
-    <div class="d-flex align-items-center justify-content-between gap-2 px-4 py-3 border-bottom" style="background-color: #fffdf0;">
-      <h6 class="fw-bold text-dark mb-0"><i class="bi bi-file-earmark-text text-primary me-2"></i>เนื้อหาเรียงความที่นักเรียนบันทึกไว้ (Student Essay Content)</h6>
-      <span class="badge bg-primary-subtle text-primary rounded-pill px-3 py-1 font-mono small flex-shrink-0" id="essayPanelWordCount">0 คำ</span>
+    <div class="essay-panel-header d-flex align-items-center justify-content-between gap-2 px-4 py-3 border-bottom" style="background-color: #fffdf0;" onclick="toggleEssayCollapse()" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleEssayCollapse();}">
+      <h6 class="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+        <i class="bi bi-file-earmark-text text-primary"></i>
+        <span class="essay-panel-title-full">เนื้อหาเรียงความที่นักเรียนบันทึกไว้ (Student Essay Content)</span>
+        <span class="essay-panel-title-short">เรียงความ</span>
+      </h6>
+      <div class="d-flex align-items-center gap-2 flex-shrink-0">
+        <span class="badge bg-primary-subtle text-primary rounded-pill px-3 py-1 font-mono small" id="essayPanelWordCount">0 คำ</span>
+        <button type="button" class="essay-collapse-btn" id="essayCollapseBtn" title="ย่อ/ขยายกล่องเรียงความ" onclick="event.stopPropagation(); toggleEssayCollapse();">
+          <i class="bi bi-dash-lg" id="essayCollapseIcon"></i>
+        </button>
+      </div>
     </div>
     <div class="essay-doc-scroll">
       <div class="essay-sheet">
@@ -458,7 +467,50 @@ require_once 'header.php';
   .essay-doc-scroll { max-height: calc(100vh - 66px - 62px); }
   /* เว้นครึ่งขวาไว้ให้กล่องเรียงความ แบบประเมินจึงกว้างเท่ากันในครึ่งซ้าย */
   #view-evaluation.essay-open { padding-right: calc(50vw + 1.5rem); }
+  /* ย่อกล่องเรียงความไว้แล้ว → ไม่ต้องเว้นที่ครึ่งขวาอีกต่อไป (แบบประเมินขยายเต็มความกว้างคืน) */
+  #view-evaluation.essay-open.essay-collapsed-open { padding-right: 0; }
 }
+
+/* ปุ่มย่อ/ขยายกล่องเรียงความ */
+.essay-panel-header { cursor: pointer; user-select: none; }
+.essay-collapse-btn {
+  border: none;
+  background: transparent;
+  color: #92642a;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 1rem;
+  line-height: 1;
+  transition: background .15s ease;
+}
+.essay-collapse-btn:hover { background: rgba(0,0,0,0.06); }
+.essay-panel-title-short { display: none; }
+
+/* สถานะย่อ: ลอยเป็นกล่องเล็กมุมขวาล่างเสมอ ไม่ว่าจะจอเล็กหรือจอใหญ่ ไม่บังเนื้อหาแบบประเมิน */
+#essayFloating.essay-collapsed {
+  position: fixed !important;
+  /* bottom เว้นสูงกว่ากล่อง toast แจ้งเตือน (.toast-container-custom อยู่มุมเดียวกันที่ bottom:20px) ไม่ให้ซ้อนทับกัน */
+  inset: auto 16px 90px auto !important;
+  top: auto !important;
+  width: auto !important;
+  max-width: calc(100vw - 32px);
+  height: auto !important;
+  margin: 0 !important;
+  border-radius: 999px !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  z-index: 1035;
+  border-left: 1px solid #e7e5e4 !important;
+}
+#essayFloating.essay-collapsed .essay-doc-scroll { display: none; }
+#essayFloating.essay-collapsed .essay-panel-header {
+  padding: 10px 18px;
+  border-bottom: none;
+  border-radius: 999px;
+}
+#essayFloating.essay-collapsed .essay-panel-title-full { display: none; }
+#essayFloating.essay-collapsed .essay-panel-title-short { display: inline; }
+
 /* แผ่นกระดาษสัดส่วน A4 (210:297 ≈ 1:1.414) — ขยายให้กว้างขึ้นด้านละ ~1 นิ้ว มีระยะขอบเหมือนกระดาษจริง */
 .essay-sheet {
   width: 100%;
@@ -687,6 +739,15 @@ require_once 'header.php';
     }
   ];
 
+  // ค้นหาข้อเกณฑ์ (item) จากรหัส เช่น "1.1" เพื่อดึงตัวคูณและป้ายระดับคะแนนมาแสดงคะแนนเดิมรายข้อ
+  function findRubricItemById(itemId) {
+    for (const section of rubricData) {
+      const found = section.items.find(i => i.id === itemId);
+      if (found) return found;
+    }
+    return null;
+  }
+
   // ไม่บังคับเลือกกลุ่มในฟอร์มอีกต่อไป — โหมดครูควบคุมกลุ่มจากปุ่มบน navbar (จุดเดียวของทั้งระบบ)
   function groupRequired() { return false; }
 
@@ -844,8 +905,11 @@ require_once 'header.php';
         });
 
         itemDiv.innerHTML = `
-          <div class="mb-3">
+          <div class="mb-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
             <h5 class="fw-bold mb-0 text-slate-800">${item.name}</h5>
+            <span id="prevScore_${item.id}" class="badge d-none rounded-pill px-3 py-2" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a;">
+              <i class="bi bi-clock-history me-1"></i><span class="prev-score-text"></span>
+            </span>
           </div>
           <div class="row row-cols-1 row-cols-md-3 row-cols-lg-5 g-3">${levelsHTML}</div>
         `;
@@ -922,6 +986,8 @@ require_once 'header.php';
     // ซ่อนกล่องคะแนนเดิมไว้ก่อน จนกว่าจะพบข้อมูลประเมินเดิมของนักเรียนคนนี้
     const origBox = document.getElementById('originalScoreBox');
     if (origBox) origBox.classList.add('d-none');
+    // ซ่อนป้ายคะแนนเดิมรายข้อทั้งหมดไว้ก่อนเช่นกัน (เผื่อสลับไปดูนักเรียนคนอื่น)
+    document.querySelectorAll('[id^="prevScore_"]').forEach(el => el.classList.add('d-none'));
     calculateRealTimeFormScore(); // รีเซ็ต
 
     statusBadge.textContent = "กำลังค้นหาคะแนนเดิม...";
@@ -954,6 +1020,21 @@ require_once 'header.php';
              const scoreLevel = Math.round(parseFloat(rawValue) / multiplier);
              const targetRadio = document.getElementById(`opt_${itemId}_${scoreLevel}`);
              if(targetRadio) targetRadio.checked = true;
+          }
+
+          // แสดงป้ายคะแนนเดิมของข้อนี้ (ครั้งก่อนเคยให้ระดับ/คะแนนเท่าไร) ไว้เทียบกับตัวเลือกที่กำลังจะให้ครั้งนี้
+          const badge = document.getElementById(`prevScore_${itemId}`);
+          if (badge) {
+            const item = findRubricItemById(itemId);
+            const pointsRaw = parseFloat(rawValue);
+            const level = item ? Math.round(pointsRaw / item.multiplier) : null;
+            const levelInfo = item && level !== null ? item.levels.find(l => l.score === level) : null;
+            const pointsText = Math.round(pointsRaw * 100) / 100;
+            const textEl = badge.querySelector('.prev-score-text');
+            if (textEl) {
+              textEl.textContent = `ครั้งก่อน: ${levelInfo ? levelInfo.label + ' · ' : ''}${pointsText} คะแนน`;
+            }
+            badge.classList.remove('d-none');
           }
         }
 
@@ -1072,7 +1153,7 @@ require_once 'header.php';
   let essayLnumTimer = null;
   window.addEventListener('resize', () => {
     const essay = document.getElementById('essayFloating');
-    if (!essay || essay.classList.contains('d-none')) return;
+    if (!essay || essay.classList.contains('d-none') || essay.classList.contains('essay-collapsed')) return;
     clearTimeout(essayLnumTimer);
     essayLnumTimer = setTimeout(() => { addEssayLineNumbers(); addEssaySectionTags(); }, 150);
   });
@@ -1084,6 +1165,33 @@ require_once 'header.php';
     const view = document.getElementById('view-evaluation');
     if (essay) essay.classList.toggle('d-none', !show);
     if (view) view.classList.toggle('essay-open', show);
+    if (show) {
+      // เปิดกล่องเรียงความขึ้นมาใหม่ → ใช้สถานะย่อ/ขยายล่าสุดที่ผู้ประเมินเคยตั้งไว้ (จำไว้ข้ามนักเรียน)
+      let collapsed = false;
+      try { collapsed = localStorage.getItem('teg_essay_panel_collapsed') === '1'; } catch (e) {}
+      setEssayCollapsed(collapsed);
+    }
+  }
+
+  // ย่อ/ขยายกล่องเรียงความ — ย่อไว้จะลอยเป็นปุ่มเล็กที่มุมขวาล่าง ไม่บังแบบประเมิน จำค่าไว้ให้ทุกครั้งที่เปิดกล่องนี้
+  function setEssayCollapsed(collapsed) {
+    const essay = document.getElementById('essayFloating');
+    const view = document.getElementById('view-evaluation');
+    const icon = document.getElementById('essayCollapseIcon');
+    if (!essay) return;
+    essay.classList.toggle('essay-collapsed', collapsed);
+    if (view) view.classList.toggle('essay-collapsed-open', collapsed);
+    if (icon) icon.className = collapsed ? 'bi bi-arrows-angle-expand' : 'bi bi-dash-lg';
+    try { localStorage.setItem('teg_essay_panel_collapsed', collapsed ? '1' : '0'); } catch (e) {}
+    if (!collapsed) {
+      // ขยายกลับมา → คำนวณเลขบรรทัด/ป้ายส่วนใหม่ (กล่องเพิ่งกลับมาแสดงเต็ม)
+      requestAnimationFrame(() => requestAnimationFrame(() => { addEssayLineNumbers(); addEssaySectionTags(); }));
+    }
+  }
+  function toggleEssayCollapse() {
+    const essay = document.getElementById('essayFloating');
+    if (!essay) return;
+    setEssayCollapsed(!essay.classList.contains('essay-collapsed'));
   }
 
   // ชื่อหัวกระดาษตามรอบการประเมิน

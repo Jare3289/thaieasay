@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ออฟไลน์ - ระบบประเมินเรียงความ</title>
+<meta name="theme-color" content="#2563eb">
+<style>
+  :root {
+    --accent-blue: #2563eb;
+    --accent-blue-dark: #1e3a8a;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Sarabun', 'Google Sans', sans-serif;
+    background: linear-gradient(160deg, #0f172a 0%, var(--accent-blue-dark) 100%);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .card {
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 24px;
+    padding: 40px 28px;
+    backdrop-filter: blur(6px);
+  }
+  .icon {
+    font-size: 3.5rem;
+    line-height: 1;
+    margin-bottom: 16px;
+  }
+  h1 {
+    font-size: 1.35rem;
+    margin: 0 0 8px;
+    font-weight: 700;
+  }
+  p {
+    margin: 0 0 24px;
+    color: rgba(255, 255, 255, 0.75);
+    font-size: 0.95rem;
+    line-height: 1.6;
+  }
+  button {
+    appearance: none;
+    border: none;
+    border-radius: 999px;
+    padding: 12px 28px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--accent-blue-dark);
+    background: #fff;
+    cursor: pointer;
+    transition: transform .15s ease, opacity .15s ease;
+  }
+  button:hover { opacity: .92; }
+  button:active { transform: scale(0.97); }
+  .hint {
+    margin-top: 18px;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.5);
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">📴</div>
+    <h1>ไม่มีการเชื่อมต่ออินเทอร์เน็ต</h1>
+    <p>ไม่สามารถโหลดหน้านี้ได้เนื่องจากไม่มีสัญญาณอินเทอร์เน็ต กรุณาตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง</p>
+    <button onclick="location.reload()">ลองใหม่อีกครั้ง</button>
+    <div class="hint">ระบบประเมินเรียงความ</div>
+  </div>
+</body>
+</html>
