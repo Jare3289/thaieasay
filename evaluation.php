@@ -316,10 +316,10 @@ require_once 'header.php';
           </div>
         </div>
 
-        <!-- สรุปคะแนนที่คำนวณอัตโนมัติ (แสดงสด) และคะแนน/ระดับเดิมที่เคยประเมินไว้ -->
+        <!-- สรุปคะแนนที่คำนวณอัตโนมัติ (แสดงสด), คะแนน/ระดับเดิมที่เคยประเมินไว้ และคะแนนรอบคู่เทียบ (ก่อน-หลังเรียน / หน่วย 1-2) -->
         <div class="row g-3 mt-1">
           <!-- คะแนนที่ระบบคำนวณอัตโนมัติจากตัวเลือกปัจจุบัน -->
-          <div class="col-md-6 col-12">
+          <div class="col-lg-4 col-md-6 col-12">
             <div class="d-flex align-items-center justify-content-between rounded-3 px-3 py-2 h-100" style="background:#eff6ff; border:1px solid #bfdbfe;">
               <div class="d-flex align-items-center gap-2">
                 <i class="bi bi-calculator-fill text-primary fs-5"></i>
@@ -333,7 +333,7 @@ require_once 'header.php';
             </div>
           </div>
           <!-- คะแนน/ระดับเดิมที่เคยบันทึกไว้ (โหมดแก้ไข) -->
-          <div class="col-md-6 col-12">
+          <div class="col-lg-4 col-md-6 col-12">
             <div id="originalScoreBox" class="d-none d-flex align-items-center justify-content-between rounded-3 px-3 py-2 h-100" style="background:#fefce8; border:1px solid #fde68a;">
               <div class="d-flex align-items-center gap-2">
                 <i class="bi bi-clock-history text-warning fs-5"></i>
@@ -343,6 +343,20 @@ require_once 'header.php';
                 <span id="originalScoreValue" class="fw-bold fs-5" style="color:#b45309;">0</span>
                 <span class="text-muted small">/ 60</span>
                 <span id="originalScoreLevel" class="badge ms-1" style="background:#fde68a; color:#92400e;">—</span>
+              </div>
+            </div>
+          </div>
+          <!-- คะแนนรอบคู่เทียบ (pretest↔posttest, task1↔task2) ให้ดูพัฒนาการของนักเรียนตอนให้คะแนน -->
+          <div class="col-lg-4 col-md-6 col-12">
+            <div id="comparisonScoreBox" class="d-none d-flex align-items-center justify-content-between rounded-3 px-3 py-2 h-100" style="background:#ecfdf5; border:1px solid #a7f3d0;">
+              <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-graph-up-arrow text-success fs-5"></i>
+                <span class="fw-bold small" id="comparisonScoreLabel" style="color:#065f46;">คะแนนรอบเปรียบเทียบ</span>
+              </div>
+              <div class="text-end">
+                <span id="comparisonScoreValue" class="fw-bold fs-5" style="color:#047857;">0</span>
+                <span class="text-muted small">/ 60</span>
+                <span id="comparisonScoreLevel" class="badge ms-1" style="background:#a7f3d0; color:#065f46;">—</span>
               </div>
             </div>
           </div>
@@ -907,9 +921,14 @@ require_once 'header.php';
         itemDiv.innerHTML = `
           <div class="mb-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
             <h5 class="fw-bold mb-0 text-slate-800">${item.name}</h5>
-            <span id="prevScore_${item.id}" class="badge d-none rounded-pill px-3 py-2" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a;">
-              <i class="bi bi-clock-history me-1"></i><span class="prev-score-text"></span>
-            </span>
+            <div class="d-flex align-items-center flex-wrap gap-2">
+              <span id="compareScore_${item.id}" class="badge d-none rounded-pill px-3 py-2" style="background:#d1fae5; color:#065f46; border:1px solid #a7f3d0;">
+                <i class="bi bi-graph-up-arrow me-1"></i><span class="compare-score-text"></span>
+              </span>
+              <span id="prevScore_${item.id}" class="badge d-none rounded-pill px-3 py-2" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a;">
+                <i class="bi bi-clock-history me-1"></i><span class="prev-score-text"></span>
+              </span>
+            </div>
           </div>
           <div class="row row-cols-1 row-cols-md-3 row-cols-lg-5 g-3">${levelsHTML}</div>
         `;
@@ -988,6 +1007,10 @@ require_once 'header.php';
     if (origBox) origBox.classList.add('d-none');
     // ซ่อนป้ายคะแนนเดิมรายข้อทั้งหมดไว้ก่อนเช่นกัน (เผื่อสลับไปดูนักเรียนคนอื่น)
     document.querySelectorAll('[id^="prevScore_"]').forEach(el => el.classList.add('d-none'));
+    // ซ่อนกล่อง/ป้ายคะแนนรอบคู่เทียบไว้ก่อนเช่นกัน (เผื่อสลับไปดูนักเรียนคนอื่น)
+    const cmpBox = document.getElementById('comparisonScoreBox');
+    if (cmpBox) cmpBox.classList.add('d-none');
+    document.querySelectorAll('[id^="compareScore_"]').forEach(el => el.classList.add('d-none'));
     calculateRealTimeFormScore(); // รีเซ็ต
 
     statusBadge.textContent = "กำลังค้นหาคะแนนเดิม...";
@@ -1070,6 +1093,8 @@ require_once 'header.php';
       }
       // โหลดเรียงความของนักเรียนมาแสดงประกอบการให้คะแนนด้วย
       fetchStudentEssayForEvaluation(studentId, testPhase);
+      // โหลดคะแนนของรอบคู่เทียบ (ก่อนเรียน↔หลังเรียน, หน่วย 1↔หน่วย 2) มาแสดงเทียบพัฒนาการ
+      fetchComparisonPhaseScores(studentId, testPhase);
     } catch (err) {
       console.error(err);
       statusBadge.textContent = "⚠️ ไม่สามารถตรวจสอบประวัติได้";
@@ -1205,6 +1230,69 @@ require_once 'header.php';
   // ภาระงานมีร่าง D1/D2 แต่ให้คะแนนเฉพาะร่างที่ 2 (D2) — จึงดึงเรียงความร่าง D2 มาแสดงเวลาประเมินหน่วยภาระงาน
   // (คะแนนยังบันทึกภายใต้รอบ task1 ตามเดิม เพื่อไม่ให้กระทบแดชบอร์ด/การส่งออก)
   const gradingEssayPhase = { pretest: 'pretest', task1: 'task1_d2', task2: 'task2_d2', posttest: 'posttest' };
+
+  // รอบคู่เทียบพัฒนาการ: ก่อนเรียน↔หลังเรียน, หน่วย 1↔หน่วย 2 — ให้เห็นว่าคะแนนแต่ละด้านพัฒนาไปจากเดิมตรงไหนตอนกำลังให้คะแนน
+  const comparisonPhaseMap = {
+    pretest:  { phase: 'posttest', label: 'คะแนนหลังเรียน (เทียบพัฒนาการ)', shortLabel: 'หลังเรียน' },
+    posttest: { phase: 'pretest',  label: 'คะแนนก่อนเรียน (เทียบพัฒนาการ)', shortLabel: 'ก่อนเรียน' },
+    task1:    { phase: 'task2',    label: 'คะแนนหน่วยที่ 2 (เทียบพัฒนาการ)', shortLabel: 'หน่วย 2' },
+    task2:    { phase: 'task1',    label: 'คะแนนหน่วยที่ 1 (เทียบพัฒนาการ)', shortLabel: 'หน่วย 1' }
+  };
+
+  // ดึงคะแนนของรอบคู่เทียบ (ของผู้ประเมินคนเดียวกัน) มาแสดงทั้งยอดรวมและรายข้อ ให้เทียบพัฒนาการได้ตอนกำลังให้คะแนน
+  async function fetchComparisonPhaseScores(studentId, testPhase) {
+    const cfg = comparisonPhaseMap[testPhase];
+    const box = document.getElementById('comparisonScoreBox');
+    if (!cfg || !studentId) return;
+
+    try {
+      const response = await fetch('api.php?action=get_single_evaluation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId: studentId,
+          evaluatorType: currentMode,
+          evaluatorName: currentUser.name,
+          testPhase: cfg.phase
+        })
+      });
+      const res = await response.json();
+      if (!res.success || !res.found) return; // ยังไม่เคยประเมินรอบคู่เทียบ — ไม่ต้องแสดงอะไร
+
+      // ป้ายรายข้อ: คะแนนของรอบคู่เทียบ วางคู่กับป้าย "ครั้งก่อน" เพื่อดูพัฒนาการทีละข้อ
+      for (const [itemId, rawValue] of Object.entries(res.scores)) {
+        const badge = document.getElementById(`compareScore_${itemId}`);
+        if (!badge) continue;
+        const item = findRubricItemById(itemId);
+        const pointsRaw = parseFloat(rawValue);
+        const level = item ? Math.round(pointsRaw / item.multiplier) : null;
+        const levelInfo = item && level !== null ? item.levels.find(l => l.score === level) : null;
+        const pointsText = Math.round(pointsRaw * 100) / 100;
+        const textEl = badge.querySelector('.compare-score-text');
+        if (textEl) {
+          textEl.textContent = `${cfg.shortLabel}: ${levelInfo ? levelInfo.label + ' · ' : ''}${pointsText} คะแนน`;
+        }
+        badge.classList.remove('d-none');
+      }
+
+      // กล่องสรุปคะแนนรวมของรอบคู่เทียบ
+      let cmpTotal = (res.totalScore !== undefined && res.totalScore !== null)
+        ? parseFloat(res.totalScore)
+        : Object.values(res.scores).reduce((sum, v) => sum + parseFloat(v), 0);
+      const cmpLevel = (res.qualityLevel && String(res.qualityLevel).trim() !== '')
+        ? res.qualityLevel
+        : scoreLevelText(cmpTotal);
+      const labelEl = document.getElementById('comparisonScoreLabel');
+      const valEl = document.getElementById('comparisonScoreValue');
+      const lvlEl = document.getElementById('comparisonScoreLevel');
+      if (labelEl) labelEl.textContent = cfg.label;
+      if (valEl) valEl.textContent = Math.round(cmpTotal * 100) / 100;
+      if (lvlEl) lvlEl.textContent = cmpLevel;
+      if (box) box.classList.remove('d-none');
+    } catch (err) {
+      console.error('Error fetching comparison phase evaluation:', err);
+    }
+  }
 
   async function fetchStudentEssayForEvaluation(studentId, testPhase) {
     const formTitleEl = document.getElementById('essayPanelFormTitle');
