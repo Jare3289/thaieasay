@@ -141,7 +141,7 @@ require_once 'header.php';
           </label>
           <p class="text-muted small mb-2">เขียนคำนำเพื่อดึงดูดความสนใจและระบุประเด็นหลักของเรื่อง</p>
           <textarea id="essayIntro" class="form-control border-2 rounded-3 essay-section-input" rows="4"
-            placeholder="พิมพ์ส่วนคำนำที่นี่..." oninput="updateWordCount()" style="font-family: 'Sarabun', sans-serif; font-size: 1rem; line-height: 1.8;"></textarea>
+            placeholder="พิมพ์ส่วนคำนำที่นี่..." oninput="updateWordCount()" style="font-family: 'TH Sarabun PSK', 'THSarabunPSK', 'TH SarabunPSK', 'TH Sarabun New', 'Sarabun', 'Leelawadee UI', 'Tahoma', sans-serif; font-size: 1rem; line-height: 1.8;"></textarea>
         </div>
 
         <!-- 2. Body -->
@@ -167,7 +167,7 @@ require_once 'header.php';
           </label>
           <p class="text-muted small mb-2">เขียนสรุปย้ำประเด็นหลักและสรุปความคิดเห็นทั้งหมด</p>
           <textarea id="essayConclusion" class="form-control border-2 rounded-3 essay-section-input" rows="4"
-            placeholder="พิมพ์ส่วนสรุปที่นี่..." oninput="updateWordCount()" style="font-family: 'Sarabun', sans-serif; font-size: 1rem; line-height: 1.8;"></textarea>
+            placeholder="พิมพ์ส่วนสรุปที่นี่..." oninput="updateWordCount()" style="font-family: 'TH Sarabun PSK', 'THSarabunPSK', 'TH SarabunPSK', 'TH Sarabun New', 'Sarabun', 'Leelawadee UI', 'Tahoma', sans-serif; font-size: 1rem; line-height: 1.8;"></textarea>
         </div>
       </div>
 
@@ -198,14 +198,17 @@ require_once 'header.php';
         </div>
       </div>
 
-      <!-- ตรวจสอบการสะกดคำ + แยกคำทั้งหน้า -->
-      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4 p-3 bg-light rounded-3">
-        <span class="small text-muted" id="spellCheckStatus">
-          <i class="bi bi-search me-1"></i>พิมพ์เรียงความเพื่อตรวจการสะกดคำ
-        </span>
-        <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" onclick="openSpellingReview()">
-          <i class="bi bi-eye me-1"></i>ตรวจสอบทั้งหน้า / แยกคำ
-        </button>
+      <!-- ตรวจสอบการสะกดคำ + แยกคำทั้งหน้า — แสดงจุดที่น่าสงสัยไว้ตรงนี้เลย ไม่ต้องกดดูก่อน -->
+      <div class="mb-4 p-3 bg-light rounded-3">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+          <span class="small text-muted" id="spellCheckStatus">
+            <i class="bi bi-search me-1"></i>พิมพ์เรียงความเพื่อตรวจการสะกดคำ
+          </span>
+          <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" onclick="openSpellingReview()">
+            <i class="bi bi-pencil-square me-1"></i>เปิดแก้ไขทีละจุด
+          </button>
+        </div>
+        <div id="spellCheckPreview" class="essay-view-doc d-none"></div>
       </div>
       </div>
 
@@ -267,7 +270,7 @@ require_once 'header.php';
 #essayContent::placeholder { color: #adb5bd; }
 .essay-content-preview {
   white-space: pre-wrap;
-  font-family: 'Sarabun', sans-serif;
+  font-family: "TH Sarabun PSK", "THSarabunPSK", "TH SarabunPSK", "TH Sarabun New", "Sarabun", "Leelawadee UI", "Tahoma", sans-serif;
   font-size: 0.9rem;
   line-height: 1.7;
   max-height: 120px;
@@ -283,7 +286,7 @@ require_once 'header.php';
 }
 /* โหมดดูฉบับที่บันทึกไว้ (อ่านอย่างเดียว) — จัดหน้าให้อ่านคล้ายเอกสารเรียงความจริง (เหมือน essay_print.php) */
 .essay-view-doc {
-  font-family: 'Sarabun', sans-serif;
+  font-family: "TH Sarabun PSK", "THSarabunPSK", "TH SarabunPSK", "TH Sarabun New", "Sarabun", "Leelawadee UI", "Tahoma", sans-serif;
   font-size: 1.05rem;
   line-height: 2;
 }
@@ -294,8 +297,10 @@ require_once 'header.php';
 }
 .essay-view-doc .thai-word { border-bottom: 1px dotted #b9c4c4; }
 .essay-view-doc .no-content { color: #888; font-style: italic; text-indent: 0; text-align: center; }
+#spellCheckPreview { background: #fff; border: 1px solid #f0e6c8; border-radius: 10px; padding: 12px 16px; font-size: 0.95rem; }
+#spellCheckPreview .trw-static-flag, #essayViewContent .trw-static-flag, #savedEssayList .trw-static-flag { cursor: pointer; }
 /* การ์ดในรายการ "บันทึกไว้แล้ว" — แสดงเนื้อหาเต็มแบบเดียวกัน */
-.saved-essay-full { font-family: 'Sarabun', sans-serif; font-size: 0.95rem; line-height: 1.9; }
+.saved-essay-full { font-family: "TH Sarabun PSK", "THSarabunPSK", "TH SarabunPSK", "TH Sarabun New", "Sarabun", "Leelawadee UI", "Tahoma", sans-serif; font-size: 0.95rem; line-height: 1.9; }
 .saved-essay-full .essay-view-para { margin: 0 0 0.6em; text-indent: 2em; text-align: justify; }
 .saved-essay-full .thai-word { border-bottom: 1px dotted #c9c2b3; }
 </style>
@@ -404,7 +409,7 @@ function addBodyParagraph(content = "") {
       </button>
     </div>
     <textarea class="form-control border-2 rounded-3 body-para-textarea essay-section-input" rows="5"
-      placeholder="พิมพ์เนื้อหาย่อหน้านี้..." oninput="updateWordCount()" style="font-family: 'Sarabun', sans-serif; font-size: 1rem; line-height: 1.8;">${content}</textarea>
+      placeholder="พิมพ์เนื้อหาย่อหน้านี้..." oninput="updateWordCount()" style="font-family: 'TH Sarabun PSK', 'THSarabunPSK', 'TH SarabunPSK', 'TH Sarabun New', 'Sarabun', 'Leelawadee UI', 'Tahoma', sans-serif; font-size: 1rem; line-height: 1.8;">${content}</textarea>
   `;
   container.appendChild(div);
   reindexBodyParagraphs();
@@ -579,12 +584,32 @@ function parseEssayContentToParas(contentStr) {
   return paras;
 }
 
-// สร้าง HTML แบบเอกสารเรียงความ (คล้าย essay_print.php) จากเนื้อหา JSON — ใช้ทั้งโหมดดูฉบับที่บันทึกไว้
-// และรายการ "เรียงความที่บันทึกไว้แล้ว" ด้านล่างหน้า
+// สร้าง HTML แบบเอกสารเรียงความ (คล้าย essay_print.php) จากเนื้อหา JSON — แสดงเฉพาะขอบเขตคำ ไม่ตรวจคำผิด
 function renderEssayDocHTML(contentStr, paraClass) {
   const paras = parseEssayContentToParas(contentStr);
   if (!paras.length) return '<div class="no-content">— ยังไม่มีเนื้อหาเรียงความ —</div>';
   return paras.map(p => `<p class="${paraClass}">${essayWordSegmentedHTML(p)}</p>`).join('');
+}
+
+// เหมือน renderEssayDocHTML แต่ตรวจคำผิด/คำภาษาอื่น/การเว้นวรรครอบ ๆ ด้วย แล้วไฮไลต์จุดที่น่าสงสัย
+// ให้เห็นตรง ๆ (ใช้ในโหมดดูฉบับที่บันทึกไว้ และรายการ "เรียงความที่บันทึกไว้แล้ว" ด้านล่างหน้า)
+async function renderEssayDocHTMLWithChecks(contentStr, paraClass) {
+  const paras = parseEssayContentToParas(contentStr);
+  if (!paras.length) return '<div class="no-content">— ยังไม่มีเนื้อหาเรียงความ —</div>';
+
+  let sets = { misspelled: [], foreign: [], spacing: [] };
+  try {
+    const res = await fetch('api.php?action=check_thai_spelling', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: paras.join('\n') })
+    });
+    const data = await res.json();
+    if (data.success) sets = { misspelled: data.misspelled, foreign: data.foreign, spacing: data.spacing };
+  } catch (e) {
+    // เงียบไว้ — แสดงเนื้อหาแบบไม่มีไฮไลต์ถ้าตรวจไม่สำเร็จ
+  }
+  return paras.map(p => `<p class="${paraClass}">${ThaiReview.renderStaticHTML(p, sets)}</p>`).join('');
 }
 
 // สลับไปโหมดดูฉบับที่บันทึกไว้ (อ่านอย่างเดียว)
@@ -605,10 +630,10 @@ function showEssayEdit() {
 }
 
 // อัปเดตโหมดดูฉบับที่บันทึกไว้ให้ตรงกับข้อมูลที่เพิ่งบันทึกสำเร็จ (ไม่ต้องโหลดจากเซิร์ฟเวอร์ใหม่)
-function refreshEssayViewFromParts(intro, bodyParas, conclusion, wordCount) {
+async function refreshEssayViewFromParts(intro, bodyParas, conclusion, wordCount) {
   currentPhaseHasSavedContent = true;
   const contentStr = JSON.stringify({ introduction: intro, body: bodyParas, conclusion: conclusion });
-  document.getElementById('essayViewContent').innerHTML = renderEssayDocHTML(contentStr, 'essay-view-para');
+  document.getElementById('essayViewContent').innerHTML = await renderEssayDocHTMLWithChecks(contentStr, 'essay-view-para');
   const now = new Date().toLocaleString('th-TH');
   document.getElementById('essayViewMeta').textContent = `${(wordCount || 0).toLocaleString('th-TH')} คำ · บันทึกล่าสุด: ${now}`;
   const backBtn = document.getElementById('backToViewBtn');
@@ -663,7 +688,7 @@ async function loadEssayForPhase(phase, opts) {
       statusBadge.className = 'badge bg-success small';
 
       currentPhaseHasSavedContent = true;
-      document.getElementById('essayViewContent').innerHTML = renderEssayDocHTML(contentStr, 'essay-view-para');
+      document.getElementById('essayViewContent').innerHTML = await renderEssayDocHTMLWithChecks(contentStr, 'essay-view-para');
       document.getElementById('essayViewMeta').textContent =
         `${(data.data.word_count || 0).toLocaleString('th-TH')} คำ · บันทึกล่าสุด: ${dt.toLocaleString('th-TH')}`;
       if (opts.forceEdit) { showEssayEdit(); } else { showEssayView(); }
@@ -700,7 +725,8 @@ if (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function') {
   }
 }
 function countThaiWords(text) {
-  const t = text.trim();
+  // อนุโลม "เ" สองตัวติดกัน (เ + เ) แทน "แ" ได้ก่อนตัดคำ กันตัวตัดคำสับสน (ดูรายละเอียดใน thai_review.js)
+  const t = text.trim().replace(/เเ/g, 'แ');
   if (!t) return 0;
   if (__thaiWordSegmenter) {
     let count = 0;
@@ -755,28 +781,41 @@ function updateWordCount() {
   // ตรวจคำผิดแบบหน่วงเวลา (เรียก API ที่เทียบกับพจนานุกรม — หนักกว่าการนับคำ จึงไม่เรียกทุกครั้งที่พิมพ์)
   clearTimeout(spellCheckTimer);
   const statusEl = document.getElementById('spellCheckStatus');
+  const previewEl = document.getElementById('spellCheckPreview');
   if (!allTextCombined.trim()) {
     statusEl.innerHTML = '<i class="bi bi-search me-1"></i>พิมพ์เรียงความเพื่อตรวจการสะกดคำ';
+    previewEl.classList.add('d-none');
+    previewEl.innerHTML = '';
   } else {
-    spellCheckTimer = setTimeout(() => refreshSpellCheckStatus(allTextCombined), 1500);
+    spellCheckTimer = setTimeout(refreshSpellCheckStatus, 1500);
   }
 }
 
 let spellCheckTimer = null;
-async function refreshSpellCheckStatus(combinedText) {
+async function refreshSpellCheckStatus() {
   const statusEl = document.getElementById('spellCheckStatus');
+  const previewEl = document.getElementById('spellCheckPreview');
+  const paragraphs = buildReviewParagraphs();
+  if (paragraphs.length === 0) return;
   try {
     const res = await fetch('api.php?action=check_thai_spelling', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: combinedText })
+      body: JSON.stringify({ text: paragraphs.map(p => p.text).join('\n') })
     });
     const data = await res.json();
     if (!data.success) return;
-    const n = (data.misspelled ? data.misspelled.length : 0) + (data.foreign ? data.foreign.length : 0);
-    statusEl.innerHTML = n > 0
-      ? `<i class="bi bi-exclamation-triangle-fill text-warning me-1"></i>พบคำที่น่าสงสัย ${n} คำ — กด "ตรวจสอบทั้งหน้า" เพื่อดู`
-      : '<i class="bi bi-check-circle-fill text-success me-1"></i>ไม่พบคำที่น่าสงสัยในขณะนี้';
+    const sets = { misspelled: data.misspelled, foreign: data.foreign, spacing: data.spacing };
+    const n = (data.misspelled ? data.misspelled.length : 0) + (data.foreign ? data.foreign.length : 0) + (data.spacing ? data.spacing.length : 0);
+    if (n > 0) {
+      statusEl.innerHTML = `<i class="bi bi-exclamation-triangle-fill text-warning me-1"></i>พบคำที่น่าสงสัย ${n} คำ — ดูจุดที่ไฮไลต์ด้านล่าง (คลิกเพื่อแก้ไข)`;
+      previewEl.innerHTML = paragraphs.map(p => `<p class="essay-view-para">${ThaiReview.renderStaticHTML(p.text, sets)}</p>`).join('');
+      previewEl.classList.remove('d-none');
+    } else {
+      statusEl.innerHTML = '<i class="bi bi-check-circle-fill text-success me-1"></i>ไม่พบคำที่น่าสงสัยในขณะนี้';
+      previewEl.classList.add('d-none');
+      previewEl.innerHTML = '';
+    }
   } catch (e) {
     // เงียบไว้ — ไม่ให้กระทบการพิมพ์งานหลัก
   }
@@ -827,6 +866,21 @@ function applyReviewParagraphsToForm(paragraphs) {
   });
 }
 
+// คลิกคำที่ไฮไลต์ในตัวอย่างที่แสดงไว้เลย (ไม่ต้องกดปุ่มก่อน) → เปิดหน้าต่างแก้ไขทันที
+document.getElementById('spellCheckPreview').addEventListener('click', (ev) => {
+  if (ev.target.closest && ev.target.closest('.trw-static-flag')) {
+    openSpellingReview();
+  }
+});
+
+// คลิกคำที่ไฮไลต์ในโหมดดูฉบับที่บันทึกไว้ → สลับไปโหมดแก้ไขแล้วเปิดหน้าต่างแก้ไขทันที
+document.getElementById('essayViewContent').addEventListener('click', (ev) => {
+  if (ev.target.closest && ev.target.closest('.trw-static-flag')) {
+    showEssayEdit();
+    openSpellingReview();
+  }
+});
+
 // เปิดหน้าต่างตรวจสอบการสะกดคำ/แยกคำทั้งหน้า (thai_review.js)
 async function openSpellingReview() {
   const paragraphs = buildReviewParagraphs();
@@ -837,6 +891,7 @@ async function openSpellingReview() {
 
   let misspelled = [];
   let foreign = [];
+  let spacing = [];
   try {
     const res = await fetch('api.php?action=check_thai_spelling', {
       method: 'POST',
@@ -844,7 +899,7 @@ async function openSpellingReview() {
       body: JSON.stringify({ text: paragraphs.map(p => p.text).join('\n') })
     });
     const data = await res.json();
-    if (data.success) { misspelled = data.misspelled; foreign = data.foreign; }
+    if (data.success) { misspelled = data.misspelled; foreign = data.foreign; spacing = data.spacing; }
   } catch (e) {
     // เงียบไว้ — เปิดหน้าต่างได้แม้ตรวจคำผิดไม่สำเร็จ (จะไม่มีคำไฮไลต์)
   }
@@ -853,6 +908,7 @@ async function openSpellingReview() {
     paragraphs,
     misspelled,
     foreign,
+    spacing,
     onSave: async (editedParagraphs) => {
       applyReviewParagraphsToForm(editedParagraphs);
       const intro = document.getElementById('essayIntro').value.trim();
@@ -868,7 +924,7 @@ async function openSpellingReview() {
       const now = new Date().toLocaleString('th-TH');
       document.getElementById('lastSavedTime').textContent = now;
       document.getElementById('lastSavedInfo').classList.remove('d-none');
-      refreshEssayViewFromParts(intro, bodyParas, conclusion, data.word_count);
+      await refreshEssayViewFromParts(intro, bodyParas, conclusion, data.word_count);
       clearDraftFromLocalStorage(currentEssayPhase);
       loadSavedList();
     }
@@ -917,7 +973,7 @@ async function saveEssay() {
       statusBadge.classList.remove('d-none');
 
       showToast(`บันทึกเรียงความ "${phaseLabels[currentEssayPhase]}" สำเร็จ! (${data.word_count} คำ)`, 'success');
-      refreshEssayViewFromParts(intro, bodyParagraphs, conclusion, data.word_count);
+      await refreshEssayViewFromParts(intro, bodyParagraphs, conclusion, data.word_count);
       // บันทึกขึ้นเซิร์ฟเวอร์สำเร็จแล้ว ไม่ต้องเก็บร่างสำรองในเครื่องอีกต่อไป
       clearDraftFromLocalStorage(currentEssayPhase);
       loadSavedList();
@@ -958,8 +1014,10 @@ async function loadSavedList() {
     return;
   }
 
-  container.innerHTML = found.map(item => {
-    const fullHTML = renderEssayDocHTML(item.data.essay_content, 'essay-view-para');
+  const htmlParts = await Promise.all(found.map(item => renderEssayDocHTMLWithChecks(item.data.essay_content, 'essay-view-para')));
+
+  container.innerHTML = found.map((item, idx) => {
+    const fullHTML = htmlParts[idx];
     const dt = new Date(item.data.updated_at);
     const dateStr = dt.toLocaleString('th-TH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     const badgeClass = phaseBadgeColors[item.phase] || 'bg-secondary';
@@ -981,7 +1039,7 @@ async function loadSavedList() {
               </button>
             </div>
           </div>
-          <div class="saved-essay-full text-dark text-start mb-2 p-3 rounded-3" style="background-color:#fffdf9; border:1px solid #f0e6c8;">
+          <div class="saved-essay-full text-dark text-start mb-2 p-3 rounded-3" data-phase="${item.phase}" style="background-color:#fffdf9; border:1px solid #f0e6c8;">
             ${fullHTML}
           </div>
           <div class="text-muted text-start" style="font-size:0.75rem;">
@@ -992,6 +1050,15 @@ async function loadSavedList() {
     `;
   }).join('');
 }
+
+// คลิกคำที่ไฮไลต์ในรายการ "เรียงความที่บันทึกไว้แล้ว" → ไปเปิดแก้ไขรอบนั้นแล้วเปิดหน้าต่างแก้ไขทันที
+document.getElementById('savedEssayList').addEventListener('click', (ev) => {
+  const flag = ev.target.closest && ev.target.closest('.trw-static-flag');
+  if (!flag) return;
+  const wrap = flag.closest('.saved-essay-full');
+  const phase = wrap && wrap.dataset.phase;
+  if (phase) openEssayPhase(phase);
+});
 
 // Init
 (async function() {

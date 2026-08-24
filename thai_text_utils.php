@@ -9,8 +9,13 @@
 // ตัดข้อความออกเป็น "ส่วนย่อย" ตามขอบเขต ICU word break แต่ละส่วนบอกด้วยว่าเป็น "คำ" จริง
 // (isWord = true) หรือเป็นช่องว่าง/เครื่องหมายวรรคตอนที่คั่นระหว่างคำ (isWord = false)
 // เก็บส่วนที่ไม่ใช่คำไว้ด้วย เพื่อนำไปประกอบกลับเป็นข้อความเดิมได้ครบ (ใช้แสดงผลได้)
+//
+// หมายเหตุ: อนุโลมให้ "เ" สองตัวติดกัน (เ + เ) แทน "แ" ได้ก่อนตัดคำ (คนละอักขระ แต่หน้าตาเหมือนกันมาก
+// เป็นการพิมพ์ผิดที่พบบ่อย) มิฉะนั้นตัวตัดคำของ ICU จะสับสนและตัดขอบเขตคำผิดเพี้ยนไปทั้งประโยค
+// ไม่กระทบข้อความต้นฉบับที่บันทึกไว้จริง เพราะฟังก์ชันนี้ใช้เพื่อ "วิเคราะห์" เท่านั้น ไม่ได้เขียนทับที่เก็บข้อมูล
 function thai_word_segments(string $text): array
 {
+    $text = str_replace('เเ', 'แ', $text);
     if ($text === '') {
         return [];
     }
@@ -135,6 +140,20 @@ function confirm_thai_word(PDO $pdo, string $word, string $confirmedBy, string $
     return $stmt->execute([$word, $confirmedBy, $role]);
 }
 
+// ตรวจว่าคำนี้อยู่ในพจนานุกรม/รายการคำที่ยืนยันแล้วหรือไม่ — อนุโลมให้ "เ" สองตัวติดกัน (เ + เ)
+// แทน "แ" ได้ (คนละอักขระ แต่หน้าตาเหมือนกันมาก เป็นการพิมพ์ผิดที่พบบ่อยจากคีย์บอร์ด/ฟอนต์เก่า)
+function is_known_thai_word(string $word, array $dict, array $confirmedWords = []): bool
+{
+    if (isset($dict[$word]) || isset($confirmedWords[$word])) {
+        return true;
+    }
+    $normalized = str_replace('เเ', 'แ', $word);
+    if ($normalized !== $word && (isset($dict[$normalized]) || isset($confirmedWords[$normalized]))) {
+        return true;
+    }
+    return false;
+}
+
 // ตรวจหาคำที่ "อาจสะกดผิด" โดยเทียบกับพจนานุกรมคำไทย (ตรวจแบบมีคำนี้ในพจนานุกรมหรือไม่เท่านั้น
 // ไม่ใช่การตรวจไวยากรณ์/ความหมาย/บริบท) คืนค่าเป็นรายการคำที่ไม่ซ้ำ ตามลำดับที่พบในข้อความ
 //
@@ -175,7 +194,7 @@ function find_misspelled_thai_words(string $text, array $confirmedWords = [], in
             continue;
         }
 
-        if (isset($dict[$word]) || isset($confirmedWords[$word])) {
+        if (is_known_thai_word($word, $dict, $confirmedWords)) {
             continue;
         }
         // "ๆ" (ไม้ยมก แปลว่าซ้ำคำ) และ "ฯ" (ไปยาลน้อย ย่อคำ) มักถูกตัดคำติดท้ายคำหลัก
@@ -184,7 +203,7 @@ function find_misspelled_thai_words(string $text, array $confirmedWords = [], in
         $lastChar = mb_substr($word, -1, 1, 'UTF-8');
         if ($lastChar === 'ๆ' || $lastChar === 'ฯ') {
             $stripped = mb_substr($word, 0, mb_strlen($word, 'UTF-8') - 1, 'UTF-8');
-            if ($stripped !== '' && (isset($dict[$stripped]) || isset($confirmedWords[$stripped]))) {
+            if ($stripped !== '' && is_known_thai_word($stripped, $dict, $confirmedWords)) {
                 continue;
             }
         }
@@ -228,6 +247,56 @@ function find_non_thai_words(string $text, array $confirmedWords = [], int $limi
             if (count($found) >= $limit) {
                 break;
             }
+        }
+    }
+    return $found;
+}
+
+// ตรวจการเว้นวรรครอบ "ๆ" (ไม้ยมก) ตามหลักภาษาไทยมาตรฐาน (ราชบัณฑิตยสถาน): ห้ามเว้นวรรคก่อน "ๆ"
+// (ต้องเขียนติดกับคำที่ซ้ำ เช่น "เด็กๆ") แต่ต้องเว้นวรรคหลัง "ๆ" เสมอก่อนขึ้นคำถัดไป
+// คืนค่าเป็นรายการคำที่ไม่ซ้ำ (คำเดี่ยว "ๆ" ถ้าถูกตัดคำแยกออกมา = เว้นวรรคหน้าผิด, หรือคำที่ลงท้าย
+// ด้วย "ๆ" ถ้าคำถัดไปติดกันทันที = ไม่ได้เว้นวรรคหลัง)
+function find_maiyamok_spacing_errors(string $text, array $confirmedWords = [], int $limit = 30): array
+{
+    $text = trim($text);
+    if ($text === '') {
+        return [];
+    }
+
+    $segments = thai_word_segments($text);
+    $n = count($segments);
+    $seen = [];
+    $found = [];
+    for ($i = 0; $i < $n; $i++) {
+        $seg = $segments[$i];
+        if (!$seg['isWord']) {
+            continue;
+        }
+        $word = $seg['text'];
+        if (mb_substr($word, -1, 1, 'UTF-8') !== 'ๆ') {
+            continue;
+        }
+
+        $flagWord = null;
+        if ($word === 'ๆ') {
+            // "ๆ" ถูกตัดคำแยกออกมาเป็นคำเดี่ยว แปลว่ามีช่องว่างคั่นจากคำหน้า — ผิด (ต้องติดคำหน้า)
+            $flagWord = $word;
+        } else {
+            // คำ+ๆ ติดกันแล้ว (ถูกต้องส่วนหน้า) — ตรวจว่าเว้นวรรคก่อนคำถัดไปหรือไม่
+            $next = $segments[$i + 1] ?? null;
+            if ($next && $next['isWord']) {
+                // ไม่มีช่องว่าง/เครื่องหมายคั่นก่อนคำถัดไปเลย — ผิด (ไม่ได้เว้นวรรคหลัง)
+                $flagWord = $word;
+            }
+        }
+
+        if ($flagWord === null || isset($seen[$flagWord]) || isset($confirmedWords[$flagWord])) {
+            continue;
+        }
+        $seen[$flagWord] = true;
+        $found[] = $flagWord;
+        if (count($found) >= $limit) {
+            break;
         }
     }
     return $found;
