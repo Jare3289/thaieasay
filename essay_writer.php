@@ -562,6 +562,29 @@ async function loadEssayForPhase(phase) {
   }
 }
 
+// นับจำนวนคำในข้อความภาษาไทยให้ถูกต้อง (ภาษาไทยไม่มีช่องว่างคั่นระหว่างคำ
+// จึงใช้ Intl.Segmenter ซึ่งตัดคำตามพจนานุกรมของ ICU แทนการแยกด้วยช่องว่างแบบเดิม)
+let __thaiWordSegmenter = null;
+if (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function') {
+  try {
+    __thaiWordSegmenter = new Intl.Segmenter('th', { granularity: 'word' });
+  } catch (e) {
+    __thaiWordSegmenter = null;
+  }
+}
+function countThaiWords(text) {
+  const t = text.trim();
+  if (!t) return 0;
+  if (__thaiWordSegmenter) {
+    let count = 0;
+    for (const part of __thaiWordSegmenter.segment(t)) {
+      if (part.isWordLike) count++;
+    }
+    return count;
+  }
+  return t.split(/[\s\n\r]+/).filter(w => w.length > 0).length;
+}
+
 function updateWordCount() {
   const introText = document.getElementById('essayIntro').value;
   const conclusionText = document.getElementById('essayConclusion').value;
@@ -570,11 +593,11 @@ function updateWordCount() {
   const allTextCombined = [introText, ...bodyTexts, conclusionText].join('\n\n').trim();
   const chars = allTextCombined.length;
 
-  const wordCountIntro = introText.trim() ? introText.trim().split(/[\s\n\r]+/).filter(w => w.length > 0).length : 0;
-  const wordCountConclusion = conclusionText.trim() ? conclusionText.trim().split(/[\s\n\r]+/).filter(w => w.length > 0).length : 0;
+  const wordCountIntro = countThaiWords(introText);
+  const wordCountConclusion = countThaiWords(conclusionText);
   let wordCountBody = 0;
   bodyTexts.forEach(t => {
-    wordCountBody += t.trim() ? t.trim().split(/[\s\n\r]+/).filter(w => w.length > 0).length : 0;
+    wordCountBody += countThaiWords(t);
   });
 
   const words = wordCountIntro + wordCountBody + wordCountConclusion;

@@ -558,6 +558,29 @@ try {
     // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
 }
 
+// Migration ย่อย: คำนวณ word_count ของเรียงความที่บันทึกไว้แล้วใหม่ทั้งหมด
+// ด้วยอัลกอริทึมตัดคำภาษาไทยที่ถูกต้อง (ICU word break iterator)
+// เดิมนับคำด้วยการแยกช่องว่าง/ขึ้นบรรทัดใหม่เท่านั้น ซึ่งนับผิดมากสำหรับภาษาไทยที่ไม่มีช่องว่างคั่นคำ
+// (เช่นทั้งย่อหน้าอาจถูกนับเป็นแค่ 1-2 คำ) ใช้คอลัมน์ word_count_recalculated เป็นตัวกันไม่ให้รันซ้ำ
+try {
+    $col = $pdo->query("SHOW COLUMNS FROM student_essays LIKE 'word_count_recalculated'");
+    if (!$col || $col->rowCount() === 0) {
+        safe_ddl($pdo, "ALTER TABLE student_essays ADD COLUMN word_count_recalculated TINYINT(1) NOT NULL DEFAULT 0 AFTER word_count");
+
+        require_once __DIR__ . '/thai_text_utils.php';
+        $rows = $pdo->query("SELECT id, intro_content, body_content, conclusion_content FROM student_essays")->fetchAll();
+        $up = $pdo->prepare("UPDATE student_essays SET word_count = ?, word_count_recalculated = 1 WHERE id = ?");
+        foreach ($rows as $r) {
+            $bodyArr  = json_decode((string)$r['body_content'], true);
+            $bodyText = is_array($bodyArr) ? implode("\n", $bodyArr) : (string)$r['body_content'];
+            $allText  = trim(($r['intro_content'] ?? '') . "\n" . $bodyText . "\n" . ($r['conclusion_content'] ?? ''));
+            $up->execute([count_thai_words($allText), $r['id']]);
+        }
+    }
+} catch (Exception $e) {
+    // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
+}
+
 // ตารางหัวข้อเรียงความที่ครูกำหนดต่อรอบ (ก่อนเรียน/หน่วยที่ 1/หลังเรียน)
 // นักเรียนไม่ต้องกรอกชื่อเรื่องเอง — ใช้หัวข้อที่ครูกำหนดของแต่ละงานแทน
 // คอลัมน์ is_open = ครูเปิด/ปิดรับการส่งเรียงความของรอบนั้น (1 = เปิดรับ, 0 = ปิดรับ)
