@@ -25,12 +25,57 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # ---------------------------------------------------------------
+      # ขั้นตอนวินิจฉัยปัญหา FTP (ไม่เปิดเผยรหัสจริง)
+      # ใช้ตรวจว่า Secrets ตั้งครบ/ไม่มีช่องว่างแฝง และเซิร์ฟเวอร์รับ
+      # FTP ธรรมดา หรือบังคับ FTPS (TLS). อ่านค่า 220/230/331/530 ในล็อก
+      #   230 = ล็อกอินผ่าน   |   530 = user/pass ผิด
+      # continue-on-error: true = ให้รันต่อไปถึงขั้น deploy เสมอ
+      # ---------------------------------------------------------------
+      - name: Diagnose FTP connection
+        continue-on-error: true
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+        run: |
+          echo "===== ตรวจค่า Secrets (โชว์แค่ความยาว ไม่โชว์ค่าจริง) ====="
+          echo "FTP_SERVER   length = ${#FTP_SERVER}"
+          echo "FTP_USERNAME length = ${#FTP_USERNAME}"
+          echo "FTP_PASSWORD length = ${#FTP_PASSWORD}"
+          # เตือนถ้าค่าว่างเปล่า
+          [ -z "$FTP_SERVER" ]   && echo "!! FTP_SERVER ว่างเปล่า"
+          [ -z "$FTP_USERNAME" ] && echo "!! FTP_USERNAME ว่างเปล่า"
+          [ -z "$FTP_PASSWORD" ] && echo "!! FTP_PASSWORD ว่างเปล่า"
+          # จับช่องว่าง/ขึ้นบรรทัดใหม่หัว-ท้าย (มักเป็นสาเหตุ 530 ที่มองไม่เห็น)
+          case "$FTP_USERNAME" in *[[:space:]]) echo "!! FTP_USERNAME มีช่องว่างต่อท้าย" ;; esac
+          case "$FTP_PASSWORD" in *[[:space:]]) echo "!! FTP_PASSWORD มีช่องว่างต่อท้าย" ;; esac
+
+          echo ""
+          echo "===== ลอง FTP ธรรมดา (พอร์ต 21) ====="
+          curl -sv --connect-timeout 20 --ftp-method nocwd \
+            --user "$FTP_USERNAME:$FTP_PASSWORD" "ftp://$FTP_SERVER/" 2>&1 \
+            | grep -Ei '^< (220|230|331|530|550)|denied|SSL|TLS|AUTH|refused|timed out' || true
+
+          echo ""
+          echo "===== ลอง FTPS แบบ Explicit (TLS บังคับ) ====="
+          curl -sv --connect-timeout 20 --ssl-reqd --ftp-method nocwd -k \
+            --user "$FTP_USERNAME:$FTP_PASSWORD" "ftp://$FTP_SERVER/" 2>&1 \
+            | grep -Ei '^< (220|230|331|530|550)|denied|SSL|TLS|AUTH|refused|timed out' || true
+
+          echo ""
+          echo "หมายเหตุ: ถ้า FTPS ขึ้น 230 แต่ FTP ธรรมดาขึ้น 530/ปิดกั้น"
+          echo "         แปลว่าเซิร์ฟเวอร์บังคับ TLS -> ต้องใส่ protocol: ftps ในขั้น deploy"
+
       - name: Deploy files via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
+          # ถ้าผลวินิจฉัยบอกว่าเซิร์ฟเวอร์บังคับ TLS (FTPS ขึ้น 230 แต่ FTP ธรรมดา
+          # โดนปิดกั้น) ให้เอา # ออกจากบรรทัดล่างนี้เพื่อบังคับใช้ FTPS แบบ explicit:
+          # protocol: ftps
           # โฟลเดอร์ปลายทางบน Plesk = document root ของ subdomain
           # (ถ้า FTP login แล้วไม่ได้อยู่ที่ home ให้ปรับ path ตรงนี้)
           server-dir: ./thaiessay.chainatpit.com/
