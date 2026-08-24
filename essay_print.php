@@ -375,6 +375,16 @@ $genAt = date('d/m/Y H:i');
     display: flex; gap: 8px; justify-content: flex-end; margin: 4px 0 6px;
     font-family: "Tahoma", sans-serif;
   }
+  /* ปุ่มตรวจสอบการสะกดคำ/แยกคำทั้งหน้า — แสดงบนจอเท่านั้น ไม่พิมพ์ลง PDF */
+  .reviewbar {
+    display: flex; justify-content: flex-end; margin: 4px 0 6px;
+    font-family: "Tahoma", sans-serif;
+  }
+  .reviewbar button {
+    border: 1px solid #0d3b66; background: #fff; color: #0d3b66; border-radius: 999px;
+    padding: 4px 14px; font-size: 14px; font-weight: 700; cursor: pointer;
+  }
+  .reviewbar button:hover { filter: brightness(0.96); }
   .editbar button {
     border: 1px solid #cbd5e1; background: #fff; border-radius: 999px;
     padding: 4px 14px; font-size: 14px; font-weight: 700; cursor: pointer;
@@ -407,7 +417,7 @@ $genAt = date('d/m/Y H:i');
 
   @media print {
     .toolbar { display: none !important; }
-    .editbar, .editpanel { display: none !important; }
+    .editbar, .editpanel, .reviewbar { display: none !important; }
     .sheet { max-width: none; padding: 0; }
   }
 </style>
@@ -447,16 +457,16 @@ $genAt = date('d/m/Y H:i');
           $eAllText = trim($eIntro . "\n" . implode("\n", $eBody) . "\n" . $eConc);
           $eWordCount = count_thai_words($eAllText);
           $eSentenceCount = count_thai_sentences($eAllText);
-          if ($isTeacher) {
-            $editData[$fi] = [
-              'sid'   => (string)$e['student_id'],
-              'phase' => (string)$e['essay_phase'],
-              'phaseText' => $phaseText,
-              'intro' => $eIntro,
-              'body'  => $eBody,
-              'conc'  => $eConc,
-            ];
-          }
+          // เก็บเนื้อหาไว้ให้ JS ใช้ได้ทั้งครูและผู้เชี่ยวชาญ (สำหรับปุ่ม "ตรวจสอบทั้งหน้า")
+          // ส่วนแผงแก้ไข/ลบด้านล่างยังจำกัดเฉพาะครูเหมือนเดิม
+          $editData[$fi] = [
+            'sid'   => (string)$e['student_id'],
+            'phase' => (string)$e['essay_phase'],
+            'phaseText' => $phaseText,
+            'intro' => $eIntro,
+            'body'  => $eBody,
+            'conc'  => $eConc,
+          ];
       ?>
       <div class="form">
         <?php if ($isTeacher): ?>
@@ -465,6 +475,9 @@ $genAt = date('d/m/Y H:i');
           <button type="button" class="b-del" onclick="deleteEssay(<?php echo $fi; ?>)">🗑️ ลบ</button>
         </div>
         <?php endif; ?>
+        <div class="reviewbar">
+          <button type="button" onclick="openPrintSpellingReview(<?php echo $fi; ?>)">🔍 ตรวจสอบทั้งหน้า / แยกคำ</button>
+        </div>
         <h1 class="form-title">แบบเขียนเรียงความ</h1>
         <div class="info">
           <span class="lead">ชื่อ-สกุล</span><span class="fill name"><?php echo $h($e['student_name']); ?></span>
@@ -496,7 +509,12 @@ $genAt = date('d/m/Y H:i');
     <?php endif; ?>
   </div>
 
+  <script src="thai_review.js"></script>
   <script>
+    // ข้อมูลเนื้อหาเรียงความต่อชิ้น (ใช้โดยปุ่ม "ตรวจสอบทั้งหน้า" — ทุกคนที่เห็นหน้านี้ใช้ได้
+    // ส่วนการบันทึกแก้ไขจริงยังจำกัดเฉพาะครูอยู่ที่ api.php?action=admin_save_essay)
+    var ESSAY_EDIT = <?php echo json_encode($editData ?? [], JSON_UNESCAPED_UNICODE); ?>;
+
     // สร้างเลขบรรทัดทุก 5 บรรทัด (5, 10, 15, ...) ที่ขอบซ้ายของเนื้อความ
     // คำนวณจำนวนบรรทัดจริงหลังจัดหน้าเสร็จ แล้ววางตัวเลขตามระยะบรรทัด (LH)
     function addLineNumbers() {
@@ -521,12 +539,66 @@ $genAt = date('d/m/Y H:i');
       addLineNumbers();
       if (AUTO_PRINT) setTimeout(function () { window.print(); }, 200);
     });
+
+    // สร้างรายการย่อหน้าทั้งฉบับของเรียงความชิ้นที่ i (สำหรับหน้าต่างตรวจสอบการสะกดคำ)
+    function buildPrintReviewParagraphs(i) {
+      var d = ESSAY_EDIT[i] || {};
+      var paras = [];
+      if ((d.intro || '').trim()) paras.push({ label: 'intro', text: d.intro });
+      (d.body || []).forEach(function (p, idx) {
+        if ((p || '').trim()) paras.push({ label: 'body:' + idx, text: p });
+      });
+      if ((d.conc || '').trim()) paras.push({ label: 'concl', text: d.conc });
+      return paras;
+    }
+
+    // เปิดหน้าต่างตรวจสอบการสะกดคำ/แยกคำทั้งหน้า สำหรับเรียงความชิ้นที่ i
+    function openPrintSpellingReview(i) {
+      var paragraphs = buildPrintReviewParagraphs(i);
+      if (paragraphs.length === 0) {
+        alert('ไม่มีเนื้อหาเรียงความให้ตรวจสอบ');
+        return;
+      }
+      var combined = paragraphs.map(function (p) { return p.text; }).join('\n');
+
+      fetch('api.php?action=check_thai_spelling', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: combined })
+      }).then(function (r) { return r.json(); }).catch(function () { return null; }).then(function (data) {
+        var misspelled = (data && data.success) ? data.misspelled : [];
+        ThaiReview.open({
+          paragraphs: paragraphs,
+          misspelled: misspelled,
+          onSave: function (editedParagraphs) {
+            var d = ESSAY_EDIT[i];
+            if (!d) return Promise.reject(new Error('ไม่พบข้อมูลเรียงความ'));
+            var byLabel = {};
+            editedParagraphs.forEach(function (p) { byLabel[p.label] = p.text; });
+            var intro = (byLabel['intro'] !== undefined) ? byLabel['intro'].trim() : '';
+            var conc  = (byLabel['concl'] !== undefined) ? byLabel['concl'].trim() : '';
+            var body  = (d.body || []).map(function (_, idx) {
+              return (byLabel['body:' + idx] !== undefined) ? byLabel['body:' + idx].trim() : '';
+            }).filter(function (t) { return t !== ''; });
+
+            return fetch('api.php?action=admin_save_essay', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ student_id: d.sid, essay_phase: d.phase, introduction: intro, body: body, conclusion: conc })
+            }).then(function (r) { return r.json(); }).then(function (res) {
+              if (!res.success) throw new Error(res.error || 'บันทึกไม่สำเร็จ');
+              // บันทึกสำเร็จ — โหลดหน้าใหม่เพื่อแสดงเนื้อหาที่แก้ไขแล้ว (เหมือนแผงแก้ไขเดิม)
+              location.reload();
+            });
+          }
+        });
+      });
+    }
   </script>
 
   <?php if ($isTeacher): ?>
   <script>
     // ===== ครูแก้ไข/ลบเรียงความในหน้าเอกสาร =====
-    var ESSAY_EDIT = <?php echo json_encode($editData ?? [], JSON_UNESCAPED_UNICODE); ?>;
 
     // เปิด/ปิดแผงแก้ไข (เติมเนื้อหาเดิมครั้งแรกที่เปิด)
     function toggleEdit(i) {
