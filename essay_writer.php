@@ -102,6 +102,18 @@ require_once 'header.php';
         </div>
       </div>
 
+      <!-- โหมดดูฉบับที่บันทึกไว้ (อ่านอย่างเดียว คล้ายเอกสารพิมพ์) — แสดงเมื่อรอบนี้มีเนื้อหาบันทึกไว้แล้ว -->
+      <div id="essayViewPanel" class="d-none">
+        <div class="essay-view-doc" id="essayViewContent"></div>
+        <div class="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2">
+          <span class="text-muted small" id="essayViewMeta"></span>
+          <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold" onclick="showEssayEdit()">
+            <i class="bi bi-pencil-fill me-1"></i>แก้ไข
+          </button>
+        </div>
+      </div>
+
+      <div id="essayEditPanel">
       <!-- แจ้งเตือนเมื่อคุณครูปิดรับการส่งงานของรอบที่เลือกอยู่ -->
       <div id="phaseClosedNotice" class="alert alert-warning border-0 rounded-3 small mb-3 py-2 d-none" role="alert">
         <i class="bi bi-lock-fill me-2"></i>
@@ -112,6 +124,12 @@ require_once 'header.php';
       <div class="alert alert-info border-0 rounded-3 small mb-3 py-2" role="alert">
         <i class="bi bi-info-circle-fill me-2"></i>
         พิมพ์เรียงความตามที่เขียนไว้บนกระดาษให้ตรงกันมากที่สุด ระบบจะนับจำนวนคำและบันทึกเก็บไว้เพื่อนำไปวิเคราะห์เชิงคุณภาพโดยคุณครูผู้สอน
+      </div>
+
+      <div class="d-flex justify-content-end mb-2">
+        <button type="button" class="btn btn-link btn-sm text-decoration-none d-none" id="backToViewBtn" onclick="showEssayView()">
+          <i class="bi bi-eye me-1"></i>กลับไปดูฉบับที่บันทึกไว้ (ไม่แก้ไข)
+        </button>
       </div>
 
       <!-- Essay sections -->
@@ -160,25 +178,19 @@ require_once 'header.php';
 
       <!-- Stats Preview -->
       <div class="row g-3 mb-3" id="statsRow">
-        <div class="col-3">
+        <div class="col-4">
           <div class="card border-0 rounded-3 p-3 text-center bg-light">
             <div class="fs-4 fw-extrabold text-primary mb-0" id="statWords">0</div>
             <div class="text-muted small">จำนวนคำ</div>
           </div>
         </div>
-        <div class="col-3">
-          <div class="card border-0 rounded-3 p-3 text-center bg-light">
-            <div class="fs-4 fw-extrabold text-info mb-0" id="statSentences">0</div>
-            <div class="text-muted small">ประโยค (โดยประมาณ)</div>
-          </div>
-        </div>
-        <div class="col-3">
+        <div class="col-4">
           <div class="card border-0 rounded-3 p-3 text-center bg-light">
             <div class="fs-4 fw-extrabold text-success mb-0" id="statChars">0</div>
             <div class="text-muted small">ตัวอักษร</div>
           </div>
         </div>
-        <div class="col-3">
+        <div class="col-4">
           <div class="card border-0 rounded-3 p-3 text-center bg-light">
             <div class="fs-4 fw-extrabold text-warning mb-0" id="statParagraphs">0</div>
             <div class="text-muted small">ย่อหน้า</div>
@@ -195,6 +207,7 @@ require_once 'header.php';
           <i class="bi bi-eye me-1"></i>ตรวจสอบทั้งหน้า / แยกคำ
         </button>
       </div>
+      </div>
 
     </div>
 
@@ -208,7 +221,7 @@ require_once 'header.php';
           </div>
           <div class="text-muted small">กดปุ่ม "บันทึกเรียงความ" เพื่อเก็บข้อมูลลงในระบบ</div>
         </div>
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2" id="essayFooterActions">
           <button id="clearBtn" class="btn btn-outline-secondary rounded-pill px-4" onclick="clearEssay()">
             <i class="bi bi-arrow-counterclockwise"></i> ล้างข้อมูล
           </button>
@@ -268,6 +281,23 @@ require_once 'header.php';
   height: 40px;
   background: linear-gradient(transparent, white);
 }
+/* โหมดดูฉบับที่บันทึกไว้ (อ่านอย่างเดียว) — จัดหน้าให้อ่านคล้ายเอกสารเรียงความจริง (เหมือน essay_print.php) */
+.essay-view-doc {
+  font-family: 'Sarabun', sans-serif;
+  font-size: 1.05rem;
+  line-height: 2;
+}
+.essay-view-doc .essay-view-para {
+  margin: 0 0 0.75em;
+  text-indent: 2.5em;
+  text-align: justify;
+}
+.essay-view-doc .thai-word { border-bottom: 1px dotted #b9c4c4; }
+.essay-view-doc .no-content { color: #888; font-style: italic; text-indent: 0; text-align: center; }
+/* การ์ดในรายการ "บันทึกไว้แล้ว" — แสดงเนื้อหาเต็มแบบเดียวกัน */
+.saved-essay-full { font-family: 'Sarabun', sans-serif; font-size: 0.95rem; line-height: 1.9; }
+.saved-essay-full .essay-view-para { margin: 0 0 0.6em; text-indent: 2em; text-align: justify; }
+.saved-essay-full .thai-word { border-bottom: 1px dotted #c9c2b3; }
 </style>
 
 <script src="thai_review.js"></script>
@@ -406,7 +436,7 @@ function reindexBodyParagraphs() {
 }
 
 // เลือกหน่วยการเรียน — ภาระงานจะเปิดแถบเลือกร่าง (D1/D2) ให้ด้วย
-function setEssayUnit(unit) {
+function setEssayUnit(unit, opts) {
   currentUnit = unit;
   const isTask = (unit === 'task1' || unit === 'task2');
 
@@ -423,11 +453,11 @@ function setEssayUnit(unit) {
   updatePhaseBadge();
   updateTopicDisplay();
   updateSubmitAvailability();
-  loadEssayForPhase(currentEssayPhase);
+  loadEssayForPhase(currentEssayPhase, opts);
 }
 
 // เลือกร่าง (D1/D2) ของภาระงานหน่วยปัจจุบัน
-function setEssayDraft(draft) {
+function setEssayDraft(draft, opts) {
   currentDraft = draft;
   document.querySelectorAll('.draft-btn').forEach(b => b.classList.remove('active-draft'));
   const activeBtn = document.querySelector(`.draft-btn[data-draft="${draft}"]`);
@@ -435,7 +465,7 @@ function setEssayDraft(draft) {
 
   currentEssayPhase = computeEssayPhase(currentUnit, draft);
   updatePhaseBadge();
-  loadEssayForPhase(currentEssayPhase);
+  loadEssayForPhase(currentEssayPhase, opts);
 }
 
 function updatePhaseBadge() {
@@ -444,15 +474,15 @@ function updatePhaseBadge() {
   badge.className = 'badge ' + (phaseBadgeColors[currentEssayPhase] || 'bg-secondary');
 }
 
-// เปิดแก้ไขจากรายการที่บันทึกไว้ (แปลงคีย์ phase → หน่วย + ร่าง)
+// เปิดแก้ไขจากรายการที่บันทึกไว้ (แปลงคีย์ phase → หน่วย + ร่าง) — เข้าโหมดแก้ไขทันที ตรงตามป้ายปุ่ม "แก้ไข"
 function openEssayPhase(phase) {
   const m = /^(task[12])_(d[12])$/.exec(phase);
   if (m) {
     currentDraft = m[2];
     document.querySelectorAll('.draft-btn').forEach(b => b.classList.toggle('active-draft', b.getAttribute('data-draft') === m[2]));
-    setEssayUnit(m[1]);
+    setEssayUnit(m[1], { forceEdit: true });
   } else {
-    setEssayUnit(phase);
+    setEssayUnit(phase, { forceEdit: true });
   }
 }
 
@@ -510,13 +540,83 @@ function checkAndOfferDraftRestore(phase) {
     const bodyList = (draft.body && draft.body.length) ? draft.body : [''];
     bodyList.forEach(t => addBodyParagraph(t));
     updateWordCount();
+    showEssayEdit();
     showToast('กู้คืนร่างที่ยังไม่ได้บันทึกเรียบร้อยแล้ว อย่าลืมกดบันทึกอีกครั้ง', 'success');
   } else {
     clearDraftFromLocalStorage(phase);
   }
 }
 
-async function loadEssayForPhase(phase) {
+// ตัดคำภาษาไทยด้วย Intl.Segmenter (ใช้ตัวเดียวกับ thai_review.js) เพื่อแสดงขอบเขตคำในโหมดดูฉบับที่บันทึกไว้
+function essayWordSegmentedHTML(text) {
+  const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  if (typeof ThaiReview === 'undefined' || !ThaiReview.segmentText) {
+    return esc(text).replace(/\n/g, '<br>');
+  }
+  let html = '';
+  ThaiReview.segmentText(text).forEach(seg => {
+    const e = esc(seg.text).replace(/\n/g, '<br>');
+    html += seg.isWord ? `<span class="thai-word">${e}</span>` : e;
+  });
+  return html;
+}
+
+// แยกเนื้อหาเรียงความ (JSON หรือข้อความล้วน) เป็นรายการย่อหน้าเรียงตามลำดับ (คำนำ/เนื้อเรื่อง.../สรุป)
+function parseEssayContentToParas(contentStr) {
+  const paras = [];
+  if (!contentStr) return paras;
+  let parsed = null;
+  try { parsed = JSON.parse(contentStr); } catch (e) { parsed = null; }
+  if (parsed && typeof parsed === 'object' && parsed.introduction !== undefined) {
+    if (parsed.introduction && parsed.introduction.trim()) paras.push(parsed.introduction);
+    if (Array.isArray(parsed.body)) {
+      parsed.body.forEach(p => { if (p && p.trim()) paras.push(p); });
+    }
+    if (parsed.conclusion && parsed.conclusion.trim()) paras.push(parsed.conclusion);
+  } else if (String(contentStr).trim()) {
+    String(contentStr).split(/\n{2,}/).forEach(p => { if (p.trim()) paras.push(p); });
+  }
+  return paras;
+}
+
+// สร้าง HTML แบบเอกสารเรียงความ (คล้าย essay_print.php) จากเนื้อหา JSON — ใช้ทั้งโหมดดูฉบับที่บันทึกไว้
+// และรายการ "เรียงความที่บันทึกไว้แล้ว" ด้านล่างหน้า
+function renderEssayDocHTML(contentStr, paraClass) {
+  const paras = parseEssayContentToParas(contentStr);
+  if (!paras.length) return '<div class="no-content">— ยังไม่มีเนื้อหาเรียงความ —</div>';
+  return paras.map(p => `<p class="${paraClass}">${essayWordSegmentedHTML(p)}</p>`).join('');
+}
+
+// สลับไปโหมดดูฉบับที่บันทึกไว้ (อ่านอย่างเดียว)
+function showEssayView() {
+  document.getElementById('essayViewPanel').classList.remove('d-none');
+  document.getElementById('essayEditPanel').classList.add('d-none');
+  document.getElementById('essayFooterActions').classList.add('d-none');
+}
+
+// สลับไปโหมดแก้ไข (กล่องข้อความ) — ปุ่ม "กลับไปดูฉบับที่บันทึกไว้" จะโผล่มาเฉพาะตอนมีฉบับที่บันทึกไว้แล้วเท่านั้น
+let currentPhaseHasSavedContent = false;
+function showEssayEdit() {
+  document.getElementById('essayViewPanel').classList.add('d-none');
+  document.getElementById('essayEditPanel').classList.remove('d-none');
+  document.getElementById('essayFooterActions').classList.remove('d-none');
+  const backBtn = document.getElementById('backToViewBtn');
+  if (backBtn) backBtn.classList.toggle('d-none', !currentPhaseHasSavedContent);
+}
+
+// อัปเดตโหมดดูฉบับที่บันทึกไว้ให้ตรงกับข้อมูลที่เพิ่งบันทึกสำเร็จ (ไม่ต้องโหลดจากเซิร์ฟเวอร์ใหม่)
+function refreshEssayViewFromParts(intro, bodyParas, conclusion, wordCount) {
+  currentPhaseHasSavedContent = true;
+  const contentStr = JSON.stringify({ introduction: intro, body: bodyParas, conclusion: conclusion });
+  document.getElementById('essayViewContent').innerHTML = renderEssayDocHTML(contentStr, 'essay-view-para');
+  const now = new Date().toLocaleString('th-TH');
+  document.getElementById('essayViewMeta').textContent = `${(wordCount || 0).toLocaleString('th-TH')} คำ · บันทึกล่าสุด: ${now}`;
+  const backBtn = document.getElementById('backToViewBtn');
+  if (backBtn) backBtn.classList.remove('d-none');
+}
+
+async function loadEssayForPhase(phase, opts) {
+  opts = opts || {};
   const statusBadge = document.getElementById('saveStatusBadge');
   statusBadge.textContent = 'กำลังโหลด...';
   statusBadge.className = 'badge bg-info small';
@@ -561,6 +661,12 @@ async function loadEssayForPhase(phase) {
 
       statusBadge.textContent = '✓ มีข้อมูลบันทึกไว้แล้ว';
       statusBadge.className = 'badge bg-success small';
+
+      currentPhaseHasSavedContent = true;
+      document.getElementById('essayViewContent').innerHTML = renderEssayDocHTML(contentStr, 'essay-view-para');
+      document.getElementById('essayViewMeta').textContent =
+        `${(data.data.word_count || 0).toLocaleString('th-TH')} คำ · บันทึกล่าสุด: ${dt.toLocaleString('th-TH')}`;
+      if (opts.forceEdit) { showEssayEdit(); } else { showEssayView(); }
     } else {
       document.getElementById('essayIntro').value = '';
       document.getElementById('essayConclusion').value = '';
@@ -570,12 +676,16 @@ async function loadEssayForPhase(phase) {
 
       statusBadge.textContent = 'ยังไม่มีข้อมูล';
       statusBadge.className = 'badge bg-secondary small';
+
+      currentPhaseHasSavedContent = false;
+      showEssayEdit();
     }
 
     checkAndOfferDraftRestore(phase);
   } catch(err) {
     statusBadge.textContent = '⚠️ โหลดไม่ได้';
     statusBadge.className = 'badge bg-danger small';
+    showEssayEdit();
   }
 }
 
@@ -602,18 +712,6 @@ function countThaiWords(text) {
   return t.split(/[\s\n\r]+/).filter(w => w.length > 0).length;
 }
 
-// นับจำนวนประโยคโดยประมาณ (ตรงกับ count_thai_sentences ฝั่งเซิร์ฟเวอร์ใน thai_text_utils.php)
-// ภาษาไทยไม่มีเครื่องหมายจบประโยคบังคับ จึงเป็นค่าประมาณ ไม่ใช่การตรวจไวยากรณ์ประโยคจริง
-function countThaiSentences(text) {
-  const paragraphs = text.split(/\n+/).map(p => p.trim()).filter(p => p !== '');
-  let count = 0;
-  paragraphs.forEach(para => {
-    const pieces = para.split(/[.!?]+/).map(s => s.trim()).filter(s => s !== '');
-    count += Math.max(pieces.length, 1);
-  });
-  return count;
-}
-
 function updateWordCount() {
   const introText = document.getElementById('essayIntro').value;
   const conclusionText = document.getElementById('essayConclusion').value;
@@ -630,11 +728,9 @@ function updateWordCount() {
   });
 
   const words = wordCountIntro + wordCountBody + wordCountConclusion;
-  const sentences = countThaiSentences(allTextCombined);
   const paragraphs = (introText.trim() ? 1 : 0) + bodyTexts.filter(t => t.trim().length > 0).length + (conclusionText.trim() ? 1 : 0);
 
   document.getElementById('statWords').textContent = words.toLocaleString('th-TH');
-  document.getElementById('statSentences').textContent = sentences.toLocaleString('th-TH');
   document.getElementById('statChars').textContent = chars.toLocaleString('th-TH');
   document.getElementById('statParagraphs').textContent = paragraphs;
   document.getElementById('charCount').textContent = chars.toLocaleString('th-TH') + ' ตัวอักษร';
@@ -677,8 +773,9 @@ async function refreshSpellCheckStatus(combinedText) {
     });
     const data = await res.json();
     if (!data.success) return;
-    statusEl.innerHTML = data.misspelled.length > 0
-      ? `<i class="bi bi-exclamation-triangle-fill text-warning me-1"></i>พบคำที่อาจสะกดผิด ${data.misspelled.length} คำ — กด "ตรวจสอบทั้งหน้า" เพื่อดู`
+    const n = (data.misspelled ? data.misspelled.length : 0) + (data.foreign ? data.foreign.length : 0);
+    statusEl.innerHTML = n > 0
+      ? `<i class="bi bi-exclamation-triangle-fill text-warning me-1"></i>พบคำที่น่าสงสัย ${n} คำ — กด "ตรวจสอบทั้งหน้า" เพื่อดู`
       : '<i class="bi bi-check-circle-fill text-success me-1"></i>ไม่พบคำที่น่าสงสัยในขณะนี้';
   } catch (e) {
     // เงียบไว้ — ไม่ให้กระทบการพิมพ์งานหลัก
@@ -739,6 +836,7 @@ async function openSpellingReview() {
   }
 
   let misspelled = [];
+  let foreign = [];
   try {
     const res = await fetch('api.php?action=check_thai_spelling', {
       method: 'POST',
@@ -746,7 +844,7 @@ async function openSpellingReview() {
       body: JSON.stringify({ text: paragraphs.map(p => p.text).join('\n') })
     });
     const data = await res.json();
-    if (data.success) misspelled = data.misspelled;
+    if (data.success) { misspelled = data.misspelled; foreign = data.foreign; }
   } catch (e) {
     // เงียบไว้ — เปิดหน้าต่างได้แม้ตรวจคำผิดไม่สำเร็จ (จะไม่มีคำไฮไลต์)
   }
@@ -754,6 +852,7 @@ async function openSpellingReview() {
   ThaiReview.open({
     paragraphs,
     misspelled,
+    foreign,
     onSave: async (editedParagraphs) => {
       applyReviewParagraphsToForm(editedParagraphs);
       const intro = document.getElementById('essayIntro').value.trim();
@@ -769,6 +868,7 @@ async function openSpellingReview() {
       const now = new Date().toLocaleString('th-TH');
       document.getElementById('lastSavedTime').textContent = now;
       document.getElementById('lastSavedInfo').classList.remove('d-none');
+      refreshEssayViewFromParts(intro, bodyParas, conclusion, data.word_count);
       clearDraftFromLocalStorage(currentEssayPhase);
       loadSavedList();
     }
@@ -817,6 +917,7 @@ async function saveEssay() {
       statusBadge.classList.remove('d-none');
 
       showToast(`บันทึกเรียงความ "${phaseLabels[currentEssayPhase]}" สำเร็จ! (${data.word_count} คำ)`, 'success');
+      refreshEssayViewFromParts(intro, bodyParagraphs, conclusion, data.word_count);
       // บันทึกขึ้นเซิร์ฟเวอร์สำเร็จแล้ว ไม่ต้องเก็บร่างสำรองในเครื่องอีกต่อไป
       clearDraftFromLocalStorage(currentEssayPhase);
       loadSavedList();
@@ -858,22 +959,7 @@ async function loadSavedList() {
   }
 
   container.innerHTML = found.map(item => {
-    let preview = '';
-    try {
-      const obj = JSON.parse(item.data.essay_content);
-      if (obj && typeof obj === 'object' && obj.introduction !== undefined) {
-        const intro = obj.introduction || '';
-        const firstBody = (obj.body && obj.body[0]) ? obj.body[0] : '';
-        const conc = obj.conclusion || '';
-        preview = `[คำนำ] ${intro}\n[เนื้อเรื่อง] ${firstBody}...\n[สรุป] ${conc}`;
-      } else {
-        preview = item.data.essay_content || '';
-      }
-    } catch (e) {
-      preview = item.data.essay_content || '';
-    }
-
-    const previewTrunc = preview.substring(0, 200).trim();
+    const fullHTML = renderEssayDocHTML(item.data.essay_content, 'essay-view-para');
     const dt = new Date(item.data.updated_at);
     const dateStr = dt.toLocaleString('th-TH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     const badgeClass = phaseBadgeColors[item.phase] || 'bg-secondary';
@@ -895,8 +981,8 @@ async function loadSavedList() {
               </button>
             </div>
           </div>
-          <div class="text-muted small mb-2 text-start" style="white-space: pre-wrap; line-height: 1.5; max-height: 80px; overflow: hidden; position: relative;">
-            ${previewTrunc}${preview.length >= 200 ? '...' : ''}
+          <div class="saved-essay-full text-dark text-start mb-2 p-3 rounded-3" style="background-color:#fffdf9; border:1px solid #f0e6c8;">
+            ${fullHTML}
           </div>
           <div class="text-muted text-start" style="font-size:0.75rem;">
             <i class="bi bi-clock me-1"></i>บันทึกล่าสุด: ${dateStr}

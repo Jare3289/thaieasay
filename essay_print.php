@@ -456,7 +456,6 @@ $genAt = date('d/m/Y H:i');
           $eConc  = is_array($eObj) ? (string)($eObj['conclusion'] ?? '') : '';
           $eAllText = trim($eIntro . "\n" . implode("\n", $eBody) . "\n" . $eConc);
           $eWordCount = count_thai_words($eAllText);
-          $eSentenceCount = count_thai_sentences($eAllText);
           // เก็บเนื้อหาไว้ให้ JS ใช้ได้ทั้งครูและผู้เชี่ยวชาญ (สำหรับปุ่ม "ตรวจสอบทั้งหน้า")
           // ส่วนแผงแก้ไข/ลบด้านล่างยังจำกัดเฉพาะครูเหมือนเดิม
           $editData[$fi] = [
@@ -487,7 +486,7 @@ $genAt = date('d/m/Y H:i');
         <div class="topic">
           <span class="lead">หัวข้อ :</span><span class="fill"><?php echo $h($e['essay_title']); ?></span>
         </div>
-        <div class="meta">รอบการประเมิน: <?php echo $h($phaseText); ?><?php if ($grp !== ''): ?> · กลุ่ม: <?php echo $h($grp); ?><?php endif; ?> · <?php echo $eWordCount; ?> คำ · <?php echo $eSentenceCount; ?> ประโยค (โดยประมาณ)</div>
+        <div class="meta">รอบการประเมิน: <?php echo $h($phaseText); ?><?php if ($grp !== ''): ?> · กลุ่ม: <?php echo $h($grp); ?><?php endif; ?> · <?php echo $eWordCount; ?> คำ</div>
         <div class="content" id="content_<?php echo $fi; ?>"><?php echo essayParagraphs($e['essay_content'] ?? ''); ?></div>
         <?php if ($isTeacher): ?>
         <div class="editpanel" id="panel_<?php echo $fi; ?>" style="display:none;">
@@ -567,9 +566,11 @@ $genAt = date('d/m/Y H:i');
         body: JSON.stringify({ text: combined })
       }).then(function (r) { return r.json(); }).catch(function () { return null; }).then(function (data) {
         var misspelled = (data && data.success) ? data.misspelled : [];
+        var foreign = (data && data.success) ? data.foreign : [];
         ThaiReview.open({
           paragraphs: paragraphs,
           misspelled: misspelled,
+          foreign: foreign,
           onSave: function (editedParagraphs) {
             var d = ESSAY_EDIT[i];
             if (!d) return Promise.reject(new Error('ไม่พบข้อมูลเรียงความ'));

@@ -427,7 +427,6 @@ require_once 'header.php';
       </h6>
       <div class="d-flex align-items-center gap-2 flex-shrink-0">
         <span class="badge bg-primary-subtle text-primary rounded-pill px-3 py-1 font-mono small" id="essayPanelWordCount">0 คำ</span>
-        <span class="badge bg-info-subtle text-info-emphasis rounded-pill px-3 py-1 font-mono small" id="essayPanelSentenceCount">0 ประโยค</span>
         <button type="button" class="essay-collapse-btn" id="essayCollapseBtn" title="ย่อ/ขยายกล่องเรียงความ" onclick="event.stopPropagation(); toggleEssayCollapse();">
           <i class="bi bi-dash-lg" id="essayCollapseIcon"></i>
         </button>
@@ -1246,18 +1245,6 @@ require_once 'header.php';
     return paras;
   }
 
-  // นับจำนวนประโยคโดยประมาณ (ตรงกับ count_thai_sentences ฝั่งเซิร์ฟเวอร์ใน thai_text_utils.php)
-  // ภาษาไทยไม่มีเครื่องหมายจบประโยคบังคับ จึงเป็นค่าประมาณ ไม่ใช่การตรวจไวยากรณ์ประโยคจริง
-  function countThaiSentences(text) {
-    const paragraphs = text.split(/\n+/).map(p => p.trim()).filter(p => p !== '');
-    let count = 0;
-    paragraphs.forEach(para => {
-      const pieces = para.split(/[.!?]+/).map(s => s.trim()).filter(s => s !== '');
-      count += Math.max(pieces.length, 1);
-    });
-    return count;
-  }
-
   function formatEssayHTML(contentStr) {
     const paras = parseEssayParas(contentStr);
     if (!paras.length) return '<div class="no-content">— ยังไม่มีเนื้อหาเรียงความ —</div>';
@@ -1433,7 +1420,6 @@ require_once 'header.php';
     const authorEl = document.getElementById('essayPanelAuthor');
     const contentEl = document.getElementById('essayPanelContent');
     const countEl = document.getElementById('essayPanelWordCount');
-    const sentenceCountEl = document.getElementById('essayPanelSentenceCount');
 
     // ไม่มีรหัสนักเรียน หรือเด็กไม่ได้บันทึกเรียงความ → ซ่อนคอลัมน์เรียงความ คงเหลือเฉพาะแบบประเมินเต็มความกว้าง
     if (!studentId) {
@@ -1462,10 +1448,6 @@ require_once 'header.php';
         }
         contentEl.innerHTML = formatEssayHTML(data.data.essay_content);
         countEl.textContent = `${data.data.word_count || 0} คำ`;
-        if (sentenceCountEl) {
-          const plainText = parseEssayParas(data.data.essay_content).map(p => p.text).join('\n');
-          sentenceCountEl.textContent = `${countThaiSentences(plainText)} ประโยค`;
-        }
         toggleEssayColumn(true);
         // รอให้จัดหน้าเสร็จก่อนคำนวณ/วางเลขบรรทัดและป้ายบอกส่วน (กล่องเพิ่งแสดง)
         requestAnimationFrame(() => requestAnimationFrame(() => { addEssayLineNumbers(); addEssaySectionTags(); }));

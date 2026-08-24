@@ -800,6 +800,7 @@ require_once 'header.php';
     }
 
     let misspelled = [];
+    let foreign = [];
     try {
       const res = await fetch('api.php?action=check_thai_spelling', {
         method: 'POST',
@@ -807,7 +808,7 @@ require_once 'header.php';
         body: JSON.stringify({ text: paragraphs.map(p => p.text).join('\n') })
       });
       const data = await res.json();
-      if (data.success) misspelled = data.misspelled;
+      if (data.success) { misspelled = data.misspelled; foreign = data.foreign; }
     } catch (e) {
       // เงียบไว้ — เปิดหน้าต่างได้แม้ตรวจคำผิดไม่สำเร็จ (จะไม่มีคำไฮไลต์)
     }
@@ -815,6 +816,7 @@ require_once 'header.php';
     ThaiReview.open({
       paragraphs,
       misspelled,
+      foreign,
       onSave: async (editedParagraphs) => {
         const sel = document.getElementById('editStudentSelect');
         const sid = (sel.dataset.fixed || sel.value || '').trim();

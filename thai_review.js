@@ -1,9 +1,10 @@
 /*
- * thai_review.js — หน้าต่างตรวจสอบเรียงความแบบเต็มหน้า (ใช้ร่วมกันโดย essay_writer.php และ essay_viewer.php)
+ * thai_review.js — หน้าต่างตรวจสอบเรียงความแบบเต็มหน้า (ใช้ร่วมกันโดย essay_writer.php, essay_viewer.php, essay_print.php)
  *
  * แสดงเรียงความทั้งฉบับ (คำนำ + เนื้อเรื่องทุกย่อหน้า + สรุป ต่อเนื่องกันเหมือนอ่านจริง) พร้อมไฮไลต์
- * คำที่ระบบตรวจพบว่า "อาจสะกดผิด" (เทียบกับพจนานุกรมคำไทย — ดู thai_text_utils.php ฝั่งเซิร์ฟเวอร์)
- * คลิกคำที่ไฮไลต์เพื่อ "✓ ยืนยันว่าถูกต้อง" (จะไม่ถูกฟ้องอีกทั้งระบบ) หรือ "✏️ แก้คำ" (แก้ตรงจุดแล้วบันทึก)
+ * คำที่ระบบตรวจพบว่า "อาจสะกดผิด" (เทียบกับพจนานุกรมคำไทย) และคำที่ "เขียนด้วยภาษาอื่นปนอยู่"
+ * (ดู thai_text_utils.php ฝั่งเซิร์ฟเวอร์) คลิกคำที่ไฮไลต์เพื่อ "✓ ยืนยันว่าถูกต้อง" (จะไม่ถูกฟ้อง
+ * อีกทั้งระบบ) "✏️ แก้คำ" (แก้ตรงจุดแล้วบันทึก) หรือ "🗑️ ลบ" (ลบคำนั้นออกจากเนื้อหาเลย)
  */
 (function (window, document) {
   'use strict';
@@ -35,7 +36,7 @@
   }
 
   let modalEl = null;
-  let state = null; // { paragraphs, misspelledSet, dirty, onSave }
+  let state = null; // { paragraphs, misspelledSet, foreignSet, dirty, onSave }
 
   function ensureModal() {
     if (modalEl) return modalEl;
@@ -49,7 +50,9 @@
           <button type="button" class="trw-close" aria-label="ปิด">&times;</button>
         </div>
         <div class="trw-note">
-          คลิกคำที่ไฮไลต์สีเหลือง เพื่อยืนยันว่าถูกต้อง หรือแก้ไขตรงจุด — ระบบตรวจเทียบกับพจนานุกรมเท่านั้น
+          <span class="trw-legend"><span class="trw-swatch trw-swatch-misspell"></span>อาจสะกดผิด</span>
+          <span class="trw-legend"><span class="trw-swatch trw-swatch-foreign"></span>เขียนด้วยภาษาอื่นปนอยู่</span>
+          — คลิกคำที่ไฮไลต์เพื่อยืนยันว่าถูกต้อง แก้ไข หรือลบ ระบบตรวจเทียบกับพจนานุกรมเท่านั้น
           ชื่อเฉพาะ คำสแลง หรือศัพท์เฉพาะทางที่ถูกต้องอยู่แล้วอาจถูกไฮไลต์ด้วย กด "ถูกต้อง" เพื่อไม่ให้ฟ้องซ้ำอีก
         </div>
         <div class="trw-status"></div>
@@ -76,16 +79,23 @@
       #thaiReviewModal .trw-title { font-weight: 700; font-size: 1.1rem; }
       #thaiReviewModal .trw-close { background: none; border: none; font-size: 1.6rem; line-height: 1; cursor: pointer; color: #888; }
       #thaiReviewModal .trw-note { padding: 10px 20px; font-size: .85rem; color: #6c5300; background: #fff9e6; border-bottom: 1px solid #f5e6a8; }
+      #thaiReviewModal .trw-legend { display: inline-flex; align-items: center; gap: 4px; margin-right: 10px; font-weight: 600; }
+      #thaiReviewModal .trw-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
+      #thaiReviewModal .trw-swatch-misspell { background: #fff2a8; border-bottom: 2px solid #d99a00; }
+      #thaiReviewModal .trw-swatch-foreign { background: #e0d6ff; border-bottom: 2px solid #7c4dff; }
       #thaiReviewModal .trw-status { padding: 8px 20px 0; font-size: .9rem; color: #444; }
       #thaiReviewModal .trw-body { padding: 12px 20px 20px; overflow-y: auto; line-height: 2; font-size: 1rem; white-space: pre-wrap; flex: 1; }
       #thaiReviewModal .trw-para { margin: 0 0 14px; }
-      #thaiReviewModal .trw-flag { background: #fff2a8; border-bottom: 2px dotted #d99a00; cursor: pointer; border-radius: 3px; padding: 0 1px; }
+      #thaiReviewModal .trw-flag { cursor: pointer; border-radius: 3px; padding: 0 1px; }
+      #thaiReviewModal .trw-flag.trw-kind-misspell { background: #fff2a8; border-bottom: 2px dotted #d99a00; }
+      #thaiReviewModal .trw-flag.trw-kind-foreign { background: #e0d6ff; border-bottom: 2px dotted #7c4dff; }
       #thaiReviewModal .trw-flag.trw-editing { background: transparent; }
-      #thaiReviewModal .trw-flag input { font: inherit; width: 8em; border: 1px solid #d99a00; border-radius: 4px; padding: 0 4px; }
+      #thaiReviewModal .trw-flag input { font: inherit; width: 8em; border: 1px solid #999; border-radius: 4px; padding: 0 4px; }
       #thaiReviewModal .trw-actions { display: inline-flex; gap: 4px; margin-left: 4px; white-space: nowrap; }
       #thaiReviewModal .trw-actions button { font-size: .78rem; border: none; border-radius: 6px; padding: 2px 8px; cursor: pointer; }
       #thaiReviewModal .trw-act-confirm { background: #d4edda; color: #155724; }
       #thaiReviewModal .trw-act-edit { background: #cfe2ff; color: #084298; }
+      #thaiReviewModal .trw-act-delete { background: #f8d7da; color: #842029; }
       #thaiReviewModal .trw-act-cancel { background: #eee; color: #555; }
       #thaiReviewModal .trw-footer { display:flex; align-items:center; justify-content:flex-end; gap: 10px; padding: 12px 20px; border-top: 1px solid #eee; }
       #thaiReviewModal .trw-save-msg { margin-right: auto; font-size: .85rem; color: #157347; }
@@ -115,21 +125,28 @@
 
   function updateStatus() {
     const statusEl = modalEl.querySelector('.trw-status');
-    const n = state.misspelledSet.size;
-    statusEl.textContent = n > 0
-      ? `พบคำที่อาจสะกดผิด ${n} คำ (ไม่ซ้ำ) — คลิกคำที่ไฮไลต์เพื่อตรวจสอบ`
+    const nMis = state.misspelledSet.size;
+    const nForeign = state.foreignSet.size;
+    const parts = [];
+    if (nMis > 0) parts.push(`อาจสะกดผิด ${nMis} คำ`);
+    if (nForeign > 0) parts.push(`เขียนด้วยภาษาอื่นปน ${nForeign} คำ`);
+    statusEl.textContent = parts.length > 0
+      ? `พบคำที่น่าสงสัย — ${parts.join(' · ')} (ไม่ซ้ำ) — คลิกคำที่ไฮไลต์เพื่อตรวจสอบ`
       : 'ไม่พบคำที่น่าสงสัยแล้วในตอนนี้';
     modalEl.querySelector('.trw-save').disabled = !state.dirty;
   }
 
   function renderParagraph(container, text) {
     container.textContent = '';
-    segmentText(text).forEach((seg, i) => {
-      if (seg.isWord && state.misspelledSet.has(seg.text)) {
+    segmentText(text).forEach((seg) => {
+      const isMis = seg.isWord && state.misspelledSet.has(seg.text);
+      const isForeign = !isMis && seg.isWord && state.foreignSet.has(seg.text);
+      if (isMis || isForeign) {
         const span = document.createElement('span');
-        span.className = 'trw-flag';
+        span.className = 'trw-flag ' + (isMis ? 'trw-kind-misspell' : 'trw-kind-foreign');
         span.textContent = seg.text;
         span.dataset.word = seg.text;
+        span.dataset.kind = isMis ? 'misspell' : 'foreign';
         span.dataset.uid = 'w' + (uidCounter++);
         span.addEventListener('click', onFlagClick);
         container.appendChild(span);
@@ -153,12 +170,20 @@
     actions.innerHTML = `
       <button type="button" class="trw-act-confirm">✓ ถูกต้อง</button>
       <button type="button" class="trw-act-edit">✏️ แก้คำ</button>
+      <button type="button" class="trw-act-delete">🗑️ ลบ</button>
       <button type="button" class="trw-act-cancel">✕</button>`;
     span.after(actions);
 
     actions.querySelector('.trw-act-cancel').addEventListener('click', () => actions.remove());
     actions.querySelector('.trw-act-confirm').addEventListener('click', () => confirmWord(span, actions));
     actions.querySelector('.trw-act-edit').addEventListener('click', () => editWord(span, actions));
+    actions.querySelector('.trw-act-delete').addEventListener('click', () => deleteWord(span, actions));
+  }
+
+  // ลบคำนี้ออกจากคำที่น่าสงสัยทั้งสองรายการ (ยืนยัน/แก้ไขแล้วจะไม่ถูกฟ้องคำนี้อีก)
+  function forgetWord(word) {
+    state.misspelledSet.delete(word);
+    state.foreignSet.delete(word);
   }
 
   async function confirmWord(span, actions) {
@@ -171,7 +196,7 @@
       alert('ยืนยันคำไม่สำเร็จ ลองใหม่อีกครั้ง');
       return;
     }
-    state.misspelledSet.delete(word);
+    forgetWord(word);
     modalEl.querySelectorAll('.trw-flag[data-word="' + attrEscape(word) + '"]').forEach(el => {
       el.replaceWith(document.createTextNode(el.textContent));
     });
@@ -203,7 +228,7 @@
       span.classList.remove('trw-editing');
       span.textContent = val || original;
       if (commit && val && val !== original) {
-        state.misspelledSet.delete(span.dataset.word);
+        forgetWord(span.dataset.word);
         span.replaceWith(document.createTextNode(val));
         state.dirty = true;
       }
@@ -215,6 +240,24 @@
       else if (ev.key === 'Escape') { ev.preventDefault(); finish(false); }
     });
     input.addEventListener('blur', () => finish(true));
+  }
+
+  // ลบคำนี้ออกจากเนื้อหาเลย (เช่น คำซ้ำ/คำที่ไม่ควรอยู่) พร้อมยุบช่องว่างซ้ำที่อาจเกิดขึ้น
+  function deleteWord(span, actions) {
+    actions.remove();
+    const word = span.dataset.word;
+    const prev = span.previousSibling;
+    const next = span.nextSibling;
+    span.remove();
+    // เช่น "กิน game มาก" ลบ "game" แล้วเหลือช่องว่างสองด้านติดกัน → ยุบเหลือช่องเดียว
+    if (prev && next && prev.nodeType === Node.TEXT_NODE && next.nodeType === Node.TEXT_NODE) {
+      if (/[ \t]$/.test(prev.textContent) && /^[ \t]/.test(next.textContent)) {
+        next.textContent = next.textContent.replace(/^[ \t]+/, '');
+      }
+    }
+    forgetWord(word);
+    state.dirty = true;
+    updateStatus();
   }
 
   async function saveEdits() {
@@ -243,6 +286,7 @@
       const combined = paragraphs.map(p => p.text).join('\n');
       const res = await postJSON('check_thai_spelling', { text: combined });
       state.misspelledSet = new Set(res && res.success ? res.misspelled : []);
+      state.foreignSet = new Set(res && res.success ? res.foreign : []);
     } catch (e) { /* เงียบไว้ — คงรายการเดิมถ้าตรวจซ้ำไม่สำเร็จ */ }
 
     renderAll();
@@ -264,13 +308,15 @@
 
   // เปิดหน้าต่างตรวจสอบ
   // options.paragraphs : [{ label, text }]  ข้อความเรียงความทั้งฉบับ เรียงตามลำดับ (คำนำ/เนื้อเรื่อง.../สรุป)
-  // options.misspelled  : string[]  รายการคำที่ตรวจพบว่าอาจสะกดผิด (จาก api.php?action=check_thai_spelling)
+  // options.misspelled  : string[]  คำที่ตรวจพบว่าอาจสะกดผิด (จาก api.php?action=check_thai_spelling)
+  // options.foreign      : string[]  คำที่เขียนด้วยภาษาอื่นปนอยู่ (จาก api.php?action=check_thai_spelling)
   // options.onSave(paragraphs) : async function — รับ paragraphs ที่แก้ไขแล้ว ไปบันทึกกลับ (throw หากบันทึกไม่สำเร็จ)
   function open(options) {
     ensureModal();
     state = {
       paragraphs: (options.paragraphs || []).filter(p => p.text && p.text.trim() !== ''),
       misspelledSet: new Set(options.misspelled || []),
+      foreignSet: new Set(options.foreign || []),
       dirty: false,
       onSave: options.onSave || (async () => {})
     };
