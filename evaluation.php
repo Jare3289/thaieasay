@@ -384,21 +384,21 @@ require_once 'header.php';
             <div class="card border-0 rounded-3 p-3 bg-white shadow-sm h-100" style="border-top: 3px solid #10b981 !important;">
               <label class="form-label fw-bold text-success-emphasis small mb-2"><i class="bi bi-star-fill text-success"></i> จุดแข็งและด้านที่ดีของเรียงความ</label>
               <p class="small text-muted mb-2" style="font-size:0.78rem;">ระบุสิ่งที่น่าประทับใจและคุณค่าที่โดดเด่นของงานเขียนชิ้นนี้</p>
-              <textarea id="peerStrengthField" name="peer_strength" class="form-control form-control-sm flex-grow-1" rows="5" placeholder="ระบุข้อดี จุดเด่น สิ่งที่น่ายกย่อง..."></textarea>
+              <textarea id="peerStrengthField" name="peer_strength" class="form-control form-control-sm flex-grow-1" rows="5" placeholder="ระบุข้อดี จุดเด่น สิ่งที่น่ายกย่อง..." oninput="scheduleEvalDraftSave()"></textarea>
             </div>
           </div>
           <div class="col-md-4 col-sm-12">
             <div class="card border-0 rounded-3 p-3 bg-white shadow-sm h-100" style="border-top: 3px solid #f59e0b !important;">
               <label class="form-label fw-bold text-warning-emphasis small mb-2"><i class="bi bi-arrow-up-circle-fill text-warning"></i> จุดที่ควรปรับปรุงและข้อเสนอแนะ</label>
               <p class="small text-muted mb-2" style="font-size:0.78rem;">ระบุจุดบกพร่องที่พบและเสนอวิธีการแก้ไขอย่างตรงไปตรงมา</p>
-              <textarea id="peerImprovementField" name="peer_improvement" class="form-control form-control-sm flex-grow-1" rows="5" placeholder="ระบุจุดบกพร่อง วิธีแก้..."></textarea>
+              <textarea id="peerImprovementField" name="peer_improvement" class="form-control form-control-sm flex-grow-1" rows="5" placeholder="ระบุจุดบกพร่อง วิธีแก้..." oninput="scheduleEvalDraftSave()"></textarea>
             </div>
           </div>
           <div class="col-md-4 col-sm-12">
             <div class="card border-0 rounded-3 p-3 bg-white shadow-sm h-100" style="border-top: 3px solid #8b5cf6 !important;">
               <label class="form-label fw-bold" style="color:#6d28d9; font-size:0.83rem;"><i class="bi bi-emoji-smile-fill" style="color:#8b5cf6"></i> ข้อความให้กำลังใจเพื่อน</label>
               <p class="small text-muted mb-2" style="font-size:0.78rem;">เขียนข้อความให้กำลังใจและส่งเสริมเพื่อนให้อยากพัฒนาต่อไป</p>
-              <textarea id="peerEncouragementField" name="peer_encouragement" class="form-control form-control-sm flex-grow-1" rows="5" placeholder="เขียนให้กำลังใจ..."></textarea>
+              <textarea id="peerEncouragementField" name="peer_encouragement" class="form-control form-control-sm flex-grow-1" rows="5" placeholder="เขียนให้กำลังใจ..." oninput="scheduleEvalDraftSave()"></textarea>
             </div>
           </div>
         </div>
@@ -626,6 +626,90 @@ require_once 'header.php';
   let modeParam = "<?php echo $mode_param; ?>";
   const initialPhaseParam = "<?php echo $phase_param; ?>"; // รอบที่ระบุมาจาก URL (ถ้ามี) — ใช้ข้ามหน้าเลือกรอบไปเริ่มประเมินทันที
   let studentDB = {};
+
+  // กันข้อมูลหายกรณีเน็ตหลุด/เซสชันหมดอายุ/ปิดแท็บกลางคัน — เก็บคะแนนที่กำลังให้ + ความเห็นเชิงคุณภาพไว้ใน localStorage ของเครื่อง
+  const DRAFT_OWNER_ID = "<?php echo isset($_SESSION['user']['id']) ? $_SESSION['user']['id'] : ''; ?>";
+  function evalDraftKey(studentId, phase) {
+    return `thaieasay_eval_draft_${DRAFT_OWNER_ID}_${currentMode}_${studentId}_${phase}`;
+  }
+  let evalDraftTimer = null;
+  function scheduleEvalDraftSave() {
+    clearTimeout(evalDraftTimer);
+    evalDraftTimer = setTimeout(saveEvalDraftToLocalStorage, 500);
+  }
+  function readCurrentEvalFormState() {
+    const scores = {};
+    document.querySelectorAll('input[type="radio"].score-radio:checked').forEach(radio => {
+      scores[radio.name.replace('item_', '')] = radio.value;
+    });
+    const feedback = (modeParam === 'peer') ? {
+      strength: (document.getElementById('peerStrengthField') || {}).value || '',
+      improvement: (document.getElementById('peerImprovementField') || {}).value || '',
+      encouragement: (document.getElementById('peerEncouragementField') || {}).value || ''
+    } : null;
+    return { scores, feedback };
+  }
+  function saveEvalDraftToLocalStorage() {
+    const studentId = getTargetId();
+    const phase = document.getElementById('selectedTestPhase') ? document.getElementById('selectedTestPhase').value : '';
+    if (!studentId || !phase) return;
+
+    const { scores, feedback } = readCurrentEvalFormState();
+    const hasAny = Object.keys(scores).length > 0
+      || (feedback && (feedback.strength || feedback.improvement || feedback.encouragement));
+    try {
+      if (hasAny) {
+        localStorage.setItem(evalDraftKey(studentId, phase), JSON.stringify({ scores, feedback, savedAt: Date.now() }));
+      } else {
+        localStorage.removeItem(evalDraftKey(studentId, phase));
+      }
+    } catch (e) { /* localStorage เต็มหรือถูกปิดใช้งาน — ข้ามไปเงียบ ๆ ไม่กระทบการให้คะแนน */ }
+  }
+  function clearEvalDraftFromLocalStorage(studentId, phase) {
+    try { localStorage.removeItem(evalDraftKey(studentId, phase)); } catch (e) {}
+  }
+  // ตรวจคะแนน/ความเห็นที่ค้างใน localStorage ของนักเรียน+รอบนี้ (กรอกไว้แต่ไม่ทันกดบันทึกจากครั้งก่อน) แล้วเสนอกู้คืนให้ผู้ใช้เลือกเอง
+  function checkAndOfferEvalDraftRestore(studentId, phase) {
+    let draft = null;
+    try {
+      const raw = localStorage.getItem(evalDraftKey(studentId, phase));
+      if (raw) draft = JSON.parse(raw);
+    } catch (e) { draft = null; }
+    if (!draft) return;
+
+    const current = readCurrentEvalFormState();
+    const same = JSON.stringify(draft.scores || {}) === JSON.stringify(current.scores)
+      && JSON.stringify(draft.feedback || null) === JSON.stringify(current.feedback);
+    if (same) {
+      // ร่างในเครื่องตรงกับข้อมูลที่แสดงอยู่แล้ว (บันทึกสำเร็จไปก่อนหน้านี้) — ล้างทิ้งได้เลย ไม่ต้องถาม
+      clearEvalDraftFromLocalStorage(studentId, phase);
+      return;
+    }
+
+    const savedAtText = new Date(draft.savedAt).toLocaleString('th-TH');
+    const wantRestore = confirm(
+      `พบคะแนน/ความเห็นที่เคยกรอกไว้เมื่อ ${savedAtText} แต่ยังไม่ได้กดบันทึก (อาจเกิดจากเน็ตหลุดหรือเซสชันหมดอายุกลางคัน)\n\nต้องการกู้คืนกลับมาแทนที่ข้อมูลที่แสดงอยู่หรือไม่?`
+    );
+    if (wantRestore) {
+      document.querySelectorAll('input[type="radio"].score-radio').forEach(r => { r.checked = false; });
+      Object.entries(draft.scores || {}).forEach(([itemId, val]) => {
+        const el = document.getElementById(`opt_${itemId}_${val}`);
+        if (el) el.checked = true;
+      });
+      if (draft.feedback) {
+        const strEl = document.getElementById('peerStrengthField');
+        const impEl = document.getElementById('peerImprovementField');
+        const encEl = document.getElementById('peerEncouragementField');
+        if (strEl) strEl.value = draft.feedback.strength || '';
+        if (impEl) impEl.value = draft.feedback.improvement || '';
+        if (encEl) encEl.value = draft.feedback.encouragement || '';
+      }
+      calculateRealTimeFormScore();
+      showToast('กู้คืนคะแนน/ความเห็นที่ยังไม่ได้บันทึกเรียบร้อยแล้ว อย่าลืมกดบันทึกอีกครั้ง', 'success');
+    } else {
+      clearEvalDraftFromLocalStorage(studentId, phase);
+    }
+  }
 
   const rubricData = [
     {
@@ -913,7 +997,7 @@ require_once 'header.php';
         item.levels.forEach(level => {
           levelsHTML += `
             <div class="col">
-              <input type="radio" name="item_${item.id}" value="${level.score}" data-multiplier="${item.multiplier}" data-raw="${level.score}" id="opt_${item.id}_${level.score}" class="score-radio" required onchange="calculateRealTimeFormScore()">
+              <input type="radio" name="item_${item.id}" value="${level.score}" data-multiplier="${item.multiplier}" data-raw="${level.score}" id="opt_${item.id}_${level.score}" class="score-radio" required onchange="calculateRealTimeFormScore(); scheduleEvalDraftSave();">
               <label for="opt_${item.id}_${level.score}" class="rubric-card w-100 text-start">
                 <div class="d-flex justify-content-between align-items-start mb-2 gap-2">
                   <span class="fw-bold fs-6 text-dark">${level.label}</span>
@@ -1098,6 +1182,8 @@ require_once 'header.php';
         if (impEl) impEl.value = f.improvement || '';
         if (encEl) encEl.value = f.encouragement || '';
       }
+      // มีคะแนน/ความเห็นที่เคยกรอกไว้แต่ไม่ทันกดบันทึกค้างอยู่ในเครื่องหรือไม่ (เน็ตหลุด/เซสชันหมดอายุกลางคัน) — เสนอกู้คืน
+      checkAndOfferEvalDraftRestore(studentId, testPhase);
       // โหลดเรียงความของนักเรียนมาแสดงประกอบการให้คะแนนด้วย
       fetchStudentEssayForEvaluation(studentId, testPhase);
       // โหลดคะแนนของรอบคู่เทียบ (ก่อนเรียน↔หลังเรียน, หน่วย 1↔หน่วย 2) มาแสดงเทียบพัฒนาการ
@@ -1561,6 +1647,8 @@ require_once 'header.php';
       const res = await response.json();
       
       if(res.success) {
+        // บันทึกขึ้นเซิร์ฟเวอร์สำเร็จแล้ว ไม่ต้องเก็บร่างสำรองในเครื่องอีกต่อไป
+        clearEvalDraftFromLocalStorage(studentId, testPhase);
         // อยู่ที่หน้าประเมินเดิม (ไม่ redirect ไปหน้าอื่น) แล้วโหลดข้อมูลที่บันทึกกลับมาให้เป็นโหมดแก้ไข
         showToast("บันทึกผลการประเมินเรียบร้อยแล้ว ✓ (คุณยังอยู่ที่หน้าประเมินเดิม)", "success");
         btn.innerHTML = originalText;
