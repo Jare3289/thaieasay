@@ -25,51 +25,20 @@ require_once 'header.php';
   <!-- แผงสำหรับนักเรียน (Student Menu) -->
   <div id="menuStudent">
     
-    <!-- 1. เช็คลิสต์ติดตามความก้าวหน้าตนเอง (Checklist Progress Dashboard) - จัดวางแนวนอนเพิ่มความกว้างและสัดส่วนที่ชัดเจน -->
+    <!-- 1. รายการสิ่งที่ยังไม่ได้ทำ (To-do Checklist) — รวมทุกรอบ (ก่อนเรียน/หน่วย 1/หน่วย 2/หลังเรียน) กดลิงก์ไปทำงานที่ค้างได้ตรงจุด -->
     <div class="card border-0 shadow-sm rounded-4 bg-white mb-4 overflow-hidden text-start">
       <div class="card-header bg-primary bg-opacity-10 text-primary fw-bold py-3 px-4 border-0 d-flex align-items-center justify-content-between">
-        <span class="fs-6"><i class="bi bi-calendar-check-fill me-2"></i>ความคืบหน้าการส่งงานประเมินรอบด้านของฉัน (My Evaluation Status)</span>
-        <span class="badge bg-primary rounded-pill px-3 py-1 font-mono fs-8">360° Tracker</span>
+        <span class="fs-6"><i class="bi bi-list-check me-2"></i>สิ่งที่ยังไม่ได้ทำ</span>
+        <span id="todoCountBadge" class="badge bg-primary rounded-pill px-3 py-1 font-mono fs-8 d-none">0</span>
       </div>
       <div class="card-body p-4">
-        <div class="row g-3">
-          <div class="col-md-4 col-12">
-            <div class="p-3 rounded-3 border d-flex align-items-center justify-content-between bg-light bg-opacity-50">
-              <div class="d-flex align-items-center gap-3">
-                <div class="fs-3">🙋‍♂️</div>
-                <div>
-                  <div class="fw-bold text-dark small" style="font-size:0.88rem;">1. ประเมินตนเอง</div>
-                  <div class="text-muted small" style="font-size:0.75rem;">Self-Evaluation</div>
-                </div>
-              </div>
-              <span id="badgeSelfStatus" class="badge rounded-pill bg-secondary">-</span>
-            </div>
-          </div>
-          <div class="col-md-4 col-12">
-            <div class="p-3 rounded-3 border d-flex align-items-center justify-content-between bg-light bg-opacity-50">
-              <div class="d-flex align-items-center gap-3">
-                <div class="fs-3">👥</div>
-                <div>
-                  <div class="fw-bold text-dark small" style="font-size:0.88rem;">2. เพื่อนประเมิน</div>
-                  <div class="text-muted small" style="font-size:0.75rem;">Peer Assessment</div>
-                </div>
-              </div>
-              <span id="badgePeerStatus" class="badge rounded-pill bg-secondary">-</span>
-            </div>
-          </div>
-          <div class="col-md-4 col-12">
-            <div class="p-3 rounded-3 border d-flex align-items-center justify-content-between bg-light bg-opacity-50">
-              <div class="d-flex align-items-center gap-3">
-                <div class="fs-3">👩‍🏫</div>
-                <div>
-                  <div class="fw-bold text-dark small" style="font-size:0.88rem;">3. ครูประเมินผล</div>
-                  <div class="text-muted small" style="font-size:0.75rem;">Teacher Grading</div>
-                </div>
-              </div>
-              <span id="badgeTeacherStatus" class="badge rounded-pill bg-secondary">-</span>
-            </div>
-          </div>
+        <div id="todoListLoading" class="text-center text-muted py-3">
+          <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>กำลังตรวจสอบความคืบหน้า...
         </div>
+        <div id="todoListDone" class="d-none text-center text-success py-3 fw-bold">
+          <i class="bi bi-check-circle-fill fs-2 d-block mb-2"></i>ทำครบทุกอย่างแล้วในตอนนี้ เยี่ยมมาก! 🎉
+        </div>
+        <div id="todoListContainer" class="d-flex flex-column gap-2"></div>
       </div>
     </div>
 
@@ -381,49 +350,93 @@ require_once 'header.php';
 </div>
 
 <script>
-  // โหลดสถานะการประเมิน 3 มิติ เพื่อมาโชว์ใน Checklist นักเรียน
-  async function checkStudentProgress() {
+  // ป้ายชื่อรอบ ใช้แสดงประกอบรายการสิ่งที่ยังไม่ได้ทำ
+  const todoPhaseLabels = {
+    pretest:  'ก่อนเรียน (Pretest)',
+    task1:    'ภาระงาน หน่วยที่ 1',
+    task2:    'ภาระงาน หน่วยที่ 2',
+    posttest: 'หลังเรียน (Posttest)'
+  };
+  function escToDoText(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  // โหลดสถานะทุกด้าน (เขียนเรียงความ/ประเมินตนเอง/ประเมินเพื่อน/สะท้อนคิด) ทุกรอบในครั้งเดียว
+  // แล้วประกอบเป็นรายการ "สิ่งที่ยังไม่ได้ทำ" พร้อมลิงก์ไปทำงานนั้น ๆ ได้ทันที
+  async function loadTodoList() {
     if (!currentUser || currentUser.role !== 'student') return;
-    
-    const badgeSelf = document.getElementById('badgeSelfStatus');
-    const badgePeer = document.getElementById('badgePeerStatus');
-    const badgeTeacher = document.getElementById('badgeTeacherStatus');
-    
-    if (!badgeSelf || !badgePeer || !badgeTeacher) return;
-    
+
+    const loadingEl   = document.getElementById('todoListLoading');
+    const doneEl      = document.getElementById('todoListDone');
+    const containerEl = document.getElementById('todoListContainer');
+    const countBadge  = document.getElementById('todoCountBadge');
+    if (!containerEl) return;
+
     try {
-      const response = await fetch(`api.php?action=get_student_scores&studentId=${currentUser.id}`);
+      const response = await fetch(`api.php?action=get_my_todo_status&_t=${Date.now()}`);
       const res = await response.json();
-      
-      let hasSelf = false;
-      let hasPeer = false;
-      let hasTeacher = false;
-      
-      if (res.success && res.data) {
-        res.data.forEach(item => {
-          if (item.evaluatorType === 'ตนเองประเมิน') hasSelf = true;
-          if (item.evaluatorType === 'เพื่อนประเมิน') hasPeer = true;
-          if (item.evaluatorType === 'ครูประเมิน') hasTeacher = true;
-        });
+      if (loadingEl) loadingEl.classList.add('d-none');
+      if (!res.success || !res.phases) return;
+
+      const items = [];
+      ['pretest', 'task1', 'task2', 'posttest'].forEach(phase => {
+        const p = res.phases[phase];
+        if (!p) return;
+        const pLabel = todoPhaseLabels[phase];
+
+        if (!p.essayDone) {
+          items.push({ icon: '✍️', label: 'เขียนเรียงความ', phaseLabel: pLabel,
+            link: `essay_writer.php?phase=${encodeURIComponent(p.essayPhaseKey)}`, btnClass: 'btn-success' });
+        }
+        if (!p.selfDone) {
+          items.push({ icon: '🙋‍♂️', label: 'ประเมินตนเอง', phaseLabel: pLabel,
+            link: `evaluation.php?mode=self&phase=${phase}`, btnClass: 'btn-primary' });
+        }
+        if (!p.peerDone) {
+          if (p.partnerId) {
+            items.push({ icon: '👥', label: `ประเมินเพื่อน (${escToDoText(p.partnerName || p.partnerId)})`, phaseLabel: pLabel,
+              link: `evaluation.php?mode=peer&phase=${phase}`, btnClass: 'btn-info text-white' });
+          } else if (phase === 'task1' || phase === 'task2') {
+            // pretest/posttest ครูเป็นผู้จับคู่ให้เท่านั้น — ยังไม่มีคู่ก็ยังทำอะไรเองไม่ได้ จึงไม่ขึ้นรายการ
+            items.push({ icon: '🤝', label: 'จับคู่เพื่อนประเมิน', phaseLabel: pLabel,
+              link: `peer_matching.php?round=${phase}`, btnClass: 'btn-outline-primary' });
+          }
+        }
+        if ((phase === 'task1' || phase === 'task2') && !p.reflectionDone) {
+          items.push({ icon: '🎨', label: 'บันทึกสะท้อนคิดการเรียนรู้', phaseLabel: pLabel,
+            link: `reflection_tools.php?unit=${phase === 'task1' ? 1 : 2}`, btnClass: 'btn-warning' });
+        }
+      });
+
+      if (countBadge) { countBadge.textContent = items.length; countBadge.classList.toggle('d-none', items.length === 0); }
+
+      if (items.length === 0) {
+        if (doneEl) doneEl.classList.remove('d-none');
+        containerEl.innerHTML = '';
+        return;
       }
-      
-      badgeSelf.className = hasSelf ? "badge rounded-pill bg-success text-white px-2.5" : "badge rounded-pill bg-secondary";
-      badgeSelf.textContent = hasSelf ? "✓ ประเมินแล้ว" : "ยังไม่เริ่ม";
-      
-      badgePeer.className = hasPeer ? "badge rounded-pill bg-success text-white px-2.5" : "badge rounded-pill bg-secondary";
-      badgePeer.textContent = hasPeer ? "✓ ประเมินแล้ว" : "รอดำเนินการ";
-      
-      badgeTeacher.className = hasTeacher ? "badge rounded-pill bg-success text-white px-2.5" : "badge rounded-pill bg-secondary";
-      badgeTeacher.textContent = hasTeacher ? "✓ ประเมินแล้ว" : "รอดำเนินการ";
-      
+
+      containerEl.innerHTML = items.map(it => `
+        <div class="p-3 rounded-3 border d-flex align-items-center justify-content-between bg-light bg-opacity-50 flex-wrap gap-2">
+          <div class="d-flex align-items-center gap-3">
+            <div class="fs-4">${it.icon}</div>
+            <div>
+              <div class="fw-bold text-dark small" style="font-size:0.88rem;">${escToDoText(it.label)}</div>
+              <div class="text-muted small" style="font-size:0.75rem;">${escToDoText(it.phaseLabel)}</div>
+            </div>
+          </div>
+          <a href="${it.link}" class="btn btn-sm ${it.btnClass} rounded-pill px-3 fw-bold text-decoration-none">ไปทำ &rarr;</a>
+        </div>
+      `).join('');
     } catch (err) {
-      console.error("Error loading checklist progress:", err);
+      console.error("Error loading todo list:", err);
+      if (loadingEl) loadingEl.classList.add('d-none');
     }
   }
 
   // เรียกใช้ตรวจสอบความคืบหน้าเมื่อโหลดหน้าสำเร็จ
   document.addEventListener('DOMContentLoaded', () => {
-    checkStudentProgress();
+    loadTodoList();
   });
 </script>
 

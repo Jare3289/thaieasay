@@ -3,6 +3,14 @@
 
 // 1. Configure session cookie parameters (30 days) to prevent session drops on mobile
 $session_lifetime = 30 * 24 * 60 * 60; // 30 days
+
+// สำคัญ: session_set_cookie_params() ด้านล่างกำหนดอายุของ "คุกกี้" ในเบราว์เซอร์เท่านั้น
+// แต่ข้อมูลเซสชันฝั่งเซิร์ฟเวอร์ (ไฟล์ session จริง) ยังถูกลบทิ้งได้เร็วกว่านั้นมาก เพราะค่าเริ่มต้นของ
+// PHP (session.gc_maxlifetime) มักตั้งไว้แค่ ~24 นาที ถ้าไม่ปรับตรงนี้ด้วย พอผู้ใช้พิมพ์เรียงความ/ประเมินผล
+// นานเกิน 24 นาทีแล้วกด "บันทึก" ระบบจะมองว่าไม่ได้ล็อกอิน ทำให้ข้อมูลที่พิมพ์ไว้บันทึกไม่ติดและเด้งออกจากระบบ
+// จึงต้องปรับให้ตรงกับอายุคุกกี้ (30 วัน) เพื่อไม่ให้เซสชันหลุดกลางคันขณะทำงาน
+ini_set('session.gc_maxlifetime', (string)$session_lifetime);
+
 if (PHP_VERSION_ID >= 70300) {
     session_set_cookie_params([
         'lifetime' => $session_lifetime,

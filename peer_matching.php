@@ -253,6 +253,12 @@ $me = $_SESSION['user'];
   });
   document.getElementById('btnRefresh').addEventListener('click', loadStatus);
 
+  // มีหน่วยระบุมาจาก URL (เช่นลิงก์จากรายการ "สิ่งที่ยังไม่ได้ทำ") → เปิดหน่วยนั้นทันที
+  const roundFromUrl = new URLSearchParams(window.location.search).get('round');
+  if (roundFromUrl === 'task1' || roundFromUrl === 'task2') {
+    currentRound = roundFromUrl;
+    document.querySelectorAll('.round-btn').forEach(b => b.classList.toggle('active', b.dataset.round === roundFromUrl));
+  }
   loadStatus();
 </script>
 

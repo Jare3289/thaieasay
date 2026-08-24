@@ -439,6 +439,66 @@ function openEssayPhase(phase) {
   }
 }
 
+// กันข้อมูลหายกรณีเน็ตหลุด/เซสชันหมดอายุ/ปิดแท็บกลางคัน — เก็บร่างที่พิมพ์ไว้ (ยังไม่ได้กดบันทึก) ลง localStorage ของเครื่อง แยกตามนักเรียน+รอบ
+const DRAFT_OWNER_ID = <?php echo json_encode($_SESSION['user']['id']); ?>;
+function draftKey(phase) {
+  return `thaieasay_essay_draft_${DRAFT_OWNER_ID}_${phase}`;
+}
+function saveDraftToLocalStorage(phase) {
+  const intro = document.getElementById('essayIntro').value;
+  const conclusion = document.getElementById('essayConclusion').value;
+  const body = Array.from(document.querySelectorAll('.body-para-textarea')).map(ta => ta.value);
+  const hasContent = (intro + conclusion + body.join('')).trim() !== '';
+  try {
+    if (hasContent) {
+      localStorage.setItem(draftKey(phase), JSON.stringify({ intro, body, conclusion, savedAt: Date.now() }));
+    } else {
+      localStorage.removeItem(draftKey(phase));
+    }
+  } catch (e) { /* localStorage เต็มหรือถูกปิดใช้งาน — ข้ามไปเงียบ ๆ ไม่กระทบการพิมพ์ */ }
+}
+function clearDraftFromLocalStorage(phase) {
+  try { localStorage.removeItem(draftKey(phase)); } catch (e) {}
+}
+
+// ตรวจร่างที่ค้างใน localStorage ของรอบนี้ (พิมพ์ไว้แต่ไม่ทันกดบันทึกจากครั้งก่อน) แล้วเสนอกู้คืนให้ผู้ใช้เลือกเอง
+function checkAndOfferDraftRestore(phase) {
+  let draft = null;
+  try {
+    const raw = localStorage.getItem(draftKey(phase));
+    if (raw) draft = JSON.parse(raw);
+  } catch (e) { draft = null; }
+  if (!draft) return;
+
+  const curIntro = document.getElementById('essayIntro').value;
+  const curConclusion = document.getElementById('essayConclusion').value;
+  const curBody = Array.from(document.querySelectorAll('.body-para-textarea')).map(ta => ta.value);
+  const isSameAsCurrent = draft.intro === curIntro && draft.conclusion === curConclusion
+    && JSON.stringify(draft.body) === JSON.stringify(curBody);
+  if (isSameAsCurrent) {
+    // ร่างในเครื่องตรงกับข้อมูลที่โหลดมาแสดงอยู่แล้ว (บันทึกสำเร็จไปก่อนหน้านี้) — ล้างทิ้งได้เลย ไม่ต้องถาม
+    clearDraftFromLocalStorage(phase);
+    return;
+  }
+
+  const savedAtText = new Date(draft.savedAt).toLocaleString('th-TH');
+  const wantRestore = confirm(
+    `พบร่างเรียงความที่เคยพิมพ์ไว้เมื่อ ${savedAtText} แต่ยังไม่ได้กดบันทึก (อาจเกิดจากเน็ตหลุดหรือเซสชันหมดอายุกลางคัน)\n\nต้องการกู้คืนร่างนี้กลับมาแทนที่ข้อมูลที่แสดงอยู่หรือไม่?`
+  );
+  if (wantRestore) {
+    document.getElementById('essayIntro').value = draft.intro || '';
+    document.getElementById('essayConclusion').value = draft.conclusion || '';
+    const container = document.getElementById('bodyParagraphsContainer');
+    container.innerHTML = '';
+    const bodyList = (draft.body && draft.body.length) ? draft.body : [''];
+    bodyList.forEach(t => addBodyParagraph(t));
+    updateWordCount();
+    showToast('กู้คืนร่างที่ยังไม่ได้บันทึกเรียบร้อยแล้ว อย่าลืมกดบันทึกอีกครั้ง', 'success');
+  } else {
+    clearDraftFromLocalStorage(phase);
+  }
+}
+
 async function loadEssayForPhase(phase) {
   const statusBadge = document.getElementById('saveStatusBadge');
   statusBadge.textContent = 'กำลังโหลด...';
@@ -494,6 +554,8 @@ async function loadEssayForPhase(phase) {
       statusBadge.textContent = 'ยังไม่มีข้อมูล';
       statusBadge.className = 'badge bg-secondary small';
     }
+
+    checkAndOfferDraftRestore(phase);
   } catch(err) {
     statusBadge.textContent = '⚠️ โหลดไม่ได้';
     statusBadge.className = 'badge bg-danger small';
@@ -536,6 +598,8 @@ function updateWordCount() {
       badge.className = 'badge bg-warning text-dark small';
       badge.classList.remove('d-none');
     }
+    // เก็บร่างที่พิมพ์อยู่ไว้ในเครื่องด้วย เผื่อกดบันทึกไม่ทัน (เน็ตหลุด/เซสชันหมดอายุ/ปิดแท็บกลางคัน)
+    saveDraftToLocalStorage(currentEssayPhase);
   }, 800);
 }
 
@@ -592,6 +656,8 @@ async function saveEssay() {
       statusBadge.classList.remove('d-none');
 
       showToast(`บันทึกเรียงความ "${phaseLabels[currentEssayPhase]}" สำเร็จ! (${data.word_count} คำ)`, 'success');
+      // บันทึกขึ้นเซิร์ฟเวอร์สำเร็จแล้ว ไม่ต้องเก็บร่างสำรองในเครื่องอีกต่อไป
+      clearDraftFromLocalStorage(currentEssayPhase);
       loadSavedList();
     } else {
       showToast('เกิดข้อผิดพลาด: ' + data.error, 'error');
@@ -683,8 +749,15 @@ async function loadSavedList() {
 // Init
 (async function() {
   await loadEssayTopics();          // โหลดหัวข้อที่ครูกำหนด
-  // ค่าเริ่มต้น: ภาระงานหน่วยที่ 1 · ร่างที่ 1 (D1)
-  setEssayUnit('task1');
+
+  // มีรอบระบุมาจาก URL (เช่นลิงก์จากรายการ "สิ่งที่ยังไม่ได้ทำ") → เปิดตรงรอบ/ร่างนั้นทันที
+  const phaseFromUrl = new URLSearchParams(window.location.search).get('phase');
+  if (phaseFromUrl && /^(pretest|posttest|task[12]_d[12])$/.test(phaseFromUrl)) {
+    openEssayPhase(phaseFromUrl);
+  } else {
+    // ค่าเริ่มต้น: ภาระงานหน่วยที่ 1 · ร่างที่ 1 (D1)
+    setEssayUnit('task1');
+  }
   await loadSavedList();
 })();
 </script>

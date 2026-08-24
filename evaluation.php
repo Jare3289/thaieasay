@@ -6,6 +6,12 @@ require_once 'auth_helper.php';
 $mode_param = isset($_GET['mode']) ? $_GET['mode'] : '';
 $currentMode = '';
 
+// รอบที่ระบุมาทาง URL (เช่นลิงก์จากรายการ "สิ่งที่ยังไม่ได้ทำ") เพื่อข้ามหน้าเลือกรอบไปเริ่มประเมินรอบนั้นทันที
+$phase_param = isset($_GET['phase']) ? $_GET['phase'] : '';
+if (!in_array($phase_param, ['pretest', 'task1', 'task2', 'posttest'], true)) {
+    $phase_param = '';
+}
+
 if ($mode_param === 'self') {
     require_login('student');
     $currentMode = 'ตนเองประเมิน';
@@ -316,10 +322,10 @@ require_once 'header.php';
           </div>
         </div>
 
-        <!-- สรุปคะแนนที่คำนวณอัตโนมัติ (แสดงสด) และคะแนน/ระดับเดิมที่เคยประเมินไว้ -->
+        <!-- สรุปคะแนนที่คำนวณอัตโนมัติ (แสดงสด), คะแนน/ระดับเดิมที่เคยประเมินไว้ และคะแนนรอบคู่เทียบ (ก่อน-หลังเรียน / หน่วย 1-2) -->
         <div class="row g-3 mt-1">
           <!-- คะแนนที่ระบบคำนวณอัตโนมัติจากตัวเลือกปัจจุบัน -->
-          <div class="col-md-6 col-12">
+          <div class="col-lg-4 col-md-6 col-12">
             <div class="d-flex align-items-center justify-content-between rounded-3 px-3 py-2 h-100" style="background:#eff6ff; border:1px solid #bfdbfe;">
               <div class="d-flex align-items-center gap-2">
                 <i class="bi bi-calculator-fill text-primary fs-5"></i>
@@ -333,7 +339,7 @@ require_once 'header.php';
             </div>
           </div>
           <!-- คะแนน/ระดับเดิมที่เคยบันทึกไว้ (โหมดแก้ไข) -->
-          <div class="col-md-6 col-12">
+          <div class="col-lg-4 col-md-6 col-12">
             <div id="originalScoreBox" class="d-none d-flex align-items-center justify-content-between rounded-3 px-3 py-2 h-100" style="background:#fefce8; border:1px solid #fde68a;">
               <div class="d-flex align-items-center gap-2">
                 <i class="bi bi-clock-history text-warning fs-5"></i>
@@ -343,6 +349,20 @@ require_once 'header.php';
                 <span id="originalScoreValue" class="fw-bold fs-5" style="color:#b45309;">0</span>
                 <span class="text-muted small">/ 60</span>
                 <span id="originalScoreLevel" class="badge ms-1" style="background:#fde68a; color:#92400e;">—</span>
+              </div>
+            </div>
+          </div>
+          <!-- คะแนนรอบคู่เทียบ (pretest↔posttest, task1↔task2) ให้ดูพัฒนาการของนักเรียนตอนให้คะแนน -->
+          <div class="col-lg-4 col-md-6 col-12">
+            <div id="comparisonScoreBox" class="d-none d-flex align-items-center justify-content-between rounded-3 px-3 py-2 h-100" style="background:#ecfdf5; border:1px solid #a7f3d0;">
+              <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-graph-up-arrow text-success fs-5"></i>
+                <span class="fw-bold small" id="comparisonScoreLabel" style="color:#065f46;">คะแนนรอบเปรียบเทียบ</span>
+              </div>
+              <div class="text-end">
+                <span id="comparisonScoreValue" class="fw-bold fs-5" style="color:#047857;">0</span>
+                <span class="text-muted small">/ 60</span>
+                <span id="comparisonScoreLevel" class="badge ms-1" style="background:#a7f3d0; color:#065f46;">—</span>
               </div>
             </div>
           </div>
@@ -364,21 +384,21 @@ require_once 'header.php';
             <div class="card border-0 rounded-3 p-3 bg-white shadow-sm h-100" style="border-top: 3px solid #10b981 !important;">
               <label class="form-label fw-bold text-success-emphasis small mb-2"><i class="bi bi-star-fill text-success"></i> จุดแข็งและด้านที่ดีของเรียงความ</label>
               <p class="small text-muted mb-2" style="font-size:0.78rem;">ระบุสิ่งที่น่าประทับใจและคุณค่าที่โดดเด่นของงานเขียนชิ้นนี้</p>
-              <textarea id="peerStrengthField" name="peer_strength" class="form-control form-control-sm flex-grow-1" rows="5" placeholder="ระบุข้อดี จุดเด่น สิ่งที่น่ายกย่อง..."></textarea>
+              <textarea id="peerStrengthField" name="peer_strength" class="form-control form-control-sm flex-grow-1" rows="5" placeholder="ระบุข้อดี จุดเด่น สิ่งที่น่ายกย่อง..." oninput="scheduleEvalDraftSave()"></textarea>
             </div>
           </div>
           <div class="col-md-4 col-sm-12">
             <div class="card border-0 rounded-3 p-3 bg-white shadow-sm h-100" style="border-top: 3px solid #f59e0b !important;">
               <label class="form-label fw-bold text-warning-emphasis small mb-2"><i class="bi bi-arrow-up-circle-fill text-warning"></i> จุดที่ควรปรับปรุงและข้อเสนอแนะ</label>
               <p class="small text-muted mb-2" style="font-size:0.78rem;">ระบุจุดบกพร่องที่พบและเสนอวิธีการแก้ไขอย่างตรงไปตรงมา</p>
-              <textarea id="peerImprovementField" name="peer_improvement" class="form-control form-control-sm flex-grow-1" rows="5" placeholder="ระบุจุดบกพร่อง วิธีแก้..."></textarea>
+              <textarea id="peerImprovementField" name="peer_improvement" class="form-control form-control-sm flex-grow-1" rows="5" placeholder="ระบุจุดบกพร่อง วิธีแก้..." oninput="scheduleEvalDraftSave()"></textarea>
             </div>
           </div>
           <div class="col-md-4 col-sm-12">
             <div class="card border-0 rounded-3 p-3 bg-white shadow-sm h-100" style="border-top: 3px solid #8b5cf6 !important;">
               <label class="form-label fw-bold" style="color:#6d28d9; font-size:0.83rem;"><i class="bi bi-emoji-smile-fill" style="color:#8b5cf6"></i> ข้อความให้กำลังใจเพื่อน</label>
               <p class="small text-muted mb-2" style="font-size:0.78rem;">เขียนข้อความให้กำลังใจและส่งเสริมเพื่อนให้อยากพัฒนาต่อไป</p>
-              <textarea id="peerEncouragementField" name="peer_encouragement" class="form-control form-control-sm flex-grow-1" rows="5" placeholder="เขียนให้กำลังใจ..."></textarea>
+              <textarea id="peerEncouragementField" name="peer_encouragement" class="form-control form-control-sm flex-grow-1" rows="5" placeholder="เขียนให้กำลังใจ..." oninput="scheduleEvalDraftSave()"></textarea>
             </div>
           </div>
         </div>
@@ -604,7 +624,92 @@ require_once 'header.php';
 <script>
   let currentMode = "<?php echo $currentMode; ?>";
   let modeParam = "<?php echo $mode_param; ?>";
+  const initialPhaseParam = "<?php echo $phase_param; ?>"; // รอบที่ระบุมาจาก URL (ถ้ามี) — ใช้ข้ามหน้าเลือกรอบไปเริ่มประเมินทันที
   let studentDB = {};
+
+  // กันข้อมูลหายกรณีเน็ตหลุด/เซสชันหมดอายุ/ปิดแท็บกลางคัน — เก็บคะแนนที่กำลังให้ + ความเห็นเชิงคุณภาพไว้ใน localStorage ของเครื่อง
+  const DRAFT_OWNER_ID = "<?php echo isset($_SESSION['user']['id']) ? $_SESSION['user']['id'] : ''; ?>";
+  function evalDraftKey(studentId, phase) {
+    return `thaieasay_eval_draft_${DRAFT_OWNER_ID}_${currentMode}_${studentId}_${phase}`;
+  }
+  let evalDraftTimer = null;
+  function scheduleEvalDraftSave() {
+    clearTimeout(evalDraftTimer);
+    evalDraftTimer = setTimeout(saveEvalDraftToLocalStorage, 500);
+  }
+  function readCurrentEvalFormState() {
+    const scores = {};
+    document.querySelectorAll('input[type="radio"].score-radio:checked').forEach(radio => {
+      scores[radio.name.replace('item_', '')] = radio.value;
+    });
+    const feedback = (modeParam === 'peer') ? {
+      strength: (document.getElementById('peerStrengthField') || {}).value || '',
+      improvement: (document.getElementById('peerImprovementField') || {}).value || '',
+      encouragement: (document.getElementById('peerEncouragementField') || {}).value || ''
+    } : null;
+    return { scores, feedback };
+  }
+  function saveEvalDraftToLocalStorage() {
+    const studentId = getTargetId();
+    const phase = document.getElementById('selectedTestPhase') ? document.getElementById('selectedTestPhase').value : '';
+    if (!studentId || !phase) return;
+
+    const { scores, feedback } = readCurrentEvalFormState();
+    const hasAny = Object.keys(scores).length > 0
+      || (feedback && (feedback.strength || feedback.improvement || feedback.encouragement));
+    try {
+      if (hasAny) {
+        localStorage.setItem(evalDraftKey(studentId, phase), JSON.stringify({ scores, feedback, savedAt: Date.now() }));
+      } else {
+        localStorage.removeItem(evalDraftKey(studentId, phase));
+      }
+    } catch (e) { /* localStorage เต็มหรือถูกปิดใช้งาน — ข้ามไปเงียบ ๆ ไม่กระทบการให้คะแนน */ }
+  }
+  function clearEvalDraftFromLocalStorage(studentId, phase) {
+    try { localStorage.removeItem(evalDraftKey(studentId, phase)); } catch (e) {}
+  }
+  // ตรวจคะแนน/ความเห็นที่ค้างใน localStorage ของนักเรียน+รอบนี้ (กรอกไว้แต่ไม่ทันกดบันทึกจากครั้งก่อน) แล้วเสนอกู้คืนให้ผู้ใช้เลือกเอง
+  function checkAndOfferEvalDraftRestore(studentId, phase) {
+    let draft = null;
+    try {
+      const raw = localStorage.getItem(evalDraftKey(studentId, phase));
+      if (raw) draft = JSON.parse(raw);
+    } catch (e) { draft = null; }
+    if (!draft) return;
+
+    const current = readCurrentEvalFormState();
+    const same = JSON.stringify(draft.scores || {}) === JSON.stringify(current.scores)
+      && JSON.stringify(draft.feedback || null) === JSON.stringify(current.feedback);
+    if (same) {
+      // ร่างในเครื่องตรงกับข้อมูลที่แสดงอยู่แล้ว (บันทึกสำเร็จไปก่อนหน้านี้) — ล้างทิ้งได้เลย ไม่ต้องถาม
+      clearEvalDraftFromLocalStorage(studentId, phase);
+      return;
+    }
+
+    const savedAtText = new Date(draft.savedAt).toLocaleString('th-TH');
+    const wantRestore = confirm(
+      `พบคะแนน/ความเห็นที่เคยกรอกไว้เมื่อ ${savedAtText} แต่ยังไม่ได้กดบันทึก (อาจเกิดจากเน็ตหลุดหรือเซสชันหมดอายุกลางคัน)\n\nต้องการกู้คืนกลับมาแทนที่ข้อมูลที่แสดงอยู่หรือไม่?`
+    );
+    if (wantRestore) {
+      document.querySelectorAll('input[type="radio"].score-radio').forEach(r => { r.checked = false; });
+      Object.entries(draft.scores || {}).forEach(([itemId, val]) => {
+        const el = document.getElementById(`opt_${itemId}_${val}`);
+        if (el) el.checked = true;
+      });
+      if (draft.feedback) {
+        const strEl = document.getElementById('peerStrengthField');
+        const impEl = document.getElementById('peerImprovementField');
+        const encEl = document.getElementById('peerEncouragementField');
+        if (strEl) strEl.value = draft.feedback.strength || '';
+        if (impEl) impEl.value = draft.feedback.improvement || '';
+        if (encEl) encEl.value = draft.feedback.encouragement || '';
+      }
+      calculateRealTimeFormScore();
+      showToast('กู้คืนคะแนน/ความเห็นที่ยังไม่ได้บันทึกเรียบร้อยแล้ว อย่าลืมกดบันทึกอีกครั้ง', 'success');
+    } else {
+      clearEvalDraftFromLocalStorage(studentId, phase);
+    }
+  }
 
   const rubricData = [
     {
@@ -892,7 +997,7 @@ require_once 'header.php';
         item.levels.forEach(level => {
           levelsHTML += `
             <div class="col">
-              <input type="radio" name="item_${item.id}" value="${level.score}" data-multiplier="${item.multiplier}" data-raw="${level.score}" id="opt_${item.id}_${level.score}" class="score-radio" required onchange="calculateRealTimeFormScore()">
+              <input type="radio" name="item_${item.id}" value="${level.score}" data-multiplier="${item.multiplier}" data-raw="${level.score}" id="opt_${item.id}_${level.score}" class="score-radio" required onchange="calculateRealTimeFormScore(); scheduleEvalDraftSave();">
               <label for="opt_${item.id}_${level.score}" class="rubric-card w-100 text-start">
                 <div class="d-flex justify-content-between align-items-start mb-2 gap-2">
                   <span class="fw-bold fs-6 text-dark">${level.label}</span>
@@ -907,9 +1012,14 @@ require_once 'header.php';
         itemDiv.innerHTML = `
           <div class="mb-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
             <h5 class="fw-bold mb-0 text-slate-800">${item.name}</h5>
-            <span id="prevScore_${item.id}" class="badge d-none rounded-pill px-3 py-2" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a;">
-              <i class="bi bi-clock-history me-1"></i><span class="prev-score-text"></span>
-            </span>
+            <div class="d-flex align-items-center flex-wrap gap-2">
+              <span id="compareScore_${item.id}" class="badge d-none rounded-pill px-3 py-2" style="background:#d1fae5; color:#065f46; border:1px solid #a7f3d0;">
+                <i class="bi bi-graph-up-arrow me-1"></i><span class="compare-score-text"></span>
+              </span>
+              <span id="prevScore_${item.id}" class="badge d-none rounded-pill px-3 py-2" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a;">
+                <i class="bi bi-clock-history me-1"></i><span class="prev-score-text"></span>
+              </span>
+            </div>
           </div>
           <div class="row row-cols-1 row-cols-md-3 row-cols-lg-5 g-3">${levelsHTML}</div>
         `;
@@ -988,6 +1098,10 @@ require_once 'header.php';
     if (origBox) origBox.classList.add('d-none');
     // ซ่อนป้ายคะแนนเดิมรายข้อทั้งหมดไว้ก่อนเช่นกัน (เผื่อสลับไปดูนักเรียนคนอื่น)
     document.querySelectorAll('[id^="prevScore_"]').forEach(el => el.classList.add('d-none'));
+    // ซ่อนกล่อง/ป้ายคะแนนรอบคู่เทียบไว้ก่อนเช่นกัน (เผื่อสลับไปดูนักเรียนคนอื่น)
+    const cmpBox = document.getElementById('comparisonScoreBox');
+    if (cmpBox) cmpBox.classList.add('d-none');
+    document.querySelectorAll('[id^="compareScore_"]').forEach(el => el.classList.add('d-none'));
     calculateRealTimeFormScore(); // รีเซ็ต
 
     statusBadge.textContent = "กำลังค้นหาคะแนนเดิม...";
@@ -1068,8 +1182,12 @@ require_once 'header.php';
         if (impEl) impEl.value = f.improvement || '';
         if (encEl) encEl.value = f.encouragement || '';
       }
+      // มีคะแนน/ความเห็นที่เคยกรอกไว้แต่ไม่ทันกดบันทึกค้างอยู่ในเครื่องหรือไม่ (เน็ตหลุด/เซสชันหมดอายุกลางคัน) — เสนอกู้คืน
+      checkAndOfferEvalDraftRestore(studentId, testPhase);
       // โหลดเรียงความของนักเรียนมาแสดงประกอบการให้คะแนนด้วย
       fetchStudentEssayForEvaluation(studentId, testPhase);
+      // โหลดคะแนนของรอบคู่เทียบ (ก่อนเรียน↔หลังเรียน, หน่วย 1↔หน่วย 2) มาแสดงเทียบพัฒนาการ
+      fetchComparisonPhaseScores(studentId, testPhase);
     } catch (err) {
       console.error(err);
       statusBadge.textContent = "⚠️ ไม่สามารถตรวจสอบประวัติได้";
@@ -1205,6 +1323,69 @@ require_once 'header.php';
   // ภาระงานมีร่าง D1/D2 แต่ให้คะแนนเฉพาะร่างที่ 2 (D2) — จึงดึงเรียงความร่าง D2 มาแสดงเวลาประเมินหน่วยภาระงาน
   // (คะแนนยังบันทึกภายใต้รอบ task1 ตามเดิม เพื่อไม่ให้กระทบแดชบอร์ด/การส่งออก)
   const gradingEssayPhase = { pretest: 'pretest', task1: 'task1_d2', task2: 'task2_d2', posttest: 'posttest' };
+
+  // รอบคู่เทียบพัฒนาการ: ก่อนเรียน↔หลังเรียน, หน่วย 1↔หน่วย 2 — ให้เห็นว่าคะแนนแต่ละด้านพัฒนาไปจากเดิมตรงไหนตอนกำลังให้คะแนน
+  const comparisonPhaseMap = {
+    pretest:  { phase: 'posttest', label: 'คะแนนหลังเรียน (เทียบพัฒนาการ)', shortLabel: 'หลังเรียน' },
+    posttest: { phase: 'pretest',  label: 'คะแนนก่อนเรียน (เทียบพัฒนาการ)', shortLabel: 'ก่อนเรียน' },
+    task1:    { phase: 'task2',    label: 'คะแนนหน่วยที่ 2 (เทียบพัฒนาการ)', shortLabel: 'หน่วย 2' },
+    task2:    { phase: 'task1',    label: 'คะแนนหน่วยที่ 1 (เทียบพัฒนาการ)', shortLabel: 'หน่วย 1' }
+  };
+
+  // ดึงคะแนนของรอบคู่เทียบ (ของผู้ประเมินคนเดียวกัน) มาแสดงทั้งยอดรวมและรายข้อ ให้เทียบพัฒนาการได้ตอนกำลังให้คะแนน
+  async function fetchComparisonPhaseScores(studentId, testPhase) {
+    const cfg = comparisonPhaseMap[testPhase];
+    const box = document.getElementById('comparisonScoreBox');
+    if (!cfg || !studentId) return;
+
+    try {
+      const response = await fetch('api.php?action=get_single_evaluation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId: studentId,
+          evaluatorType: currentMode,
+          evaluatorName: currentUser.name,
+          testPhase: cfg.phase
+        })
+      });
+      const res = await response.json();
+      if (!res.success || !res.found) return; // ยังไม่เคยประเมินรอบคู่เทียบ — ไม่ต้องแสดงอะไร
+
+      // ป้ายรายข้อ: คะแนนของรอบคู่เทียบ วางคู่กับป้าย "ครั้งก่อน" เพื่อดูพัฒนาการทีละข้อ
+      for (const [itemId, rawValue] of Object.entries(res.scores)) {
+        const badge = document.getElementById(`compareScore_${itemId}`);
+        if (!badge) continue;
+        const item = findRubricItemById(itemId);
+        const pointsRaw = parseFloat(rawValue);
+        const level = item ? Math.round(pointsRaw / item.multiplier) : null;
+        const levelInfo = item && level !== null ? item.levels.find(l => l.score === level) : null;
+        const pointsText = Math.round(pointsRaw * 100) / 100;
+        const textEl = badge.querySelector('.compare-score-text');
+        if (textEl) {
+          textEl.textContent = `${cfg.shortLabel}: ${levelInfo ? levelInfo.label + ' · ' : ''}${pointsText} คะแนน`;
+        }
+        badge.classList.remove('d-none');
+      }
+
+      // กล่องสรุปคะแนนรวมของรอบคู่เทียบ
+      let cmpTotal = (res.totalScore !== undefined && res.totalScore !== null)
+        ? parseFloat(res.totalScore)
+        : Object.values(res.scores).reduce((sum, v) => sum + parseFloat(v), 0);
+      const cmpLevel = (res.qualityLevel && String(res.qualityLevel).trim() !== '')
+        ? res.qualityLevel
+        : scoreLevelText(cmpTotal);
+      const labelEl = document.getElementById('comparisonScoreLabel');
+      const valEl = document.getElementById('comparisonScoreValue');
+      const lvlEl = document.getElementById('comparisonScoreLevel');
+      if (labelEl) labelEl.textContent = cfg.label;
+      if (valEl) valEl.textContent = Math.round(cmpTotal * 100) / 100;
+      if (lvlEl) lvlEl.textContent = cmpLevel;
+      if (box) box.classList.remove('d-none');
+    } catch (err) {
+      console.error('Error fetching comparison phase evaluation:', err);
+    }
+  }
 
   async function fetchStudentEssayForEvaluation(studentId, testPhase) {
     const formTitleEl = document.getElementById('essayPanelFormTitle');
@@ -1466,6 +1647,8 @@ require_once 'header.php';
       const res = await response.json();
       
       if(res.success) {
+        // บันทึกขึ้นเซิร์ฟเวอร์สำเร็จแล้ว ไม่ต้องเก็บร่างสำรองในเครื่องอีกต่อไป
+        clearEvalDraftFromLocalStorage(studentId, testPhase);
         // อยู่ที่หน้าประเมินเดิม (ไม่ redirect ไปหน้าอื่น) แล้วโหลดข้อมูลที่บันทึกกลับมาให้เป็นโหมดแก้ไข
         showToast("บันทึกผลการประเมินเรียบร้อยแล้ว ✓ (คุณยังอยู่ที่หน้าประเมินเดิม)", "success");
         btn.innerHTML = originalText;
@@ -1508,6 +1691,9 @@ require_once 'header.php';
       if (tInput) { tInput.value = ''; tInput.disabled = false; }
       dimRubric();
     }
+
+    // มีรอบระบุมาจาก URL (เช่นลิงก์จากรายการ "สิ่งที่ยังไม่ได้ทำ") → ข้ามหน้าเลือกรอบไปเริ่มประเมินรอบนั้นทันที
+    if (initialPhaseParam) selectPhase(initialPhaseParam);
   })();
 </script>
 

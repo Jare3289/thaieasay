@@ -434,6 +434,97 @@ try {
             }
             break;
 
+        // ============================================================
+        //  รายการ "สิ่งที่ยังไม่ได้ทำ" ของนักเรียนที่ล็อกอินอยู่ (ใช้ในหน้าเมนูหลัก index.php)
+        //  รวมสถานะทุกด้าน (เขียนเรียงความ / ประเมินตนเอง / ประเมินเพื่อน / ครูประเมิน / สะท้อนคิด)
+        //  แยกตามรอบ (ก่อนเรียน/หน่วย 1/หน่วย 2/หลังเรียน) ในครั้งเดียว ให้หน้าเว็บลิงก์ไปทำงานที่ค้างได้ตรงจุด
+        // ============================================================
+        case 'get_my_todo_status':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'student') {
+                echo json_encode(['success' => false, 'error' => 'ต้องเป็นนักเรียน']);
+                exit;
+            }
+            $myId = $_SESSION['user']['id'];
+            $myName = $_SESSION['user']['name'];
+
+            $phases = ['pretest', 'task1', 'task2', 'posttest'];
+            // essay_phase ที่ใช้ตรวจว่าเขียนเรียงความของแต่ละรอบครบหรือยัง — ภาระงานตรวจที่ร่างที่ 2 (D2) เพราะเป็นร่างที่ใช้ให้คะแนนจริง
+            $essayPhaseKeyMap = ['pretest' => 'pretest', 'task1' => 'task1_d2', 'task2' => 'task2_d2', 'posttest' => 'posttest'];
+
+            // 1) เรียงความที่เขียนแล้ว (มีคำอย่างน้อย 1 คำ) ของแต่ละรอบ
+            $essayWordCounts = [];
+            $stmtEssay = $pdo->prepare('SELECT word_count FROM student_essays WHERE student_id = ? AND essay_phase = ?');
+            foreach ($essayPhaseKeyMap as $phase => $essayPhaseKey) {
+                $stmtEssay->execute([$myId, $essayPhaseKey]);
+                $wc = $stmtEssay->fetchColumn();
+                $essayWordCounts[$phase] = ($wc !== false) ? (int)$wc : 0;
+            }
+
+            // 2) การประเมินทั้งหมดของนักเรียนคนนี้ (ทุกผู้ประเมิน ทุกรอบ) ดึงครั้งเดียวแล้วแยกตามรอบ
+            $stmtEval = $pdo->prepare('SELECT test_phase, evaluator_type FROM evaluations WHERE student_id = ?');
+            $stmtEval->execute([$myId]);
+            $evalByPhase = [];
+            foreach ($phases as $phase) { $evalByPhase[$phase] = ['self' => false, 'teacher' => false]; }
+            while ($erow = $stmtEval->fetch()) {
+                $ph = $erow['test_phase'];
+                if (!isset($evalByPhase[$ph])) continue;
+                if ($erow['evaluator_type'] === 'ตนเองประเมิน') $evalByPhase[$ph]['self'] = true;
+                if ($erow['evaluator_type'] === 'ครูประเมิน')   $evalByPhase[$ph]['teacher'] = true;
+            }
+
+            // 3) คู่ประเมินเพื่อนของแต่ละรอบ + สถานะว่าประเมินคู่ตนเองไปแล้วหรือยัง
+            $stmtPartner  = $pdo->prepare('SELECT partner_code FROM peer_pairs WHERE round = ? AND student_code = ?');
+            $stmtPeerDone = $pdo->prepare("SELECT 1 FROM evaluations WHERE student_id = ? AND evaluator_type = 'เพื่อนประเมิน' AND evaluator_name = ? AND test_phase = ?");
+            $peerByPhase = [];
+            foreach ($phases as $phase) {
+                $stmtPartner->execute([$phase, $myId]);
+                $partnerId = $stmtPartner->fetchColumn();
+                $partnerId = ($partnerId !== false && $partnerId !== null && $partnerId !== '') ? $partnerId : null;
+                $peerDone = false;
+                if ($partnerId) {
+                    $stmtPeerDone->execute([$partnerId, $myName, $phase]);
+                    $peerDone = (bool)$stmtPeerDone->fetchColumn();
+                }
+                $peerByPhase[$phase] = ['partnerId' => $partnerId, 'peerDone' => $peerDone];
+            }
+            // ชื่อคู่ (ถ้ามี) เอาไว้แสดงในหน้าเว็บ
+            $partnerNames = [];
+            $partnerIds = array_unique(array_filter(array_column($peerByPhase, 'partnerId')));
+            if (!empty($partnerIds)) {
+                $placeholders = implode(',', array_fill(0, count($partnerIds), '?'));
+                $stmtNames = $pdo->prepare("SELECT student_id, student_name FROM students WHERE student_id IN ($placeholders)");
+                $stmtNames->execute(array_values($partnerIds));
+                while ($nrow = $stmtNames->fetch()) { $partnerNames[$nrow['student_id']] = $nrow['student_name']; }
+            }
+
+            // 4) สะท้อนคิดการเรียนรู้ (เฉพาะหน่วย 1/2 — ไม่มีในรอบก่อน/หลังเรียน)
+            $stmtRefl = $pdo->prepare('SELECT 1 FROM learning_reflections WHERE student_id = ? AND task_unit = ?');
+            $reflectionByUnit = [];
+            foreach ([1, 2] as $unit) {
+                $stmtRefl->execute([$myId, $unit]);
+                $reflectionByUnit[$unit] = (bool)$stmtRefl->fetchColumn();
+            }
+
+            // ประกอบผลลัพธ์ต่อรอบ
+            $todoResult = [];
+            foreach ($phases as $phase) {
+                $todoResult[$phase] = [
+                    'essayDone'     => $essayWordCounts[$phase] > 0,
+                    'wordCount'     => $essayWordCounts[$phase],
+                    'essayPhaseKey' => $essayPhaseKeyMap[$phase],
+                    'selfDone'      => $evalByPhase[$phase]['self'],
+                    'teacherDone'   => $evalByPhase[$phase]['teacher'],
+                    'partnerId'     => $peerByPhase[$phase]['partnerId'],
+                    'partnerName'   => $peerByPhase[$phase]['partnerId'] ? ($partnerNames[$peerByPhase[$phase]['partnerId']] ?? null) : null,
+                    'peerDone'      => $peerByPhase[$phase]['peerDone']
+                ];
+            }
+            $todoResult['task1']['reflectionDone'] = $reflectionByUnit[1];
+            $todoResult['task2']['reflectionDone'] = $reflectionByUnit[2];
+
+            echo json_encode(['success' => true, 'phases' => $todoResult]);
+            break;
+
         // 8. ดึงภาพรวมแดชบอร์ดความคืบหน้าของห้องเรียน
         case 'get_all_students_summary':
             // ดึงรายชื่อนักเรียนทั้งหมด
