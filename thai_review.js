@@ -110,6 +110,7 @@
       #thaiReviewModal .trw-flag input { font: inherit; width: 8em; border: 1px solid #999; border-radius: 4px; padding: 0 4px; }
       #thaiReviewModal .trw-actions { display: inline-flex; gap: 4px; margin-left: 4px; white-space: nowrap; }
       #thaiReviewModal .trw-actions button { font-size: .78rem; border: none; border-radius: 6px; padding: 2px 8px; cursor: pointer; }
+      #thaiReviewModal .trw-act-fixspacing { background: #ffe4cf; color: #a03e00; font-weight: 600; }
       #thaiReviewModal .trw-act-confirm { background: #d4edda; color: #155724; }
       #thaiReviewModal .trw-act-edit { background: #cfe2ff; color: #084298; }
       #thaiReviewModal .trw-act-delete { background: #f8d7da; color: #842029; }
@@ -193,7 +194,9 @@
     const actions = document.createElement('span');
     actions.className = 'trw-actions';
     actions.dataset.for = span.dataset.uid;
+    const isSpacing = span.dataset.kind === 'spacing';
     actions.innerHTML = `
+      ${isSpacing ? '<button type="button" class="trw-act-fixspacing">🔧 เว้นวรรคให้ถูก</button>' : ''}
       <button type="button" class="trw-act-confirm">✓ ถูกต้อง</button>
       <button type="button" class="trw-act-edit">✏️ แก้คำ</button>
       <button type="button" class="trw-act-delete">🗑️ ลบ</button>
@@ -204,6 +207,9 @@
     actions.querySelector('.trw-act-confirm').addEventListener('click', () => confirmWord(span, actions));
     actions.querySelector('.trw-act-edit').addEventListener('click', () => editWord(span, actions));
     actions.querySelector('.trw-act-delete').addEventListener('click', () => deleteWord(span, actions));
+    if (isSpacing) {
+      actions.querySelector('.trw-act-fixspacing').addEventListener('click', () => fixSpacing(span, actions));
+    }
   }
 
   // ลบคำนี้ออกจากคำที่น่าสงสัยทุกรายการ (ยืนยัน/แก้ไขแล้วจะไม่ถูกฟ้องคำนี้อีก)
@@ -252,17 +258,20 @@
     const finish = (commit) => {
       if (finished) return;
       finished = true;
-      const val = commit ? input.value.trim() : original;
-      if (commit && val && val !== original) {
+      // ไม่ใช้ .trim() กับค่าที่จะนำไปแทนที่ เพราะบางกรณี (เช่นแก้เว้นวรรครอบ "ๆ") ผู้ใช้ตั้งใจ
+      // เคาะช่องว่างไว้หน้า/หลังคำ — trim() จะลบช่องว่างที่ตั้งใจพิมพ์นั้นทิ้งไปเสีย
+      const raw = commit ? input.value : original;
+      const isBlank = raw.trim() === '';
+      if (commit && !isBlank && raw !== original) {
         forgetWord(originalWord);
         // แก้ "ทุกจุด" ที่เป็นคำเดียวกันในเรียงความทั้งฉบับ ไม่ใช่แค่จุดที่คลิก
         modalEl.querySelectorAll('.trw-flag[data-word="' + attrEscape(originalWord) + '"]').forEach(el => {
-          el.replaceWith(document.createTextNode(val));
+          el.replaceWith(document.createTextNode(raw));
         });
         state.dirty = true;
       } else {
         span.classList.remove('trw-editing');
-        span.textContent = val || original;
+        span.textContent = isBlank ? original : raw;
       }
       updateStatus();
     };
@@ -272,6 +281,40 @@
       else if (ev.key === 'Escape') { ev.preventDefault(); finish(false); }
     });
     input.addEventListener('blur', () => finish(true));
+  }
+
+  // แก้เว้นวรรครอบ "ๆ" ให้ถูกต้องแบบอัตโนมัติ (ไม่พึ่งให้ผู้ใช้พิมพ์เว้นวรรคเอง เพราะจุดที่ต้องเว้น
+  // วรรค "หลัง" ๆ อยู่นอกขอบเขตคำที่ถูกไฮไลต์ — พิมพ์แก้ในช่องแก้คำธรรมดาจะเติมได้แค่ฝั่งหน้าเท่านั้น)
+  // เว้นวรรคให้ทั้งสองด้านเสมอ ทำกับทุกจุดที่เป็นคำเดียวกันในเรียงความทั้งฉบับ
+  function fixSpacing(span, actions) {
+    actions.remove();
+    const word = span.dataset.word;
+    const stem = (word !== 'ๆ' && word.slice(-1) === 'ๆ') ? word.slice(0, -1) : '';
+    modalEl.querySelectorAll('.trw-flag[data-word="' + attrEscape(word) + '"]').forEach((el) => {
+      const prev = el.previousSibling;
+      const next = el.nextSibling;
+      const frag = document.createDocumentFragment();
+      if (stem) {
+        // ตัดคำที่ซ้ำ (stem) กับ "ๆ" ออกจากกัน แล้วแทรกช่องว่างคั่นกลาง
+        frag.appendChild(document.createTextNode(stem + ' '));
+      } else if (prev && prev.nodeType === Node.TEXT_NODE && !/[ \t]$/.test(prev.textContent)) {
+        prev.textContent += ' ';
+      }
+      frag.appendChild(document.createTextNode('ๆ'));
+      el.replaceWith(frag);
+      if (next) {
+        if (next.nodeType === Node.TEXT_NODE) {
+          if (!/^[ \t]/.test(next.textContent)) {
+            next.textContent = ' ' + next.textContent;
+          }
+        } else {
+          next.before(document.createTextNode(' '));
+        }
+      }
+    });
+    forgetWord(word);
+    state.dirty = true;
+    updateStatus();
   }
 
   // ลบคำนี้ออกจากเนื้อหาเลย (เช่น คำซ้ำ/คำที่ไม่ควรอยู่) พร้อมยุบช่องว่างซ้ำที่อาจเกิดขึ้น

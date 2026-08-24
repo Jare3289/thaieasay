@@ -505,6 +505,7 @@ require_once 'header.php';
   </div>
 </div>
 
+<script src="thai_review.js"></script>
 <script>
   // ==== ศูนย์ส่งออกรายงาน: ประกอบ URL แล้วสั่งดาวน์โหลดตามตัวกรองที่เลือก ====
   function doExport(report, format) {
@@ -2059,41 +2060,118 @@ require_once 'header.php';
     return html;
   }
 
-  function formatEssayHTML(contentStr) {
-    if (!contentStr) return '<em class="text-muted">ไม่มีเนื้อหาเรียงความ</em>';
+  // แยกโครงสร้างเรียงความ (คำนำ/เนื้อเรื่อง/สรุป) จาก JSON ที่บันทึกไว้ — คืน null ถ้าไม่ใช่รูปแบบ JSON โครงสร้าง
+  function parseEssayStructured(contentStr) {
     try {
       const obj = JSON.parse(contentStr);
       if (obj && typeof obj === 'object' && obj.introduction !== undefined) {
-        let html = '';
-        if (obj.introduction) {
+        return { introduction: obj.introduction || '', body: Array.isArray(obj.body) ? obj.body : [], conclusion: obj.conclusion || '' };
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  // ต่อทุกส่วนของเรียงความเป็นข้อความเดียว (ใช้ส่งตรวจคำผิด/นับตัวอักษร)
+  function essayCombinedText(contentStr) {
+    const parts = parseEssayStructured(contentStr);
+    if (parts) {
+      return [parts.introduction, ...parts.body, parts.conclusion].filter(t => t).join('\n');
+    }
+    return contentStr || '';
+  }
+
+  // sets = { misspelled, foreign, spacing } จาก api.php?action=check_thai_spelling — ใส่ null ถ้ายังไม่ได้ตรวจ (แสดงแค่ขอบเขตคำ)
+  function formatEssayHTML(contentStr, sets) {
+    if (!contentStr) return '<em class="text-muted">ไม่มีเนื้อหาเรียงความ</em>';
+    const renderText = (t) => sets ? ThaiReview.renderStaticHTML(t, sets) : wordSegmentedHTML(t);
+    const parts = parseEssayStructured(contentStr);
+    if (parts) {
+      let html = '';
+      if (parts.introduction) {
+        html += `
+          <div class="mb-3">
+            <span class="badge bg-primary bg-opacity-10 text-primary fw-bold mb-1"><i class="bi bi-pencil-fill me-1"></i>ส่วนคำนำ (Introduction)</span>
+            <div class="p-3 bg-white rounded-3 border text-dark" style="white-space:pre-wrap; line-height:1.7;">${renderText(parts.introduction)}</div>
+          </div>`;
+      }
+      parts.body.forEach((paraText, i) => {
+        if (paraText) {
           html += `
             <div class="mb-3">
-              <span class="badge bg-primary bg-opacity-10 text-primary fw-bold mb-1"><i class="bi bi-pencil-fill me-1"></i>ส่วนคำนำ (Introduction)</span>
-              <div class="p-3 bg-white rounded-3 border text-dark" style="white-space:pre-wrap; line-height:1.7;">${wordSegmentedHTML(obj.introduction)}</div>
+              <span class="badge bg-success bg-opacity-10 text-success fw-bold mb-1"><i class="bi bi-book-fill me-1"></i>ส่วนเนื้อเรื่อง ย่อหน้าที่ ${i+1} (Body Paragraph)</span>
+              <div class="p-3 bg-white rounded-3 border text-dark" style="white-space:pre-wrap; line-height:1.7;">${renderText(paraText)}</div>
             </div>`;
         }
-        if (obj.body && Array.isArray(obj.body)) {
-          obj.body.forEach((paraText, i) => {
-            if (paraText) {
-              html += `
-                <div class="mb-3">
-                  <span class="badge bg-success bg-opacity-10 text-success fw-bold mb-1"><i class="bi bi-book-fill me-1"></i>ส่วนเนื้อเรื่อง ย่อหน้าที่ ${i+1} (Body Paragraph)</span>
-                  <div class="p-3 bg-white rounded-3 border text-dark" style="white-space:pre-wrap; line-height:1.7;">${wordSegmentedHTML(paraText)}</div>
-                </div>`;
-            }
-          });
-        }
-        if (obj.conclusion) {
-          html += `
-            <div class="mb-0">
-              <span class="badge bg-danger bg-opacity-10 text-danger fw-bold mb-1"><i class="bi bi-award-fill me-1"></i>ส่วนสรุป (Conclusion)</span>
-              <div class="p-3 bg-white rounded-3 border text-dark" style="white-space:pre-wrap; line-height:1.7;">${wordSegmentedHTML(obj.conclusion)}</div>
-            </div>`;
-        }
-        return html;
+      });
+      if (parts.conclusion) {
+        html += `
+          <div class="mb-0">
+            <span class="badge bg-danger bg-opacity-10 text-danger fw-bold mb-1"><i class="bi bi-award-fill me-1"></i>ส่วนสรุป (Conclusion)</span>
+            <div class="p-3 bg-white rounded-3 border text-dark" style="white-space:pre-wrap; line-height:1.7;">${renderText(parts.conclusion)}</div>
+          </div>`;
       }
-    } catch(e) {}
-    return `<div class="p-3 bg-white rounded-3 border text-dark" style="white-space:pre-wrap; line-height:1.7;">${wordSegmentedHTML(contentStr)}</div>`;
+      return html;
+    }
+    return `<div class="p-3 bg-white rounded-3 border text-dark" style="white-space:pre-wrap; line-height:1.7;">${renderText(contentStr)}</div>`;
+  }
+
+  // แถบค่าสถิติรายบุคคลของเรียงความฉบับนี้ — จำนวนคำ/ตัวอักษร และจำนวนจุดที่น่าสงสัยแต่ละประเภท
+  function renderEssayIndividualStats(sets, combinedText, wordCountStr) {
+    const chars  = combinedText.length;
+    const nMis   = (sets.misspelled || []).length;
+    const nFor   = (sets.foreign || []).length;
+    const nSpace = (sets.spacing || []).length;
+    const badges = [
+      `<span class="badge bg-secondary-subtle text-secondary rounded-pill px-2 py-1"><i class="bi bi-fonts me-1"></i>${wordCountStr} คำ</span>`,
+      `<span class="badge bg-secondary-subtle text-secondary rounded-pill px-2 py-1"><i class="bi bi-text-paragraph me-1"></i>${chars.toLocaleString('th-TH')} ตัวอักษร</span>`
+    ];
+    if (nMis > 0) badges.push(`<span class="badge bg-warning-subtle text-warning-emphasis rounded-pill px-2 py-1"><i class="bi bi-exclamation-triangle-fill me-1"></i>สะกดผิด ${nMis} คำ</span>`);
+    if (nFor > 0) badges.push(`<span class="badge rounded-pill px-2 py-1" style="background:#e0d6ff;color:#4b2fa8;"><i class="bi bi-translate me-1"></i>ภาษาอื่นปน ${nFor} คำ</span>`);
+    if (nSpace > 0) badges.push(`<span class="badge rounded-pill px-2 py-1" style="background:#ffd8c2;color:#a03e00;"><i class="bi bi-textarea-t me-1"></i>เว้นวรรค "ๆ" ผิด ${nSpace} คำ</span>`);
+    if (nMis === 0 && nFor === 0 && nSpace === 0) {
+      badges.push(`<span class="badge bg-success-subtle text-success rounded-pill px-2 py-1"><i class="bi bi-check-circle-fill me-1"></i>ไม่พบคำผิด</span>`);
+    }
+    return `<div class="d-flex flex-wrap gap-2 mb-3 pb-2 border-bottom">${badges.join('')}</div>`;
+  }
+
+  // แคชผลตรวจคำผิดต่อเรียงความ (คีย์ = essayId) กันตรวจซ้ำเวลาเปิด/ปิดกล่องซ้ำ ๆ
+  const essayCheckCache = {};
+  let currentFilteredEssays = [];
+
+  // ครั้งแรกที่เปิดดูฉบับเต็ม จะส่งตรวจคำผิด/ภาษาอื่น/เว้นวรรค แล้วไฮไลต์ + แสดงค่าสถิติของฉบับนั้นให้เลย
+  async function toggleEssayFull(essayId, idx) {
+    const panel = document.getElementById(essayId);
+    if (!panel) return;
+    const wasHidden = panel.classList.contains('d-none');
+    panel.classList.toggle('d-none');
+    if (!wasHidden || essayCheckCache[essayId]) return;
+
+    const e = currentFilteredEssays[idx];
+    if (!e) return;
+    const combinedText = essayCombinedText(e.essay_content);
+    const wordCountStr = parseInt(e.word_count || 0).toLocaleString('th-TH');
+
+    let sets = { misspelled: [], foreign: [], spacing: [] };
+    if (combinedText.trim() && typeof ThaiReview !== 'undefined') {
+      const loadingId = essayId + '_loading';
+      panel.insertAdjacentHTML('afterbegin', `<div class="text-muted small mb-2" id="${loadingId}"><span class="spinner-border spinner-border-sm me-1"></span>กำลังตรวจสอบคำผิด...</div>`);
+      try {
+        const res = await fetch('api.php?action=check_thai_spelling', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: combinedText })
+        });
+        const data = await res.json();
+        if (data.success) sets = { misspelled: data.misspelled, foreign: data.foreign, spacing: data.spacing };
+      } catch (err) {
+        // เงียบไว้ — แสดงเนื้อหาได้แม้ตรวจคำผิดไม่สำเร็จ (จะไม่มีคำไฮไลต์)
+      }
+      const loadingEl = document.getElementById(loadingId);
+      if (loadingEl) loadingEl.remove();
+    }
+
+    essayCheckCache[essayId] = sets;
+    panel.innerHTML = renderEssayIndividualStats(sets, combinedText, wordCountStr) + formatEssayHTML(e.essay_content, sets);
   }
 
   function renderEssayViewer(essays) {
@@ -2137,6 +2215,10 @@ require_once 'header.php';
     setEl('essayStatMinWords', minWords);
     setEl('essayStatTotalWords', totalWords);
     setEl('essayStatStdDevWords', stdDevWords);
+
+    currentFilteredEssays = filtered;
+    // ล้างแคชผลตรวจคำผิดเดิม เพราะ essayId (essay_<ลำดับ>) จะถูกใช้ซ้ำกับเรียงความคนละฉบับหลังกรอง/ค้นหาใหม่
+    Object.keys(essayCheckCache).forEach(k => delete essayCheckCache[k]);
 
     if (filtered.length === 0) {
       container.innerHTML = '<div class="text-center py-5 text-muted"><i class="bi bi-inbox fs-3 d-block mb-2"></i>ไม่พบเรียงความที่ตรงกับเงื่อนไข</div>';
@@ -2185,7 +2267,7 @@ require_once 'header.php';
                   <i class="bi bi-fonts me-1"></i>${wordCount} คำ
                 </span>
                 <button class="btn btn-outline-primary btn-sm rounded-pill px-3 py-1 small" style="font-size:0.75rem;"
-                  onclick="document.getElementById('${essayId}').classList.toggle('d-none')">
+                  onclick="toggleEssayFull('${essayId}', ${idx})">
                   <i class="bi bi-eye me-1"></i>เปิดดูเต็มยศ
                 </button>
               </div>
