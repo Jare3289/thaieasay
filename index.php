@@ -25,11 +25,11 @@ require_once 'header.php';
   <!-- แผงสำหรับนักเรียน (Student Menu) -->
   <div id="menuStudent">
     
-    <!-- 1. รายการสิ่งที่ยังไม่ได้ทำ (To-do Checklist) — รวมทุกรอบ (ก่อนเรียน/หน่วย 1/หน่วย 2/หลังเรียน) กดลิงก์ไปทำงานที่ค้างได้ตรงจุด -->
+    <!-- 1. ตารางความคืบหน้า/สิ่งที่ยังไม่ได้ทำ — แยกเป็นตารางตามรอบ (ก่อนเรียน/หน่วย 1/หน่วย 2/หลังเรียน) กดลิงก์ไปทำงานที่ค้างได้ตรงจุด -->
     <div class="card border-0 shadow-sm rounded-4 bg-white mb-4 overflow-hidden text-start">
       <div class="card-header bg-primary bg-opacity-10 text-primary fw-bold py-3 px-4 border-0 d-flex align-items-center justify-content-between">
-        <span class="fs-6"><i class="bi bi-list-check me-2"></i>สิ่งที่ยังไม่ได้ทำ</span>
-        <span id="todoCountBadge" class="badge bg-primary rounded-pill px-3 py-1 font-mono fs-8 d-none">0</span>
+        <span class="fs-6"><i class="bi bi-list-check me-2"></i>ความคืบหน้า / สิ่งที่ยังไม่ได้ทำ</span>
+        <span id="todoCountBadge" class="badge bg-primary rounded-pill px-3 py-1 font-mono fs-8 d-none">-</span>
       </div>
       <div class="card-body p-4">
         <div id="todoListLoading" class="text-center text-muted py-3">
@@ -38,7 +38,7 @@ require_once 'header.php';
         <div id="todoListDone" class="d-none text-center text-success py-3 fw-bold">
           <i class="bi bi-check-circle-fill fs-2 d-block mb-2"></i>ทำครบทุกอย่างแล้วในตอนนี้ เยี่ยมมาก! 🎉
         </div>
-        <div id="todoListContainer" class="d-flex flex-column gap-2"></div>
+        <div id="todoListContainer"></div>
       </div>
     </div>
 
@@ -350,7 +350,7 @@ require_once 'header.php';
 </div>
 
 <script>
-  // ป้ายชื่อรอบ ใช้แสดงประกอบรายการสิ่งที่ยังไม่ได้ทำ
+  // ป้ายชื่อรอบ ใช้แสดงหัวตารางความคืบหน้าแยกตามรอบ
   const todoPhaseLabels = {
     pretest:  'ก่อนเรียน (Pretest)',
     task1:    'ภาระงาน หน่วยที่ 1',
@@ -361,8 +361,61 @@ require_once 'header.php';
     return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
+  // สร้าง 1 แถวในตารางความคืบหน้า
+  // done: true = เสร็จแล้ว, false = ยังไม่เสร็จ (นับในความคืบหน้า + มีปุ่มลิงก์ไปทำ), null = ยังทำเองไม่ได้ตอนนี้ (ไม่นับ ไม่มีปุ่ม)
+  function buildTodoRow(icon, label, done, link, actionText, neutralText) {
+    let statusHTML, actionHTML;
+    if (done === null) {
+      statusHTML = `<span class="badge bg-light text-muted border">${escToDoText(neutralText || '-')}</span>`;
+      actionHTML = '';
+    } else if (done) {
+      statusHTML = `<span class="badge bg-success"><i class="bi bi-check-lg"></i> เสร็จแล้ว</span>`;
+      actionHTML = '';
+    } else {
+      statusHTML = `<span class="badge bg-warning text-dark">ยังไม่เสร็จ</span>`;
+      actionHTML = `<a href="${link}" class="btn btn-sm btn-primary rounded-pill px-3 fw-bold text-decoration-none">${escToDoText(actionText)} &rarr;</a>`;
+    }
+    const html = `
+      <tr>
+        <td class="small"><span class="me-2">${icon}</span>${escToDoText(label)}</td>
+        <td class="text-center">${statusHTML}</td>
+        <td class="text-end">${actionHTML}</td>
+      </tr>`;
+    return { html, done };
+  }
+
+  // สร้างตารางความคืบหน้า 1 รอบ พร้อมแถบ/ตัวเลขสรุปความคืบหน้าของรอบนั้น
+  function buildTodoPhaseSection(phaseLabel, rows) {
+    const countable = rows.filter(r => r.done !== null);
+    const doneCount = countable.filter(r => r.done).length;
+    const totalCount = countable.length;
+    const pct = totalCount ? Math.round((doneCount / totalCount) * 100) : 0;
+    const barClass = pct === 100 ? 'bg-success' : (pct > 0 ? 'bg-warning' : 'bg-secondary');
+
+    return {
+      doneCount, totalCount,
+      html: `
+        <div class="mb-4">
+          <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
+            <h6 class="fw-bold text-dark mb-0">${escToDoText(phaseLabel)}</h6>
+            <div class="d-flex align-items-center gap-2">
+              <div class="progress" style="width:110px; height:8px;">
+                <div class="progress-bar ${barClass}" style="width:${pct}%"></div>
+              </div>
+              <span class="small text-muted fw-bold" style="min-width:2.5rem;">${doneCount}/${totalCount}</span>
+            </div>
+          </div>
+          <div class="table-responsive rounded-3 border">
+            <table class="table table-sm align-middle mb-0">
+              <tbody>${rows.map(r => r.html).join('')}</tbody>
+            </table>
+          </div>
+        </div>`
+    };
+  }
+
   // โหลดสถานะทุกด้าน (เขียนเรียงความ/ประเมินตนเอง/ประเมินเพื่อน/สะท้อนคิด) ทุกรอบในครั้งเดียว
-  // แล้วประกอบเป็นรายการ "สิ่งที่ยังไม่ได้ทำ" พร้อมลิงก์ไปทำงานนั้น ๆ ได้ทันที
+  // แล้วแสดงเป็นตารางความคืบหน้า แยกตามรอบ (ก่อนเรียน/หน่วย 1/หน่วย 2/หลังเรียน) พร้อมลิงก์ไปทำงานที่ค้างได้ทันที
   async function loadTodoList() {
     if (!currentUser || currentUser.role !== 'student') return;
 
@@ -378,56 +431,50 @@ require_once 'header.php';
       if (loadingEl) loadingEl.classList.add('d-none');
       if (!res.success || !res.phases) return;
 
-      const items = [];
-      ['pretest', 'task1', 'task2', 'posttest'].forEach(phase => {
+      let overallDone = 0, overallTotal = 0;
+      const sectionsHTML = ['pretest', 'task1', 'task2', 'posttest'].map(phase => {
         const p = res.phases[phase];
-        if (!p) return;
-        const pLabel = todoPhaseLabels[phase];
+        if (!p) return '';
+        const isTaskUnit = (phase === 'task1' || phase === 'task2');
+        const rows = [];
 
-        if (!p.essayDone) {
-          items.push({ icon: '✍️', label: 'เขียนเรียงความ', phaseLabel: pLabel,
-            link: `essay_writer.php?phase=${encodeURIComponent(p.essayPhaseKey)}`, btnClass: 'btn-success' });
-        }
-        if (!p.selfDone) {
-          items.push({ icon: '🙋‍♂️', label: 'ประเมินตนเอง', phaseLabel: pLabel,
-            link: `evaluation.php?mode=self&phase=${phase}`, btnClass: 'btn-primary' });
-        }
-        if (!p.peerDone) {
-          if (p.partnerId) {
-            items.push({ icon: '👥', label: `ประเมินเพื่อน (${escToDoText(p.partnerName || p.partnerId)})`, phaseLabel: pLabel,
-              link: `evaluation.php?mode=peer&phase=${phase}`, btnClass: 'btn-info text-white' });
-          } else if (phase === 'task1' || phase === 'task2') {
-            // pretest/posttest ครูเป็นผู้จับคู่ให้เท่านั้น — ยังไม่มีคู่ก็ยังทำอะไรเองไม่ได้ จึงไม่ขึ้นรายการ
-            items.push({ icon: '🤝', label: 'จับคู่เพื่อนประเมิน', phaseLabel: pLabel,
-              link: `peer_matching.php?round=${phase}`, btnClass: 'btn-outline-primary' });
-          }
-        }
-        if ((phase === 'task1' || phase === 'task2') && !p.reflectionDone) {
-          items.push({ icon: '🎨', label: 'บันทึกสะท้อนคิดการเรียนรู้', phaseLabel: pLabel,
-            link: `reflection_tools.php?unit=${phase === 'task1' ? 1 : 2}`, btnClass: 'btn-warning' });
-        }
-      });
+        rows.push(buildTodoRow('✍️', 'เขียนเรียงความ', p.essayDone,
+          `essay_writer.php?phase=${encodeURIComponent(p.essayPhaseKey)}`, 'ไปเขียน'));
 
-      if (countBadge) { countBadge.textContent = items.length; countBadge.classList.toggle('d-none', items.length === 0); }
+        rows.push(buildTodoRow('🙋‍♂️', 'ประเมินตนเอง', p.selfDone,
+          `evaluation.php?mode=self&phase=${phase}`, 'ไปประเมิน'));
 
-      if (items.length === 0) {
-        if (doneEl) doneEl.classList.remove('d-none');
-        containerEl.innerHTML = '';
-        return;
+        if (p.peerDone) {
+          rows.push(buildTodoRow('👥', `ประเมินเพื่อน${p.partnerName ? ' (' + escToDoText(p.partnerName) + ')' : ''}`, true));
+        } else if (p.partnerId) {
+          rows.push(buildTodoRow('👥', `ประเมินเพื่อน (${escToDoText(p.partnerName || p.partnerId)})`, false,
+            `evaluation.php?mode=peer&phase=${phase}`, 'ไปประเมิน'));
+        } else if (isTaskUnit) {
+          rows.push(buildTodoRow('🤝', 'จับคู่เพื่อนประเมิน', false,
+            `peer_matching.php?round=${phase}`, 'ไปจับคู่'));
+        } else {
+          // pretest/posttest ครูเป็นผู้จับคู่ให้เท่านั้น — ยังไม่มีคู่ก็ยังทำอะไรเองไม่ได้ตอนนี้
+          rows.push(buildTodoRow('🤝', 'ประเมินเพื่อน', null, null, null, 'รอครูจับคู่'));
+        }
+
+        if (isTaskUnit) {
+          rows.push(buildTodoRow('🎨', 'สะท้อนคิดการเรียนรู้', p.reflectionDone,
+            `reflection_tools.php?unit=${phase === 'task1' ? 1 : 2}`, 'ไปบันทึก'));
+        }
+
+        const section = buildTodoPhaseSection(todoPhaseLabels[phase], rows);
+        overallDone += section.doneCount;
+        overallTotal += section.totalCount;
+        return section.html;
+      }).join('');
+
+      containerEl.innerHTML = sectionsHTML;
+
+      if (countBadge) {
+        countBadge.textContent = `${overallDone}/${overallTotal}`;
+        countBadge.classList.remove('d-none');
       }
-
-      containerEl.innerHTML = items.map(it => `
-        <div class="p-3 rounded-3 border d-flex align-items-center justify-content-between bg-light bg-opacity-50 flex-wrap gap-2">
-          <div class="d-flex align-items-center gap-3">
-            <div class="fs-4">${it.icon}</div>
-            <div>
-              <div class="fw-bold text-dark small" style="font-size:0.88rem;">${escToDoText(it.label)}</div>
-              <div class="text-muted small" style="font-size:0.75rem;">${escToDoText(it.phaseLabel)}</div>
-            </div>
-          </div>
-          <a href="${it.link}" class="btn btn-sm ${it.btnClass} rounded-pill px-3 fw-bold text-decoration-none">ไปทำ &rarr;</a>
-        </div>
-      `).join('');
+      if (doneEl) doneEl.classList.toggle('d-none', !(overallTotal > 0 && overallDone === overallTotal));
     } catch (err) {
       console.error("Error loading todo list:", err);
       if (loadingEl) loadingEl.classList.add('d-none');

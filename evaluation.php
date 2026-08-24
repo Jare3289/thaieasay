@@ -1136,7 +1136,8 @@ require_once 'header.php';
              if(targetRadio) targetRadio.checked = true;
           }
 
-          // แสดงป้ายคะแนนเดิมของข้อนี้ (ครั้งก่อนเคยให้ระดับ/คะแนนเท่าไร) ไว้เทียบกับตัวเลือกที่กำลังจะให้ครั้งนี้
+          // แสดงป้ายคะแนนเดิมของข้อนี้ (เคยให้ระดับ/คะแนนเท่าไรไว้ในรอบนี้) ไว้เทียบกับตัวเลือกที่กำลังจะให้ครั้งนี้
+          // ใช้คำว่า "คะแนนเดิม" ให้ตรงกับกล่องสรุปด้านบน — ไม่ใช้คำว่า "ครั้งก่อน/ครั้งหลัง" เพราะสับสนกับรอบคู่เทียบ (ก่อนเรียน/หลังเรียน ฯลฯ)
           const badge = document.getElementById(`prevScore_${itemId}`);
           if (badge) {
             const item = findRubricItemById(itemId);
@@ -1146,7 +1147,7 @@ require_once 'header.php';
             const pointsText = Math.round(pointsRaw * 100) / 100;
             const textEl = badge.querySelector('.prev-score-text');
             if (textEl) {
-              textEl.textContent = `ครั้งก่อน: ${levelInfo ? levelInfo.label + ' · ' : ''}${pointsText} คะแนน`;
+              textEl.textContent = `คะแนนเดิม: ${levelInfo ? levelInfo.label + ' · ' : ''}${pointsText} คะแนน`;
             }
             badge.classList.remove('d-none');
           }
