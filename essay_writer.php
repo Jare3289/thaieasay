@@ -198,6 +198,11 @@ require_once 'header.php';
         </div>
       </div>
 
+      <!-- เกณฑ์ความยาว: ผลงานต้องมีความยาว 250-300 คำ หรือ 25-30 บรรทัด (อย่างใดอย่างหนึ่ง) -->
+      <div class="mb-4 p-3 rounded-3" id="lengthCheckBox">
+        <div id="lengthCheckText" class="small fw-bold"></div>
+      </div>
+
       <!-- ตรวจสอบการสะกดคำ + แยกคำทั้งหน้า — แสดงจุดที่น่าสงสัยไว้ตรงนี้เลย ไม่ต้องกดดูก่อน -->
       <div class="mb-4 p-3 bg-light rounded-3">
         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
@@ -553,6 +558,52 @@ function checkAndOfferDraftRestore(phase) {
 }
 
 // ตัดคำภาษาไทยด้วย Intl.Segmenter (ใช้ตัวเดียวกับ thai_review.js) เพื่อแสดงขอบเขตคำในโหมดดูฉบับที่บันทึกไว้
+// ประมาณจำนวน "บรรทัด" ที่จะได้เมื่อพิมพ์จริง (จำลองการจัดหน้าแบบเดียวกับ essay_print.php —
+// ความกว้างกระดาษ/ฟอนต์/ระยะบรรทัดเดียวกัน) โดยวัดจากกล่องที่ซ่อนไว้นอกจอ
+// หมายเหตุ: เป็นค่าประมาณเท่านั้น ขึ้นกับฟอนต์ TH Sarabun PSK ที่ติดตั้งอยู่ในเครื่องผู้ใช้จริง
+function estimateLineCount(paragraphTexts) {
+  let measureEl = document.getElementById('__lineMeasure');
+  if (!measureEl) {
+    measureEl = document.createElement('div');
+    measureEl.id = '__lineMeasure';
+    measureEl.style.cssText = [
+      'position:absolute', 'left:-9999px', 'top:0', 'visibility:hidden',
+      'width:696px', // เทียบเท่าความกว้างเนื้อหาในกระดาษพิมพ์ของ essay_print.php (.sheet 800px หักขอบ/ที่เว้นเลขบรรทัด)
+      "font-family:'TH Sarabun PSK','THSarabunPSK','TH SarabunPSK','TH Sarabun New','Sarabun','Leelawadee UI','Tahoma',sans-serif",
+      'font-size:20px', 'line-height:30px'
+    ].join(';');
+    document.body.appendChild(measureEl);
+  }
+  const nonEmpty = paragraphTexts.filter(t => t && t.trim() !== '');
+  if (nonEmpty.length === 0) return 0;
+  measureEl.innerHTML = nonEmpty.map(t =>
+    `<p style="margin:0; text-indent:2.5em; text-align:justify;">${essayWordSegmentedHTML(t)}</p>`
+  ).join('');
+  return Math.round(measureEl.scrollHeight / 30);
+}
+
+// ตรวจว่าเข้าเกณฑ์ความยาวหรือไม่ (250-300 คำ หรือ 25-30 บรรทัด อย่างใดอย่างหนึ่งก็ผ่าน) แล้วแสดงผล
+function updateLengthCheck(words, paragraphTexts) {
+  const box = document.getElementById('lengthCheckBox');
+  const textEl = document.getElementById('lengthCheckText');
+  if (words === 0) {
+    box.className = 'mb-4 p-3 rounded-3 bg-light';
+    textEl.innerHTML = '<i class="bi bi-rulers me-1"></i>เกณฑ์ความยาว: ต้องมี 250–300 คำ หรือ 25–30 บรรทัด (พิมพ์เรียงความเพื่อตรวจ)';
+    return;
+  }
+  const lines = estimateLineCount(paragraphTexts);
+  const wordsOk = words >= 250 && words <= 300;
+  const linesOk = lines >= 25 && lines <= 30;
+  const pass = wordsOk || linesOk;
+  box.className = 'mb-4 p-3 rounded-3 ' + (pass ? 'bg-success bg-opacity-10' : 'bg-danger bg-opacity-10');
+  const icon = pass ? '<i class="bi bi-check-circle-fill text-success me-1"></i>' : '<i class="bi bi-x-circle-fill text-danger me-1"></i>';
+  const wordsPart = `${words.toLocaleString('th-TH')} คำ${wordsOk ? ' ✓' : ''}`;
+  const linesPart = `~${lines.toLocaleString('th-TH')} บรรทัด (ประมาณ)${linesOk ? ' ✓' : ''}`;
+  textEl.innerHTML = pass
+    ? `${icon}ผ่านเกณฑ์ความยาว (250–300 คำ หรือ 25–30 บรรทัด) — ${wordsPart} · ${linesPart}`
+    : `${icon}ยังไม่เข้าเกณฑ์ความยาว (ต้อง 250–300 คำ หรือ 25–30 บรรทัด) — ตอนนี้มี ${wordsPart} · ${linesPart}`;
+}
+
 function essayWordSegmentedHTML(text) {
   const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   if (typeof ThaiReview === 'undefined' || !ThaiReview.segmentText) {
@@ -765,6 +816,8 @@ function updateWordCount() {
   if (wBadge) {
     wBadge.innerHTML = `<i class="bi bi-fonts me-1"></i>${words.toLocaleString('th-TH')} คำ`;
   }
+
+  updateLengthCheck(words, [introText, ...bodyTexts, conclusionText]);
 
   clearTimeout(autoSaveTimer);
   autoSaveTimer = setTimeout(() => {
