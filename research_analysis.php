@@ -409,27 +409,15 @@ require_once 'header.php';
             </div>
           </div>
 
-          <!-- Summary stats row 2: คำรวมทั้งหมด + สถิติประโยค -->
+          <!-- Summary stats row 2: คำรวมทั้งหมด + ส่วนเบี่ยงเบนมาตรฐาน -->
           <div class="row g-3 mb-4" id="essaySummaryRow2">
-            <div class="col-md-3 col-6">
+            <div class="col-md-6 col-6">
               <div class="card border-0 rounded-3 p-3 text-center bg-light">
                 <div class="fs-4 fw-bold text-primary" id="essayStatTotalWords">-</div>
                 <div class="text-muted small">คำรวมทั้งหมด</div>
               </div>
             </div>
-            <div class="col-md-3 col-6">
-              <div class="card border-0 rounded-3 p-3 text-center bg-light">
-                <div class="fs-4 fw-bold text-info" id="essayStatAvgSentences">-</div>
-                <div class="text-muted small">เฉลี่ย ประโยค/ชิ้น (โดยประมาณ)</div>
-              </div>
-            </div>
-            <div class="col-md-3 col-6">
-              <div class="card border-0 rounded-3 p-3 text-center bg-light">
-                <div class="fs-4 fw-bold text-secondary" id="essayStatWordsPerSentence">-</div>
-                <div class="text-muted small">เฉลี่ย คำ/ประโยค</div>
-              </div>
-            </div>
-            <div class="col-md-3 col-6">
+            <div class="col-md-6 col-6">
               <div class="card border-0 rounded-3 p-3 text-center bg-light">
                 <div class="fs-4 fw-bold text-dark" id="essayStatStdDevWords">-</div>
                 <div class="text-muted small">ส่วนเบี่ยงเบนมาตรฐาน (คำ)</div>
@@ -2025,12 +2013,11 @@ require_once 'header.php';
     container.innerHTML = '<div class="text-center py-5 text-muted"><span class="spinner-border spinner-border-sm me-2"></span>กำลังโหลดเรียงความ...</div>';
     try {
       if (researchDataPromise) await researchDataPromise;
-      const experimentalIds = getExperimentalStudentIds();
       const res = await fetch('api.php?action=get_all_essays');
       const data = await res.json();
       if (data.success) {
-        // กรองเฉพาะเรียงความของนักเรียนห้อง 606 (กลุ่มทดลอง) ไม่ให้ปนกับห้องอื่น
-        allEssaysCache = data.essays.filter(e => experimentalIds.has(e.student_id));
+        // กรองเฉพาะเรียงความของนักเรียน "กลุ่มตัวอย่าง" เท่านั้น (ให้ตรงกับส่วนอื่นของรายงานวิจัยที่ใช้กลุ่มนี้)
+        allEssaysCache = data.essays.filter(e => (e.student_group || '').trim() === SAMPLE_GROUP);
         setKpiValue('kpiEssayCount', allEssaysCache.length.toLocaleString('th-TH'));
         renderEssayViewer(allEssaysCache);
       } else {
@@ -2070,31 +2057,6 @@ require_once 'header.php';
       html += part.isWordLike ? `<span class="thai-word">${e}</span>` : e;
     }
     return html;
-  }
-
-  // นับจำนวนประโยคโดยประมาณ (ตรงกับ count_thai_sentences ฝั่งเซิร์ฟเวอร์ใน thai_text_utils.php)
-  // ภาษาไทยไม่มีเครื่องหมายจบประโยคบังคับ จึงเป็นค่าประมาณ ไม่ใช่การตรวจไวยากรณ์ประโยคจริง
-  function countThaiSentences(text) {
-    const paragraphs = text.split(/\n+/).map(p => p.trim()).filter(p => p !== '');
-    let count = 0;
-    paragraphs.forEach(para => {
-      const pieces = para.split(/[.!?]+/).map(s => s.trim()).filter(s => s !== '');
-      count += Math.max(pieces.length, 1);
-    });
-    return count;
-  }
-
-  // ดึงข้อความล้วนทั้งหมด (ไม่รวม HTML) จาก essay_content ไว้ใช้นับประโยค
-  function essayContentPlainText(contentStr) {
-    if (!contentStr) return '';
-    try {
-      const obj = JSON.parse(contentStr);
-      if (obj && typeof obj === 'object' && obj.introduction !== undefined) {
-        const body = Array.isArray(obj.body) ? obj.body.join('\n') : '';
-        return [obj.introduction || '', body, obj.conclusion || ''].join('\n');
-      }
-    } catch (e) {}
-    return String(contentStr);
   }
 
   function formatEssayHTML(contentStr) {
@@ -2168,20 +2130,12 @@ require_once 'header.php';
       ? Math.round(Math.sqrt(words.reduce((a,b)=>a+Math.pow(b-avgWords,2),0)/total))
       : 0;
 
-    // สถิติเกี่ยวกับประโยค (นับแบบประมาณ — ดู countThaiSentences ด้านบน)
-    const sentenceCounts   = filtered.map(e => countThaiSentences(essayContentPlainText(e.essay_content)));
-    const totalSentences   = sentenceCounts.reduce((a,b)=>a+b,0);
-    const avgSentences     = total > 0 ? Math.round(totalSentences/total*10)/10 : 0;
-    const wordsPerSentence = totalSentences > 0 ? Math.round(totalWords/totalSentences*10)/10 : 0;
-
     const setEl = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val.toLocaleString('th-TH'); };
     setEl('essayStatTotal', total);
     setEl('essayStatAvgWords', avgWords);
     setEl('essayStatMaxWords', maxWords);
     setEl('essayStatMinWords', minWords);
     setEl('essayStatTotalWords', totalWords);
-    setEl('essayStatAvgSentences', avgSentences);
-    setEl('essayStatWordsPerSentence', wordsPerSentence);
     setEl('essayStatStdDevWords', stdDevWords);
 
     if (filtered.length === 0) {
@@ -2216,7 +2170,6 @@ require_once 'header.php';
       // ใช้ลำดับที่ (index) ของรายการที่แสดง เป็น id — ปลอดภัยและไม่ชนกัน แม้รหัส/รอบจะมีอักขระพิเศษ
       const essayId      = `essay_${idx}`;
       const formattedHTML = formatEssayHTML(e.essay_content);
-      const sentenceCount = countThaiSentences(essayContentPlainText(e.essay_content)).toLocaleString('th-TH');
 
       return `
         <div class="card border-0 rounded-3 mb-3 shadow-sm" style="border-left: 4px solid #0d7377 !important;">
@@ -2230,9 +2183,6 @@ require_once 'header.php';
               <div class="d-flex align-items-center gap-2">
                 <span class="badge bg-primary-subtle text-primary rounded-pill px-2 py-1 small">
                   <i class="bi bi-fonts me-1"></i>${wordCount} คำ
-                </span>
-                <span class="badge bg-info-subtle text-info-emphasis rounded-pill px-2 py-1 small">
-                  <i class="bi bi-quote me-1"></i>${sentenceCount} ประโยค
                 </span>
                 <button class="btn btn-outline-primary btn-sm rounded-pill px-3 py-1 small" style="font-size:0.75rem;"
                   onclick="document.getElementById('${essayId}').classList.toggle('d-none')">

@@ -65,31 +65,6 @@ function count_thai_words(string $text): int
     return $count;
 }
 
-// นับจำนวนประโยคโดยประมาณ — ภาษาไทยไม่มีเครื่องหมายจบประโยคบังคับแบบภาษาอังกฤษ
-// จึงนับตามเครื่องหมายจบประโยคที่พบ (. ! ? หรือหลายตัวติดกันอย่าง "..." นับเป็น 1) ต่อย่อหน้า
-// ถ้าย่อหน้าใดไม่มีเครื่องหมายจบประโยคเลย ให้นับเป็นอย่างน้อย 1 ประโยค
-// หมายเหตุ: เป็นค่าประมาณเท่านั้น ไม่ใช่การตรวจไวยากรณ์ประโยคจริง
-function count_thai_sentences(string $text): int
-{
-    $text = trim($text);
-    if ($text === '') {
-        return 0;
-    }
-
-    $paragraphs = preg_split('/\n+/u', $text, -1, PREG_SPLIT_NO_EMPTY);
-    $count = 0;
-    foreach ($paragraphs as $para) {
-        $para = trim($para);
-        if ($para === '') {
-            continue;
-        }
-        $pieces = preg_split('/[.!?]+/u', $para, -1, PREG_SPLIT_NO_EMPTY);
-        $pieces = array_filter($pieces, function ($p) { return trim($p) !== ''; });
-        $count += max(count($pieces), 1);
-    }
-    return $count;
-}
-
 // แปลงข้อความเป็น HTML โดยครอบแต่ละ "คำ" ด้วย <span class="thai-word"> เพื่อแสดงขอบเขตการตัดคำ
 // ส่วนที่ไม่ใช่คำ (ช่องว่าง/เครื่องหมายวรรคตอน) จะถูก escape และแปลงขึ้นบรรทัดใหม่เป็น <br> ตามปกติ
 function render_thai_segmented_html(string $text): string
@@ -220,4 +195,40 @@ function find_misspelled_thai_words(string $text, array $confirmedWords = [], in
         }
     }
     return $misspelled;
+}
+
+// หาคำที่เขียนด้วยตัวอักษรภาษาอื่นปนอยู่ในข้อความ (เช่น คำอังกฤษที่พิมพ์แทรกมาทั้งคำ) เพื่อชวนให้
+// ลองพิจารณาเปลี่ยนเป็นคำไทย คืนค่าเป็นรายการคำที่ไม่ซ้ำ ตามลำดับที่พบในข้อความ
+//
+// ข้อจำกัดสำคัญ: ตรวจจับได้เฉพาะคำที่เขียนด้วย "ตัวอักษรละติน" (a-z) ปนอยู่จริง ๆ เท่านั้น
+// ไม่สามารถตรวจจับ "คำทับศัพท์" ที่เขียนด้วยตัวอักษรไทยแล้ว (เช่น คอมพิวเตอร์, อินเทอร์เน็ต) ได้
+// เพราะการจะบอกว่าคำทับศัพท์แบบไหนควรมีคำไทยแทนได้ ต้องใช้พจนานุกรมคำทับศัพท์→คำไทยที่ยัง
+// ไม่มีให้ใช้แบบออฟไลน์ในระบบนี้ — ฟังก์ชันนี้จึงบอกได้แค่ "เขียนด้วยภาษาอื่นปนอยู่" เท่านั้น
+function find_non_thai_words(string $text, array $confirmedWords = [], int $limit = 30): array
+{
+    $text = trim($text);
+    if ($text === '') {
+        return [];
+    }
+
+    $seen = [];
+    $found = [];
+    foreach (thai_word_segments($text) as $seg) {
+        if (!$seg['isWord']) {
+            continue;
+        }
+        $word = trim($seg['text']);
+        if ($word === '' || isset($seen[$word]) || isset($confirmedWords[$word])) {
+            continue;
+        }
+        $seen[$word] = true;
+
+        if (preg_match('/[A-Za-z]/', $word)) {
+            $found[] = $word;
+            if (count($found) >= $limit) {
+                break;
+            }
+        }
+    }
+    return $found;
 }
