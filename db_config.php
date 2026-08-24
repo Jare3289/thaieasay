@@ -1,10 +1,13 @@
 <?php
 // ไฟล์กำหนดค่าเชื่อมต่อฐานข้อมูล MySQL ด้วย PDO
-
-$db_host = 'sql309.infinityfree.com';
-$db_name = 'if0_42376188_thaieasay';
-$db_user = 'if0_42376188';
-$db_pass = 'wEBv1Ea42V';
+//
+// ค่าลับ (host/name/user/pass) เก็บไว้ในไฟล์ db_secrets.php ที่ "ไม่ถูก commit ขึ้น git"
+// (ดู .gitignore) — เวลาย้ายโฮสต์/ติดตั้งใหม่ ให้คัดลอกไฟล์ db_secrets.sample.php
+// เป็น db_secrets.php แล้วกรอกค่าจริงของเซิร์ฟเวอร์ลงไป
+$db_host = $db_name = $db_user = $db_pass = '';
+if (file_exists(__DIR__ . '/db_secrets.php')) {
+    require __DIR__ . '/db_secrets.php';
+}
 
 /**
  * แจ้งข้อผิดพลาดฐานข้อมูลแบบเหมาะกับชนิดของ Request
@@ -34,6 +37,12 @@ function db_fail_response($message) {
             . '</body></html>';
     }
     exit;
+}
+
+// ยังไม่ได้ตั้งค่าฐานข้อมูล (ไม่มีไฟล์ db_secrets.php หรือกรอกไม่ครบ) → แจ้งเตือนแบบเข้าใจง่าย
+if ($db_name === '' || $db_user === '') {
+    db_fail_response('ยังไม่ได้ตั้งค่าฐานข้อมูล: กรุณาสร้างไฟล์ db_secrets.php '
+        . '(คัดลอกจาก db_secrets.sample.php) แล้วกรอกค่าเชื่อมต่อจากเซิร์ฟเวอร์');
 }
 
 try {
