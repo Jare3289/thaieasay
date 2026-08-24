@@ -568,7 +568,9 @@ function estimateLineCount(paragraphTexts) {
     measureEl.id = '__lineMeasure';
     measureEl.style.cssText = [
       'position:absolute', 'left:-9999px', 'top:0', 'visibility:hidden',
-      'width:696px', // เทียบเท่าความกว้างเนื้อหาในกระดาษพิมพ์ของ essay_print.php (.sheet 800px หักขอบ/ที่เว้นเลขบรรทัด)
+      // ความกว้างเนื้อหาจริงตอนพิมพ์ของ essay_print.php: A4 (210mm) หัก @page margin ซ้าย+ขวา 16mm+16mm = 673px
+      // แล้วหัก .content padding-left 2.8em (ที่เว้นเลขบรรทัด, font-size 20px) = 56px เหลือ 673-56 = 617px
+      'width:617px',
       "font-family:'TH Sarabun PSK','THSarabunPSK','TH SarabunPSK','TH Sarabun New','Sarabun','Leelawadee UI','Tahoma',sans-serif",
       'font-size:20px', 'line-height:30px'
     ].join(';');
