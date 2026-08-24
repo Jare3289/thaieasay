@@ -1905,7 +1905,7 @@ try {
             echo json_encode(['success' => true, 'found' => (bool)$row, 'data' => $row ?: null]);
             break;
 
-        // ตรวจคำที่อาจสะกดผิด + คำที่เขียนด้วยภาษาอื่นปนอยู่ ของข้อความเรียงความ (ดู thai_text_utils.php)
+        // ตรวจคำที่อาจสะกดผิด + คำที่เขียนด้วยภาษาอื่นปนอยู่ + การเว้นวรรครอบ "ๆ" ของข้อความเรียงความ (ดู thai_text_utils.php)
         // รับได้ทั้งแบบส่ง text ดิบมาตรง ๆ หรือแบบแยกส่วน introduction/body[]/conclusion เหมือน save_essay
         case 'check_thai_spelling':
             if (!isset($_SESSION['user'])) {
@@ -1925,6 +1925,7 @@ try {
                 'success'    => true,
                 'misspelled' => array_values(find_misspelled_thai_words($spellText, $confirmedWords)),
                 'foreign'    => array_values(find_non_thai_words($spellText, $confirmedWords)),
+                'spacing'    => array_values(find_maiyamok_spacing_errors($spellText, $confirmedWords)),
             ]);
             break;
 

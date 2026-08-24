@@ -14,7 +14,10 @@
     try { segmenter = new Intl.Segmenter('th', { granularity: 'word' }); } catch (e) { segmenter = null; }
   }
 
+  // อนุโลมให้ "เ" สองตัวติดกัน (เ + เ) แทน "แ" ได้ก่อนตัดคำ (คนละอักขระ แต่หน้าตาเหมือนกันมาก
+  // เป็นการพิมพ์ผิดที่พบบ่อย) มิฉะนั้นตัวตัดคำจะสับสนและตัดขอบเขตคำผิดเพี้ยนไปทั้งประโยค
   function segmentText(text) {
+    text = text.replace(/เเ/g, 'แ');
     if (segmenter) {
       const out = [];
       for (const part of segmenter.segment(text)) {
@@ -35,8 +38,19 @@
     return res.json();
   }
 
+  // สีไฮไลต์คำที่น่าสงสัย 3 ประเภท — ฝังทันทีตอนโหลดสคริปต์ (ไม่รอเปิดหน้าต่างตรวจสอบ) เพื่อให้
+  // renderStaticHTML() ใช้แสดงผลนอกหน้าต่างตรวจสอบได้เลย (เช่น ตัวอย่างแบบเรียลไทม์ใน essay_writer.php)
+  const staticStyle = document.createElement('style');
+  staticStyle.textContent = `
+    .trw-static-flag { border-radius: 3px; padding: 0 1px; }
+    .trw-static-flag.trw-kind-misspell { background: #fff2a8; border-bottom: 2px dotted #d99a00; }
+    .trw-static-flag.trw-kind-foreign { background: #e0d6ff; border-bottom: 2px dotted #7c4dff; }
+    .trw-static-flag.trw-kind-spacing { background: #ffd8c2; border-bottom: 2px dotted #e8590c; }
+  `;
+  document.head.appendChild(staticStyle);
+
   let modalEl = null;
-  let state = null; // { paragraphs, misspelledSet, foreignSet, dirty, onSave }
+  let state = null; // { paragraphs, misspelledSet, foreignSet, spacingSet, dirty, onSave }
 
   function ensureModal() {
     if (modalEl) return modalEl;
@@ -52,6 +66,7 @@
         <div class="trw-note">
           <span class="trw-legend"><span class="trw-swatch trw-swatch-misspell"></span>อาจสะกดผิด</span>
           <span class="trw-legend"><span class="trw-swatch trw-swatch-foreign"></span>เขียนด้วยภาษาอื่นปนอยู่</span>
+          <span class="trw-legend"><span class="trw-swatch trw-swatch-spacing"></span>เว้นวรรครอบ "ๆ" ไม่ถูก</span>
           — คลิกคำที่ไฮไลต์เพื่อยืนยันว่าถูกต้อง แก้ไข หรือลบ ระบบตรวจเทียบกับพจนานุกรมเท่านั้น
           ชื่อเฉพาะ คำสแลง หรือศัพท์เฉพาะทางที่ถูกต้องอยู่แล้วอาจถูกไฮไลต์ด้วย กด "ถูกต้อง" เพื่อไม่ให้ฟ้องซ้ำอีก
         </div>
@@ -73,7 +88,7 @@
       #thaiReviewModal .trw-dialog {
         position: relative; max-width: 760px; margin: 4vh auto; background: #fff; border-radius: 12px;
         max-height: 92vh; display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0,0,0,.3);
-        font-family: 'Sarabun', sans-serif;
+        font-family: "TH Sarabun PSK", "THSarabunPSK", "TH SarabunPSK", "TH Sarabun New", "Sarabun", "Leelawadee UI", "Tahoma", sans-serif;
       }
       #thaiReviewModal .trw-header { display:flex; align-items:center; justify-content:space-between; padding: 14px 20px; border-bottom: 1px solid #eee; }
       #thaiReviewModal .trw-title { font-weight: 700; font-size: 1.1rem; }
@@ -83,12 +98,14 @@
       #thaiReviewModal .trw-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
       #thaiReviewModal .trw-swatch-misspell { background: #fff2a8; border-bottom: 2px solid #d99a00; }
       #thaiReviewModal .trw-swatch-foreign { background: #e0d6ff; border-bottom: 2px solid #7c4dff; }
+      #thaiReviewModal .trw-swatch-spacing { background: #ffd8c2; border-bottom: 2px solid #e8590c; }
       #thaiReviewModal .trw-status { padding: 8px 20px 0; font-size: .9rem; color: #444; }
       #thaiReviewModal .trw-body { padding: 12px 20px 20px; overflow-y: auto; line-height: 2; font-size: 1rem; white-space: pre-wrap; flex: 1; }
       #thaiReviewModal .trw-para { margin: 0 0 14px; }
       #thaiReviewModal .trw-flag { cursor: pointer; border-radius: 3px; padding: 0 1px; }
       #thaiReviewModal .trw-flag.trw-kind-misspell { background: #fff2a8; border-bottom: 2px dotted #d99a00; }
       #thaiReviewModal .trw-flag.trw-kind-foreign { background: #e0d6ff; border-bottom: 2px dotted #7c4dff; }
+      #thaiReviewModal .trw-flag.trw-kind-spacing { background: #ffd8c2; border-bottom: 2px dotted #e8590c; }
       #thaiReviewModal .trw-flag.trw-editing { background: transparent; }
       #thaiReviewModal .trw-flag input { font: inherit; width: 8em; border: 1px solid #999; border-radius: 4px; padding: 0 4px; }
       #thaiReviewModal .trw-actions { display: inline-flex; gap: 4px; margin-left: 4px; white-space: nowrap; }
@@ -127,26 +144,35 @@
     const statusEl = modalEl.querySelector('.trw-status');
     const nMis = state.misspelledSet.size;
     const nForeign = state.foreignSet.size;
+    const nSpacing = state.spacingSet.size;
     const parts = [];
     if (nMis > 0) parts.push(`อาจสะกดผิด ${nMis} คำ`);
     if (nForeign > 0) parts.push(`เขียนด้วยภาษาอื่นปน ${nForeign} คำ`);
+    if (nSpacing > 0) parts.push(`เว้นวรรครอบ "ๆ" ไม่ถูก ${nSpacing} คำ`);
     statusEl.textContent = parts.length > 0
       ? `พบคำที่น่าสงสัย — ${parts.join(' · ')} (ไม่ซ้ำ) — คลิกคำที่ไฮไลต์เพื่อตรวจสอบ`
       : 'ไม่พบคำที่น่าสงสัยแล้วในตอนนี้';
     modalEl.querySelector('.trw-save').disabled = !state.dirty;
   }
 
+  // จัดประเภทคำ ('misspell' | 'foreign' | 'spacing' | null) ตามชุดคำที่น่าสงสัยปัจจุบัน
+  function classifyWord(word, sets) {
+    if (sets.misspelledSet.has(word)) return 'misspell';
+    if (sets.foreignSet.has(word)) return 'foreign';
+    if (sets.spacingSet.has(word)) return 'spacing';
+    return null;
+  }
+
   function renderParagraph(container, text) {
     container.textContent = '';
     segmentText(text).forEach((seg) => {
-      const isMis = seg.isWord && state.misspelledSet.has(seg.text);
-      const isForeign = !isMis && seg.isWord && state.foreignSet.has(seg.text);
-      if (isMis || isForeign) {
+      const kind = seg.isWord ? classifyWord(seg.text, state) : null;
+      if (kind) {
         const span = document.createElement('span');
-        span.className = 'trw-flag ' + (isMis ? 'trw-kind-misspell' : 'trw-kind-foreign');
+        span.className = 'trw-flag trw-kind-' + kind;
         span.textContent = seg.text;
         span.dataset.word = seg.text;
-        span.dataset.kind = isMis ? 'misspell' : 'foreign';
+        span.dataset.kind = kind;
         span.dataset.uid = 'w' + (uidCounter++);
         span.addEventListener('click', onFlagClick);
         container.appendChild(span);
@@ -180,10 +206,11 @@
     actions.querySelector('.trw-act-delete').addEventListener('click', () => deleteWord(span, actions));
   }
 
-  // ลบคำนี้ออกจากคำที่น่าสงสัยทั้งสองรายการ (ยืนยัน/แก้ไขแล้วจะไม่ถูกฟ้องคำนี้อีก)
+  // ลบคำนี้ออกจากคำที่น่าสงสัยทุกรายการ (ยืนยัน/แก้ไขแล้วจะไม่ถูกฟ้องคำนี้อีก)
   function forgetWord(word) {
     state.misspelledSet.delete(word);
     state.foreignSet.delete(word);
+    state.spacingSet.delete(word);
   }
 
   async function confirmWord(span, actions) {
@@ -212,6 +239,7 @@
     actions.remove();
     span.classList.add('trw-editing');
     const original = span.textContent;
+    const originalWord = span.dataset.word; // เก็บไว้ก่อนแก้ เผื่อคำเดียวกันนี้ปรากฏหลายจุดในเรียงความ
     span.textContent = '';
     const input = document.createElement('input');
     input.type = 'text';
@@ -225,12 +253,16 @@
       if (finished) return;
       finished = true;
       const val = commit ? input.value.trim() : original;
-      span.classList.remove('trw-editing');
-      span.textContent = val || original;
       if (commit && val && val !== original) {
-        forgetWord(span.dataset.word);
-        span.replaceWith(document.createTextNode(val));
+        forgetWord(originalWord);
+        // แก้ "ทุกจุด" ที่เป็นคำเดียวกันในเรียงความทั้งฉบับ ไม่ใช่แค่จุดที่คลิก
+        modalEl.querySelectorAll('.trw-flag[data-word="' + attrEscape(originalWord) + '"]').forEach(el => {
+          el.replaceWith(document.createTextNode(val));
+        });
         state.dirty = true;
+      } else {
+        span.classList.remove('trw-editing');
+        span.textContent = val || original;
       }
       updateStatus();
     };
@@ -266,6 +298,10 @@
     saveBtn.disabled = true;
     msgEl.textContent = 'กำลังบันทึก...';
 
+    // ปิดกล่องตัวเลือก (✓ ถูกต้อง / ✏️ แก้คำ / 🗑️ ลบ / ✕) ที่อาจเปิดค้างไว้ก่อนอ่านเนื้อหา
+    // มิฉะนั้นข้อความปุ่มเหล่านี้จะติดปนไปกับเนื้อหาที่บันทึกจริง
+    modalEl.querySelectorAll('.trw-actions').forEach(el => el.remove());
+
     const paragraphEls = Array.from(modalEl.querySelectorAll('.trw-para'));
     const paragraphs = state.paragraphs.map((p, i) => ({ label: p.label, text: paragraphEls[i].textContent }));
 
@@ -287,6 +323,7 @@
       const res = await postJSON('check_thai_spelling', { text: combined });
       state.misspelledSet = new Set(res && res.success ? res.misspelled : []);
       state.foreignSet = new Set(res && res.success ? res.foreign : []);
+      state.spacingSet = new Set(res && res.success ? res.spacing : []);
     } catch (e) { /* เงียบไว้ — คงรายการเดิมถ้าตรวจซ้ำไม่สำเร็จ */ }
 
     renderAll();
@@ -310,6 +347,7 @@
   // options.paragraphs : [{ label, text }]  ข้อความเรียงความทั้งฉบับ เรียงตามลำดับ (คำนำ/เนื้อเรื่อง.../สรุป)
   // options.misspelled  : string[]  คำที่ตรวจพบว่าอาจสะกดผิด (จาก api.php?action=check_thai_spelling)
   // options.foreign      : string[]  คำที่เขียนด้วยภาษาอื่นปนอยู่ (จาก api.php?action=check_thai_spelling)
+  // options.spacing      : string[]  คำที่เว้นวรรครอบ "ๆ" ไม่ถูก (จาก api.php?action=check_thai_spelling)
   // options.onSave(paragraphs) : async function — รับ paragraphs ที่แก้ไขแล้ว ไปบันทึกกลับ (throw หากบันทึกไม่สำเร็จ)
   function open(options) {
     ensureModal();
@@ -317,6 +355,7 @@
       paragraphs: (options.paragraphs || []).filter(p => p.text && p.text.trim() !== ''),
       misspelledSet: new Set(options.misspelled || []),
       foreignSet: new Set(options.foreign || []),
+      spacingSet: new Set(options.spacing || []),
       dirty: false,
       onSave: options.onSave || (async () => {})
     };
@@ -324,5 +363,25 @@
     modalEl.classList.add('open');
   }
 
-  window.ThaiReview = { open, segmentText };
+  // สร้าง HTML แบบอ่านอย่างเดียว (ไม่มีปุ่มโต้ตอบ) พร้อมไฮไลต์คำที่น่าสงสัย — ใช้แสดงตัวอย่างแบบเรียลไทม์
+  // หรือรายการ "บันทึกไว้แล้ว" โดยไม่ต้องเปิดหน้าต่างตรวจสอบ (ดู essay_writer.php)
+  // sets: { misspelled, foreign, spacing } เป็น array ของคำ — wrapClass ใช้ครอบ <p> แต่ละย่อหน้า (ใส่ null ได้ถ้าไม่ต้องการ)
+  function renderStaticHTML(text, sets) {
+    const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const wrapSets = {
+      misspelledSet: new Set(sets.misspelled || []),
+      foreignSet: new Set(sets.foreign || []),
+      spacingSet: new Set(sets.spacing || [])
+    };
+    let html = '';
+    segmentText(text).forEach(seg => {
+      const e = esc(seg.text).replace(/\n/g, '<br>');
+      const kind = seg.isWord ? classifyWord(seg.text, wrapSets) : null;
+      html += kind ? `<span class="thai-word trw-static-flag trw-kind-${kind}">${e}</span>`
+                   : (seg.isWord ? `<span class="thai-word">${e}</span>` : e);
+    });
+    return html;
+  }
+
+  window.ThaiReview = { open, segmentText, renderStaticHTML };
 })(window, document);

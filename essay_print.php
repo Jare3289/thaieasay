@@ -567,10 +567,12 @@ $genAt = date('d/m/Y H:i');
       }).then(function (r) { return r.json(); }).catch(function () { return null; }).then(function (data) {
         var misspelled = (data && data.success) ? data.misspelled : [];
         var foreign = (data && data.success) ? data.foreign : [];
+        var spacing = (data && data.success) ? data.spacing : [];
         ThaiReview.open({
           paragraphs: paragraphs,
           misspelled: misspelled,
           foreign: foreign,
+          spacing: spacing,
           onSave: function (editedParagraphs) {
             var d = ESSAY_EDIT[i];
             if (!d) return Promise.reject(new Error('ไม่พบข้อมูลเรียงความ'));
