@@ -229,6 +229,9 @@ require_once 'header.php';
         </div>
       </div>
       <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-outline-primary rounded-pill px-4 me-auto" onclick="openEssayEditorSpellingReview()">
+          <i class="bi bi-eye me-1"></i>ตรวจสอบทั้งหน้า / แยกคำ
+        </button>
         <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">ยกเลิก</button>
         <button type="button" class="btn btn-primary rounded-pill px-4" id="editSaveBtn" onclick="saveEssayEdit()">
           <i class="bi bi-save me-1"></i>บันทึกเรียงความ
@@ -239,6 +242,7 @@ require_once 'header.php';
 </div>
 <?php endif; ?>
 
+<script src="thai_review.js"></script>
 <script>
   // ========== Essay Viewer (ตารางสถานะการส่งเรียงความรายบุคคล) ==========
   let allEssaysCache = null;
@@ -711,6 +715,16 @@ require_once 'header.php';
     warn.classList.toggle('d-none', !(sid && findEssayInCache(sid, phase)));
   }
 
+  // ส่งเนื้อหาไปบันทึก (ใช้ร่วมกันโดยปุ่ม "บันทึกเรียงความ" และหน้าต่างตรวจสอบการสะกดคำทั้งหน้า)
+  async function submitEssayEdit(sid, phase, intro, body, conclusion) {
+    const res = await fetch('api.php?action=admin_save_essay', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ student_id: sid, essay_phase: phase, introduction: intro, body, conclusion })
+    });
+    return res.json();
+  }
+
   // บันทึกเรียงความ (เพิ่ม/แก้ไข)
   async function saveEssayEdit() {
     const sel = document.getElementById('editStudentSelect');
@@ -731,12 +745,7 @@ require_once 'header.php';
     btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>กำลังบันทึก...';
     btn.disabled = true;
     try {
-      const res = await fetch('api.php?action=admin_save_essay', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ student_id: sid, essay_phase: phase, introduction: intro, body, conclusion })
-      });
-      const data = await res.json();
+      const data = await submitEssayEdit(sid, phase, intro, body, conclusion);
       if (data.success) {
         showToast('บันทึกเรียงความเรียบร้อยแล้ว', 'success');
         if (essayEditorModal) essayEditorModal.hide();
@@ -751,6 +760,83 @@ require_once 'header.php';
       btn.innerHTML = orig;
       btn.disabled = false;
     }
+  }
+
+  // สร้างรายการย่อหน้าทั้งฉบับจากกล่องแก้ไขปัจจุบัน (สำหรับหน้าต่างตรวจสอบการสะกดคำ)
+  function buildEditorReviewParagraphs() {
+    const intro = document.getElementById('editIntro').value;
+    const conclusion = document.getElementById('editConclusion').value;
+    const bodyTextareas = Array.from(document.querySelectorAll('#editBodyList .edit-body-para'));
+    const paras = [];
+    if (intro.trim()) paras.push({ label: 'intro', text: intro });
+    bodyTextareas.forEach((ta, i) => {
+      if (ta.value.trim()) paras.push({ label: 'body:' + i, text: ta.value });
+    });
+    if (conclusion.trim()) paras.push({ label: 'concl', text: conclusion });
+    return paras;
+  }
+
+  // เขียนข้อความที่แก้ไขจากหน้าต่างตรวจสอบกลับเข้ากล่องแก้ไขเดิมตามป้าย label
+  function applyEditorReviewParagraphsToForm(paragraphs) {
+    const bodyTextareas = Array.from(document.querySelectorAll('#editBodyList .edit-body-para'));
+    paragraphs.forEach(p => {
+      if (p.label === 'intro') {
+        document.getElementById('editIntro').value = p.text;
+      } else if (p.label === 'concl') {
+        document.getElementById('editConclusion').value = p.text;
+      } else if (p.label.indexOf('body:') === 0) {
+        const idx = parseInt(p.label.split(':')[1], 10);
+        if (bodyTextareas[idx]) bodyTextareas[idx].value = p.text;
+      }
+    });
+  }
+
+  // เปิดหน้าต่างตรวจสอบการสะกดคำ/แยกคำทั้งหน้า สำหรับเรียงความที่ครูกำลังแก้ไขอยู่ในโมดัลนี้
+  async function openEssayEditorSpellingReview() {
+    const paragraphs = buildEditorReviewParagraphs();
+    if (paragraphs.length === 0) {
+      showToast('กรุณากรอกเนื้อหาเรียงความก่อน', 'error');
+      return;
+    }
+
+    let misspelled = [];
+    try {
+      const res = await fetch('api.php?action=check_thai_spelling', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: paragraphs.map(p => p.text).join('\n') })
+      });
+      const data = await res.json();
+      if (data.success) misspelled = data.misspelled;
+    } catch (e) {
+      // เงียบไว้ — เปิดหน้าต่างได้แม้ตรวจคำผิดไม่สำเร็จ (จะไม่มีคำไฮไลต์)
+    }
+
+    ThaiReview.open({
+      paragraphs,
+      misspelled,
+      onSave: async (editedParagraphs) => {
+        const sel = document.getElementById('editStudentSelect');
+        const sid = (sel.dataset.fixed || sel.value || '').trim();
+        const phase = document.getElementById('editPhaseSelect').value;
+        if (!sid) throw new Error('กรุณาเลือกนักเรียนก่อนบันทึก');
+
+        applyEditorReviewParagraphsToForm(editedParagraphs);
+        const intro = document.getElementById('editIntro').value.trim();
+        const conclusion = document.getElementById('editConclusion').value.trim();
+        const body = [...document.querySelectorAll('#editBodyList .edit-body-para')]
+          .map(t => t.value.trim()).filter(t => t !== '');
+
+        const data = await submitEssayEdit(sid, phase, intro, body, conclusion);
+        if (!data.success) {
+          throw new Error(data.error || 'บันทึกไม่สำเร็จ');
+        }
+
+        fullEssaysCache = null;
+        await loadEssayViewer();
+        showToast('บันทึกการแก้ไขเรียบร้อยแล้ว', 'success');
+      }
+    });
   }
 
   // ===== หัวข้อเรียงความที่ครูกำหนด =====

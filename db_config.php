@@ -607,3 +607,22 @@ try {
 } catch (Exception $e) {
     // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
 }
+
+// ตารางคำที่ถูก "ยืนยันว่าสะกดถูกต้อง" โดยนักเรียนหรือครู (ใช้กับระบบตรวจคำผิดของเรียงความ)
+// คำในพจนานุกรมมาตรฐานมักไม่มีชื่อคน/คำสแลง/ศัพท์เฉพาะทาง ทำให้ถูกฟ้องว่า "อาจสะกดผิด" ทั้งที่ถูก
+// เมื่อมีใครยืนยันคำใดคำหนึ่งแล้ว คำนั้นจะไม่ถูกฟ้องซ้ำอีกทั้งระบบ (รายการกลาง ใช้ร่วมกันทุกคน)
+try {
+    $tw = $pdo->query("SHOW TABLES LIKE 'thai_confirmed_words'");
+    if (!$tw || $tw->rowCount() === 0) {
+        safe_ddl($pdo, "
+            CREATE TABLE IF NOT EXISTS thai_confirmed_words (
+                word VARCHAR(191) PRIMARY KEY,
+                confirmed_by VARCHAR(100) DEFAULT NULL,
+                confirmed_role VARCHAR(20) DEFAULT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+    }
+} catch (Exception $e) {
+    // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
+}

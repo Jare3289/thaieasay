@@ -8,6 +8,8 @@ require_once 'header.php';
 <style>
   html { scroll-behavior: smooth; }
   #section-icc, #section-ttest, #section-qual, #section-essay { scroll-margin-top: 84px; }
+  /* แสดงขอบเขตการตัดคำในตัวอย่างเรียงความ (อ่านอย่างเดียว) — เส้นประบาง ๆ ใต้แต่ละคำ */
+  .thai-word { border-bottom: 1px dotted #b9c4c4; }
 </style>
 
 <div class="text-start">
@@ -403,6 +405,34 @@ require_once 'header.php';
               <div class="card border-0 rounded-3 p-3 text-center bg-light">
                 <div class="fs-4 fw-bold text-danger" id="essayStatMinWords">-</div>
                 <div class="text-muted small">น้อยสุด (คำ)</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Summary stats row 2: คำรวมทั้งหมด + สถิติประโยค -->
+          <div class="row g-3 mb-4" id="essaySummaryRow2">
+            <div class="col-md-3 col-6">
+              <div class="card border-0 rounded-3 p-3 text-center bg-light">
+                <div class="fs-4 fw-bold text-primary" id="essayStatTotalWords">-</div>
+                <div class="text-muted small">คำรวมทั้งหมด</div>
+              </div>
+            </div>
+            <div class="col-md-3 col-6">
+              <div class="card border-0 rounded-3 p-3 text-center bg-light">
+                <div class="fs-4 fw-bold text-info" id="essayStatAvgSentences">-</div>
+                <div class="text-muted small">เฉลี่ย ประโยค/ชิ้น (โดยประมาณ)</div>
+              </div>
+            </div>
+            <div class="col-md-3 col-6">
+              <div class="card border-0 rounded-3 p-3 text-center bg-light">
+                <div class="fs-4 fw-bold text-secondary" id="essayStatWordsPerSentence">-</div>
+                <div class="text-muted small">เฉลี่ย คำ/ประโยค</div>
+              </div>
+            </div>
+            <div class="col-md-3 col-6">
+              <div class="card border-0 rounded-3 p-3 text-center bg-light">
+                <div class="fs-4 fw-bold text-dark" id="essayStatStdDevWords">-</div>
+                <div class="text-muted small">ส่วนเบี่ยงเบนมาตรฐาน (คำ)</div>
               </div>
             </div>
           </div>
@@ -2026,6 +2056,47 @@ require_once 'header.php';
       .replace(/'/g, '&#39;');
   }
 
+  // ตัดคำภาษาไทยด้วย Intl.Segmenter เพื่อแสดงขอบเขตคำให้เห็น (แสดงผลอย่างเดียว ไม่ใช่การแก้ไข)
+  let __raWordSegmenter = null;
+  if (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function') {
+    try { __raWordSegmenter = new Intl.Segmenter('th', { granularity: 'word' }); } catch (e) { __raWordSegmenter = null; }
+  }
+  function wordSegmentedHTML(s) {
+    const esc = (t) => String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    if (!__raWordSegmenter) return esc(s).replace(/\n/g, '<br>');
+    let html = '';
+    for (const part of __raWordSegmenter.segment(s)) {
+      const e = esc(part.segment).replace(/\n/g, '<br>');
+      html += part.isWordLike ? `<span class="thai-word">${e}</span>` : e;
+    }
+    return html;
+  }
+
+  // นับจำนวนประโยคโดยประมาณ (ตรงกับ count_thai_sentences ฝั่งเซิร์ฟเวอร์ใน thai_text_utils.php)
+  // ภาษาไทยไม่มีเครื่องหมายจบประโยคบังคับ จึงเป็นค่าประมาณ ไม่ใช่การตรวจไวยากรณ์ประโยคจริง
+  function countThaiSentences(text) {
+    const paragraphs = text.split(/\n+/).map(p => p.trim()).filter(p => p !== '');
+    let count = 0;
+    paragraphs.forEach(para => {
+      const pieces = para.split(/[.!?]+/).map(s => s.trim()).filter(s => s !== '');
+      count += Math.max(pieces.length, 1);
+    });
+    return count;
+  }
+
+  // ดึงข้อความล้วนทั้งหมด (ไม่รวม HTML) จาก essay_content ไว้ใช้นับประโยค
+  function essayContentPlainText(contentStr) {
+    if (!contentStr) return '';
+    try {
+      const obj = JSON.parse(contentStr);
+      if (obj && typeof obj === 'object' && obj.introduction !== undefined) {
+        const body = Array.isArray(obj.body) ? obj.body.join('\n') : '';
+        return [obj.introduction || '', body, obj.conclusion || ''].join('\n');
+      }
+    } catch (e) {}
+    return String(contentStr);
+  }
+
   function formatEssayHTML(contentStr) {
     if (!contentStr) return '<em class="text-muted">ไม่มีเนื้อหาเรียงความ</em>';
     try {
@@ -2036,7 +2107,7 @@ require_once 'header.php';
           html += `
             <div class="mb-3">
               <span class="badge bg-primary bg-opacity-10 text-primary fw-bold mb-1"><i class="bi bi-pencil-fill me-1"></i>ส่วนคำนำ (Introduction)</span>
-              <div class="p-3 bg-white rounded-3 border text-dark" style="white-space:pre-wrap; line-height:1.7;">${obj.introduction.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+              <div class="p-3 bg-white rounded-3 border text-dark" style="white-space:pre-wrap; line-height:1.7;">${wordSegmentedHTML(obj.introduction)}</div>
             </div>`;
         }
         if (obj.body && Array.isArray(obj.body)) {
@@ -2045,7 +2116,7 @@ require_once 'header.php';
               html += `
                 <div class="mb-3">
                   <span class="badge bg-success bg-opacity-10 text-success fw-bold mb-1"><i class="bi bi-book-fill me-1"></i>ส่วนเนื้อเรื่อง ย่อหน้าที่ ${i+1} (Body Paragraph)</span>
-                  <div class="p-3 bg-white rounded-3 border text-dark" style="white-space:pre-wrap; line-height:1.7;">${paraText.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+                  <div class="p-3 bg-white rounded-3 border text-dark" style="white-space:pre-wrap; line-height:1.7;">${wordSegmentedHTML(paraText)}</div>
                 </div>`;
             }
           });
@@ -2054,13 +2125,13 @@ require_once 'header.php';
           html += `
             <div class="mb-0">
               <span class="badge bg-danger bg-opacity-10 text-danger fw-bold mb-1"><i class="bi bi-award-fill me-1"></i>ส่วนสรุป (Conclusion)</span>
-              <div class="p-3 bg-white rounded-3 border text-dark" style="white-space:pre-wrap; line-height:1.7;">${obj.conclusion.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+              <div class="p-3 bg-white rounded-3 border text-dark" style="white-space:pre-wrap; line-height:1.7;">${wordSegmentedHTML(obj.conclusion)}</div>
             </div>`;
         }
         return html;
       }
     } catch(e) {}
-    return `<div class="p-3 bg-white rounded-3 border text-dark" style="white-space:pre-wrap; line-height:1.7;">${contentStr.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`;
+    return `<div class="p-3 bg-white rounded-3 border text-dark" style="white-space:pre-wrap; line-height:1.7;">${wordSegmentedHTML(contentStr)}</div>`;
   }
 
   function renderEssayViewer(essays) {
@@ -2087,17 +2158,31 @@ require_once 'header.php';
     });
 
     // update summary stats
-    const total    = filtered.length;
-    const words    = filtered.map(e => parseInt(e.word_count || 0));
-    const avgWords = total > 0 ? Math.round(words.reduce((a,b)=>a+b,0)/total) : 0;
-    const maxWords = total > 0 ? Math.max(...words) : 0;
-    const minWords = total > 0 ? Math.min(...words) : 0;
+    const total      = filtered.length;
+    const words      = filtered.map(e => parseInt(e.word_count || 0));
+    const totalWords = words.reduce((a,b)=>a+b,0);
+    const avgWords   = total > 0 ? Math.round(totalWords/total) : 0;
+    const maxWords   = total > 0 ? Math.max(...words) : 0;
+    const minWords   = total > 0 ? Math.min(...words) : 0;
+    const stdDevWords = total > 0
+      ? Math.round(Math.sqrt(words.reduce((a,b)=>a+Math.pow(b-avgWords,2),0)/total))
+      : 0;
+
+    // สถิติเกี่ยวกับประโยค (นับแบบประมาณ — ดู countThaiSentences ด้านบน)
+    const sentenceCounts   = filtered.map(e => countThaiSentences(essayContentPlainText(e.essay_content)));
+    const totalSentences   = sentenceCounts.reduce((a,b)=>a+b,0);
+    const avgSentences     = total > 0 ? Math.round(totalSentences/total*10)/10 : 0;
+    const wordsPerSentence = totalSentences > 0 ? Math.round(totalWords/totalSentences*10)/10 : 0;
 
     const setEl = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val.toLocaleString('th-TH'); };
     setEl('essayStatTotal', total);
     setEl('essayStatAvgWords', avgWords);
     setEl('essayStatMaxWords', maxWords);
     setEl('essayStatMinWords', minWords);
+    setEl('essayStatTotalWords', totalWords);
+    setEl('essayStatAvgSentences', avgSentences);
+    setEl('essayStatWordsPerSentence', wordsPerSentence);
+    setEl('essayStatStdDevWords', stdDevWords);
 
     if (filtered.length === 0) {
       container.innerHTML = '<div class="text-center py-5 text-muted"><i class="bi bi-inbox fs-3 d-block mb-2"></i>ไม่พบเรียงความที่ตรงกับเงื่อนไข</div>';
@@ -2131,6 +2216,7 @@ require_once 'header.php';
       // ใช้ลำดับที่ (index) ของรายการที่แสดง เป็น id — ปลอดภัยและไม่ชนกัน แม้รหัส/รอบจะมีอักขระพิเศษ
       const essayId      = `essay_${idx}`;
       const formattedHTML = formatEssayHTML(e.essay_content);
+      const sentenceCount = countThaiSentences(essayContentPlainText(e.essay_content)).toLocaleString('th-TH');
 
       return `
         <div class="card border-0 rounded-3 mb-3 shadow-sm" style="border-left: 4px solid #0d7377 !important;">
@@ -2144,6 +2230,9 @@ require_once 'header.php';
               <div class="d-flex align-items-center gap-2">
                 <span class="badge bg-primary-subtle text-primary rounded-pill px-2 py-1 small">
                   <i class="bi bi-fonts me-1"></i>${wordCount} คำ
+                </span>
+                <span class="badge bg-info-subtle text-info-emphasis rounded-pill px-2 py-1 small">
+                  <i class="bi bi-quote me-1"></i>${sentenceCount} ประโยค
                 </span>
                 <button class="btn btn-outline-primary btn-sm rounded-pill px-3 py-1 small" style="font-size:0.75rem;"
                   onclick="document.getElementById('${essayId}').classList.toggle('d-none')">

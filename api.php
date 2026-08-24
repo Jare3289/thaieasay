@@ -1905,6 +1905,46 @@ try {
             echo json_encode(['success' => true, 'found' => (bool)$row, 'data' => $row ?: null]);
             break;
 
+        // ตรวจคำที่อาจสะกดผิด + นับจำนวนประโยคโดยประมาณ ของข้อความเรียงความ (ดู thai_text_utils.php)
+        // รับได้ทั้งแบบส่ง text ดิบมาตรง ๆ หรือแบบแยกส่วน introduction/body[]/conclusion เหมือน save_essay
+        case 'check_thai_spelling':
+            if (!isset($_SESSION['user'])) {
+                echo json_encode(['success' => false, 'error' => 'Not logged in']);
+                exit;
+            }
+            if (isset($request_data['text'])) {
+                $spellText = (string)$request_data['text'];
+            } else {
+                $sIntro = isset($request_data['introduction']) ? (string)$request_data['introduction'] : '';
+                $sBody  = (isset($request_data['body']) && is_array($request_data['body'])) ? $request_data['body'] : [];
+                $sConcl = isset($request_data['conclusion']) ? (string)$request_data['conclusion'] : '';
+                $spellText = trim($sIntro . "\n" . implode("\n", $sBody) . "\n" . $sConcl);
+            }
+            $confirmedWords = load_confirmed_thai_words($pdo);
+            echo json_encode([
+                'success'        => true,
+                'sentence_count' => count_thai_sentences($spellText),
+                'misspelled'     => array_values(find_misspelled_thai_words($spellText, $confirmedWords)),
+            ]);
+            break;
+
+        // นักเรียนหรือครูยืนยันว่าคำที่ระบบขึ้นเตือนว่า "อาจสะกดผิด" นั้นสะกดถูกต้องแล้วจริง ๆ
+        // (เช่น ชื่อคน/คำสแลง/ศัพท์เฉพาะทางที่ไม่มีในพจนานุกรม) — ยืนยันแล้วจะไม่ถูกฟ้องซ้ำอีกทั้งระบบ
+        case 'confirm_thai_word':
+            if (!isset($_SESSION['user'])) {
+                echo json_encode(['success' => false, 'error' => 'Not logged in']);
+                exit;
+            }
+            $confirmWord = isset($request_data['word']) ? trim((string)$request_data['word']) : '';
+            if ($confirmWord === '') {
+                echo json_encode(['success' => false, 'error' => 'ไม่พบคำที่จะยืนยัน']);
+                exit;
+            }
+            $confirmUser = $_SESSION['user'];
+            $confirmOk = confirm_thai_word($pdo, $confirmWord, (string)($confirmUser['id'] ?? ''), (string)($confirmUser['role'] ?? ''));
+            echo json_encode(['success' => (bool)$confirmOk]);
+            break;
+
         // Essay: ดึงเรียงความทั้งชั้น (สำหรับครู/แดชบอร์ด)
         // light=1 : โหมดเบา — คืนเฉพาะสถานะการส่ง (ไม่รวมเนื้อหาเต็ม) เพื่อให้หน้า Essay Viewer โหลดเร็ว
         case 'get_all_essays':

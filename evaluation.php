@@ -427,6 +427,7 @@ require_once 'header.php';
       </h6>
       <div class="d-flex align-items-center gap-2 flex-shrink-0">
         <span class="badge bg-primary-subtle text-primary rounded-pill px-3 py-1 font-mono small" id="essayPanelWordCount">0 คำ</span>
+        <span class="badge bg-info-subtle text-info-emphasis rounded-pill px-3 py-1 font-mono small" id="essayPanelSentenceCount">0 ประโยค</span>
         <button type="button" class="essay-collapse-btn" id="essayCollapseBtn" title="ย่อ/ขยายกล่องเรียงความ" onclick="event.stopPropagation(); toggleEssayCollapse();">
           <i class="bi bi-dash-lg" id="essayCollapseIcon"></i>
         </button>
@@ -600,6 +601,10 @@ require_once 'header.php';
 .essay-doc-content .essay-para {
   margin: 0;
   text-indent: 2.5em;
+}
+/* แสดงขอบเขตการตัดคำ (อ่านอย่างเดียว) — เส้นประบาง ๆ ใต้แต่ละคำ ไม่รบกวนการอ่าน */
+.essay-doc-content .thai-word {
+  border-bottom: 1px dotted #c9c2b3;
 }
 .essay-doc-content .lnum {
   position: absolute;
@@ -1204,8 +1209,25 @@ require_once 'header.php';
   function nl2brSafe(s) {
     return escapeHTML(s).replace(/\n/g, '<br>');
   }
-  function formatEssayHTML(contentStr) {
-    // เก็บย่อหน้าพร้อม "ส่วน" (intro/body/concl) เพื่อทำป้ายบอกส่วนแบบแอบ ๆ
+
+  // ตัดคำภาษาไทยด้วย Intl.Segmenter (ตัวเดียวกับที่ใช้นับคำในหน้าเขียนเรียงความ) เพื่อแสดงขอบเขตคำ
+  // ให้ผู้ประเมินเห็นว่าระบบตัดคำตรงไหนบ้าง — เป็นการแสดงผลอย่างเดียว ไม่ใช่การแก้ไข
+  let __evalWordSegmenter = null;
+  if (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function') {
+    try { __evalWordSegmenter = new Intl.Segmenter('th', { granularity: 'word' }); } catch (e) { __evalWordSegmenter = null; }
+  }
+  function wordSegmentedHTML(s) {
+    if (!__evalWordSegmenter) return nl2brSafe(s);
+    let html = '';
+    for (const part of __evalWordSegmenter.segment(s)) {
+      const esc = escapeHTML(part.segment).replace(/\n/g, '<br>');
+      html += part.isWordLike ? `<span class="thai-word">${esc}</span>` : esc;
+    }
+    return html;
+  }
+
+  // แยกเนื้อหาเรียงความ (JSON หรือข้อความล้วน) ออกเป็นย่อหน้าพร้อม "ส่วน" (intro/body/concl)
+  function parseEssayParas(contentStr) {
     const paras = []; // { text, sec }  (sec = 'intro' | 'body' | 'concl' | '')
     if (contentStr) {
       let parsed = null;
@@ -1221,6 +1243,23 @@ require_once 'header.php';
         String(contentStr).split(/\n{2,}/).forEach(p => { if (p.trim()) paras.push({ text: p, sec: '' }); });
       }
     }
+    return paras;
+  }
+
+  // นับจำนวนประโยคโดยประมาณ (ตรงกับ count_thai_sentences ฝั่งเซิร์ฟเวอร์ใน thai_text_utils.php)
+  // ภาษาไทยไม่มีเครื่องหมายจบประโยคบังคับ จึงเป็นค่าประมาณ ไม่ใช่การตรวจไวยากรณ์ประโยคจริง
+  function countThaiSentences(text) {
+    const paragraphs = text.split(/\n+/).map(p => p.trim()).filter(p => p !== '');
+    let count = 0;
+    paragraphs.forEach(para => {
+      const pieces = para.split(/[.!?]+/).map(s => s.trim()).filter(s => s !== '');
+      count += Math.max(pieces.length, 1);
+    });
+    return count;
+  }
+
+  function formatEssayHTML(contentStr) {
+    const paras = parseEssayParas(contentStr);
     if (!paras.length) return '<div class="no-content">— ยังไม่มีเนื้อหาเรียงความ —</div>';
     // ทำเครื่องหมาย data-sec เฉพาะย่อหน้า "แรก" ของแต่ละส่วน เพื่อวางป้ายเพียงจุดเดียวต่อส่วน
     let seenBody = false;
@@ -1229,7 +1268,7 @@ require_once 'header.php';
       if (p.sec === 'intro') mark = ' data-sec="intro"';
       else if (p.sec === 'concl') mark = ' data-sec="concl"';
       else if (p.sec === 'body' && !seenBody) { mark = ' data-sec="body"'; seenBody = true; }
-      return `<p class="essay-para"${mark}>${nl2brSafe(p.text)}</p>`;
+      return `<p class="essay-para"${mark}>${wordSegmentedHTML(p.text)}</p>`;
     }).join('');
   }
 
@@ -1394,6 +1433,7 @@ require_once 'header.php';
     const authorEl = document.getElementById('essayPanelAuthor');
     const contentEl = document.getElementById('essayPanelContent');
     const countEl = document.getElementById('essayPanelWordCount');
+    const sentenceCountEl = document.getElementById('essayPanelSentenceCount');
 
     // ไม่มีรหัสนักเรียน หรือเด็กไม่ได้บันทึกเรียงความ → ซ่อนคอลัมน์เรียงความ คงเหลือเฉพาะแบบประเมินเต็มความกว้าง
     if (!studentId) {
@@ -1422,6 +1462,10 @@ require_once 'header.php';
         }
         contentEl.innerHTML = formatEssayHTML(data.data.essay_content);
         countEl.textContent = `${data.data.word_count || 0} คำ`;
+        if (sentenceCountEl) {
+          const plainText = parseEssayParas(data.data.essay_content).map(p => p.text).join('\n');
+          sentenceCountEl.textContent = `${countThaiSentences(plainText)} ประโยค`;
+        }
         toggleEssayColumn(true);
         // รอให้จัดหน้าเสร็จก่อนคำนวณ/วางเลขบรรทัดและป้ายบอกส่วน (กล่องเพิ่งแสดง)
         requestAnimationFrame(() => requestAnimationFrame(() => { addEssayLineNumbers(); addEssaySectionTags(); }));
