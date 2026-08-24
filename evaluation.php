@@ -6,6 +6,12 @@ require_once 'auth_helper.php';
 $mode_param = isset($_GET['mode']) ? $_GET['mode'] : '';
 $currentMode = '';
 
+// รอบที่ระบุมาทาง URL (เช่นลิงก์จากรายการ "สิ่งที่ยังไม่ได้ทำ") เพื่อข้ามหน้าเลือกรอบไปเริ่มประเมินรอบนั้นทันที
+$phase_param = isset($_GET['phase']) ? $_GET['phase'] : '';
+if (!in_array($phase_param, ['pretest', 'task1', 'task2', 'posttest'], true)) {
+    $phase_param = '';
+}
+
 if ($mode_param === 'self') {
     require_login('student');
     $currentMode = 'ตนเองประเมิน';
@@ -618,6 +624,7 @@ require_once 'header.php';
 <script>
   let currentMode = "<?php echo $currentMode; ?>";
   let modeParam = "<?php echo $mode_param; ?>";
+  const initialPhaseParam = "<?php echo $phase_param; ?>"; // รอบที่ระบุมาจาก URL (ถ้ามี) — ใช้ข้ามหน้าเลือกรอบไปเริ่มประเมินทันที
   let studentDB = {};
 
   const rubricData = [
@@ -1596,6 +1603,9 @@ require_once 'header.php';
       if (tInput) { tInput.value = ''; tInput.disabled = false; }
       dimRubric();
     }
+
+    // มีรอบระบุมาจาก URL (เช่นลิงก์จากรายการ "สิ่งที่ยังไม่ได้ทำ") → ข้ามหน้าเลือกรอบไปเริ่มประเมินรอบนั้นทันที
+    if (initialPhaseParam) selectPhase(initialPhaseParam);
   })();
 </script>
 

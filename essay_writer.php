@@ -683,8 +683,15 @@ async function loadSavedList() {
 // Init
 (async function() {
   await loadEssayTopics();          // โหลดหัวข้อที่ครูกำหนด
-  // ค่าเริ่มต้น: ภาระงานหน่วยที่ 1 · ร่างที่ 1 (D1)
-  setEssayUnit('task1');
+
+  // มีรอบระบุมาจาก URL (เช่นลิงก์จากรายการ "สิ่งที่ยังไม่ได้ทำ") → เปิดตรงรอบ/ร่างนั้นทันที
+  const phaseFromUrl = new URLSearchParams(window.location.search).get('phase');
+  if (phaseFromUrl && /^(pretest|posttest|task[12]_d[12])$/.test(phaseFromUrl)) {
+    openEssayPhase(phaseFromUrl);
+  } else {
+    // ค่าเริ่มต้น: ภาระงานหน่วยที่ 1 · ร่างที่ 1 (D1)
+    setEssayUnit('task1');
+  }
   await loadSavedList();
 })();
 </script>

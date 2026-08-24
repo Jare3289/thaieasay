@@ -1248,9 +1248,15 @@ $role = $sessionUser['role'];
     // เรียกใช้ตอนเริ่มต้นสำหรับนักเรียน
     document.addEventListener('DOMContentLoaded', async () => {
       await loadStudents();
-      await loadStudentWritingProblems();
-      await loadStudentChecklist();
-      await loadStudentReflection();
+      // มีหน่วยระบุมาจาก URL (เช่นลิงก์จากรายการ "สิ่งที่ยังไม่ได้ทำ") → เปิดหน่วยนั้นทันที
+      const unitFromUrl = new URLSearchParams(window.location.search).get('unit');
+      if (unitFromUrl === '1' || unitFromUrl === '2') {
+        await setReflectionUnit(parseInt(unitFromUrl, 10));
+      } else {
+        await loadStudentWritingProblems();
+        await loadStudentChecklist();
+        await loadStudentReflection();
+      }
     });
   }
 
