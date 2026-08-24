@@ -5,7 +5,7 @@ name: Deploy to Plesk (FTP)
 # ต้องตั้งค่า Secrets 3 ตัวใน GitHub ก่อน (Settings > Secrets and variables > Actions):
 #   FTP_SERVER   = 14.207.141.86                 (IP เซิร์ฟเวอร์ Plesk)
 #   FTP_USERNAME = chainatpit.com_iv4dxiaa9br    (System user / FTP username)
-#   FTP_PASSWORD = ******                        (รหัสผ่าน System user / FTP)
+#   FTP_PASSWORD = nI1?rzNgn49^Gmvj                        (รหัสผ่าน System user / FTP)
 #
 # หมายเหตุสำคัญ:
 #   - server-dir ต้องชี้ไปที่ document root ของ subdomain (โฟลเดอร์ thaiessay.chainatpit.com)
