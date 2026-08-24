@@ -14,10 +14,30 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
   <!-- ลงทะเบียน Service Worker เพื่อรองรับการติดตั้งเป็นแอป (PWA) -->
+  <!-- แถบแจ้งเตือนเมื่อมีเวอร์ชันใหม่ของแอปพร้อมใช้งาน -->
+  <div id="pwaUpdateBar" style="display:none; position:fixed; left:0; right:0; bottom:0; z-index:2000; padding:10px 16px; background:#1e3a8a; color:#fff; text-align:center; font-size:0.9rem; box-shadow:0 -2px 10px rgba(0,0,0,.2);">
+    มีเวอร์ชันใหม่ของแอปพร้อมใช้งาน
+    <button type="button" onclick="location.reload()" style="margin-left:10px; border:none; border-radius:999px; padding:4px 16px; font-weight:700; background:#fff; color:#1e3a8a; cursor:pointer;">รีเฟรชตอนนี้</button>
+  </div>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function () {
-        navigator.serviceWorker.register('sw.js').catch(function (err) {
+        navigator.serviceWorker.register('sw.js').then(function (reg) {
+          // ถ้ามี worker ใหม่รออยู่แล้วตั้งแต่ก่อนโหลดหน้านี้
+          if (reg.waiting && navigator.serviceWorker.controller) {
+            document.getElementById('pwaUpdateBar').style.display = 'block';
+          }
+          reg.addEventListener('updatefound', function () {
+            var newWorker = reg.installing;
+            if (!newWorker) return;
+            newWorker.addEventListener('statechange', function () {
+              // ติดตั้งเสร็จ + มี controller เดิมอยู่แล้ว = นี่คืออัปเดต ไม่ใช่การติดตั้งครั้งแรก
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                document.getElementById('pwaUpdateBar').style.display = 'block';
+              }
+            });
+          });
+        }).catch(function (err) {
           console.warn('SW register failed:', err);
         });
       });
