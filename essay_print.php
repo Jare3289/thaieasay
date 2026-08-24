@@ -5,6 +5,7 @@
 // รองรับทั้งแบบรวม (ตามตัวกรอง) และแบบแยกรายบุคคล (ส่ง student_id + essay_phase)
 
 require_once 'auth_helper.php';
+require_once 'thai_text_utils.php';
 require_login();
 if (!isset($_SESSION['user']) || !in_array($_SESSION['user']['role'], ['teacher', 'expert'])) {
     header('Location: index.php');
@@ -284,7 +285,7 @@ if (!$isSingle && $fQuery !== '') {
 $h = function ($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); };
 
 // แปลงเนื้อหา (JSON) เป็นย่อหน้าเรียงความล้วน ไม่มีกล่องสี — ให้เหมือนเรียงความจริง
-function essayParagraphs($contentStr, $h) {
+function essayParagraphs($contentStr) {
     $paras = [];
     $obj = json_decode((string)$contentStr, true);
     if (is_array($obj) && isset($obj['introduction'])) {
@@ -302,8 +303,8 @@ function essayParagraphs($contentStr, $h) {
     if (empty($paras)) return '<div class="no-content">— ยังไม่มีเนื้อหาเรียงความ —</div>';
     $out = '';
     foreach ($paras as $p) {
-        // คงการขึ้นบรรทัดภายในย่อหน้าไว้ด้วย
-        $out .= '<p class="para">' . nl2br($h($p)) . '</p>';
+        // แสดงขอบเขตการตัดคำให้เห็นด้วย (เส้นประใต้คำ) — ดู thai_text_utils.php
+        $out .= '<p class="para">' . render_thai_segmented_html((string)$p) . '</p>';
     }
     return $out;
 }
@@ -360,6 +361,8 @@ $genAt = date('d/m/Y H:i');
     line-height: 30px;     /* ต้องตรงกับ LH ในสคริปต์ด้านล่าง */
   }
   .content .para { margin: 0; text-indent: 2.5em; text-align: justify; }
+  /* แสดงขอบเขตการตัดคำ (อ่านอย่างเดียว) — เส้นประบาง ๆ ใต้แต่ละคำ */
+  .content .thai-word { border-bottom: 1px dotted #999; }
   .content .lnum {
     position: absolute; left: 0; width: 2.1em; text-align: right;
     color: #9aa1ac; font-size: 14px; font-family: "Tahoma", sans-serif;
@@ -441,6 +444,9 @@ $genAt = date('d/m/Y H:i');
           $eIntro = is_array($eObj) ? (string)($eObj['introduction'] ?? '') : '';
           $eBody  = (is_array($eObj) && isset($eObj['body']) && is_array($eObj['body'])) ? array_values($eObj['body']) : [];
           $eConc  = is_array($eObj) ? (string)($eObj['conclusion'] ?? '') : '';
+          $eAllText = trim($eIntro . "\n" . implode("\n", $eBody) . "\n" . $eConc);
+          $eWordCount = count_thai_words($eAllText);
+          $eSentenceCount = count_thai_sentences($eAllText);
           if ($isTeacher) {
             $editData[$fi] = [
               'sid'   => (string)$e['student_id'],
@@ -468,8 +474,8 @@ $genAt = date('d/m/Y H:i');
         <div class="topic">
           <span class="lead">หัวข้อ :</span><span class="fill"><?php echo $h($e['essay_title']); ?></span>
         </div>
-        <div class="meta">รอบการประเมิน: <?php echo $h($phaseText); ?><?php if ($grp !== ''): ?> · กลุ่ม: <?php echo $h($grp); ?><?php endif; ?></div>
-        <div class="content" id="content_<?php echo $fi; ?>"><?php echo essayParagraphs($e['essay_content'] ?? '', $h); ?></div>
+        <div class="meta">รอบการประเมิน: <?php echo $h($phaseText); ?><?php if ($grp !== ''): ?> · กลุ่ม: <?php echo $h($grp); ?><?php endif; ?> · <?php echo $eWordCount; ?> คำ · <?php echo $eSentenceCount; ?> ประโยค (โดยประมาณ)</div>
+        <div class="content" id="content_<?php echo $fi; ?>"><?php echo essayParagraphs($e['essay_content'] ?? ''); ?></div>
         <?php if ($isTeacher): ?>
         <div class="editpanel" id="panel_<?php echo $fi; ?>" style="display:none;">
           <label>ส่วนคำนำ (Introduction)</label>

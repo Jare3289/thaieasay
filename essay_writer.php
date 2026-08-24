@@ -159,25 +159,41 @@ require_once 'header.php';
       </div>
 
       <!-- Stats Preview -->
-      <div class="row g-3 mb-4" id="statsRow">
-        <div class="col-4">
+      <div class="row g-3 mb-3" id="statsRow">
+        <div class="col-3">
           <div class="card border-0 rounded-3 p-3 text-center bg-light">
             <div class="fs-4 fw-extrabold text-primary mb-0" id="statWords">0</div>
             <div class="text-muted small">จำนวนคำ</div>
           </div>
         </div>
-        <div class="col-4">
+        <div class="col-3">
+          <div class="card border-0 rounded-3 p-3 text-center bg-light">
+            <div class="fs-4 fw-extrabold text-info mb-0" id="statSentences">0</div>
+            <div class="text-muted small">ประโยค (โดยประมาณ)</div>
+          </div>
+        </div>
+        <div class="col-3">
           <div class="card border-0 rounded-3 p-3 text-center bg-light">
             <div class="fs-4 fw-extrabold text-success mb-0" id="statChars">0</div>
             <div class="text-muted small">ตัวอักษร</div>
           </div>
         </div>
-        <div class="col-4">
+        <div class="col-3">
           <div class="card border-0 rounded-3 p-3 text-center bg-light">
             <div class="fs-4 fw-extrabold text-warning mb-0" id="statParagraphs">0</div>
             <div class="text-muted small">ย่อหน้า</div>
           </div>
         </div>
+      </div>
+
+      <!-- ตรวจสอบการสะกดคำ + แยกคำทั้งหน้า -->
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4 p-3 bg-light rounded-3">
+        <span class="small text-muted" id="spellCheckStatus">
+          <i class="bi bi-search me-1"></i>พิมพ์เรียงความเพื่อตรวจการสะกดคำ
+        </span>
+        <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" onclick="openSpellingReview()">
+          <i class="bi bi-eye me-1"></i>ตรวจสอบทั้งหน้า / แยกคำ
+        </button>
       </div>
 
     </div>
@@ -254,6 +270,7 @@ require_once 'header.php';
 }
 </style>
 
+<script src="thai_review.js"></script>
 <script>
 const phaseLabels = {
   pretest:  'ก่อนเรียน (Pretest)',
@@ -585,6 +602,18 @@ function countThaiWords(text) {
   return t.split(/[\s\n\r]+/).filter(w => w.length > 0).length;
 }
 
+// นับจำนวนประโยคโดยประมาณ (ตรงกับ count_thai_sentences ฝั่งเซิร์ฟเวอร์ใน thai_text_utils.php)
+// ภาษาไทยไม่มีเครื่องหมายจบประโยคบังคับ จึงเป็นค่าประมาณ ไม่ใช่การตรวจไวยากรณ์ประโยคจริง
+function countThaiSentences(text) {
+  const paragraphs = text.split(/\n+/).map(p => p.trim()).filter(p => p !== '');
+  let count = 0;
+  paragraphs.forEach(para => {
+    const pieces = para.split(/[.!?]+/).map(s => s.trim()).filter(s => s !== '');
+    count += Math.max(pieces.length, 1);
+  });
+  return count;
+}
+
 function updateWordCount() {
   const introText = document.getElementById('essayIntro').value;
   const conclusionText = document.getElementById('essayConclusion').value;
@@ -601,9 +630,11 @@ function updateWordCount() {
   });
 
   const words = wordCountIntro + wordCountBody + wordCountConclusion;
+  const sentences = countThaiSentences(allTextCombined);
   const paragraphs = (introText.trim() ? 1 : 0) + bodyTexts.filter(t => t.trim().length > 0).length + (conclusionText.trim() ? 1 : 0);
 
   document.getElementById('statWords').textContent = words.toLocaleString('th-TH');
+  document.getElementById('statSentences').textContent = sentences.toLocaleString('th-TH');
   document.getElementById('statChars').textContent = chars.toLocaleString('th-TH');
   document.getElementById('statParagraphs').textContent = paragraphs;
   document.getElementById('charCount').textContent = chars.toLocaleString('th-TH') + ' ตัวอักษร';
@@ -624,6 +655,124 @@ function updateWordCount() {
     // เก็บร่างที่พิมพ์อยู่ไว้ในเครื่องด้วย เผื่อกดบันทึกไม่ทัน (เน็ตหลุด/เซสชันหมดอายุ/ปิดแท็บกลางคัน)
     saveDraftToLocalStorage(currentEssayPhase);
   }, 800);
+
+  // ตรวจคำผิดแบบหน่วงเวลา (เรียก API ที่เทียบกับพจนานุกรม — หนักกว่าการนับคำ จึงไม่เรียกทุกครั้งที่พิมพ์)
+  clearTimeout(spellCheckTimer);
+  const statusEl = document.getElementById('spellCheckStatus');
+  if (!allTextCombined.trim()) {
+    statusEl.innerHTML = '<i class="bi bi-search me-1"></i>พิมพ์เรียงความเพื่อตรวจการสะกดคำ';
+  } else {
+    spellCheckTimer = setTimeout(() => refreshSpellCheckStatus(allTextCombined), 1500);
+  }
+}
+
+let spellCheckTimer = null;
+async function refreshSpellCheckStatus(combinedText) {
+  const statusEl = document.getElementById('spellCheckStatus');
+  try {
+    const res = await fetch('api.php?action=check_thai_spelling', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: combinedText })
+    });
+    const data = await res.json();
+    if (!data.success) return;
+    statusEl.innerHTML = data.misspelled.length > 0
+      ? `<i class="bi bi-exclamation-triangle-fill text-warning me-1"></i>พบคำที่อาจสะกดผิด ${data.misspelled.length} คำ — กด "ตรวจสอบทั้งหน้า" เพื่อดู`
+      : '<i class="bi bi-check-circle-fill text-success me-1"></i>ไม่พบคำที่น่าสงสัยในขณะนี้';
+  } catch (e) {
+    // เงียบไว้ — ไม่ให้กระทบการพิมพ์งานหลัก
+  }
+}
+
+// ส่งเนื้อหาแยกเป็น 3 ส่วน (ส่วนนำ/เนื้อหาหลายย่อหน้า/สรุป) ไปบันทึก — ใช้ร่วมกันโดยปุ่ม "บันทึกเรียงความ"
+// และหน้าต่างตรวจสอบการสะกดคำทั้งหน้า (เมื่อกด "บันทึกการแก้ไข" ในหน้าต่างนั้น)
+async function submitEssayContent(intro, bodyParagraphs, conclusion) {
+  const res = await fetch('api.php?action=save_essay', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      essay_phase:  currentEssayPhase,
+      introduction: intro,
+      body:         bodyParagraphs,
+      conclusion:   conclusion
+    })
+  });
+  return res.json();
+}
+
+// สร้างรายการย่อหน้าทั้งฉบับ (คำนำ/เนื้อเรื่องแต่ละย่อหน้า/สรุป) สำหรับส่งให้หน้าต่างตรวจสอบการสะกดคำ
+function buildReviewParagraphs() {
+  const intro = document.getElementById('essayIntro').value;
+  const conclusion = document.getElementById('essayConclusion').value;
+  const bodyTextareas = Array.from(document.querySelectorAll('.body-para-textarea'));
+  const paras = [];
+  if (intro.trim()) paras.push({ label: 'intro', text: intro });
+  bodyTextareas.forEach((ta, i) => {
+    if (ta.value.trim()) paras.push({ label: 'body:' + i, text: ta.value });
+  });
+  if (conclusion.trim()) paras.push({ label: 'concl', text: conclusion });
+  return paras;
+}
+
+// เขียนข้อความที่แก้ไขจากหน้าต่างตรวจสอบกลับเข้ากล่องข้อความเดิมตามป้าย label
+function applyReviewParagraphsToForm(paragraphs) {
+  const bodyTextareas = Array.from(document.querySelectorAll('.body-para-textarea'));
+  paragraphs.forEach(p => {
+    if (p.label === 'intro') {
+      document.getElementById('essayIntro').value = p.text;
+    } else if (p.label === 'concl') {
+      document.getElementById('essayConclusion').value = p.text;
+    } else if (p.label.indexOf('body:') === 0) {
+      const idx = parseInt(p.label.split(':')[1], 10);
+      if (bodyTextareas[idx]) bodyTextareas[idx].value = p.text;
+    }
+  });
+}
+
+// เปิดหน้าต่างตรวจสอบการสะกดคำ/แยกคำทั้งหน้า (thai_review.js)
+async function openSpellingReview() {
+  const paragraphs = buildReviewParagraphs();
+  if (paragraphs.length === 0) {
+    showToast('กรุณาพิมพ์เนื้อเรียงความก่อน', 'error');
+    return;
+  }
+
+  let misspelled = [];
+  try {
+    const res = await fetch('api.php?action=check_thai_spelling', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: paragraphs.map(p => p.text).join('\n') })
+    });
+    const data = await res.json();
+    if (data.success) misspelled = data.misspelled;
+  } catch (e) {
+    // เงียบไว้ — เปิดหน้าต่างได้แม้ตรวจคำผิดไม่สำเร็จ (จะไม่มีคำไฮไลต์)
+  }
+
+  ThaiReview.open({
+    paragraphs,
+    misspelled,
+    onSave: async (editedParagraphs) => {
+      applyReviewParagraphsToForm(editedParagraphs);
+      const intro = document.getElementById('essayIntro').value.trim();
+      const conclusion = document.getElementById('essayConclusion').value.trim();
+      const bodyParas = Array.from(document.querySelectorAll('.body-para-textarea')).map(ta => ta.value.trim()).filter(Boolean);
+
+      const data = await submitEssayContent(intro, bodyParas, conclusion);
+      if (!data.success) {
+        throw new Error(data.error || 'บันทึกไม่สำเร็จ');
+      }
+
+      updateWordCount();
+      const now = new Date().toLocaleString('th-TH');
+      document.getElementById('lastSavedTime').textContent = now;
+      document.getElementById('lastSavedInfo').classList.remove('d-none');
+      clearDraftFromLocalStorage(currentEssayPhase);
+      loadSavedList();
+    }
+  });
 }
 
 async function saveEssay() {
@@ -655,18 +804,7 @@ async function saveEssay() {
   btn.disabled = true;
 
   try {
-    // ส่งเนื้อหาแยกเป็น 3 ส่วน (ส่วนนำ/เนื้อหาหลายย่อหน้า/สรุป) — ไม่มีชื่อเรื่องจากนักเรียน
-    const res = await fetch('api.php?action=save_essay', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        essay_phase:  currentEssayPhase,
-        introduction: intro,
-        body:         bodyParagraphs,
-        conclusion:   conclusion
-      })
-    });
-    const data = await res.json();
+    const data = await submitEssayContent(intro, bodyParagraphs, conclusion);
 
     if (data.success) {
       const now = new Date().toLocaleString('th-TH');

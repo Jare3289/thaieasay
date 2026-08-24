@@ -1,0 +1,282 @@
+/*
+ * thai_review.js — หน้าต่างตรวจสอบเรียงความแบบเต็มหน้า (ใช้ร่วมกันโดย essay_writer.php และ essay_viewer.php)
+ *
+ * แสดงเรียงความทั้งฉบับ (คำนำ + เนื้อเรื่องทุกย่อหน้า + สรุป ต่อเนื่องกันเหมือนอ่านจริง) พร้อมไฮไลต์
+ * คำที่ระบบตรวจพบว่า "อาจสะกดผิด" (เทียบกับพจนานุกรมคำไทย — ดู thai_text_utils.php ฝั่งเซิร์ฟเวอร์)
+ * คลิกคำที่ไฮไลต์เพื่อ "✓ ยืนยันว่าถูกต้อง" (จะไม่ถูกฟ้องอีกทั้งระบบ) หรือ "✏️ แก้คำ" (แก้ตรงจุดแล้วบันทึก)
+ */
+(function (window, document) {
+  'use strict';
+
+  let segmenter = null;
+  if (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function') {
+    try { segmenter = new Intl.Segmenter('th', { granularity: 'word' }); } catch (e) { segmenter = null; }
+  }
+
+  function segmentText(text) {
+    if (segmenter) {
+      const out = [];
+      for (const part of segmenter.segment(text)) {
+        out.push({ text: part.segment, isWord: part.isWordLike });
+      }
+      return out;
+    }
+    // fallback: แยกด้วยช่องว่าง
+    return text.split(/(\s+)/).filter(s => s !== '').map(s => ({ text: s, isWord: /\S/.test(s) }));
+  }
+
+  async function postJSON(action, payload) {
+    const res = await fetch('api.php?action=' + action, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload || {})
+    });
+    return res.json();
+  }
+
+  let modalEl = null;
+  let state = null; // { paragraphs, misspelledSet, dirty, onSave }
+
+  function ensureModal() {
+    if (modalEl) return modalEl;
+    modalEl = document.createElement('div');
+    modalEl.id = 'thaiReviewModal';
+    modalEl.innerHTML = `
+      <div class="trw-backdrop"></div>
+      <div class="trw-dialog" role="dialog" aria-modal="true">
+        <div class="trw-header">
+          <div class="trw-title"><i class="bi bi-search"></i> ตรวจสอบการสะกดคำทั้งหน้า</div>
+          <button type="button" class="trw-close" aria-label="ปิด">&times;</button>
+        </div>
+        <div class="trw-note">
+          คลิกคำที่ไฮไลต์สีเหลือง เพื่อยืนยันว่าถูกต้อง หรือแก้ไขตรงจุด — ระบบตรวจเทียบกับพจนานุกรมเท่านั้น
+          ชื่อเฉพาะ คำสแลง หรือศัพท์เฉพาะทางที่ถูกต้องอยู่แล้วอาจถูกไฮไลต์ด้วย กด "ถูกต้อง" เพื่อไม่ให้ฟ้องซ้ำอีก
+        </div>
+        <div class="trw-status"></div>
+        <div class="trw-body"></div>
+        <div class="trw-footer">
+          <span class="trw-save-msg"></span>
+          <button type="button" class="trw-btn trw-btn-secondary trw-cancel">ปิด</button>
+          <button type="button" class="trw-btn trw-btn-primary trw-save" disabled>บันทึกการแก้ไข</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modalEl);
+
+    const style = document.createElement('style');
+    style.textContent = `
+      #thaiReviewModal { position: fixed; inset: 0; z-index: 2000; display: none; }
+      #thaiReviewModal.open { display: block; }
+      #thaiReviewModal .trw-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.5); }
+      #thaiReviewModal .trw-dialog {
+        position: relative; max-width: 760px; margin: 4vh auto; background: #fff; border-radius: 12px;
+        max-height: 92vh; display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0,0,0,.3);
+        font-family: 'Sarabun', sans-serif;
+      }
+      #thaiReviewModal .trw-header { display:flex; align-items:center; justify-content:space-between; padding: 14px 20px; border-bottom: 1px solid #eee; }
+      #thaiReviewModal .trw-title { font-weight: 700; font-size: 1.1rem; }
+      #thaiReviewModal .trw-close { background: none; border: none; font-size: 1.6rem; line-height: 1; cursor: pointer; color: #888; }
+      #thaiReviewModal .trw-note { padding: 10px 20px; font-size: .85rem; color: #6c5300; background: #fff9e6; border-bottom: 1px solid #f5e6a8; }
+      #thaiReviewModal .trw-status { padding: 8px 20px 0; font-size: .9rem; color: #444; }
+      #thaiReviewModal .trw-body { padding: 12px 20px 20px; overflow-y: auto; line-height: 2; font-size: 1rem; white-space: pre-wrap; flex: 1; }
+      #thaiReviewModal .trw-para { margin: 0 0 14px; }
+      #thaiReviewModal .trw-flag { background: #fff2a8; border-bottom: 2px dotted #d99a00; cursor: pointer; border-radius: 3px; padding: 0 1px; }
+      #thaiReviewModal .trw-flag.trw-editing { background: transparent; }
+      #thaiReviewModal .trw-flag input { font: inherit; width: 8em; border: 1px solid #d99a00; border-radius: 4px; padding: 0 4px; }
+      #thaiReviewModal .trw-actions { display: inline-flex; gap: 4px; margin-left: 4px; white-space: nowrap; }
+      #thaiReviewModal .trw-actions button { font-size: .78rem; border: none; border-radius: 6px; padding: 2px 8px; cursor: pointer; }
+      #thaiReviewModal .trw-act-confirm { background: #d4edda; color: #155724; }
+      #thaiReviewModal .trw-act-edit { background: #cfe2ff; color: #084298; }
+      #thaiReviewModal .trw-act-cancel { background: #eee; color: #555; }
+      #thaiReviewModal .trw-footer { display:flex; align-items:center; justify-content:flex-end; gap: 10px; padding: 12px 20px; border-top: 1px solid #eee; }
+      #thaiReviewModal .trw-save-msg { margin-right: auto; font-size: .85rem; color: #157347; }
+      #thaiReviewModal .trw-btn { border: none; border-radius: 8px; padding: 8px 18px; font-weight: 600; cursor: pointer; }
+      #thaiReviewModal .trw-btn-secondary { background: #eee; color: #333; }
+      #thaiReviewModal .trw-btn-primary { background: #0d7377; color: #fff; }
+      #thaiReviewModal .trw-btn-primary:disabled { background: #a9c9ca; cursor: default; }
+    `;
+    document.head.appendChild(style);
+
+    modalEl.querySelector('.trw-backdrop').addEventListener('click', closeModal);
+    modalEl.querySelector('.trw-close').addEventListener('click', closeModal);
+    modalEl.querySelector('.trw-cancel').addEventListener('click', closeModal);
+    modalEl.querySelector('.trw-save').addEventListener('click', saveEdits);
+
+    return modalEl;
+  }
+
+  function closeModal() {
+    if (!modalEl) return;
+    if (state && state.dirty) {
+      if (!window.confirm('มีการแก้ไขที่ยังไม่ได้บันทึก ต้องการปิดหน้าต่างนี้เลยหรือไม่?')) return;
+    }
+    modalEl.classList.remove('open');
+    state = null;
+  }
+
+  function updateStatus() {
+    const statusEl = modalEl.querySelector('.trw-status');
+    const n = state.misspelledSet.size;
+    statusEl.textContent = n > 0
+      ? `พบคำที่อาจสะกดผิด ${n} คำ (ไม่ซ้ำ) — คลิกคำที่ไฮไลต์เพื่อตรวจสอบ`
+      : 'ไม่พบคำที่น่าสงสัยแล้วในตอนนี้';
+    modalEl.querySelector('.trw-save').disabled = !state.dirty;
+  }
+
+  function renderParagraph(container, text) {
+    container.textContent = '';
+    segmentText(text).forEach((seg, i) => {
+      if (seg.isWord && state.misspelledSet.has(seg.text)) {
+        const span = document.createElement('span');
+        span.className = 'trw-flag';
+        span.textContent = seg.text;
+        span.dataset.word = seg.text;
+        span.dataset.uid = 'w' + (uidCounter++);
+        span.addEventListener('click', onFlagClick);
+        container.appendChild(span);
+      } else {
+        container.appendChild(document.createTextNode(seg.text));
+      }
+    });
+  }
+
+  let uidCounter = 0;
+
+  function onFlagClick(ev) {
+    const span = ev.currentTarget;
+    if (span.classList.contains('trw-editing')) return;
+    // ปิดกล่องตัวเลือกที่เปิดค้างไว้จุดอื่นก่อน (เปิดได้ทีละจุด)
+    modalEl.querySelectorAll('.trw-actions').forEach(el => el.remove());
+
+    const actions = document.createElement('span');
+    actions.className = 'trw-actions';
+    actions.dataset.for = span.dataset.uid;
+    actions.innerHTML = `
+      <button type="button" class="trw-act-confirm">✓ ถูกต้อง</button>
+      <button type="button" class="trw-act-edit">✏️ แก้คำ</button>
+      <button type="button" class="trw-act-cancel">✕</button>`;
+    span.after(actions);
+
+    actions.querySelector('.trw-act-cancel').addEventListener('click', () => actions.remove());
+    actions.querySelector('.trw-act-confirm').addEventListener('click', () => confirmWord(span, actions));
+    actions.querySelector('.trw-act-edit').addEventListener('click', () => editWord(span, actions));
+  }
+
+  async function confirmWord(span, actions) {
+    const word = span.dataset.word;
+    actions.remove();
+    try {
+      const res = await postJSON('confirm_thai_word', { word });
+      if (!res || !res.success) throw new Error(res && res.error);
+    } catch (e) {
+      alert('ยืนยันคำไม่สำเร็จ ลองใหม่อีกครั้ง');
+      return;
+    }
+    state.misspelledSet.delete(word);
+    modalEl.querySelectorAll('.trw-flag[data-word="' + attrEscape(word) + '"]').forEach(el => {
+      el.replaceWith(document.createTextNode(el.textContent));
+    });
+    updateStatus();
+  }
+
+  // escape สำหรับฝังในค่า attribute selector ที่ครอบด้วยเครื่องหมายคำพูดคู่ เช่น [data-word="..."]
+  function attrEscape(s) {
+    return s.replace(/["\\]/g, '\\$&');
+  }
+
+  function editWord(span, actions) {
+    actions.remove();
+    span.classList.add('trw-editing');
+    const original = span.textContent;
+    span.textContent = '';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = original;
+    span.appendChild(input);
+    input.focus();
+    input.select();
+
+    let finished = false;
+    const finish = (commit) => {
+      if (finished) return;
+      finished = true;
+      const val = commit ? input.value.trim() : original;
+      span.classList.remove('trw-editing');
+      span.textContent = val || original;
+      if (commit && val && val !== original) {
+        state.misspelledSet.delete(span.dataset.word);
+        span.replaceWith(document.createTextNode(val));
+        state.dirty = true;
+      }
+      updateStatus();
+    };
+
+    input.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') { ev.preventDefault(); finish(true); }
+      else if (ev.key === 'Escape') { ev.preventDefault(); finish(false); }
+    });
+    input.addEventListener('blur', () => finish(true));
+  }
+
+  async function saveEdits() {
+    const saveBtn = modalEl.querySelector('.trw-save');
+    const msgEl = modalEl.querySelector('.trw-save-msg');
+    saveBtn.disabled = true;
+    msgEl.textContent = 'กำลังบันทึก...';
+
+    const paragraphEls = Array.from(modalEl.querySelectorAll('.trw-para'));
+    const paragraphs = state.paragraphs.map((p, i) => ({ label: p.label, text: paragraphEls[i].textContent }));
+
+    try {
+      await state.onSave(paragraphs);
+    } catch (e) {
+      msgEl.textContent = '';
+      alert('บันทึกไม่สำเร็จ: ' + (e && e.message ? e.message : 'เกิดข้อผิดพลาด'));
+      saveBtn.disabled = false;
+      return;
+    }
+
+    state.paragraphs = paragraphs;
+    state.dirty = false;
+
+    // ตรวจคำผิดซ้ำอีกครั้งด้วยข้อความที่แก้ไขแล้ว เผื่อการแก้คำสร้างคำที่น่าสงสัยใหม่ขึ้นมา
+    try {
+      const combined = paragraphs.map(p => p.text).join('\n');
+      const res = await postJSON('check_thai_spelling', { text: combined });
+      state.misspelledSet = new Set(res && res.success ? res.misspelled : []);
+    } catch (e) { /* เงียบไว้ — คงรายการเดิมถ้าตรวจซ้ำไม่สำเร็จ */ }
+
+    renderAll();
+    msgEl.textContent = '✓ บันทึกแล้ว';
+    setTimeout(() => { if (msgEl) msgEl.textContent = ''; }, 3000);
+  }
+
+  function renderAll() {
+    const body = modalEl.querySelector('.trw-body');
+    body.textContent = '';
+    state.paragraphs.forEach(p => {
+      const container = document.createElement('div');
+      container.className = 'trw-para';
+      body.appendChild(container);
+      renderParagraph(container, p.text);
+    });
+    updateStatus();
+  }
+
+  // เปิดหน้าต่างตรวจสอบ
+  // options.paragraphs : [{ label, text }]  ข้อความเรียงความทั้งฉบับ เรียงตามลำดับ (คำนำ/เนื้อเรื่อง.../สรุป)
+  // options.misspelled  : string[]  รายการคำที่ตรวจพบว่าอาจสะกดผิด (จาก api.php?action=check_thai_spelling)
+  // options.onSave(paragraphs) : async function — รับ paragraphs ที่แก้ไขแล้ว ไปบันทึกกลับ (throw หากบันทึกไม่สำเร็จ)
+  function open(options) {
+    ensureModal();
+    state = {
+      paragraphs: (options.paragraphs || []).filter(p => p.text && p.text.trim() !== ''),
+      misspelledSet: new Set(options.misspelled || []),
+      dirty: false,
+      onSave: options.onSave || (async () => {})
+    };
+    renderAll();
+    modalEl.classList.add('open');
+  }
+
+  window.ThaiReview = { open, segmentText };
+})(window, document);

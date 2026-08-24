@@ -1,0 +1,19 @@
+thai_dictionary.txt
+====================
+
+Source: LibreOffice Thai spellcheck dictionary (th_TH), part of the
+"libreoffice-dictionaries" project (Debian package: hunspell-th).
+https://www.libreoffice.org/  /  https://cgit.freedesktop.org/libreoffice/dictionaries/
+
+License: MPL-2.0 (Mozilla Public License 2.0)
+Copyright: The LibreOffice Project
+
+This file is a plain word list (one Thai word per line) extracted from the
+upstream th_TH.dic file (affix flags stripped; the dictionary uses no affix
+flags, so this is simply the raw word list with the leading entry-count line
+removed). It is used only for basic dictionary-membership lookups (flagging
+words not found in the list as "possibly misspelled") — no other part of
+the upstream dictionary/affix files is used.
+
+Per MPL-2.0, the full license text is available at:
+https://www.mozilla.org/en-US/MPL/2.0/
