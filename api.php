@@ -1,6 +1,7 @@
 <?php
 // บังคับให้เริ่มเปิดใช้งาน Session และระบุประเภทการตอบกลับเป็น JSON
 require_once 'auth_helper.php';
+require_once 'thai_text_utils.php';
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Cache-Control: post-check=0, pre-check=0', false);
@@ -1810,7 +1811,7 @@ try {
 
             // นับจำนวนคำจากทั้ง 3 ส่วนรวมกัน
             $allText   = trim($intro . "\n" . implode("\n", $bodyArr) . "\n" . $conclusion);
-            $wordCount = $allText !== '' ? count(preg_split('/[\s\n\r]+/u', $allText, -1, PREG_SPLIT_NO_EMPTY)) : 0;
+            $wordCount = count_thai_words($allText);
 
             $stmt = $pdo->prepare('
                 INSERT INTO student_essays (student_id, essay_phase, intro_content, body_content, conclusion_content, word_count)
@@ -1977,7 +1978,7 @@ try {
             $aBodyJson = json_encode($aBodyArr, JSON_UNESCAPED_UNICODE);
 
             $aAllText   = trim($aIntro . "\n" . implode("\n", $aBodyArr) . "\n" . $aConclusion);
-            $aWordCount = $aAllText !== '' ? count(preg_split('/[\s\n\r]+/u', $aAllText, -1, PREG_SPLIT_NO_EMPTY)) : 0;
+            $aWordCount = count_thai_words($aAllText);
 
             $stmt = $pdo->prepare('
                 INSERT INTO student_essays (student_id, essay_phase, intro_content, body_content, conclusion_content, word_count)
