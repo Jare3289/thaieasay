@@ -114,9 +114,9 @@ if ($sessionUser) {
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="ประเมินเรียงความ">
-  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
-  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
-  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="icon.php?f=favicon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon.php?f=icon-192.png">
+  <link rel="apple-touch-icon" href="icon.php?f=icon-180.png">
 </head>
 <body class="<?php echo $sessionUser ? 'has-sidebar' : 'auth-body'; ?>">
 
