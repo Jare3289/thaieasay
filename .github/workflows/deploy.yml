@@ -14,7 +14,12 @@ name: Deploy to Plesk (FTP)
 #    ลบทีหลังจึงไม่ช่วย — ถ้าหลุดแล้วต้องเปลี่ยนรหัสใน Plesk สถานเดียว
 #
 # หมายเหตุสำคัญ:
-#   - server-dir ต้องชี้ไปที่ document root ของ subdomain (โฟลเดอร์ thaiessay.chainatpit.com)
+#   - ใช้บัญชี FTP เฉพาะงาน deploy (easay_deploy) ไม่ใช่ System user ของโฮสติ้ง
+#     เพราะบัญชีนี้เข้าถึงได้เฉพาะโฟลเดอร์เว็บ ถ้ารหัสหลุดความเสียหายจึงจำกัดวงกว่ามาก
+#   - server-dir สัมพันธ์กับ "Home directory" ของบัญชี FTP ที่ล็อกอิน
+#     easay_deploy มี home = /thaiessay.chainatpit.com อยู่แล้ว จึงล็อกอินแล้วอยู่ใน
+#     document root เลย ค่าที่ถูกต้องคือ ./ (ถ้าเปลี่ยนไปใช้ System user ต้องแก้กลับเป็น
+#     ./thaiessay.chainatpit.com/ เพราะบัญชีนั้นล็อกอินที่ระดับบนสุดของบัญชีโฮสติ้ง)
 #   - ไฟล์ db_secrets.php, google_secrets.php และ ai_secrets.php ถูก exclude ไว้
 #     จึง "ไม่ถูกอัปโหลด" และ "ไม่ถูกลบ" ออกจากเซิร์ฟเวอร์ (รหัสลับปลอดภัย)
 
@@ -37,9 +42,9 @@ jobs:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          # โฟลเดอร์ปลายทางบน Plesk = document root ของ subdomain
-          # (ถ้า FTP login แล้วไม่ได้อยู่ที่ home ให้ปรับ path ตรงนี้)
-          server-dir: ./thaiessay.chainatpit.com/
+          # โฟลเดอร์ปลายทาง = จุดที่บัญชี FTP ล็อกอินเข้ามา (Home directory ของ easay_deploy
+          # คือ /thaiessay.chainatpit.com ซึ่งเป็น document root อยู่แล้ว จึงใช้ ./ )
+          server-dir: ./
           # ไม่อัปโหลด/ไม่ลบไฟล์เหล่านี้บนเซิร์ฟเวอร์
           exclude: |
             **/.git*
