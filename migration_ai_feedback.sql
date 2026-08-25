@@ -65,3 +65,11 @@ CREATE TABLE IF NOT EXISTS ai_usage_log (
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_ai_usage_user_day (user_id, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- คิวตรวจใหม่: เมื่อนักเรียนแก้ไขต้นฉบับหลังจาก AI ตรวจไปแล้ว
+-- (db_config.php รันให้อัตโนมัติเมื่อเปิดเว็บ — บรรทัดด้านล่างไว้รันมือกรณีจำเป็น)
+-- ---------------------------------------------------------------------------
+-- ALTER TABLE essay_ai_feedback ADD COLUMN essay_hash CHAR(40) DEFAULT NULL AFTER raw_response;
+-- ALTER TABLE essay_ai_feedback ADD COLUMN recheck_needed TINYINT(1) NOT NULL DEFAULT 0 AFTER essay_hash;
+-- ALTER TABLE essay_ai_feedback ADD COLUMN recheck_marked_at DATETIME DEFAULT NULL AFTER recheck_needed;

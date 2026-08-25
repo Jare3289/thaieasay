@@ -599,3 +599,10 @@ body {
 .ai-eval-note-row { font-size: 0.85rem; line-height: 1.65; color: #334155; }
 .ai-eval-note-row + .ai-eval-note-row { margin-top: 4px; }
 .ai-eval-note-label { font-weight: 700; }
+
+/* แถบเตือน "ต้นฉบับถูกแก้ไขหลัง AI ตรวจ — รอตรวจใหม่" */
+.ai-recheck-alert {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-left: 4px solid #f59e0b;
+}

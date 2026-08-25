@@ -99,6 +99,7 @@ function aiClearManualInput(itemId) {
  * opts.compact = true : แบบย่อ (ใช้ในหน้าเขียนเรียงความ — ไม่แสดงตารางคะแนนรายข้อ)
  * opts.deleteAction    : โค้ด onclick ของปุ่มลบ (ครูเท่านั้น) เว้นว่างไว้ = ไม่แสดงปุ่ม
  * opts.manualAction    : โค้ด onclick ของปุ่มบันทึกคะแนนที่ครูให้เอง (ครูเท่านั้น) เว้นว่าง = ดูอย่างเดียว
+ * opts.recheckAction   : โค้ด onclick ของปุ่ม "ให้ AI ตรวจใหม่" ที่ขึ้นเมื่อต้นฉบับถูกแก้หลังตรวจ (ครูเท่านั้น)
  */
 function aiFeedbackHTML(fb, opts) {
   opts = opts || {};
@@ -150,6 +151,25 @@ function aiFeedbackHTML(fb, opts) {
       </div>
     </div>`;
   }).join('') || '<div class="text-muted small mb-2">— ไม่มีข้อมูล —</div>';
+
+  // แถบเตือนเมื่อนักเรียนแก้ไขต้นฉบับหลังจาก AI ตรวจไปแล้ว — ผลตรวจที่เห็นเป็นของฉบับก่อนแก้
+  const markedAt = fb.recheck_marked_at ? String(fb.recheck_marked_at).replace('T', ' ').slice(0, 16) : '';
+  const recheckBox = fb.needs_recheck
+    ? `<div class="ai-recheck-alert rounded-3 p-3 mb-3 d-flex align-items-start gap-3 flex-wrap">
+         <i class="bi bi-arrow-repeat fs-4 text-warning-emphasis"></i>
+         <div class="flex-grow-1">
+           <div class="fw-bold text-warning-emphasis">ต้นฉบับถูกแก้ไขหลังจาก AI ตรวจ — อยู่ในคิวรอตรวจใหม่</div>
+           <div class="small text-muted">
+             ผลตรวจและคะแนนด้านล่างเป็นของฉบับ<strong>ก่อนแก้ไข</strong>
+             ${markedAt ? ` · นักเรียนบันทึกฉบับแก้ไขเมื่อ ${aiEsc(markedAt)}` : ''}
+             ${opts.recheckAction ? '' : ' · รอคุณครูสั่งให้ AI ตรวจใหม่อีกครั้ง'}
+           </div>
+         </div>
+         ${opts.recheckAction ? `<button class="btn btn-warning fw-bold rounded-pill px-4" onclick="${opts.recheckAction}">
+           <i class="bi bi-stars me-1"></i>ให้ AI ตรวจใหม่ตอนนี้
+         </button>` : ''}
+       </div>`
+    : '';
 
   const nextSteps = (fb.next_steps || []).map(s =>
     `<div class="p-3 rounded-3 mb-2 ai-next-card"><i class="bi bi-arrow-right-circle-fill text-primary me-2"></i>${aiEsc(s)}</div>`
@@ -308,6 +328,8 @@ function aiFeedbackHTML(fb, opts) {
       </div>
       ${deleteBtn}
     </div>
+
+    ${recheckBox}
 
     <div class="row g-3 mb-4">
       <div class="col-lg-5">

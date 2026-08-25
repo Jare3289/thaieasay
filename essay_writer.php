@@ -1010,6 +1010,7 @@ async function openSpellingReview(focus) {
       const now = new Date().toLocaleString('th-TH');
       document.getElementById('lastSavedTime').textContent = now;
       document.getElementById('lastSavedInfo').classList.remove('d-none');
+      notifyAiRequeue(data);
       await refreshEssayViewFromParts(intro, bodyParas, conclusion, data.word_count);
       clearDraftFromLocalStorage(currentEssayPhase);
       loadSavedList();
@@ -1059,6 +1060,7 @@ async function saveEssay() {
       statusBadge.classList.remove('d-none');
 
       showToast(`บันทึกเรียงความ "${phaseLabels[currentEssayPhase]}" สำเร็จ! (${data.word_count} คำ)`, 'success');
+      notifyAiRequeue(data);
       await refreshEssayViewFromParts(intro, bodyParagraphs, conclusion, data.word_count);
       // บันทึกขึ้นเซิร์ฟเวอร์สำเร็จแล้ว ไม่ต้องเก็บร่างสำรองในเครื่องอีกต่อไป
       clearDraftFromLocalStorage(currentEssayPhase);
@@ -1154,6 +1156,15 @@ let writerAiStatus = null;   // สถานะฟีเจอร์ AI (โห�
 
 async function initWriterAi() {
   writerAiStatus = await aiGetStatus();
+  refreshWriterAiPanel();
+}
+
+// เรียงความฉบับนี้เคยให้ AI ตรวจไว้แล้วและเพิ่งถูกแก้ไข → ระบบจัดเข้าคิวให้คุณครูสั่งตรวจใหม่
+// บอกนักเรียนให้รู้ตัว และรีเฟรชแผงผลตรวจให้ขึ้นป้าย "รอตรวจใหม่" ทันที
+function notifyAiRequeue(data) {
+  if (!data || !data.ai_requeued) return;
+  showToast(data.ai_requeue_message
+    || 'ต้นฉบับนี้เคยให้ AI ตรวจไว้แล้ว ระบบได้จัดเข้าคิวให้คุณครูสั่ง AI ตรวจใหม่อีกครั้ง', 'success');
   refreshWriterAiPanel();
 }
 
