@@ -238,6 +238,100 @@ function ai_full_max() {
     return ai_rubric_max() + ai_manual_max();
 }
 
+/**
+ * รอบการประเมินในหน้า evaluation.php ที่ตรงกับรอบงานของ AI
+ * ('' = รอบนั้นคุณครูไม่ได้ให้คะแนนในระบบประเมิน เช่นร่างที่ 1 ซึ่งครูให้คะแนนเฉพาะร่างที่ 2)
+ */
+function ai_eval_phase($aiPhase) {
+    $map = [
+        'pretest'  => 'pretest',
+        'task1_d2' => 'task1',
+        'task2_d2' => 'task2',
+        'posttest' => 'posttest',
+    ];
+    return isset($map[$aiPhase]) ? $map[$aiPhase] : '';
+}
+
+/**
+ * ดึงคะแนนข้อที่ AI ตรวจแทนไม่ได้ (ปัจจุบันคือ 4.3 ความเรียบร้อย) จาก "แบบประเมินของคุณครู"
+ * ที่บันทึกไว้แล้วในหน้า evaluation.php เพื่อไม่ให้คุณครูต้องกรอกคะแนนซ้ำสองที่
+ *
+ * ตาราง evaluations เก็บคะแนน "หลังถ่วงน้ำหนัก" ไว้ จึงหารด้วยตัวคูณกลับเป็นระดับ 0-4
+ * ระบุ $studentId = เฉพาะคนนั้น, ไม่ระบุ = ทุกคน (ใช้กับตารางภาพรวมทั้งชั้น)
+ * คืนค่า: [รหัสนักเรียน => [รอบงานของ AI => ['scores', 'total', 'by', 'at']]]
+ */
+function ai_teacher_eval_manual_all(PDO $pdo, $studentId = null) {
+    $out    = [];
+    $manual = ai_rubric_manual();
+    if (!$manual) return $out;
+
+    try {
+        $cols = [];
+        foreach ($manual as $it) {
+            $cols[$it['id']] = 'score_' . str_replace('.', '_', $it['id']);
+        }
+        $sql = 'SELECT student_id, test_phase, evaluator_name, timestamp, ' . implode(', ', array_values($cols))
+             . ' FROM evaluations WHERE evaluator_type = ?';
+        $params = ['ครูประเมิน'];
+        if ($studentId !== null && $studentId !== '') {
+            $sql .= ' AND student_id = ?';
+            $params[] = $studentId;
+        }
+        $sql .= ' ORDER BY timestamp ASC';   // เรียงเก่า→ใหม่ แถวหลังทับแถวก่อน จึงได้การประเมินล่าสุด
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+
+        // จับคู่รอบการประเมิน (pretest/task1/task2/posttest) กลับเป็นรอบงานของ AI
+        $phaseBack = [];
+        foreach (ai_all_phases() as $ph) {
+            $ep = ai_eval_phase($ph);
+            if ($ep !== '') $phaseBack[$ep] = $ph;
+        }
+
+        while ($r = $stmt->fetch()) {
+            $ph = $phaseBack[(string)$r['test_phase']] ?? '';
+            if ($ph === '') continue;
+
+            $scores = [];
+            $total  = 0.0;
+            foreach ($manual as $it) {
+                $col = $cols[$it['id']];
+                if (!array_key_exists($col, $r) || $r[$col] === null || $r[$col] === '') continue;
+                $weighted = round((float)$r[$col], 2);
+                $mult     = (float)$it['multiplier'];
+                $raw      = ($mult > 0) ? round($weighted / $mult) : 0;
+                if ($raw < 0) $raw = 0;
+                if ($raw > 4) $raw = 4;
+                $scores[$it['id']] = [
+                    'raw'      => (float)$raw,
+                    'weighted' => $weighted,
+                    'max'      => $it['max'],
+                    'name'     => $it['name'],
+                ];
+                $total += $weighted;
+            }
+            if (!$scores) continue;
+
+            $out[$r['student_id']][$ph] = [
+                'scores' => $scores,
+                'total'  => round($total, 2),
+                'by'     => (string)$r['evaluator_name'],
+                'at'     => (string)$r['timestamp'],
+            ];
+        }
+    } catch (Exception $e) {
+        // ฐานข้อมูลเก่ายังไม่มีคอลัมน์ test_phase หรืออ่านไม่ได้ — ถือว่าไม่มีคะแนนให้ดึง
+    }
+    return $out;
+}
+
+/** คะแนนข้อที่ครูให้ไว้ในแบบประเมิน ของนักเรียนคนเดียว: [รอบงานของ AI => [...]] */
+function ai_teacher_eval_manual(PDO $pdo, $studentId) {
+    if ($studentId === '' || $studentId === null) return [];
+    $all = ai_teacher_eval_manual_all($pdo, $studentId);
+    return $all[$studentId] ?? [];
+}
+
 /** แปลงคะแนนดิบ 0-4 ที่ครูกรอกในข้อที่ AI ตรวจแทนไม่ได้ ให้เป็นคะแนนถ่วงน้ำหนักพร้อมคะแนนรวม */
 function ai_build_manual_scores($rawScores) {
     if (!is_array($rawScores)) $rawScores = [];
@@ -266,7 +360,7 @@ function ai_build_manual_scores($rawScores) {
  * เติมข้อมูลฝั่ง "คะแนนที่ครูให้เอง" และคะแนนรวมเต็ม 60 ลงในผลตรวจ 1 ชุด
  * เพื่อให้หน้าเว็บแสดงคะแนนเต็มจริงตามเกณฑ์ของครูได้ ไม่ใช่แค่ 58 คะแนนที่ AI ตรวจได้
  */
-function ai_attach_manual(array $data, $teacherScores = [], $teacherTotal = 0.0, $teacherBy = '', $teacherAt = '') {
+function ai_attach_manual(array $data, $teacherScores = [], $teacherTotal = 0.0, $teacherBy = '', $teacherAt = '', $teacherSource = '') {
     if (!is_array($teacherScores)) $teacherScores = [];
     $items = [];
     foreach (ai_rubric_manual() as $it) {
@@ -282,6 +376,8 @@ function ai_attach_manual(array $data, $teacherScores = [], $teacherTotal = 0.0,
     $data['teacher_total']   = round((float)$teacherTotal, 2);
     $data['teacher_by']      = (string)$teacherBy;
     $data['teacher_at']      = (string)$teacherAt;
+    // 'evaluation' = ดึงมาจากแบบประเมินในหน้า evaluation.php, 'ai_page' = ครูกรอกในหน้าผู้ช่วย AI
+    $data['teacher_source']  = (string)$teacherSource;
     $data['manual_items']    = $items;
     $data['manual_max']      = ai_manual_max();
     $data['full_max']        = ai_full_max();
@@ -775,7 +871,7 @@ function ai_log_usage(PDO $pdo, $userId, $role, $studentId, $phase, $ok, $errorM
 }
 
 /** แปลงแถวในตาราง essay_ai_feedback ให้เป็นโครงสร้างที่หน้าเว็บใช้ได้ทันที */
-function ai_feedback_row_to_array(array $row) {
+function ai_feedback_row_to_array(array $row, array $evalManual = null) {
     $decode = function ($v) {
         $d = json_decode((string)$v, true);
         return is_array($d) ? $d : [];
@@ -804,11 +900,24 @@ function ai_feedback_row_to_array(array $row) {
         'needs_recheck'     => !empty($row['recheck_needed']),
         'recheck_marked_at' => (string)($row['recheck_marked_at'] ?? ''),
     ];
-    return ai_attach_manual(
-        $out,
-        $decode($row['teacher_scores'] ?? ''),
-        $row['teacher_total'] ?? 0,
-        $row['teacher_by'] ?? '',
-        (string)($row['teacher_scored_at'] ?? '')
-    );
+    $tScores = $decode($row['teacher_scores'] ?? '');
+    $tTotal  = $row['teacher_total'] ?? 0;
+    $tBy     = $row['teacher_by'] ?? '';
+    $tAt     = (string)($row['teacher_scored_at'] ?? '');
+    $tSource = $tScores ? 'ai_page' : '';
+
+    // ยังไม่ได้กรอกคะแนนข้อนี้ในหน้าผู้ช่วย AI แต่คุณครูเคยให้คะแนนไว้ในแบบประเมินแล้ว
+    // → ดึงคะแนนจากหน้า evaluation.php มาใช้เลย ไม่ต้องกรอกซ้ำ
+    if (!$tScores && $evalManual !== null) {
+        $ev = $evalManual[$row['essay_phase']] ?? null;
+        if ($ev && !empty($ev['scores'])) {
+            $tScores = $ev['scores'];
+            $tTotal  = $ev['total'];
+            $tBy     = $ev['by'];
+            $tAt     = $ev['at'];
+            $tSource = 'evaluation';
+        }
+    }
+
+    return ai_attach_manual($out, $tScores, $tTotal, $tBy, $tAt, $tSource);
 }

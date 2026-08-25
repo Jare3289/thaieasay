@@ -112,6 +112,12 @@ function aiFeedbackHTML(fb, opts) {
   const teacherTotal  = Number(fb.teacher_total || 0);
   const combined      = Number(fb.combined_total != null ? fb.combined_total : fb.total_score);
   const manualDone    = manualItems.length > 0 ? !!fb.manual_done : true;
+  // คะแนนข้อที่ครูให้เองมาจากไหน: 'evaluation' = ดึงจากแบบประเมินในหน้าประเมิน, 'ai_page' = กรอกในหน้านี้
+  const fromEval      = (fb.teacher_source === 'evaluation');
+  const evalNote      = fromEval
+    ? `ดึงมาจากแบบประเมินของคุณครูในหน้าประเมินแล้ว`
+      + (fb.teacher_by ? ` (ผู้ประเมิน: ${aiEsc(fb.teacher_by)}` + (fb.teacher_at ? ` · ${aiEsc(String(fb.teacher_at).replace('T', ' ').slice(0, 16))}` : '') + ')' : '')
+    : '';
   const pct           = fullMax > 0 ? Math.round((combined / fullMax) * 100) : 0;
 
   const strengths = (fb.strengths || []).map(s =>
@@ -187,6 +193,7 @@ function aiFeedbackHTML(fb, opts) {
       <td>${aiEsc(it.name)}
         <div class="text-muted small mt-1">
           <i class="bi bi-person-check me-1"></i>ครูเป็นผู้ให้คะแนนข้อนี้${lv ? ' · ระดับ ' + aiEsc(lv.label) : ''}
+          ${has && fromEval ? ' · <span class="text-success-emphasis"><i class="bi bi-link-45deg"></i>ดึงจากแบบประเมินของครู</span>' : ''}
           ${opts.manualAction && !has ? ' · <span class="text-warning-emphasis">เลือกระดับได้ที่แผงใต้ตารางนี้</span>' : ''}
         </div>
       </td>
@@ -213,7 +220,7 @@ function aiFeedbackHTML(fb, opts) {
       // ป้ายบอกว่าข้อนี้คุณครูให้ไว้เท่าไรแล้ว (หรือยังไม่ได้ให้)
       const given = cur
         ? `<span class="badge rounded-pill px-3 py-2" style="background:#d1fae5; color:#065f46; border:1px solid #a7f3d0;">
-             <i class="bi bi-person-check me-1"></i>คะแนนที่ให้ไว้: ${lv ? aiEsc(lv.label) + ' · ' : ''}${cur.weighted} / ${it.max} คะแนน</span>`
+             <i class="bi ${fromEval ? 'bi-link-45deg' : 'bi-person-check'} me-1"></i>คะแนนที่ให้ไว้: ${lv ? aiEsc(lv.label) + ' · ' : ''}${cur.weighted} / ${it.max} คะแนน${fromEval ? ' (จากแบบประเมิน)' : ''}</span>`
         : `<span class="badge rounded-pill px-3 py-2" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a;">
              <i class="bi bi-hourglass-split me-1"></i>ยังไม่ได้ให้คะแนนข้อนี้</span>`;
 
@@ -269,6 +276,11 @@ function aiFeedbackHTML(fb, opts) {
           ${opts.manualAction ? 'เลือกระดับคะแนนแล้วกดบันทึก คะแนนจะไปรวมกับคะแนนของ AI ให้ครบเต็ม ' + fullMax
                               : 'คุณครูเป็นผู้ให้คะแนนข้อนี้'}
         </div>
+        ${evalNote ? `<div class="alert border-0 rounded-3 small py-2 px-3 mb-3"
+                           style="background:#ecfdf5; border-left:4px solid #10b981 !important;">
+          <i class="bi bi-link-45deg me-1"></i>${evalNote}
+          ${opts.manualAction ? ' — ระบบเลือกระดับตามคะแนนนั้นไว้ให้แล้ว ถ้าตรงแล้วไม่ต้องทำอะไรต่อ หรือเลือกใหม่แล้วกดบันทึกเพื่อแก้เฉพาะในหน้านี้' : ''}
+        </div>` : ''}
         ${blocks}
         ${opts.manualAction ? `<div class="d-flex justify-content-end">
           <button class="btn btn-success rounded-pill px-4 fw-bold" onclick="${opts.manualAction}">
@@ -346,7 +358,7 @@ function aiFeedbackHTML(fb, opts) {
             <span class="fw-semibold">${fb.total_score} / ${fb.max_score}</span>
           </div>
           <div class="d-flex justify-content-between small">
-            <span><i class="bi bi-person-check me-1 text-success"></i>ครูให้เอง</span>
+            <span><i class="bi ${fromEval ? 'bi-link-45deg' : 'bi-person-check'} me-1 text-success"></i>ครูให้เอง${fromEval ? ' (จากแบบประเมิน)' : ''}</span>
             <span class="fw-semibold">${manualDone ? teacherTotal : '—'} / ${manualMax}</span>
           </div>
         </div>

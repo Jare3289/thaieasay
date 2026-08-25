@@ -765,7 +765,9 @@ async function saveManualScores() {
       paintPhaseCards();
       renderFeedback(data.feedback);
     }
-    showToast(Object.keys(scores).length ? 'บันทึกคะแนนของครูเรียบร้อยแล้ว' : 'ล้างคะแนนของครูแล้ว');
+    showToast(Object.keys(scores).length
+      ? 'บันทึกคะแนนของครูเรียบร้อยแล้ว'
+      : 'ล้างคะแนนที่กรอกในหน้านี้แล้ว — ถ้ามีคะแนนในแบบประเมิน ระบบจะกลับไปใช้ค่านั้นให้');
     loadAiOverview();
   } catch (err) {
     showToast('เชื่อมต่อไม่สำเร็จ', 'error');
@@ -980,6 +982,7 @@ function paintAiOverview() {
       if (r.needs_recheck) stale++;
       const tip = `${aiEsc(r.phase_label)} · AI ${aiNum(r.total_score)}/${aiNum(r.max_score)}`
                 + ` · ครู ${r.manual_done ? aiNum(r.teacher_total) : 'ยังไม่ให้'}/${aiNum(r.full_max - r.max_score)}`
+                + (r.teacher_source === 'evaluation' ? ' (จากแบบประเมิน)' : '')
                 + ` · รวม ${aiNum(r.combined_total)}/${aiNum(r.full_max)}`
                 + (r.quality_level ? ` · ระดับ ${aiEsc(r.quality_level)}` : '')
                 + (r.needs_recheck ? ' · ต้นฉบับถูกแก้หลังตรวจ รอตรวจใหม่' : '');
