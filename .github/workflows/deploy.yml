@@ -9,7 +9,7 @@ name: Deploy to Plesk (FTP)
 #
 # หมายเหตุสำคัญ:
 #   - server-dir ต้องชี้ไปที่ document root ของ subdomain (โฟลเดอร์ thaiessay.chainatpit.com)
-#   - ไฟล์ db_secrets.php และ google_secrets.php ถูก exclude ไว้
+#   - ไฟล์ db_secrets.php, google_secrets.php และ ai_secrets.php ถูก exclude ไว้
 #     จึง "ไม่ถูกอัปโหลด" และ "ไม่ถูกลบ" ออกจากเซิร์ฟเวอร์ (รหัสลับปลอดภัย)
 
 on:
@@ -41,11 +41,15 @@ jobs:
             **/.github/**
             db_secrets.php
             google_secrets.php
+            ai_secrets.php
             db_secrets.sample.php
+            ai_secrets.sample.php
             MIGRATION.md
+            AI_SETUP.md
             schema.sql
             migration_essay_split.sql
             migration_reflection_units.sql
+            migration_ai_feedback.sql
             research_queries.sql
             test_db.php
             clean_temp.php
