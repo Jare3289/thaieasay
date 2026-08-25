@@ -1499,9 +1499,13 @@ require_once 'header.php';
           if (manual) {
             const levelInfo = item.levels.find(l => Number(l.score) === Number(manual.raw));
             const weighted  = Math.round(parseFloat(manual.weighted) * 100) / 100;
-            badgeText = `คุณครูให้ไว้ในหน้า AI: ${levelInfo ? levelInfo.label + ' · ' : ''}${weighted} คะแนน`;
-            headText  = `หมายเหตุจากหน้าผู้ช่วย AI · ข้อ ${item.id}`;
-            rows.push(`<div class="ai-eval-note-row">ข้อนี้ AI ประเมินจากไฟล์ที่พิมพ์ไม่ได้ — คะแนนข้างต้นเป็นคะแนนที่คุณครูกรอกไว้เองในหน้าผู้ช่วย AI</div>`);
+            // คะแนนข้อนี้อาจมาจากแบบประเมินหน้านี้เอง (ดึงไปแสดงในหน้า AI) หรือครูกรอกไว้ในหน้าผู้ช่วย AI
+            const fromEval  = (fb.teacher_source === 'evaluation');
+            badgeText = `${fromEval ? 'คะแนนที่บันทึกไว้' : 'คุณครูให้ไว้ในหน้า AI'}: ${levelInfo ? levelInfo.label + ' · ' : ''}${weighted} คะแนน`;
+            headText  = `หมายเหตุ · ข้อ ${item.id}`;
+            rows.push(`<div class="ai-eval-note-row">ข้อนี้ AI ประเมินจากไฟล์ที่พิมพ์ไม่ได้ — ${fromEval
+              ? 'คะแนนข้างต้นคือคะแนนที่บันทึกไว้ในแบบประเมินนี้ และถูกนำไปรวมเป็นคะแนนเต็ม 60 ในหน้าผู้ช่วย AI ให้แล้ว'
+              : 'คะแนนข้างต้นเป็นคะแนนที่คุณครูกรอกไว้เองในหน้าผู้ช่วย AI'}</div>`);
           } else {
             badgeText = 'AI ตรวจข้อนี้แทนไม่ได้';
             headText  = `หมายเหตุจาก AI · ข้อ ${item.id}`;

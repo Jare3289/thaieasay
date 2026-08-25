@@ -2408,12 +2408,25 @@ try {
                 if ($rowT) $aiTeacherRow = $rowT;
             } catch (Exception $e) { /* ไม่มีคอลัมน์/อ่านไม่ได้ ก็แสดงเป็นยังไม่ให้คะแนน */ }
             $aiTeacherScores = json_decode((string)$aiTeacherRow['teacher_scores'], true);
+            if (!is_array($aiTeacherScores)) $aiTeacherScores = [];
+            $aiTeacherTotal  = $aiTeacherRow['teacher_total'] ?? 0;
+            $aiTeacherBy     = $aiTeacherRow['teacher_by'] ?? '';
+            $aiTeacherAt     = (string)($aiTeacherRow['teacher_scored_at'] ?? '');
+            $aiTeacherSource = $aiTeacherScores ? 'ai_page' : '';
+
+            // ยังไม่เคยกรอกในหน้านี้ แต่คุณครูให้คะแนนข้อ 4.3 ไว้ในแบบประเมินแล้ว → ดึงมาใช้เลย
+            if (!$aiTeacherScores) {
+                $aiEvalManual = ai_teacher_eval_manual($pdo, $aiSid);
+                if (!empty($aiEvalManual[$aiPhase]['scores'])) {
+                    $aiTeacherScores = $aiEvalManual[$aiPhase]['scores'];
+                    $aiTeacherTotal  = $aiEvalManual[$aiPhase]['total'];
+                    $aiTeacherBy     = $aiEvalManual[$aiPhase]['by'];
+                    $aiTeacherAt     = $aiEvalManual[$aiPhase]['at'];
+                    $aiTeacherSource = 'evaluation';
+                }
+            }
             $aiData = ai_attach_manual(
-                $aiData,
-                is_array($aiTeacherScores) ? $aiTeacherScores : [],
-                $aiTeacherRow['teacher_total'] ?? 0,
-                $aiTeacherRow['teacher_by'] ?? '',
-                (string)($aiTeacherRow['teacher_scored_at'] ?? '')
+                $aiData, $aiTeacherScores, $aiTeacherTotal, $aiTeacherBy, $aiTeacherAt, $aiTeacherSource
             );
 
             $aiData['student_id']   = $aiSid;
@@ -2539,7 +2552,11 @@ try {
 
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
-            $aiRows = array_map('ai_feedback_row_to_array', $stmt->fetchAll());
+            // คะแนนข้อที่ AI ตรวจแทนไม่ได้ ที่คุณครูเคยให้ไว้ในหน้า evaluation.php (ดึงครั้งเดียวใช้ได้ทุกรอบ)
+            $aiEvalManual = ai_teacher_eval_manual($pdo, $aiSid);
+            $aiRows = array_map(function ($r) use ($aiEvalManual) {
+                return ai_feedback_row_to_array($r, $aiEvalManual);
+            }, $stmt->fetchAll());
 
             // สถานะเรียงความของนักเรียนคนนี้ทุกรอบงาน — ใช้แยกว่า "ยังไม่ได้เขียน" กับ "เขียนแล้วแต่ยังไม่ตรวจ"
             $aiEssays = [];
@@ -2589,13 +2606,23 @@ try {
                 ORDER BY s.classroom ASC, f.student_id ASC
             ');
             // ครูให้คะแนนข้อที่ AI ตรวจแทนไม่ได้ครบแล้วหรือยัง (ใช้ทำเครื่องหมายเตือนในตารางภาพรวม)
+            // นับรวมคะแนนที่คุณครูให้ไว้ในแบบประเมิน (evaluation.php) ด้วย ไม่ใช่เฉพาะที่กรอกในหน้าผู้ช่วย AI
             $aiManualCount = count(ai_rubric_manual());
-            $aiManualDone  = function ($json) use ($aiManualCount) {
-                $d = json_decode((string)$json, true);
-                return is_array($d) && count($d) >= $aiManualCount;
-            };
+            $aiEvalAll     = ai_teacher_eval_manual_all($pdo);
             $aiList = [];
             while ($r = $stmt->fetch()) {
+                $aiStored = json_decode((string)($r['teacher_scores'] ?? ''), true);
+                if (!is_array($aiStored)) $aiStored = [];
+                $aiTTotal = (float)($r['teacher_total'] ?? 0);
+                $aiTSrc   = $aiStored ? 'ai_page' : '';
+                if (!$aiStored) {
+                    $aiEv = $aiEvalAll[$r['student_id']][$r['essay_phase']] ?? null;
+                    if ($aiEv && !empty($aiEv['scores'])) {
+                        $aiStored = $aiEv['scores'];
+                        $aiTTotal = (float)$aiEv['total'];
+                        $aiTSrc   = 'evaluation';
+                    }
+                }
                 $aiList[] = [
                     'student_id'    => $r['student_id'],
                     'student_name'  => formatNamePrefix((string)$r['student_name']),
@@ -2605,9 +2632,10 @@ try {
                     'phase_label'   => ai_phase_label($r['essay_phase']),
                     'total_score'   => (float)$r['total_score'],
                     'max_score'     => (float)$r['max_score'],
-                    'teacher_total' => (float)($r['teacher_total'] ?? 0),
-                    'manual_done'   => $aiManualDone($r['teacher_scores'] ?? ''),
-                    'combined_total'=> round((float)$r['total_score'] + (float)($r['teacher_total'] ?? 0), 2),
+                    'teacher_total' => $aiTTotal,
+                    'manual_done'   => (count($aiStored) >= $aiManualCount),
+                    'teacher_source'=> $aiTSrc,
+                    'combined_total'=> round((float)$r['total_score'] + $aiTTotal, 2),
                     'full_max'      => ai_full_max(),
                     'quality_level' => $r['quality_level'],
                     'model'         => $r['model'],
@@ -2702,7 +2730,7 @@ try {
             $aiRow = $stmt->fetch();
             echo json_encode([
                 'success'  => true,
-                'feedback' => $aiRow ? ai_feedback_row_to_array($aiRow) : null,
+                'feedback' => $aiRow ? ai_feedback_row_to_array($aiRow, ai_teacher_eval_manual($pdo, $aiSid)) : null,
             ]);
             break;
 

@@ -116,6 +116,9 @@ $aiPhases    = ai_all_phases();
   <div id="aiQuotaText" class="text-muted small mb-3"></div>
 <?php endif; ?>
 
+  <!-- สรุปภาพรวมรายบุคคลจากผลตรวจทุกรอบ — จุดแข็ง จุดที่ต้องแก้ และสถิติพัฒนาการ -->
+  <div id="aiStudentSummary" class="mb-4"></div>
+
   <!-- ผลตรวจทุกรอบงานในหน้าเดียว — คลิกการ์ดเพื่อดูรายละเอียดการให้คะแนนและข้อเสนอแนะ -->
   <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
     <h6 class="fw-bold text-dark mb-0">
@@ -123,10 +126,10 @@ $aiPhases    = ai_all_phases();
     </h6>
     <span class="text-muted small"><i class="bi bi-hand-index-thumb me-1"></i>คลิกการ์ดคะแนนเพื่อดูรายละเอียด</span>
   </div>
-  <div id="aiPhaseCards" class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3 mb-4">
-    <div class="col-12"><div class="text-center text-muted py-4">
+  <div id="aiPhaseCards" class="mb-4">
+    <div class="text-center text-muted py-4">
       <i class="bi bi-hourglass-split me-2"></i>กำลังโหลด...
-    </div></div>
+    </div>
   </div>
 
   <!-- รายละเอียดการให้คะแนนและข้อมูลย้อนกลับของฉบับที่เลือก -->
@@ -334,6 +337,23 @@ $aiPhases    = ai_all_phases();
 </div>
 
 <style>
+  /* สรุปภาพรวมรายบุคคล: การ์ดตัวเลข กราฟ และกล่องข้อเสนอแนะ */
+  .ai-stat-tile {
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border: 1px solid var(--border-gray);
+  }
+  .ai-chart-box { background: #fbfbfe; border: 1px solid var(--border-gray); }
+  .ai-crit-bar {
+    height: 8px; border-radius: 999px; background: #e9ecef; overflow: hidden;
+  }
+  .ai-crit-bar > span { display: block; height: 100%; border-radius: 999px; }
+  .ai-summary-quote {
+    background: #ecfdf5; border-left: 3px solid #10b981;
+    border-radius: 8px; padding: 8px 10px; color: #334155;
+  }
+  .ai-summary-todo { background: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #f59e0b; }
+  .ai-summary-step { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a; }
+
   /* การ์ดคะแนนรายรอบงาน — คลิกเพื่อเปิดรายละเอียดการให้คะแนนและข้อมูลย้อนกลับ */
   .ai-phase-card {
     background: #ffffff;
@@ -492,6 +512,8 @@ async function loadFeedback() {
   aiEssayStatus = {};
   aiCardsReady  = false;
   panel.innerHTML = '';
+  const sumBox = document.getElementById('aiStudentSummary');
+  if (sumBox) sumBox.innerHTML = '';
 
   if (!sid) {
     cards.innerHTML = `<div class="col-12">${emptyBox('เลือกนักเรียนด้านบนเพื่อดูผลตรวจของ AI ทุกรอบงาน')}</div>`;
@@ -522,80 +544,444 @@ async function loadFeedback() {
   paintSelectedFeedback();
 }
 
+/* ============================================================
+   สรุปภาพรวมรายบุคคล — รวมผลตรวจทุกรอบมาบอกว่า "ทำอะไรได้ดีแล้ว" กับ
+   "ต้องแก้อะไรก่อนเขียนครั้งถัดไป" พร้อมกราฟพัฒนาการและกราฟรายเกณฑ์
+   คิดจากข้อมูลที่โหลดมาแล้วทั้งหมด ไม่เรียก AI ซ้ำ จึงไม่เปลืองโควตา
+   ============================================================ */
+const AI_PHASE_SHORT = {
+  pretest: 'ก่อนเรียน', task1_d1: 'D1.1', task1_d2: 'D1.2',
+  task2_d1: 'D2.1', task2_d2: 'D2.2', posttest: 'หลังเรียน',
+};
+
+// รอบที่มีผลตรวจแล้ว เรียงตามลำดับการเรียน
+function aiReviewedPhases() {
+  return AI_PHASES.filter(ph => aiAllFeedback[ph]);
+}
+
+// สรุปคะแนนรายเกณฑ์ข้ามทุกรอบ: id => {name, max, sum, cnt, pct, lost, times}
+function aiCriterionSummary() {
+  const acc = {};
+  const touch = (id, name, max) => {
+    if (!acc[id]) acc[id] = { id, name: name || '', max: Number(max) || 0, sum: 0, cnt: 0, times: 0 };
+    if (name && !acc[id].name) acc[id].name = name;
+    return acc[id];
+  };
+
+  aiReviewedPhases().forEach(ph => {
+    const fb = aiAllFeedback[ph];
+    Object.keys(fb.scores || {}).forEach(id => {
+      const c = fb.scores[id];
+      const a = touch(id, c.name, c.max);
+      a.sum += Number(c.weighted); a.cnt++;
+    });
+    // ข้อที่ครูให้เอง (4.3) นับด้วยเมื่อมีคะแนนแล้ว จะได้เห็นภาพครบทุกเกณฑ์
+    Object.keys(fb.teacher_scores || {}).forEach(id => {
+      const c = fb.teacher_scores[id];
+      const a = touch(id, c.name, c.max);
+      a.sum += Number(c.weighted); a.cnt++;
+    });
+    // นับว่าเกณฑ์ข้อไหนถูก AI ชี้ว่าควรปรับปรุงกี่รอบ
+    (fb.improvements || []).forEach(it => {
+      const id = (it.criterion || '').trim();
+      if (id && acc[id]) acc[id].times++;
+    });
+  });
+
+  return Object.values(acc).map(a => {
+    const avg = a.cnt ? a.sum / a.cnt : 0;
+    return Object.assign(a, {
+      avg:  Math.round(avg * 100) / 100,
+      pct:  a.max > 0 ? Math.round((avg / a.max) * 100) : 0,
+      lost: Math.round((a.max - avg) * 100) / 100,
+    });
+  }).sort((x, y) => x.id.localeCompare(y.id, 'th', { numeric: true }));
+}
+
+// สีของแถบตามระดับความสำเร็จของเกณฑ์นั้น
+function aiPctColor(pct) {
+  if (pct >= 80) return '#0d9488';
+  if (pct >= 60) return '#2563eb';
+  if (pct >= 40) return '#d97706';
+  return '#dc2626';
+}
+
+// กราฟเส้นพัฒนาการคะแนนรวมข้ามรอบงาน (SVG ล้วน ไม่ต้องพึ่งไลบรารีภายนอก)
+function aiTrendChartSVG(points, fullMax) {
+  const W = 560, H = 230, L = 38, R = 14, T = 18, B = 34;
+  const pw = W - L - R, phh = H - T - B;
+  const yOf = v => T + (1 - (v / fullMax)) * phh;
+  const xOf = i => points.length > 1 ? L + (i / (points.length - 1)) * pw : L + pw / 2;
+
+  // เส้นอ้างอิงตามเกณฑ์ระดับคุณภาพ ให้เห็นว่าคะแนนอยู่ช่วงระดับไหน
+  const marks = [
+    { v: 49, label: 'ดีมาก' }, { v: 37, label: 'ดี' },
+    { v: 25, label: 'ปานกลาง' }, { v: 13, label: 'พอใช้' },
+  ].filter(m => m.v < fullMax);
+
+  const grid = marks.map(m => `
+    <line x1="${L}" y1="${yOf(m.v).toFixed(1)}" x2="${W - R}" y2="${yOf(m.v).toFixed(1)}"
+          stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4 4"></line>
+    <text x="${L - 6}" y="${(yOf(m.v) + 3).toFixed(1)}" text-anchor="end"
+          font-size="9" fill="#94a3b8">${esc(m.label)}</text>`).join('');
+
+  const line = points.length > 1
+    ? `<polyline fill="none" stroke="url(#aiTrendGrad)" stroke-width="3" stroke-linejoin="round"
+                 stroke-linecap="round" points="${points.map((p, i) => xOf(i).toFixed(1) + ',' + yOf(p.value).toFixed(1)).join(' ')}"></polyline>`
+    : '';
+  const area = points.length > 1
+    ? `<polygon fill="url(#aiTrendFill)" points="${L},${T + phh} ${points.map((p, i) => xOf(i).toFixed(1) + ',' + yOf(p.value).toFixed(1)).join(' ')} ${(W - R)},${T + phh}"></polygon>`
+    : '';
+
+  // ดึงป้ายของจุดริมซ้าย/ริมขวาเข้ามาเล็กน้อย ไม่ให้ตัวเลขล้นไปทับป้ายระดับหรือขอบกราฟ
+  const labelX = i => Math.max(L + 14, Math.min(W - R - 14, xOf(i)));
+  const dots = points.map((p, i) => `
+    <circle cx="${xOf(i).toFixed(1)}" cy="${yOf(p.value).toFixed(1)}" r="5.5" fill="#ffffff" stroke="#6d28d9" stroke-width="3"></circle>
+    <text x="${labelX(i).toFixed(1)}" y="${(yOf(p.value) - 12).toFixed(1)}" text-anchor="middle"
+          font-size="12" font-weight="700" fill="#4c1d95">${aiNum(p.value)}</text>
+    <text x="${labelX(i).toFixed(1)}" y="${H - 12}" text-anchor="middle" font-size="10" fill="#64748b">${esc(p.label)}</text>`).join('');
+
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="230" role="img"
+               aria-label="กราฟพัฒนาการคะแนนรวมของแต่ละรอบงาน">
+    <defs>
+      <linearGradient id="aiTrendGrad" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#6d28d9"></stop><stop offset="100%" stop-color="#0d7377"></stop>
+      </linearGradient>
+      <linearGradient id="aiTrendFill" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#6d28d9" stop-opacity="0.18"></stop>
+        <stop offset="100%" stop-color="#6d28d9" stop-opacity="0"></stop>
+      </linearGradient>
+    </defs>
+    ${grid}
+    <line x1="${L}" y1="${T + phh}" x2="${W - R}" y2="${T + phh}" stroke="#cbd5e1" stroke-width="1"></line>
+    ${area}${line}${dots}
+  </svg>`;
+}
+
+// การ์ดตัวเลขสรุป 1 ใบ
+function aiStatTile(icon, label, value, sub, color) {
+  return `<div class="col">
+    <div class="ai-stat-tile h-100 p-3 rounded-4">
+      <div class="text-muted small mb-1"><i class="bi ${icon} me-1" style="color:${color};"></i>${esc(label)}</div>
+      <div class="fs-4 fw-bold lh-1" style="color:${color};">${value}</div>
+      ${sub ? `<div class="text-muted mt-1" style="font-size:0.78rem;">${sub}</div>` : ''}
+    </div>
+  </div>`;
+}
+
+function paintStudentSummary() {
+  const box = document.getElementById('aiStudentSummary');
+  if (!box) return;
+  const phases = aiReviewedPhases();
+  if (!aiCardsReady || !phases.length) { box.innerHTML = ''; return; }
+
+  const first  = aiAllFeedback[phases[0]];
+  const last   = aiAllFeedback[phases[phases.length - 1]];
+  const fullMax = Number(last.full_max || last.max_score || 60);
+
+  // ---- สถิติรวม ----
+  const points = phases.map(ph => ({
+    phase: ph,
+    label: AI_PHASE_SHORT[ph] || ph,
+    value: aiCombinedOf(aiAllFeedback[ph]),
+  }));
+  const values = points.map(p => p.value);
+  const avg    = values.reduce((a, b) => a + b, 0) / values.length;
+  const best   = points.reduce((a, b) => (b.value > a.value ? b : a), points[0]);
+  const diff   = Math.round((last.combined_total - first.combined_total) * 100) / 100;
+  const gained = phases.length > 1 ? diff : null;
+
+  const tiles = [
+    aiStatTile('bi-clipboard2-check', 'ตรวจแล้ว', phases.length + ' <span class="fs-6 fw-normal text-muted">ฉบับ</span>',
+      'จากทั้งหมด ' + AI_PHASES.length + ' รอบงาน', '#6d28d9'),
+    aiStatTile('bi-bullseye', 'คะแนนเฉลี่ย', aiNum(avg) + ' <span class="fs-6 fw-normal text-muted">/ ' + aiNum(fullMax) + '</span>',
+      'ระดับ ' + esc(aiLevelFromScore(avg)), '#0d7377'),
+    aiStatTile('bi-trophy', 'คะแนนดีที่สุด', aiNum(best.value) + ' <span class="fs-6 fw-normal text-muted">/ ' + aiNum(fullMax) + '</span>',
+      'รอบ ' + esc(best.label), '#b45309'),
+    gained === null
+      ? aiStatTile('bi-hourglass', 'พัฒนาการ', '—', 'ต้องมีอย่างน้อย 2 รอบจึงเทียบได้', '#64748b')
+      : aiStatTile(gained > 0 ? 'bi-graph-up-arrow' : (gained < 0 ? 'bi-graph-down-arrow' : 'bi-dash-lg'),
+          'พัฒนาการ', (gained > 0 ? '+' : '') + aiNum(gained) + ' <span class="fs-6 fw-normal text-muted">คะแนน</span>',
+          esc(AI_PHASE_SHORT[phases[0]]) + ' → ' + esc(AI_PHASE_SHORT[phases[phases.length - 1]]),
+          gained > 0 ? '#0d9488' : (gained < 0 ? '#dc2626' : '#64748b')),
+  ].join('');
+
+  // ---- กราฟรายเกณฑ์ (เฉลี่ยทุกรอบ) ----
+  const crits = aiCriterionSummary();
+  const critBars = crits.map(c => `
+    <div class="mb-2">
+      <div class="d-flex justify-content-between align-items-center small">
+        <span class="text-truncate me-2"><span class="fw-semibold">${esc(c.id)}</span> ${esc(c.name)}</span>
+        <span class="fw-bold text-nowrap" style="color:${aiPctColor(c.pct)};">${c.pct}%
+          <span class="text-muted fw-normal">(${aiNum(c.avg)}/${aiNum(c.max)})</span></span>
+      </div>
+      <div class="ai-crit-bar mt-1"><span style="width:${c.pct}%; background:${aiPctColor(c.pct)};"></span></div>
+    </div>`).join('');
+
+  // ---- จุดแข็ง: เกณฑ์ที่ทำได้ดีสม่ำเสมอ + ข้อความชมจาก AI ----
+  const strongCrits = crits.filter(c => c.pct >= 75).sort((a, b) => b.pct - a.pct).slice(0, 4);
+  const strongList = strongCrits.length
+    ? strongCrits.map(c => `<div class="d-flex align-items-start gap-2 mb-2">
+        <i class="bi bi-check-circle-fill text-success mt-1"></i>
+        <span class="small"><span class="fw-semibold">ข้อ ${esc(c.id)} ${esc(c.name)}</span>
+          <span class="text-muted">— ทำได้ ${c.pct}% ของคะแนนเต็ม${c.cnt > 1 ? ' สม่ำเสมอทั้ง ' + c.cnt + ' รอบ' : ''}</span></span>
+      </div>`).join('')
+    : '<div class="text-muted small mb-2">ยังไม่มีเกณฑ์ข้อไหนที่ทำได้ถึง 75% — ลองไล่แก้จากรายการทางขวาทีละข้อ</div>';
+
+  // ข้อความชมจาก AI (เอาของรอบล่าสุดที่มี ไม่ให้ซ้ำกัน)
+  const seenStr = new Set();
+  const praise = [];
+  [...phases].reverse().forEach(ph => {
+    (aiAllFeedback[ph].strengths || []).forEach(t => {
+      const k = String(t).trim();
+      if (k && !seenStr.has(k) && praise.length < 3) { seenStr.add(k); praise.push({ text: k, ph }); }
+    });
+  });
+  const praiseList = praise.map(x => `<div class="ai-summary-quote small mb-2">
+      <span class="badge bg-success-subtle text-success-emphasis me-1">${esc(AI_PHASE_SHORT[x.ph] || x.ph)}</span>${esc(x.text)}
+    </div>`).join('');
+
+  // ---- จุดที่ต้องแก้: เรียงจากเกณฑ์ที่เสียคะแนนมากที่สุด ----
+  const weak = crits.filter(c => c.pct < 100).sort((a, b) => (b.lost - a.lost) || (b.times - a.times)).slice(0, 3);
+  const weakList = weak.length ? weak.map((c, i) => {
+    // หยิบคำแนะนำของเกณฑ์ข้อนี้จากรอบล่าสุดที่ AI พูดถึง
+    let tip = null, tipPhase = '';
+    [...phases].reverse().some(ph => {
+      const hit = (aiAllFeedback[ph].improvements || []).find(it => (it.criterion || '').trim() === c.id);
+      if (hit) { tip = hit; tipPhase = ph; return true; }
+      return false;
+    });
+    return `<div class="ai-summary-todo p-3 rounded-3 mb-2">
+      <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap mb-1">
+        <span class="fw-bold text-dark small">
+          <span class="badge bg-danger-subtle text-danger-emphasis me-1">อันดับ ${i + 1}</span>
+          ข้อ ${esc(c.id)} ${esc(c.name)}
+        </span>
+        <span class="small fw-semibold text-danger-emphasis text-nowrap">
+          เสียเฉลี่ย ${aiNum(c.lost)} คะแนน/รอบ${c.times ? ' · AI ทัก ' + c.times + ' รอบ' : ''}
+        </span>
+      </div>
+      ${tip && tip.issue ? `<div class="small mb-1"><span class="fw-semibold text-danger-emphasis">บกพร่องอะไร:</span> ${esc(tip.issue)}</div>` : ''}
+      ${tip && tip.suggestion ? `<div class="small"><span class="fw-semibold text-success-emphasis">แก้อย่างไร:</span> ${esc(tip.suggestion)}</div>` : ''}
+      ${tip ? `<div class="text-muted mt-1" style="font-size:0.75rem;">
+        <i class="bi bi-info-circle me-1"></i>จากผลตรวจรอบ ${esc(AI_PHASE_SHORT[tipPhase] || tipPhase)}</div>` : ''}
+    </div>`;
+  }).join('') : '<div class="text-muted small">ยอดเยี่ยมมาก — ยังไม่พบเกณฑ์ข้อไหนที่เสียคะแนน</div>';
+
+  // ---- สิ่งที่ควรทำก่อนเขียนครั้งถัดไป (จากรอบล่าสุด) ----
+  const steps = [];
+  const seenStep = new Set();
+  [...phases].reverse().forEach(ph => {
+    (aiAllFeedback[ph].next_steps || []).forEach(t => {
+      const k = String(t).trim();
+      if (k && !seenStep.has(k) && steps.length < 4) { seenStep.add(k); steps.push(k); }
+    });
+  });
+  const stepList = steps.length ? `
+    <h6 class="fw-bold text-primary mt-4 mb-2"><i class="bi bi-list-check me-2"></i>เช็กลิสต์ก่อนลงมือเขียนครั้งถัดไป</h6>
+    <div class="row row-cols-1 row-cols-md-2 g-2">
+      ${steps.map((t, i) => `<div class="col"><div class="ai-summary-step p-3 rounded-3 h-100 small">
+        <span class="badge bg-primary-subtle text-primary-emphasis me-1">${i + 1}</span>${esc(t)}</div></div>`).join('')}
+    </div>` : '';
+
+  // ---- คำชื่นชมภาพรวม ----
+  let praiseLine = '';
+  if (gained !== null && gained > 0) {
+    praiseLine = `เก่งมาก! คะแนนขยับขึ้น ${aiNum(gained)} คะแนนจากรอบแรก แสดงว่าที่แก้ไปได้ผลจริง `
+               + `รักษาวิธีทำงานแบบนี้ไว้แล้วเก็บอีก ${weak.length ? 'ข้อ ' + weak[0].id : 'อีกนิด'} ให้ได้ในครั้งถัดไป`;
+  } else if (gained !== null && gained < 0) {
+    praiseLine = `รอบนี้คะแนนลดลง ${aiNum(Math.abs(gained))} คะแนน ไม่เป็นไรเลย — งานเขียนพัฒนาได้ด้วยการแก้ทีละจุด `
+               + `ลองกลับไปดูว่ารอบที่ทำได้ดีที่สุด (${esc(best.label)}) เราทำอะไรต่างออกไป`;
+  } else {
+    praiseLine = `ตั้งใจดีมากที่ส่งงานมาให้ตรวจ — โฟกัสที่รายการ "ต้องแก้ให้ได้" ด้านบนทีละข้อ แล้วคะแนนจะขยับขึ้นแน่นอน`;
+  }
+  const encouragement = (last.encouragement || '').trim();
+
+  const who = last.student_name ? esc(last.student_name) : '';
+
+  box.innerHTML = `
+    <div class="card border-0 shadow-sm rounded-4" style="border-top:4px solid #6d28d9 !important;">
+      <div class="card-header bg-white border-bottom py-3 px-4 rounded-top-4">
+        <h6 class="fw-bold text-dark mb-0">
+          <i class="bi bi-clipboard2-data text-primary me-2"></i>สรุปภาพรวมผลงานเขียน${who ? ' · ' + who : ''}
+        </h6>
+        <div class="text-muted small mt-1">
+          รวมผลตรวจ ${phases.length} ฉบับที่ผ่านมา — ทำอะไรได้ดีแล้ว และต้องแก้อะไรก่อนเขียนครั้งถัดไป
+        </div>
+      </div>
+      <div class="card-body p-4">
+
+        <div class="row row-cols-2 row-cols-lg-4 g-3 mb-4">${tiles}</div>
+
+        <div class="row g-4 mb-2">
+          <div class="col-lg-7">
+            <h6 class="fw-bold text-dark mb-2"><i class="bi bi-graph-up me-2"></i>พัฒนาการคะแนนรวม (เต็ม ${aiNum(fullMax)})</h6>
+            <div class="ai-chart-box p-2 rounded-4">${aiTrendChartSVG(points, fullMax)}</div>
+          </div>
+          <div class="col-lg-5">
+            <h6 class="fw-bold text-dark mb-2"><i class="bi bi-bar-chart-steps me-2"></i>ความสำเร็จรายเกณฑ์ (เฉลี่ยทุกรอบ)</h6>
+            <div class="ai-chart-box p-3 rounded-4">${critBars || '<div class="text-muted small">— ไม่มีข้อมูล —</div>'}</div>
+          </div>
+        </div>
+
+        <div class="row g-4 mt-1">
+          <div class="col-lg-6">
+            <h6 class="fw-bold text-success mb-2"><i class="bi bi-hand-thumbs-up-fill me-2"></i>ข้อดีที่ทำได้แล้ว — รักษาไว้</h6>
+            ${strongList}
+            ${praiseList ? `<div class="mt-3">${praiseList}</div>` : ''}
+          </div>
+          <div class="col-lg-6">
+            <h6 class="fw-bold text-warning-emphasis mb-2"><i class="bi bi-tools me-2"></i>ต้องแก้ให้ได้ในครั้งถัดไป</h6>
+            ${weakList}
+          </div>
+        </div>
+
+        ${stepList}
+
+        <div class="alert border-0 rounded-3 mt-4 mb-0" style="background:#f0fdf4; border-left:4px solid #16a34a !important;">
+          <div class="fw-bold text-success mb-1"><i class="bi bi-heart-fill me-2"></i>คำชื่นชมและกำลังใจ</div>
+          <div class="small text-dark" style="line-height:1.8;">${esc(praiseLine)}</div>
+          ${encouragement ? `<div class="small text-muted fst-italic mt-2">
+            <i class="bi bi-quote me-1"></i>${esc(encouragement)}</div>` : ''}
+        </div>
+
+        <div class="text-muted mt-3" style="font-size:0.75rem;">
+          <i class="bi bi-info-circle me-1"></i>สรุปนี้คำนวณจากผลตรวจที่บันทึกไว้แล้วทุกรอบ
+          ไม่ได้เรียก AI ใหม่ และไม่ถูกนำไปรวมกับคะแนนจริงในระบบประเมิน
+        </div>
+      </div>
+    </div>`;
+}
+
+// จัดกลุ่มการ์ดตามลักษณะงาน: แบบวัดก่อน-หลังเรียนอยู่คู่กันแถวหนึ่ง
+// ส่วนภาระงานระหว่างเรียนทั้ง 4 ร่างเรียงอยู่ในแถวเดียวกันอีกแถวหนึ่ง
+const AI_CARD_GROUPS = [
+  {
+    key: 'test', title: 'แบบวัดความสามารถ (ก่อนเรียน – หลังเรียน)', icon: 'bi-clipboard2-pulse',
+    phases: ['pretest', 'posttest'], cols: 'row-cols-1 row-cols-md-2',
+  },
+  {
+    key: 'task', title: 'ภาระงานระหว่างเรียน', icon: 'bi-journal-text',
+    phases: ['task1_d1', 'task1_d2', 'task2_d1', 'task2_d2'], cols: 'row-cols-1 row-cols-sm-2 row-cols-lg-4',
+  },
+];
+
+// คะแนนรวม (เต็ม 60) ของฉบับหนึ่ง — ยังไม่มีผลตรวจคืน null
+function aiCombinedOf(fb) {
+  if (!fb) return null;
+  const v = Number(fb.combined_total != null ? fb.combined_total : fb.total_score);
+  return isNaN(v) ? null : v;
+}
+
 // การ์ด 1 ใบต่อ 1 รอบงาน — เห็นคะแนนของตัวเองครบทุกฉบับในหน้าเดียว
 function paintPhaseCards() {
   const box = document.getElementById('aiPhaseCards');
   if (!box || !aiCardsReady || !currentStudentId()) return;
 
   const blocked = reviewBlockReason();
-  box.innerHTML = AI_PHASES.map(ph => {
-    const fb    = aiAllFeedback[ph];
-    const essay = aiEssayStatus[ph];
-    const label = AI_PHASE_LABELS[ph] || ph;
-    const on    = (selectedPhase === ph);
 
-    let body, foot = '', cls = 'ai-phase-card', badges = '';
+  box.innerHTML = AI_CARD_GROUPS.map(g => {
+    const phases = g.phases.filter(ph => AI_PHASES.indexOf(ph) >= 0);
+    if (!phases.length) return '';
 
-    if (fb) {
-      const fullMax  = Number(fb.full_max || fb.max_score || 60);
-      const combined = Number(fb.combined_total != null ? fb.combined_total : fb.total_score);
-      const pct      = fullMax > 0 ? Math.round((combined / fullMax) * 100) : 0;
-      const level    = (fb.manual_done && fb.full_quality_level) ? fb.full_quality_level : (fb.quality_level || '-');
-      if (!fb.manual_done) {
-        badges += '<span class="badge bg-warning text-dark">รอคะแนนครู</span>';
+    // แถวก่อน-หลังเรียน: ถ้ามีผลตรวจครบทั้งคู่ ให้สรุปพัฒนาการไว้ที่หัวกลุ่มเลย
+    let extra = '';
+    if (g.key === 'test') {
+      const pre  = aiCombinedOf(aiAllFeedback['pretest']);
+      const post = aiCombinedOf(aiAllFeedback['posttest']);
+      if (pre !== null && post !== null) {
+        const diff = Math.round((post - pre) * 100) / 100;
+        const up   = diff > 0, same = (diff === 0);
+        extra = `<span class="badge rounded-pill px-3 py-2 ${same ? 'bg-secondary-subtle text-secondary-emphasis'
+                  : (up ? 'bg-success-subtle text-success-emphasis' : 'bg-danger-subtle text-danger-emphasis')}">
+          <i class="bi ${same ? 'bi-dash-lg' : (up ? 'bi-graph-up-arrow' : 'bi-graph-down-arrow')} me-1"></i>
+          พัฒนาการหลังเรียน ${same ? 'เท่าเดิม' : (up ? '+' : '') + aiNum(diff) + ' คะแนน'}</span>`;
       }
-      if (fb.needs_recheck) {
-        badges += '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning">'
-                + '<i class="bi bi-arrow-repeat me-1"></i>รอตรวจใหม่</span>';
-      }
-      body = `<div class="d-flex align-items-end gap-2">
-          <div class="display-6 fw-bold text-primary lh-1">${aiNum(combined)}</div>
-          <div class="text-muted pb-1">/ ${aiNum(fullMax)} คะแนน</div>
-        </div>
-        <div class="ai-score-bar mt-2"><span style="width:${pct}%"></span></div>
-        <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-1">
-          <span class="badge bg-primary-subtle text-primary-emphasis">ระดับ${fb.manual_done ? '' : 'โดยประมาณ'}: ${esc(level)}</span>
-          <span class="text-muted small">AI ${aiNum(fb.total_score)}/${aiNum(fb.max_score)}
-            · ครู ${fb.manual_done ? aiNum(fb.teacher_total) : '—'}/${aiNum(fb.manual_max)}</span>
-        </div>`;
-      foot = `<span class="fw-semibold text-primary"><i class="bi bi-card-list me-1"></i>${on ? 'กำลังแสดงรายละเอียด' : 'ดูรายละเอียดการให้คะแนน'}</span>`;
-    } else if (essay) {
-      cls += ' ai-phase-card-empty';
-      body = `<div class="text-muted"><i class="bi bi-hourglass-split me-1"></i>เขียนแล้ว ${essay.word_count} คำ · ยังไม่มีผลตรวจ</div>`
-           + (essay.too_short ? `<div class="small text-warning-emphasis mt-1">
-                <i class="bi bi-exclamation-triangle me-1"></i>สั้นกว่าเกณฑ์ ยังส่งให้ AI ตรวจไม่ได้</div>` : '');
-    } else {
-      cls += ' ai-phase-card-empty';
-      body = '<div class="text-muted"><i class="bi bi-file-earmark-x me-1"></i>ยังไม่ได้เขียนเรียงความรอบนี้</div>';
     }
 
-    // ปุ่มสั่งตรวจของคุณครู อยู่บนการ์ดแต่ละใบ (ไม่ต้องเลือกรอบงานจากช่องเลือกอีก)
-    let reviewBtn = '';
-    if (AI_IS_TEACHER && essay && !essay.too_short) {
-      const dis = blocked ? ' disabled' : '';
-      reviewBtn = `<button class="btn btn-sm rounded-pill px-3 fw-bold text-white ai-phase-review-btn"
-              style="background:linear-gradient(135deg,#6d28d9,#0d7377);"${dis}
-              title="${esc(blocked || 'ส่งเรียงความรอบนี้ให้ AI ตรวจ')}"
-              onclick="event.stopPropagation(); runAiReview('${esc(ph)}')">
-        <i class="bi bi-stars me-1"></i>${fb ? 'ตรวจใหม่' : 'ให้ AI ตรวจ'}</button>`;
-    }
-
-    return `<div class="col">
-      <div class="${cls}${on ? ' ai-phase-card-active' : ''} h-100 p-3 rounded-4"
-           ${fb ? `role="button" tabindex="0" onclick="selectPhase('${esc(ph)}')"
-                  onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectPhase('${esc(ph)}');}"` : ''}>
-        <div class="d-flex align-items-start justify-content-between gap-2 mb-2 flex-wrap">
-          <span class="fw-bold text-dark">${esc(label)}</span>
-          <span class="d-flex gap-1 flex-wrap">${badges}</span>
-        </div>
-        ${body}
-        <div class="d-flex align-items-center justify-content-between gap-2 mt-3 flex-wrap">
-          <span class="small">${foot}</span>
-          ${reviewBtn}
-        </div>
+    const cards = phases.map(ph => phaseCardHTML(ph, blocked)).join('');
+    return `<div class="mb-4">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+        <span class="fw-bold text-secondary small text-uppercase">
+          <i class="bi ${g.icon} me-1"></i>${esc(g.title)}
+        </span>
+        ${extra}
       </div>
+      <div class="row ${g.cols} g-3">${cards}</div>
     </div>`;
   }).join('');
+
+  paintStudentSummary();   // สรุปภาพรวมใช้ข้อมูลชุดเดียวกัน วาดพร้อมกันเสมอ
+}
+
+// การ์ดคะแนนของรอบงานหนึ่ง
+function phaseCardHTML(ph, blocked) {
+  const fb    = aiAllFeedback[ph];
+  const essay = aiEssayStatus[ph];
+  const label = AI_PHASE_LABELS[ph] || ph;
+  const on    = (selectedPhase === ph);
+
+  let body, foot = '', cls = 'ai-phase-card', badges = '';
+
+  if (fb) {
+    const fullMax  = Number(fb.full_max || fb.max_score || 60);
+    const combined = aiCombinedOf(fb);
+    const pct      = fullMax > 0 ? Math.round((combined / fullMax) * 100) : 0;
+    const level    = (fb.manual_done && fb.full_quality_level) ? fb.full_quality_level : (fb.quality_level || '-');
+    if (!fb.manual_done) {
+      badges += '<span class="badge bg-warning text-dark">รอคะแนนครู</span>';
+    }
+    if (fb.needs_recheck) {
+      badges += '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning">'
+              + '<i class="bi bi-arrow-repeat me-1"></i>รอตรวจใหม่</span>';
+    }
+    body = `<div class="d-flex align-items-end gap-2">
+        <div class="display-6 fw-bold text-primary lh-1">${aiNum(combined)}</div>
+        <div class="text-muted pb-1">/ ${aiNum(fullMax)} คะแนน</div>
+      </div>
+      <div class="ai-score-bar mt-2"><span style="width:${pct}%"></span></div>
+      <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-1">
+        <span class="badge bg-primary-subtle text-primary-emphasis">ระดับ${fb.manual_done ? '' : 'โดยประมาณ'}: ${esc(level)}</span>
+        <span class="text-muted small">AI ${aiNum(fb.total_score)}/${aiNum(fb.max_score)}
+          · ครู ${fb.manual_done ? aiNum(fb.teacher_total) : '—'}/${aiNum(fb.manual_max)}</span>
+      </div>`;
+    foot = `<span class="fw-semibold text-primary"><i class="bi bi-card-list me-1"></i>${on ? 'กำลังแสดงรายละเอียด' : 'ดูรายละเอียดการให้คะแนน'}</span>`;
+  } else if (essay) {
+    cls += ' ai-phase-card-empty';
+    body = `<div class="text-muted"><i class="bi bi-hourglass-split me-1"></i>เขียนแล้ว ${essay.word_count} คำ · ยังไม่มีผลตรวจ</div>`
+         + (essay.too_short ? `<div class="small text-warning-emphasis mt-1">
+              <i class="bi bi-exclamation-triangle me-1"></i>สั้นกว่าเกณฑ์ ยังส่งให้ AI ตรวจไม่ได้</div>` : '');
+  } else {
+    cls += ' ai-phase-card-empty';
+    body = '<div class="text-muted"><i class="bi bi-file-earmark-x me-1"></i>ยังไม่ได้เขียนเรียงความรอบนี้</div>';
+  }
+
+  // ปุ่มสั่งตรวจของคุณครู อยู่บนการ์ดแต่ละใบ (ไม่ต้องเลือกรอบงานจากช่องเลือกอีก)
+  let reviewBtn = '';
+  if (AI_IS_TEACHER && essay && !essay.too_short) {
+    const dis = blocked ? ' disabled' : '';
+    reviewBtn = `<button class="btn btn-sm rounded-pill px-3 fw-bold text-white ai-phase-review-btn"
+            style="background:linear-gradient(135deg,#6d28d9,#0d7377);"${dis}
+            title="${esc(blocked || 'ส่งเรียงความรอบนี้ให้ AI ตรวจ')}"
+            onclick="event.stopPropagation(); runAiReview('${esc(ph)}')">
+      <i class="bi bi-stars me-1"></i>${fb ? 'ตรวจใหม่' : 'ให้ AI ตรวจ'}</button>`;
+  }
+
+  return `<div class="col">
+    <div class="${cls}${on ? ' ai-phase-card-active' : ''} h-100 p-3 rounded-4"
+         ${fb ? `role="button" tabindex="0" onclick="selectPhase('${esc(ph)}')"
+                onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectPhase('${esc(ph)}');}"` : ''}>
+      <div class="d-flex align-items-start justify-content-between gap-2 mb-2 flex-wrap">
+        <span class="fw-bold text-dark">${esc(label)}</span>
+        <span class="d-flex gap-1 flex-wrap">${badges}</span>
+      </div>
+      ${body}
+      <div class="d-flex align-items-center justify-content-between gap-2 mt-3 flex-wrap">
+        <span class="small">${foot}</span>
+        ${reviewBtn}
+      </div>
+    </div>
+  </div>`;
 }
 
 // คลิกการ์ด → เปิด/ปิดรายละเอียดของรอบนั้น (คลิกใบเดิมซ้ำ = ปิด)
@@ -712,7 +1098,9 @@ async function saveManualScores() {
       paintPhaseCards();
       renderFeedback(data.feedback);
     }
-    showToast(Object.keys(scores).length ? 'บันทึกคะแนนของครูเรียบร้อยแล้ว' : 'ล้างคะแนนของครูแล้ว');
+    showToast(Object.keys(scores).length
+      ? 'บันทึกคะแนนของครูเรียบร้อยแล้ว'
+      : 'ล้างคะแนนที่กรอกในหน้านี้แล้ว — ถ้ามีคะแนนในแบบประเมิน ระบบจะกลับไปใช้ค่านั้นให้');
     loadAiOverview();
   } catch (err) {
     showToast('เชื่อมต่อไม่สำเร็จ', 'error');
@@ -827,6 +1215,31 @@ const AI_OVERVIEW_COLS = [
   { key: 'posttest', label: 'หลังเรียน',  grp: '' },
 ];
 
+// แปลงคะแนนรวม (เต็ม 60) เป็นระดับคุณภาพ — เกณฑ์เดียวกับหน้า evaluation.php และ ai_config.php
+function aiLevelFromScore(total60) {
+  const n = parseFloat(total60);
+  if (isNaN(n)) return '';
+  if (n >= 49) return 'ดีมาก';
+  if (n >= 37) return 'ดี';
+  if (n >= 25) return 'ปานกลาง';
+  if (n >= 13) return 'พอใช้';
+  return 'ต้องปรับปรุง';
+}
+
+// ป้ายระดับคุณภาพ ใช้สีเดียวกับการ์ดเกณฑ์ในหน้าประเมิน (ดีมาก=เขียวอมฟ้า ... ต้องปรับปรุง=แดง)
+const AI_LEVEL_STYLE = {
+  'ดีมาก':       'background:#ccfbf1; color:#0f766e; border:1px solid #99f6e4;',
+  'ดี':          'background:#dbeafe; color:#1e40af; border:1px solid #bfdbfe;',
+  'ปานกลาง':     'background:#f1f5f9; color:#475569; border:1px solid #e2e8f0;',
+  'พอใช้':       'background:#fffbeb; color:#b45309; border:1px solid #fde68a;',
+  'ต้องปรับปรุง': 'background:#fef2f2; color:#b91c1c; border:1px solid #fecaca;',
+};
+function aiLevelBadge(level) {
+  if (!level) return '<span class="text-muted">-</span>';
+  const style = AI_LEVEL_STYLE[level] || 'background:#f1f5f9; color:#475569; border:1px solid #e2e8f0;';
+  return `<span class="badge rounded-pill px-3 py-2 fw-semibold" style="${style}">${esc(level)}</span>`;
+}
+
 // ตัดทศนิยมท้ายที่ไม่จำเป็นออก (45.00 → 45, 45.50 → 45.5)
 function aiNum(v) {
   const n = Math.round(parseFloat(v) * 100) / 100;
@@ -902,6 +1315,7 @@ function paintAiOverview() {
       if (r.needs_recheck) stale++;
       const tip = `${aiEsc(r.phase_label)} · AI ${aiNum(r.total_score)}/${aiNum(r.max_score)}`
                 + ` · ครู ${r.manual_done ? aiNum(r.teacher_total) : 'ยังไม่ให้'}/${aiNum(r.full_max - r.max_score)}`
+                + (r.teacher_source === 'evaluation' ? ' (จากแบบประเมิน)' : '')
                 + ` · รวม ${aiNum(r.combined_total)}/${aiNum(r.full_max)}`
                 + (r.quality_level ? ` · ระดับ ${aiEsc(r.quality_level)}` : '')
                 + (r.needs_recheck ? ' · ต้นฉบับถูกแก้หลังตรวจ รอตรวจใหม่' : '');
@@ -915,13 +1329,15 @@ function paintAiOverview() {
       </td>`;
     }).join('');
 
-    const avg = cnt ? aiNum(sum / cnt) : '-';
+    const avgRaw = cnt ? (sum / cnt) : null;
+    const avg    = cnt ? aiNum(avgRaw) : '-';
     return `<tr>
       <td class="stu-id text-start">${esc(stu.student_id)}</td>
       <td class="stu-name">${esc(stu.student_name || '-')}${stu.classroom
         ? ` <span class="badge bg-info-subtle text-info-emphasis small">ห้อง ${esc(stu.classroom)}</span>` : ''}</td>
       ${cells}
       <td class="ai-cell-avg fw-bold">${avg}<span class="text-muted fw-normal small"> / ${aiNum(fullMax)}</span></td>
+      <td class="ai-cell-avg" title="ระดับคุณภาพจากคะแนนเฉลี่ย ${avg} คะแนน">${aiLevelBadge(aiLevelFromScore(avgRaw))}</td>
     </tr>`;
   }).join('');
 
@@ -932,7 +1348,8 @@ function paintAiOverview() {
     allSum += colSum[c.key]; allCount += colCount[c.key];
     return `<td class="fw-bold" title="เฉลี่ยจาก ${colCount[c.key]} ฉบับ">${aiNum(colSum[c.key] / colCount[c.key])}</td>`;
   }).join('');
-  const allAvg = allCount ? aiNum(allSum / allCount) : '-';
+  const allAvgRaw = allCount ? (allSum / allCount) : null;
+  const allAvg    = allCount ? aiNum(allAvgRaw) : '-';
 
   const headGroups = phase
     ? `<tr class="report-head-group">
@@ -940,6 +1357,7 @@ function paintAiOverview() {
          <th rowspan="2" class="text-start align-middle">ชื่อ-สกุลผู้เรียน</th>
          <th rowspan="2" class="align-middle">${esc(cols[0].label)}</th>
          <th rowspan="2" class="align-middle">เฉลี่ย</th>
+         <th rowspan="2" class="align-middle">ระดับ</th>
        </tr>
        <tr class="report-head-sub"></tr>`
     : `<tr class="report-head-group">
@@ -950,6 +1368,7 @@ function paintAiOverview() {
          <th colspan="2" class="grp-unit2">หน่วยการเรียนที่ 2</th>
          <th rowspan="2" class="align-middle">หลังเรียน</th>
          <th rowspan="2" class="align-middle">เฉลี่ย</th>
+         <th rowspan="2" class="align-middle">ระดับ</th>
        </tr>
        <tr class="report-head-sub">
          <th class="grp-unit1">D1.1</th>
@@ -967,12 +1386,15 @@ function paintAiOverview() {
           <td colspan="2" class="text-start fw-bold">เฉลี่ยทั้งชั้น (${students.length} คน)</td>
           ${avgCells}
           <td class="fw-bold">${allAvg}</td>
+          <td>${aiLevelBadge(aiLevelFromScore(allAvgRaw))}</td>
         </tr>
       </tfoot>
     </table>
     <div class="px-3 py-2 small text-muted border-top bg-light">
       คะแนนในตารางคือคะแนนรวมเต็ม ${aiNum(fullMax)} (AI ประเมิน + ข้อที่คุณครูให้เอง) · คลิกที่ช่องคะแนนเพื่อเปิดผลตรวจฉบับนั้น
       · แสดง ${students.length} คน จากผลตรวจ ${gradedCells} ฉบับ
+      <br>คอลัมน์ <strong>ระดับ</strong> คิดจากคะแนน<strong>เฉลี่ย</strong>ของช่องที่แสดงอยู่ ตามเกณฑ์เดียวกับหน้าประเมิน
+      (ดีมาก 49 ขึ้นไป · ดี 37-48 · ปานกลาง 25-36 · พอใช้ 13-24 · ต้องปรับปรุง ต่ำกว่า 13)
       ${waiting > 0 ? `<br><span class="text-warning-emphasis fw-semibold">
           <i class="bi bi-asterisk me-1"></i>ช่องที่มีเครื่องหมาย * ยังรอคุณครูให้คะแนนข้อที่ AI ตรวจแทนไม่ได้ อีก ${waiting} ฉบับ</span>` : ''}
       ${stale > 0 ? `<br><span class="text-warning-emphasis fw-semibold">
