@@ -43,7 +43,7 @@ function ai_providers() {
             'label'    => 'Google Gemini (AI Studio) — มีโควตาฟรี',
             'kind'     => 'gemini',
             'base_url' => 'https://generativelanguage.googleapis.com/v1beta',
-            'model'    => 'gemini-2.5-flash',
+            'model'    => 'gemini-3.6-flash',
             'key_url'  => 'https://aistudio.google.com/apikey',
         ],
         'typhoon' => [

@@ -14,13 +14,13 @@
  * (ค่าจากไฟล์นี้มีลำดับความสำคัญเหนือกว่าค่าที่กรอกในเว็บเสมอ)
  *
  * ตัวเลือกที่ "มีโควตาให้ใช้ฟรี" — ดูรายละเอียดใน AI_SETUP.md
- *   gemini     : https://aistudio.google.com/apikey        โมเดล gemini-2.5-flash
+ *   gemini     : https://aistudio.google.com/apikey        โมเดล gemini-3.6-flash
  *   typhoon    : https://opentyphoon.ai/                   โมเดล typhoon-v2.1-12b-instruct
  *   openrouter : https://openrouter.ai/keys                โมเดลที่ลงท้ายด้วย :free
  *   groq       : https://console.groq.com/keys             โมเดล llama-3.3-70b-versatile
  */
 
 $ai_provider = 'gemini';              // gemini | typhoon | openrouter | groq | custom
-$ai_model    = 'gemini-2.5-flash';    // เว้นว่างไว้ = ใช้โมเดลเริ่มต้นของผู้ให้บริการ
+$ai_model    = 'gemini-3.6-flash';    // เว้นว่างไว้ = ใช้โมเดลเริ่มต้นของผู้ให้บริการ
 $ai_api_key  = 'ใส่ API key ของคุณที่นี่';
 $ai_base_url = '';                    // เว้นว่างไว้ = ใช้ค่าเริ่มต้น (ระบุเฉพาะกรณี provider = custom)
