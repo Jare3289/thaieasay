@@ -77,8 +77,16 @@ $aiPhases    = ai_all_phases();
           </div>
           <div class="col-md-6">
             <label class="form-label fw-bold small">ชื่อโมเดล</label>
-            <input type="text" id="aiModel" class="form-control border-2 rounded-3" placeholder="เช่น gemini-2.5-flash">
-            <div class="form-text small">เว้นว่างไว้เพื่อใช้โมเดลเริ่มต้นของผู้ให้บริการ</div>
+            <div class="input-group">
+              <input type="text" id="aiModel" class="form-control border-2 rounded-start-3" placeholder="เช่น gemini-3.6-flash">
+              <button class="btn btn-outline-secondary rounded-end-3" type="button" onclick="useDefaultModel()"
+                      title="ล้างช่องนี้เพื่อกลับไปใช้โมเดลเริ่มต้นของผู้ให้บริการ">
+                <i class="bi bi-arrow-counterclockwise"></i> ใช้ค่าเริ่มต้น
+              </button>
+            </div>
+            <div class="form-text small">
+              เว้นว่างไว้เพื่อใช้โมเดลเริ่มต้นของผู้ให้บริการ (แนะนำ — ระบบจะตามรุ่นใหม่ให้เองเมื่อผู้ให้บริการเลิกใช้รุ่นเก่า)
+            </div>
           </div>
           <div class="col-md-8">
             <label class="form-label fw-bold small">API key</label>
@@ -485,6 +493,13 @@ function onProviderChange(initial) {
     document.getElementById('aiModel').value   = p.default_model || '';
     document.getElementById('aiBaseUrl').value = p.default_base_url || '';
   }
+}
+
+// ล้างชื่อโมเดลที่บันทึกไว้ เพื่อกลับไปใช้ค่าเริ่มต้นของผู้ให้บริการที่กำหนดไว้ในโค้ด
+// (ใช้เมื่อผู้ให้บริการเลิกให้บริการโมเดลรุ่นเดิม แล้วระบบขึ้นว่า "ไม่พบโมเดลที่ตั้งค่าไว้")
+function useDefaultModel() {
+  document.getElementById('aiModel').value = '';
+  showToast('ล้างชื่อโมเดลแล้ว — กด "บันทึกการตั้งค่า" เพื่อใช้โมเดลเริ่มต้นของผู้ให้บริการ');
 }
 
 function renderUsage(usage) {
