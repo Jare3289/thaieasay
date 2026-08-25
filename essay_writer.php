@@ -322,7 +322,9 @@ require_once 'header.php';
 .essay-view-doc .thai-word { border-bottom: 1px dotted #b9c4c4; }
 .essay-view-doc .no-content { color: #888; font-style: italic; text-indent: 0; text-align: center; }
 #spellCheckPreview { background: #fff; border: 1px solid #f0e6c8; border-radius: 10px; padding: 12px 16px; font-size: 0.95rem; }
-#spellCheckPreview .trw-static-flag, #essayViewContent .trw-static-flag, #savedEssayList .trw-static-flag { cursor: pointer; }
+/* คลิกได้ "ทุกคำ" ไม่ใช่เฉพาะคำที่ไฮไลต์ — คลิกแล้วเปิดหน้าต่างตรวจสอบตรงคำนั้นให้เลย */
+#spellCheckPreview .thai-word, #essayViewContent .thai-word, #savedEssayList .thai-word { cursor: pointer; }
+#spellCheckPreview .thai-word:hover, #essayViewContent .thai-word:hover { background: #e7f1ff; border-radius: 3px; }
 /* การ์ดในรายการ "บันทึกไว้แล้ว" — แสดงเนื้อหาเต็มแบบเดียวกัน */
 .saved-essay-full { font-family: "TH Sarabun PSK", "THSarabunPSK", "TH SarabunPSK", "TH Sarabun New", "Sarabun", "Leelawadee UI", "Tahoma", sans-serif; font-size: 0.95rem; line-height: 1.9; }
 .saved-essay-full .essay-view-para { margin: 0 0 0.6em; text-indent: 2em; text-align: justify; }
@@ -942,23 +944,29 @@ function applyReviewParagraphsToForm(paragraphs) {
   });
 }
 
-// คลิกคำที่ไฮไลต์ในตัวอย่างที่แสดงไว้เลย (ไม่ต้องกดปุ่มก่อน) → เปิดหน้าต่างแก้ไขทันที
+// คลิก "คำไหนก็ได้" ในตัวอย่างที่แสดงไว้เลย (ไม่ต้องกดปุ่มก่อน) → เปิดหน้าต่างแก้ไขตรงคำนั้นทันที
+// (ไม่จำกัดเฉพาะคำที่ไฮไลต์ เพราะคำที่ถูกอยู่แล้วแต่แยกคำเพี้ยนก็ต้องแก้ได้เหมือนกัน)
 document.getElementById('spellCheckPreview').addEventListener('click', (ev) => {
-  if (ev.target.closest && ev.target.closest('.trw-static-flag')) {
-    openSpellingReview();
-  }
+  const word = ev.target.closest && ev.target.closest('.thai-word');
+  if (word) openSpellingReview(clickedWordFocus(ev.currentTarget, word));
 });
 
-// คลิกคำที่ไฮไลต์ในโหมดดูฉบับที่บันทึกไว้ → สลับไปโหมดแก้ไขแล้วเปิดหน้าต่างแก้ไขทันที
+// คลิกคำในโหมดดูฉบับที่บันทึกไว้ → สลับไปโหมดแก้ไขแล้วเปิดหน้าต่างแก้ไขตรงคำนั้นทันที
 document.getElementById('essayViewContent').addEventListener('click', (ev) => {
-  if (ev.target.closest && ev.target.closest('.trw-static-flag')) {
-    showEssayEdit();
-    openSpellingReview();
-  }
+  const word = ev.target.closest && ev.target.closest('.thai-word');
+  if (!word) return;
+  const focus = clickedWordFocus(ev.currentTarget, word);
+  showEssayEdit();
+  openSpellingReview(focus);
 });
+
+// แปลงคำที่คลิกในหน้าตัวอย่างให้เป็นตำแหน่งที่หน้าต่างตรวจสอบเข้าใจ (คำ + ลำดับที่ของคำนั้น)
+function clickedWordFocus(root, wordEl) {
+  return { focusWord: wordEl.textContent, focusIndex: ThaiReview.wordIndexIn(root, wordEl) };
+}
 
 // เปิดหน้าต่างตรวจสอบการสะกดคำ/แยกคำทั้งหน้า (thai_review.js)
-async function openSpellingReview() {
+async function openSpellingReview(focus) {
   const paragraphs = buildReviewParagraphs();
   if (paragraphs.length === 0) {
     showToast('กรุณาพิมพ์เนื้อเรียงความก่อน', 'error');
@@ -985,6 +993,8 @@ async function openSpellingReview() {
     misspelled,
     foreign,
     spacing,
+    focusWord: focus && focus.focusWord,
+    focusIndex: focus && focus.focusIndex,
     onSave: async (editedParagraphs) => {
       applyReviewParagraphsToForm(editedParagraphs);
       const intro = document.getElementById('essayIntro').value.trim();
@@ -1127,9 +1137,9 @@ async function loadSavedList() {
   }).join('');
 }
 
-// คลิกคำที่ไฮไลต์ในรายการ "เรียงความที่บันทึกไว้แล้ว" → ไปเปิดแก้ไขรอบนั้นแล้วเปิดหน้าต่างแก้ไขทันที
+// คลิกคำใดก็ได้ในรายการ "เรียงความที่บันทึกไว้แล้ว" → ไปเปิดแก้ไขรอบนั้นแล้วเปิดหน้าต่างแก้ไขทันที
 document.getElementById('savedEssayList').addEventListener('click', (ev) => {
-  const flag = ev.target.closest && ev.target.closest('.trw-static-flag');
+  const flag = ev.target.closest && ev.target.closest('.thai-word');
   if (!flag) return;
   const wrap = flag.closest('.saved-essay-full');
   const phase = wrap && wrap.dataset.phase;

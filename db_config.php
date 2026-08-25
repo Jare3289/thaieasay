@@ -657,6 +657,10 @@ try {
                 next_steps      TEXT,          -- JSON array ของสิ่งที่ควรทำต่อ
                 encouragement   TEXT,
                 scores          TEXT,          -- JSON map รหัสเกณฑ์ => {raw, weighted, max, name, reason}
+                teacher_scores  TEXT,          -- JSON map ของข้อที่ครูให้คะแนนเอง (AI ตรวจแทนไม่ได้)
+                teacher_total   DECIMAL(6,2) NOT NULL DEFAULT 0,
+                teacher_by      VARCHAR(50)  DEFAULT NULL,
+                teacher_scored_at DATETIME   DEFAULT NULL,
                 total_score     DECIMAL(6,2) NOT NULL DEFAULT 0,
                 max_score       DECIMAL(6,2) NOT NULL DEFAULT 0,
                 quality_level   VARCHAR(50)  DEFAULT NULL,
@@ -684,6 +688,20 @@ try {
                 INDEX idx_ai_usage_user_day (user_id, created_at)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         ");
+    }
+} catch (Exception $e) {
+    // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
+}
+
+// เพิ่มคอลัมน์ "คะแนนที่ครูให้เอง" ให้ตาราง essay_ai_feedback (ฐานข้อมูลที่สร้างไว้ก่อนหน้านี้)
+// ข้อ 4.3 ความเรียบร้อย/ลายมือ AI ตรวจจากไฟล์พิมพ์ไม่ได้ ครูจึงต้องกรอกคะแนนเองให้ครบเต็ม 60
+try {
+    $colTs = $pdo->query("SHOW COLUMNS FROM essay_ai_feedback LIKE 'teacher_scores'");
+    if ($colTs && $colTs->rowCount() === 0) {
+        safe_ddl($pdo, "ALTER TABLE essay_ai_feedback ADD COLUMN teacher_scores TEXT NULL AFTER scores");
+        safe_ddl($pdo, "ALTER TABLE essay_ai_feedback ADD COLUMN teacher_total DECIMAL(6,2) NOT NULL DEFAULT 0 AFTER teacher_scores");
+        safe_ddl($pdo, "ALTER TABLE essay_ai_feedback ADD COLUMN teacher_by VARCHAR(50) DEFAULT NULL AFTER teacher_total");
+        safe_ddl($pdo, "ALTER TABLE essay_ai_feedback ADD COLUMN teacher_scored_at DATETIME DEFAULT NULL AFTER teacher_by");
     }
 } catch (Exception $e) {
     // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ

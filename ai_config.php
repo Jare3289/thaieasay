@@ -199,8 +199,16 @@ function ai_rubric() {
          'guide' => '4=สะกดถูกทุกคำ, 3=ผิด 1-2 แห่ง, 2=ผิด 3-5 แห่ง, 1=ผิด 6-8 แห่ง, 0=ผิดตั้งแต่ 9 แห่งขึ้นไป'],
         ['id' => '4.2', 'name' => 'การเว้นวรรค',                   'multiplier' => 0.5,  'max' => 2,  'ai' => true,
          'guide' => '4=เว้นวรรคถูกต้องทั้งหมด, 3=ผิด 1-2 จุด, 2=ผิด 3-5 จุด, 1=ผิด 6-8 จุด, 0=ผิดตั้งแต่ 9 จุดขึ้นไป'],
+        // ข้อที่ AI ตรวจแทนไม่ได้ — ครูกรอกคะแนนเองในหน้า "ผู้ช่วย AI" (ระดับคะแนนตรงกับ rubric ในหน้า evaluation.php)
         ['id' => '4.3', 'name' => 'ความเรียบร้อย (ลายมือ/ความสะอาด)', 'multiplier' => 0.5, 'max' => 2, 'ai' => false,
-         'guide' => 'ตรวจจากต้นฉบับลายมือเท่านั้น — AI ไม่ประเมินข้อนี้'],
+         'guide' => 'ตรวจจากต้นฉบับลายมือเท่านั้น — AI ไม่ประเมินข้อนี้',
+         'levels' => [
+             ['score' => 4, 'label' => 'ดีมาก',   'desc' => 'ผลงานสะอาด เป็นระเบียบ ลายมืออ่านง่าย ไม่ปรากฏรอยขูดลบขีดฆ่า'],
+             ['score' => 3, 'label' => 'ดี',      'desc' => 'ผลงานสะอาดเรียบร้อย ลายมืออ่านง่าย ปรากฏรอยขูดลบขีดฆ่า 1 ถึง 2 จุด'],
+             ['score' => 2, 'label' => 'ปานกลาง', 'desc' => 'ผลงานค่อนข้างเรียบร้อย ลายมืออ่านง่าย ปรากฏรอยขูดลบขีดฆ่า 3 ถึง 5 จุด'],
+             ['score' => 1, 'label' => 'พอใช้',   'desc' => 'ผลงานไม่เรียบร้อย ปรากฏรอยขูดลบขีดฆ่า 6 ถึง 8 จุด'],
+             ['score' => 0, 'label' => 'ปรับปรุง', 'desc' => 'ผลงานไม่เรียบร้อย ปรากฏรอยขูดลบขีดฆ่าตั้งแต่ 9 จุดขึ้นไป หรือลายมืออ่านยาก'],
+         ]],
     ];
 }
 
@@ -209,6 +217,79 @@ function ai_rubric_max() {
     $sum = 0;
     foreach (ai_rubric() as $it) { if ($it['ai']) $sum += $it['max']; }
     return $sum;
+}
+
+/** ข้อที่ AI ตรวจแทนไม่ได้ ครูต้องให้คะแนนเองจากต้นฉบับ (ปัจจุบันคือข้อ 4.3 ความเรียบร้อย/ลายมือ) */
+function ai_rubric_manual() {
+    $out = [];
+    foreach (ai_rubric() as $it) { if (!$it['ai']) $out[] = $it; }
+    return $out;
+}
+
+/** คะแนนเต็มของข้อที่ครูต้องให้เอง (2 จาก 60) */
+function ai_manual_max() {
+    $sum = 0;
+    foreach (ai_rubric_manual() as $it) { $sum += $it['max']; }
+    return $sum;
+}
+
+/** คะแนนเต็มทั้งฉบับตามเกณฑ์จริงของครู = ข้อที่ AI ตรวจ + ข้อที่ครูให้เอง (60) */
+function ai_full_max() {
+    return ai_rubric_max() + ai_manual_max();
+}
+
+/** แปลงคะแนนดิบ 0-4 ที่ครูกรอกในข้อที่ AI ตรวจแทนไม่ได้ ให้เป็นคะแนนถ่วงน้ำหนักพร้อมคะแนนรวม */
+function ai_build_manual_scores($rawScores) {
+    if (!is_array($rawScores)) $rawScores = [];
+    $scores = [];
+    $total  = 0.0;
+    foreach (ai_rubric_manual() as $it) {
+        if (!array_key_exists($it['id'], $rawScores)) continue;
+        $val = $rawScores[$it['id']];
+        if ($val === '' || $val === null || !is_numeric($val)) continue;  // เว้นว่าง = ยังไม่ให้คะแนนข้อนี้
+        $raw = (float)$val;
+        if ($raw < 0) $raw = 0;
+        if ($raw > 4) $raw = 4;
+        $weighted = round($raw * $it['multiplier'], 2);
+        $scores[$it['id']] = [
+            'raw'      => $raw,
+            'weighted' => $weighted,
+            'max'      => $it['max'],
+            'name'     => $it['name'],
+        ];
+        $total += $weighted;
+    }
+    return ['scores' => $scores, 'total' => round($total, 2)];
+}
+
+/**
+ * เติมข้อมูลฝั่ง "คะแนนที่ครูให้เอง" และคะแนนรวมเต็ม 60 ลงในผลตรวจ 1 ชุด
+ * เพื่อให้หน้าเว็บแสดงคะแนนเต็มจริงตามเกณฑ์ของครูได้ ไม่ใช่แค่ 58 คะแนนที่ AI ตรวจได้
+ */
+function ai_attach_manual(array $data, $teacherScores = [], $teacherTotal = 0.0, $teacherBy = '', $teacherAt = '') {
+    if (!is_array($teacherScores)) $teacherScores = [];
+    $items = [];
+    foreach (ai_rubric_manual() as $it) {
+        $items[] = [
+            'id'     => $it['id'],
+            'name'   => $it['name'],
+            'max'    => $it['max'],
+            'guide'  => $it['guide'],
+            'levels' => isset($it['levels']) ? $it['levels'] : [],
+        ];
+    }
+    $data['teacher_scores']  = $teacherScores;
+    $data['teacher_total']   = round((float)$teacherTotal, 2);
+    $data['teacher_by']      = (string)$teacherBy;
+    $data['teacher_at']      = (string)$teacherAt;
+    $data['manual_items']    = $items;
+    $data['manual_max']      = ai_manual_max();
+    $data['full_max']        = ai_full_max();
+    $data['combined_total']  = round((float)($data['total_score'] ?? 0) + $data['teacher_total'], 2);
+    $data['manual_done']     = (count($teacherScores) >= count($items));
+    // ระดับคุณภาพ "ของจริง" คิดได้ต่อเมื่อครูให้คะแนนข้อที่ AI ตรวจแทนไม่ได้ครบแล้วเท่านั้น
+    $data['full_quality_level'] = $data['manual_done'] ? ai_quality_level($data['combined_total']) : '';
+    return $data;
 }
 
 /** แปลงคะแนนรวม (เต็ม 60) เป็นระดับคุณภาพ — ใช้เกณฑ์เดียวกับหน้า evaluation.php */
@@ -653,7 +734,7 @@ function ai_feedback_row_to_array(array $row) {
         $d = json_decode((string)$v, true);
         return is_array($d) ? $d : [];
     };
-    return [
+    $out = [
         'student_id'    => $row['student_id'],
         'student_name'  => isset($row['student_name']) ? formatNamePrefix($row['student_name']) : '',
         'classroom'     => $row['classroom'] ?? '',
@@ -674,4 +755,11 @@ function ai_feedback_row_to_array(array $row) {
         'requested_role'=> (string)$row['requested_role'],
         'created_at'    => (string)$row['created_at'],
     ];
+    return ai_attach_manual(
+        $out,
+        $decode($row['teacher_scores'] ?? ''),
+        $row['teacher_total'] ?? 0,
+        $row['teacher_by'] ?? '',
+        (string)($row['teacher_scored_at'] ?? '')
+    );
 }

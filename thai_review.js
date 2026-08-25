@@ -3,8 +3,13 @@
  *
  * แสดงเรียงความทั้งฉบับ (คำนำ + เนื้อเรื่องทุกย่อหน้า + สรุป ต่อเนื่องกันเหมือนอ่านจริง) พร้อมไฮไลต์
  * คำที่ระบบตรวจพบว่า "อาจสะกดผิด" (เทียบกับพจนานุกรมคำไทย) และคำที่ "เขียนด้วยภาษาอื่นปนอยู่"
- * (ดู thai_text_utils.php ฝั่งเซิร์ฟเวอร์) คลิกคำที่ไฮไลต์เพื่อ "✓ ยืนยันว่าถูกต้อง" (จะไม่ถูกฟ้อง
- * อีกทั้งระบบ) "✏️ แก้คำ" (แก้ตรงจุดแล้วบันทึก) หรือ "🗑️ ลบ" (ลบคำนั้นออกจากเนื้อหาเลย)
+ * (ดู thai_text_utils.php ฝั่งเซิร์ฟเวอร์)
+ *
+ * แก้ได้ "ทุกคำ" ไม่ใช่เฉพาะคำที่ถูกไฮไลต์ — คลิกคำไหนก็ได้ในหน้าต่างนี้เพื่อ
+ *   "✏️ แก้ตรงนี้" (แก้เฉพาะจุดที่คลิก) · "✏️ แก้ทุกจุด" (แก้คำเดียวกันทั้งฉบับ)
+ *   "🔗 รวมกับคำหน้า/คำหลัง" (กรณีตัวตัดคำแยกคำที่ถูกอยู่แล้วออกจากกันเพี้ยน ๆ)
+ *   "🗑️ ลบ" (ลบคำนั้นออกจากเนื้อหา) และเฉพาะคำที่ถูกไฮไลต์จะมี "✓ ถูกต้อง" (ไม่ให้ฟ้องซ้ำอีกทั้งระบบ)
+ *   กับ "🔧 เว้นวรรคให้ถูก" (เฉพาะกรณีเว้นวรรครอบ "ๆ" ไม่ถูก)
  */
 (function (window, document) {
   'use strict';
@@ -67,8 +72,9 @@
           <span class="trw-legend"><span class="trw-swatch trw-swatch-misspell"></span>อาจสะกดผิด</span>
           <span class="trw-legend"><span class="trw-swatch trw-swatch-foreign"></span>เขียนด้วยภาษาอื่นปนอยู่</span>
           <span class="trw-legend"><span class="trw-swatch trw-swatch-spacing"></span>เว้นวรรครอบ "ๆ" ไม่ถูก</span>
-          — คลิกคำที่ไฮไลต์เพื่อยืนยันว่าถูกต้อง แก้ไข หรือลบ ระบบตรวจเทียบกับพจนานุกรมเท่านั้น
-          ชื่อเฉพาะ คำสแลง หรือศัพท์เฉพาะทางที่ถูกต้องอยู่แล้วอาจถูกไฮไลต์ด้วย กด "ถูกต้อง" เพื่อไม่ให้ฟ้องซ้ำอีก
+          — <strong>คลิกคำไหนก็ได้เพื่อแก้ไข</strong> ไม่จำเป็นต้องเป็นคำที่ไฮไลต์ (คำที่ถูกอยู่แล้วแต่ถูกแยกคำเพี้ยน
+          กด "🔗 รวมกับคำหน้า/คำหลัง" ให้เป็นคำเดียวแล้วพิมพ์แก้ได้เลย) ระบบตรวจเทียบกับพจนานุกรมเท่านั้น
+          ชื่อเฉพาะ คำสแลง หรือศัพท์เฉพาะทางที่ถูกต้องอยู่แล้วอาจถูกไฮไลต์ด้วย กด "✓ ถูกต้อง" เพื่อไม่ให้ฟ้องซ้ำอีก
         </div>
         <div class="trw-status"></div>
         <div class="trw-body"></div>
@@ -102,17 +108,23 @@
       #thaiReviewModal .trw-status { padding: 8px 20px 0; font-size: .9rem; color: #444; }
       #thaiReviewModal .trw-body { padding: 12px 20px 20px; overflow-y: auto; line-height: 2; font-size: 1rem; white-space: pre-wrap; flex: 1; }
       #thaiReviewModal .trw-para { margin: 0 0 14px; }
-      #thaiReviewModal .trw-flag { cursor: pointer; border-radius: 3px; padding: 0 1px; }
+      /* ทุกคำคลิกได้ — ใช้ box-shadow/มาร์กเกอร์ที่ไม่กินพื้นที่ เพื่อไม่ให้ระยะห่างตัวอักษรขยับตอนชี้ */
+      #thaiReviewModal .trw-word { cursor: pointer; border-radius: 3px; }
+      #thaiReviewModal .trw-word:hover { background: #e7f1ff; box-shadow: 0 0 0 1px #91b7f5; }
+      #thaiReviewModal .trw-word.trw-edited { background: #d8f5e3; box-shadow: 0 0 0 1px #34a853; }
+      #thaiReviewModal .trw-flag { border-radius: 3px; padding: 0 1px; }
       #thaiReviewModal .trw-flag.trw-kind-misspell { background: #fff2a8; border-bottom: 2px dotted #d99a00; }
       #thaiReviewModal .trw-flag.trw-kind-foreign { background: #e0d6ff; border-bottom: 2px dotted #7c4dff; }
       #thaiReviewModal .trw-flag.trw-kind-spacing { background: #ffd8c2; border-bottom: 2px dotted #e8590c; }
-      #thaiReviewModal .trw-flag.trw-editing { background: transparent; }
-      #thaiReviewModal .trw-flag input { font: inherit; width: 8em; border: 1px solid #999; border-radius: 4px; padding: 0 4px; }
-      #thaiReviewModal .trw-actions { display: inline-flex; gap: 4px; margin-left: 4px; white-space: nowrap; }
+      #thaiReviewModal .trw-word.trw-editing, #thaiReviewModal .trw-word.trw-editing:hover { background: transparent; box-shadow: none; }
+      #thaiReviewModal .trw-word input { font: inherit; min-width: 5em; border: 1px solid #999; border-radius: 4px; padding: 0 4px; }
+      #thaiReviewModal .trw-actions { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-left: 4px; vertical-align: middle; }
       #thaiReviewModal .trw-actions button { font-size: .78rem; border: none; border-radius: 6px; padding: 2px 8px; cursor: pointer; }
       #thaiReviewModal .trw-act-fixspacing { background: #ffe4cf; color: #a03e00; font-weight: 600; }
       #thaiReviewModal .trw-act-confirm { background: #d4edda; color: #155724; }
       #thaiReviewModal .trw-act-edit { background: #cfe2ff; color: #084298; }
+      #thaiReviewModal .trw-act-editall { background: #e2d6ff; color: #4b2ea8; }
+      #thaiReviewModal .trw-act-mergeprev, #thaiReviewModal .trw-act-mergenext { background: #d5f0ee; color: #0b5f5c; }
       #thaiReviewModal .trw-act-delete { background: #f8d7da; color: #842029; }
       #thaiReviewModal .trw-act-cancel { background: #eee; color: #555; }
       #thaiReviewModal .trw-footer { display:flex; align-items:center; justify-content:flex-end; gap: 10px; padding: 12px 20px; border-top: 1px solid #eee; }
@@ -128,6 +140,8 @@
     modalEl.querySelector('.trw-close').addEventListener('click', closeModal);
     modalEl.querySelector('.trw-cancel').addEventListener('click', closeModal);
     modalEl.querySelector('.trw-save').addEventListener('click', saveEdits);
+    // ผูกคลิกไว้ที่กล่องเนื้อหาแทนการผูกทีละคำ (เรียงความหนึ่งฉบับมีคำเป็นพัน — ผูกทีละคำจะหนักเครื่อง)
+    modalEl.querySelector('.trw-body').addEventListener('click', onBodyClick);
 
     return modalEl;
   }
@@ -151,8 +165,8 @@
     if (nForeign > 0) parts.push(`เขียนด้วยภาษาอื่นปน ${nForeign} คำ`);
     if (nSpacing > 0) parts.push(`เว้นวรรครอบ "ๆ" ไม่ถูก ${nSpacing} คำ`);
     statusEl.textContent = parts.length > 0
-      ? `พบคำที่น่าสงสัย — ${parts.join(' · ')} (ไม่ซ้ำ) — คลิกคำที่ไฮไลต์เพื่อตรวจสอบ`
-      : 'ไม่พบคำที่น่าสงสัยแล้วในตอนนี้';
+      ? `พบคำที่น่าสงสัย — ${parts.join(' · ')} (ไม่ซ้ำ) — คลิกคำที่ไฮไลต์เพื่อตรวจสอบ หรือคลิกคำอื่นเพื่อแก้ไขได้ทุกคำ`
+      : 'ไม่พบคำที่น่าสงสัยแล้วในตอนนี้ — คลิกคำใดก็ได้ถ้าต้องการแก้ไขเอง';
     modalEl.querySelector('.trw-save').disabled = !state.dirty;
   }
 
@@ -164,52 +178,110 @@
     return null;
   }
 
+  let uidCounter = 0;
+
+  // ครอบ "ทุกคำ" ด้วย span ไม่ใช่เฉพาะคำที่น่าสงสัย เพื่อให้คลิกแก้ได้ทุกคำ — คำที่สะกดถูกอยู่แล้ว
+  // แต่ตัวตัดคำแยกขอบเขตเพี้ยนไปนิดเดียวก็แก้/รวมคำได้ ทั้งที่ระบบไม่ได้ฟ้องว่าผิด
+  function makeWordSpan(text) {
+    const span = document.createElement('span');
+    span.className = 'trw-word';
+    span.textContent = text;
+    span.dataset.word = text;
+    span.dataset.uid = 'w' + (uidCounter++);
+    const kind = classifyWord(text, state);
+    if (kind) {
+      span.classList.add('trw-flag', 'trw-kind-' + kind);
+      span.dataset.kind = kind;
+    }
+    return span;
+  }
+
   function renderParagraph(container, text) {
     container.textContent = '';
     segmentText(text).forEach((seg) => {
-      const kind = seg.isWord ? classifyWord(seg.text, state) : null;
-      if (kind) {
-        const span = document.createElement('span');
-        span.className = 'trw-flag trw-kind-' + kind;
-        span.textContent = seg.text;
-        span.dataset.word = seg.text;
-        span.dataset.kind = kind;
-        span.dataset.uid = 'w' + (uidCounter++);
-        span.addEventListener('click', onFlagClick);
-        container.appendChild(span);
-      } else {
-        container.appendChild(document.createTextNode(seg.text));
-      }
+      container.appendChild(seg.isWord ? makeWordSpan(seg.text) : document.createTextNode(seg.text));
     });
   }
 
-  let uidCounter = 0;
+  // escape สำหรับฝังในค่า attribute selector ที่ครอบด้วยเครื่องหมายคำพูดคู่ เช่น [data-word="..."]
+  function attrEscape(s) {
+    return s.replace(/["\\]/g, '\\$&');
+  }
 
-  function onFlagClick(ev) {
-    const span = ev.currentTarget;
-    if (span.classList.contains('trw-editing')) return;
+  // ทุกจุดที่เป็นคำเดียวกันในเรียงความทั้งฉบับ
+  function wordSpans(word) {
+    return Array.from(modalEl.querySelectorAll('.trw-word[data-word="' + attrEscape(word) + '"]'));
+  }
+
+  // คำที่ติดกันโดยไม่มีอะไรคั่น (dir = -1 คำหน้า, 1 คำหลัง) — ใช้กับการรวมคำที่ถูกแยกผิด
+  function adjacentWord(span, dir) {
+    const node = dir < 0 ? span.previousSibling : span.nextSibling;
+    return (node && node.nodeType === Node.ELEMENT_NODE && node.classList.contains('trw-word')) ? node : null;
+  }
+
+  // ล้างสถานะไฮไลต์ของคำ (ยืนยันว่าถูก/แก้แล้ว/รวมคำแล้ว — ยังไม่ผ่านการตรวจใหม่จึงยังไม่ฟ้อง)
+  function clearFlag(span) {
+    delete span.dataset.kind;
+    span.classList.remove('trw-flag', 'trw-kind-misspell', 'trw-kind-foreign', 'trw-kind-spacing');
+  }
+
+  // เปลี่ยนข้อความในคำหนึ่ง ๆ (ยังคงเป็นคำที่คลิกแก้ซ้ำได้อยู่)
+  function setWordText(span, text, markEdited) {
+    span.textContent = text;
+    span.dataset.word = text;
+    clearFlag(span);
+    if (markEdited) span.classList.add('trw-edited');
+  }
+
+  function onBodyClick(ev) {
+    if (!ev.target.closest) return;
+    if (ev.target.closest('.trw-actions')) return;   // คลิกปุ่มในกล่องตัวเลือก ไม่ใช่คลิกคำ
+    const span = ev.target.closest('.trw-word');
+    if (!span) return;
+    if (span.classList.contains('trw-editing')) return;  // กำลังพิมพ์แก้อยู่ในช่องนี้
+    openWordActions(span);
+  }
+
+  // กล่องตัวเลือกของคำที่คลิก — ปุ่มที่ขึ้นต่างกันตามบริบทของคำนั้น
+  function openWordActions(span) {
     // ปิดกล่องตัวเลือกที่เปิดค้างไว้จุดอื่นก่อน (เปิดได้ทีละจุด)
     modalEl.querySelectorAll('.trw-actions').forEach(el => el.remove());
 
+    const kind = span.dataset.kind || '';
+    const sameCount = wordSpans(span.dataset.word).length;
+    // หาคำข้างเคียงไว้ก่อนแทรกกล่องตัวเลือก มิฉะนั้นกล่องจะไปคั่นระหว่างคำจนหาคำหลังไม่เจอ
+    const prevWord = adjacentWord(span, -1);
+    const nextWord = adjacentWord(span, 1);
+
+    const btn = (cls, label) => '<button type="button" class="' + cls + '">' + label + '</button>';
     const actions = document.createElement('span');
     actions.className = 'trw-actions';
     actions.dataset.for = span.dataset.uid;
-    const isSpacing = span.dataset.kind === 'spacing';
-    actions.innerHTML = `
-      ${isSpacing ? '<button type="button" class="trw-act-fixspacing">🔧 เว้นวรรคให้ถูก</button>' : ''}
-      <button type="button" class="trw-act-confirm">✓ ถูกต้อง</button>
-      <button type="button" class="trw-act-edit">✏️ แก้คำ</button>
-      <button type="button" class="trw-act-delete">🗑️ ลบ</button>
-      <button type="button" class="trw-act-cancel">✕</button>`;
+    actions.innerHTML = [
+      kind === 'spacing' ? btn('trw-act-fixspacing', '🔧 เว้นวรรคให้ถูก') : '',
+      kind ? btn('trw-act-confirm', '✓ ถูกต้อง') : '',
+      btn('trw-act-edit', '✏️ แก้ตรงนี้'),
+      sameCount > 1 ? btn('trw-act-editall', '✏️ แก้ทุกจุด (' + sameCount + ')') : '',
+      prevWord ? btn('trw-act-mergeprev', '🔗 รวมกับคำหน้า') : '',
+      nextWord ? btn('trw-act-mergenext', '🔗 รวมกับคำหลัง') : '',
+      btn('trw-act-delete', '🗑️ ลบ'),
+      btn('trw-act-cancel', '✕')
+    ].join('');
     span.after(actions);
 
-    actions.querySelector('.trw-act-cancel').addEventListener('click', () => actions.remove());
-    actions.querySelector('.trw-act-confirm').addEventListener('click', () => confirmWord(span, actions));
-    actions.querySelector('.trw-act-edit').addEventListener('click', () => editWord(span, actions));
-    actions.querySelector('.trw-act-delete').addEventListener('click', () => deleteWord(span, actions));
-    if (isSpacing) {
-      actions.querySelector('.trw-act-fixspacing').addEventListener('click', () => fixSpacing(span, actions));
-    }
+    const close = () => actions.remove();
+    const on = (cls, fn) => {
+      const el = actions.querySelector('.' + cls);
+      if (el) el.addEventListener('click', () => { close(); fn(); });
+    };
+    actions.querySelector('.trw-act-cancel').addEventListener('click', close);
+    on('trw-act-fixspacing', () => fixSpacing(span));
+    on('trw-act-confirm', () => confirmWord(span));
+    on('trw-act-edit', () => editWord(span, false));
+    on('trw-act-editall', () => editWord(span, true));
+    on('trw-act-mergeprev', () => mergeWords(prevWord, span));
+    on('trw-act-mergenext', () => mergeWords(span, nextWord));
+    on('trw-act-delete', () => deleteWord(span));
   }
 
   // ลบคำนี้ออกจากคำที่น่าสงสัยทุกรายการ (ยืนยัน/แก้ไขแล้วจะไม่ถูกฟ้องคำนี้อีก)
@@ -219,9 +291,8 @@
     state.spacingSet.delete(word);
   }
 
-  async function confirmWord(span, actions) {
+  async function confirmWord(span) {
     const word = span.dataset.word;
-    actions.remove();
     try {
       const res = await postJSON('confirm_thai_word', { word });
       if (!res || !res.success) throw new Error(res && res.error);
@@ -230,26 +301,22 @@
       return;
     }
     forgetWord(word);
-    modalEl.querySelectorAll('.trw-flag[data-word="' + attrEscape(word) + '"]').forEach(el => {
-      el.replaceWith(document.createTextNode(el.textContent));
-    });
+    wordSpans(word).forEach(clearFlag);   // เอาไฮไลต์ออกแต่ยังคลิกแก้ได้เหมือนคำอื่น ๆ
     updateStatus();
   }
 
-  // escape สำหรับฝังในค่า attribute selector ที่ครอบด้วยเครื่องหมายคำพูดคู่ เช่น [data-word="..."]
-  function attrEscape(s) {
-    return s.replace(/["\\]/g, '\\$&');
-  }
-
-  function editWord(span, actions) {
-    actions.remove();
+  // applyAll = true → แก้ "ทุกจุด" ที่เป็นคำเดียวกันในเรียงความทั้งฉบับ (เหมาะกับคำที่สะกดผิดซ้ำ ๆ)
+  // applyAll = false → แก้เฉพาะจุดที่คลิก (ค่าเริ่มต้น — คำทั่วไปอย่าง "การ" "และ" ห้ามแก้เหมารวม)
+  function editWord(span, applyAll) {
     span.classList.add('trw-editing');
     const original = span.textContent;
-    const originalWord = span.dataset.word; // เก็บไว้ก่อนแก้ เผื่อคำเดียวกันนี้ปรากฏหลายจุดในเรียงความ
+    const originalWord = span.dataset.word;  // เก็บไว้ก่อนแก้ เผื่อคำเดียวกันนี้ปรากฏหลายจุดในเรียงความ
+    const targets = applyAll ? wordSpans(originalWord) : [span];
     span.textContent = '';
     const input = document.createElement('input');
     input.type = 'text';
     input.value = original;
+    input.size = Math.max(6, original.length + 2);   // คำที่เพิ่งรวมกันอาจยาวกว่าช่องขนาดปกติ
     span.appendChild(input);
     input.focus();
     input.select();
@@ -262,15 +329,12 @@
       // เคาะช่องว่างไว้หน้า/หลังคำ — trim() จะลบช่องว่างที่ตั้งใจพิมพ์นั้นทิ้งไปเสีย
       const raw = commit ? input.value : original;
       const isBlank = raw.trim() === '';
+      span.classList.remove('trw-editing');
       if (commit && !isBlank && raw !== original) {
-        forgetWord(originalWord);
-        // แก้ "ทุกจุด" ที่เป็นคำเดียวกันในเรียงความทั้งฉบับ ไม่ใช่แค่จุดที่คลิก
-        modalEl.querySelectorAll('.trw-flag[data-word="' + attrEscape(originalWord) + '"]').forEach(el => {
-          el.replaceWith(document.createTextNode(raw));
-        });
+        if (applyAll) forgetWord(originalWord);
+        targets.forEach(el => setWordText(el, raw, true));
         state.dirty = true;
       } else {
-        span.classList.remove('trw-editing');
         span.textContent = isBlank ? original : raw;
       }
       updateStatus();
@@ -283,6 +347,17 @@
     input.addEventListener('blur', () => finish(true));
   }
 
+  // รวมคำที่ตัวตัดคำแยกออกจากกันทั้งที่เป็นคำเดียวกัน (เช่น "ประเทศ"+"ไทย") ให้เป็นก้อนเดียว
+  // ข้อความรวมแล้วเท่าเดิมทุกตัวอักษร จึงยังไม่นับเป็นการแก้ไข แล้วเปิดช่องพิมพ์ให้ทันที
+  // เพราะจุดประสงค์ของการรวมคำคือแก้ทั้งคำในคราวเดียว (กด Esc ถ้าแค่อยากดูเฉย ๆ)
+  function mergeWords(first, second) {
+    if (!first || !second) return;
+    const merged = first.textContent + second.textContent;
+    second.remove();
+    setWordText(first, merged, false);
+    editWord(first, false);
+  }
+
   // เช็คว่าข้อความที่ต่อจากนี้ขึ้นต้นด้วย "คำ" จริง ๆ หรือไม่ (ใช้ segmentText ตัวเดียวกับที่ใช้ตัดคำ
   // เพื่อให้สอดคล้องกับตัวตรวจฝั่งเซิร์ฟเวอร์) — ถ้าขึ้นต้นด้วยช่องว่างหรือเครื่องหมายวรรคตอน
   // (เช่น "," ",") ถือว่ามีตัวคั่นอยู่แล้ว ไม่ต้องเติมช่องว่างซ้ำ
@@ -292,36 +367,46 @@
     return !!(seg && seg.isWord);
   }
 
+  // เติมช่องว่างคั่น "ท้าย" โหนดนี้ (โหนดอาจเป็นข้อความธรรมดาหรือ span ของคำข้าง ๆ ก็ได้)
+  function ensureSpaceAfterNode(node) {
+    if (!node) return;
+    if (node.nodeType === Node.TEXT_NODE) {
+      if (!/[ \t\n]$/.test(node.textContent)) node.textContent += ' ';
+    } else {
+      node.after(document.createTextNode(' '));
+    }
+  }
+
+  // เติมช่องว่างคั่น "หน้า" โหนดนี้ — ถ้าขึ้นต้นด้วยเครื่องหมายวรรคตอนอยู่แล้วก็ไม่ต้องเติม
+  function ensureSpaceBeforeNode(node) {
+    if (!node) return;
+    if (node.nodeType === Node.TEXT_NODE) {
+      if (textStartsWithWord(node.textContent)) node.textContent = ' ' + node.textContent;
+    } else {
+      node.before(document.createTextNode(' '));
+    }
+  }
+
   // แก้เว้นวรรครอบ "ๆ" ให้ถูกต้องแบบอัตโนมัติ (ไม่พึ่งให้ผู้ใช้พิมพ์เว้นวรรคเอง เพราะจุดที่ต้องเว้น
   // วรรค "หลัง" ๆ อยู่นอกขอบเขตคำที่ถูกไฮไลต์ — พิมพ์แก้ในช่องแก้คำธรรมดาจะเติมได้แค่ฝั่งหน้าเท่านั้น)
   // เว้นวรรคให้ทั้งสองด้านเสมอ (เฉพาะฝั่งที่ติดกับ "คำ" จริง ๆ ไม่แทรกซ้ำถ้ามีเครื่องหมายวรรคตอน
   // คั่นอยู่แล้ว) ทำกับทุกจุดที่เป็นคำเดียวกันในเรียงความทั้งฉบับ
-  function fixSpacing(span, actions) {
-    actions.remove();
+  function fixSpacing(span) {
     const word = span.dataset.word;
     const stem = (word !== 'ๆ' && word.slice(-1) === 'ๆ') ? word.slice(0, -1) : '';
-    modalEl.querySelectorAll('.trw-flag[data-word="' + attrEscape(word) + '"]').forEach((el) => {
-      const prev = el.previousSibling;
+    wordSpans(word).forEach((el) => {
       const next = el.nextSibling;
       const frag = document.createDocumentFragment();
       if (stem) {
         // ตัดคำที่ซ้ำ (stem) กับ "ๆ" ออกจากกัน แล้วแทรกช่องว่างคั่นกลาง
-        frag.appendChild(document.createTextNode(stem + ' '));
-      } else if (prev && prev.nodeType === Node.TEXT_NODE && !/[ \t]$/.test(prev.textContent)) {
-        prev.textContent += ' ';
+        frag.appendChild(makeWordSpan(stem));
+        frag.appendChild(document.createTextNode(' '));
+      } else {
+        ensureSpaceAfterNode(el.previousSibling);
       }
-      frag.appendChild(document.createTextNode('ๆ'));
+      frag.appendChild(makeWordSpan('ๆ'));
       el.replaceWith(frag);
-      if (next) {
-        if (next.nodeType === Node.TEXT_NODE) {
-          if (textStartsWithWord(next.textContent)) {
-            next.textContent = ' ' + next.textContent;
-          }
-        } else {
-          // next เป็น element (เช่น span คำที่ถูกไฮไลต์อีกจุด) — เป็นคำเสมอ ต้องเว้นวรรคคั่น
-          next.before(document.createTextNode(' '));
-        }
-      }
+      ensureSpaceBeforeNode(next);
     });
     forgetWord(word);
     state.dirty = true;
@@ -329,8 +414,7 @@
   }
 
   // ลบคำนี้ออกจากเนื้อหาเลย (เช่น คำซ้ำ/คำที่ไม่ควรอยู่) พร้อมยุบช่องว่างซ้ำที่อาจเกิดขึ้น
-  function deleteWord(span, actions) {
-    actions.remove();
+  function deleteWord(span) {
     const word = span.dataset.word;
     const prev = span.previousSibling;
     const next = span.nextSibling;
@@ -341,7 +425,8 @@
         next.textContent = next.textContent.replace(/^[ \t]+/, '');
       }
     }
-    forgetWord(word);
+    // ถ้ายังมีคำเดียวกันเหลืออยู่จุดอื่น ให้ฟ้องต่อไปตามเดิม
+    if (wordSpans(word).length === 0) forgetWord(word);
     state.dirty = true;
     updateStatus();
   }
@@ -403,6 +488,8 @@
   // options.foreign      : string[]  คำที่เขียนด้วยภาษาอื่นปนอยู่ (จาก api.php?action=check_thai_spelling)
   // options.spacing      : string[]  คำที่เว้นวรรครอบ "ๆ" ไม่ถูก (จาก api.php?action=check_thai_spelling)
   // options.onSave(paragraphs) : async function — รับ paragraphs ที่แก้ไขแล้ว ไปบันทึกกลับ (throw หากบันทึกไม่สำเร็จ)
+  // options.focusWord   : string (ไม่บังคับ) คำที่ให้เลื่อนไปหาและเปิดกล่องตัวเลือกให้ทันทีตอนเปิดหน้าต่าง
+  // options.focusIndex  : number (ไม่บังคับ) ลำดับที่ของคำนั้น (เริ่มที่ 0) กรณีคำเดียวกันมีหลายจุด
   function open(options) {
     ensureModal();
     state = {
@@ -415,6 +502,29 @@
     };
     renderAll();
     modalEl.classList.add('open');
+    if (options.focusWord) focusWord(options.focusWord, options.focusIndex || 0);
+  }
+
+  // เลื่อนไปยังคำที่ผู้ใช้คลิกมาจากหน้าตัวอย่างข้างนอก แล้วเปิดกล่องตัวเลือกให้เลย
+  function focusWord(word, index) {
+    const spans = wordSpans(word);
+    const span = spans[index] || spans[0];
+    if (!span) return;
+    try { span.scrollIntoView({ block: 'center' }); } catch (e) { span.scrollIntoView(); }
+    openWordActions(span);
+  }
+
+  // ลำดับที่ของคำนี้ในบรรดาคำที่เขียนเหมือนกันภายใน root — ส่งต่อเป็น focusIndex ให้ open()
+  // เพื่อให้หน้าต่างตรวจสอบเปิดตรง "จุดที่คลิก" ไม่ใช่จุดแรกที่เจอ
+  function wordIndexIn(root, el) {
+    const text = el.textContent;
+    let idx = 0;
+    const all = root.querySelectorAll('.thai-word');
+    for (let i = 0; i < all.length; i++) {
+      if (all[i] === el) return idx;
+      if (all[i].textContent === text) idx++;
+    }
+    return 0;
   }
 
   // สร้าง HTML แบบอ่านอย่างเดียว (ไม่มีปุ่มโต้ตอบ) พร้อมไฮไลต์คำที่น่าสงสัย — ใช้แสดงตัวอย่างแบบเรียลไทม์
@@ -437,5 +547,5 @@
     return html;
   }
 
-  window.ThaiReview = { open, segmentText, renderStaticHTML };
+  window.ThaiReview = { open, segmentText, renderStaticHTML, wordIndexIn };
 })(window, document);
