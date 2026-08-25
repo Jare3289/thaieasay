@@ -375,6 +375,9 @@ $aiPhases    = ai_all_phases();
     box-shadow: 0 6px 18px rgba(109, 40, 217, 0.15);
   }
   .ai-phase-card-empty { background: #f8fafc; border-style: dashed; }
+  /* การ์ดค่าเฉลี่ยทั้งชั้น (ครู/ผู้เชี่ยวชาญ) — แยกโทนจากการ์ดของนักเรียนให้ไม่สับสน */
+  .ai-phase-card-class { border-color: #99f6e4; background: #ffffff; }
+  .ai-class-avg-wrap { background: #f0fdfa; border: 1px dashed #99f6e4; }
   .ai-phase-card .ai-score-bar { height: 8px; }
 
   /* ตารางภาพรวมผลตรวจ AI — ใช้รูปแบบหัวตารางเดียวกับ "รายงานการส่งงานรายบุคคล" (submission_report.php) */
@@ -516,7 +519,7 @@ async function loadFeedback() {
   if (sumBox) sumBox.innerHTML = '';
 
   if (!sid) {
-    cards.innerHTML = `<div class="col-12">${emptyBox('เลือกนักเรียนด้านบนเพื่อดูผลตรวจของ AI ทุกรอบงาน')}</div>`;
+    paintPhaseCards();   // ยังไม่เลือกนักเรียน แต่ครูยังเห็นการ์ดค่าเฉลี่ยทั้งชั้นได้
     return;
   }
 
@@ -905,14 +908,110 @@ function aiCombinedOf(fb) {
   return isNaN(v) ? null : v;
 }
 
+// ทศนิยม 1 ตำแหน่ง — ใช้กับค่าเฉลี่ยบนการ์ด ไม่ให้ตัวเลขยาวจนตกบรรทัด
+function aiNum1(v) {
+  const n = Math.round(parseFloat(v) * 10) / 10;
+  return isNaN(n) ? '-' : String(n);
+}
+
+// ค่าเฉลี่ยของทั้งชั้นรายรอบงาน คิดจากตารางภาพรวมที่โหลดไว้แล้ว (ครู/ผู้เชี่ยวชาญเท่านั้น)
+function aiClassAverages() {
+  const acc = {};
+  (aiOverviewList || []).forEach(r => {
+    if (!acc[r.essay_phase]) acc[r.essay_phase] = { sum: 0, cnt: 0, max: Number(r.full_max) || 60 };
+    acc[r.essay_phase].sum += Number(r.combined_total);
+    acc[r.essay_phase].cnt++;
+  });
+  Object.keys(acc).forEach(ph => { acc[ph].avg = acc[ph].sum / acc[ph].cnt; });
+  return acc;
+}
+
+// การ์ดค่าเฉลี่ยทั้งชั้นของรอบงานหนึ่ง — หน้าตาเดียวกับการ์ดของนักเรียน แต่เป็นสีเขียวอมฟ้าและกดไม่ได้
+function classPhaseCardHTML(ph, stat) {
+  const label = AI_PHASE_LABELS[ph] || ph;
+  if (!stat || !stat.cnt) {
+    return `<div class="col">
+      <div class="ai-phase-card ai-phase-card-empty ai-phase-card-class h-100 p-3 rounded-4">
+        <div class="fw-bold text-dark mb-2">${esc(label)}</div>
+        <div class="text-muted"><i class="bi bi-dash-circle me-1"></i>ยังไม่มีผลตรวจในรอบนี้</div>
+      </div>
+    </div>`;
+  }
+
+  const pct = stat.max > 0 ? Math.round((stat.avg / stat.max) * 100) : 0;
+
+  // ถ้ากำลังเปิดดูนักเรียนอยู่ ให้เทียบคะแนนของคนนี้กับค่าเฉลี่ยไปเลย
+  const mine = (currentStudentId() && aiAllFeedback[ph]) ? aiCombinedOf(aiAllFeedback[ph]) : null;
+  let cmp = '';
+  if (mine !== null) {
+    const d  = Math.round((mine - stat.avg) * 100) / 100;
+    const up = d > 0, same = (d === 0);
+    cmp = `<div class="small mt-2 ${same ? 'text-muted' : (up ? 'text-success-emphasis' : 'text-danger-emphasis')}">
+      <i class="bi ${same ? 'bi-dash-lg' : (up ? 'bi-arrow-up-short' : 'bi-arrow-down-short')} me-1"></i>
+      นักเรียนคนนี้ได้ ${aiNum(mine)} — ${same ? 'เท่ากับค่าเฉลี่ย' : (up ? 'สูงกว่าค่าเฉลี่ย ' : 'ต่ำกว่าค่าเฉลี่ย ') + aiNum1(Math.abs(d)) + ' คะแนน'}
+    </div>`;
+  }
+
+  return `<div class="col">
+    <div class="ai-phase-card ai-phase-card-class h-100 p-3 rounded-4">
+      <div class="d-flex align-items-start justify-content-between gap-2 mb-2 flex-wrap">
+        <span class="fw-bold text-dark">${esc(label)}</span>
+        <span class="badge bg-light text-secondary border">${stat.cnt} ฉบับ</span>
+      </div>
+      <div class="d-flex align-items-end gap-2" title="ค่าเฉลี่ยจริง ${aiNum(stat.avg)} คะแนน">
+        <div class="display-6 fw-bold lh-1" style="color:#0d7377;">${aiNum1(stat.avg)}</div>
+        <div class="text-muted pb-1 text-nowrap">/ ${aiNum(stat.max)} คะแนน</div>
+      </div>
+      <div class="ai-crit-bar mt-2"><span style="width:${pct}%; background:linear-gradient(90deg,#0d7377,#14b8a6);"></span></div>
+      <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-1">
+        <span class="badge bg-info-subtle text-info-emphasis">ระดับเฉลี่ย: ${esc(aiLevelFromScore(stat.avg))}</span>
+        <span class="text-muted small">เฉลี่ยทั้งชั้น</span>
+      </div>
+      ${cmp}
+    </div>
+  </div>`;
+}
+
+// กลุ่มการ์ด "ค่าเฉลี่ยทั้งชั้น" — จัดกลุ่มแบบเดียวกับการ์ดของนักเรียน
+function classAverageGroupsHTML() {
+  if (AI_IS_STUDENT) return '';
+  const stats = aiClassAverages();
+  if (!Object.keys(stats).length) return '';
+
+  const groups = AI_CARD_GROUPS.map(g => {
+    const phases = g.phases.filter(ph => AI_PHASES.indexOf(ph) >= 0);
+    if (!phases.length) return '';
+    return `<div class="mb-4">
+      <div class="fw-bold text-secondary small text-uppercase mb-2">
+        <i class="bi ${g.icon} me-1"></i>${esc(g.title)}
+      </div>
+      <div class="row ${g.cols} g-3">${phases.map(ph => classPhaseCardHTML(ph, stats[ph])).join('')}</div>
+    </div>`;
+  }).join('');
+
+  const total = (aiOverviewList || []).length;
+  return `<div class="ai-class-avg-wrap p-3 p-md-4 rounded-4 mt-2">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+      <div>
+        <h6 class="fw-bold text-dark mb-0"><i class="bi bi-people-fill text-info me-2"></i>ค่าเฉลี่ยทั้งชั้นรายรอบงาน</h6>
+        <div class="text-muted small mt-1">คิดจากผลตรวจของ AI ทั้งหมด ${total} ฉบับที่บันทึกไว้ในระบบ</div>
+      </div>
+    </div>
+    ${groups}
+  </div>`;
+}
+
 // การ์ด 1 ใบต่อ 1 รอบงาน — เห็นคะแนนของตัวเองครบทุกฉบับในหน้าเดียว
 function paintPhaseCards() {
   const box = document.getElementById('aiPhaseCards');
-  if (!box || !aiCardsReady || !currentStudentId()) return;
+  if (!box) return;
+  const sid = currentStudentId();
+  // ยังโหลดผลตรวจของนักเรียนไม่เสร็จ และยังไม่มีค่าเฉลี่ยทั้งชั้นให้แสดง → ปล่อยข้อความ "กำลังโหลด" ไว้
+  if ((!aiCardsReady || !sid) && (AI_IS_STUDENT || !(aiOverviewList || []).length)) return;
 
   const blocked = reviewBlockReason();
 
-  box.innerHTML = AI_CARD_GROUPS.map(g => {
+  const studentCards = (aiCardsReady && sid) ? AI_CARD_GROUPS.map(g => {
     const phases = g.phases.filter(ph => AI_PHASES.indexOf(ph) >= 0);
     if (!phases.length) return '';
 
@@ -941,7 +1040,10 @@ function paintPhaseCards() {
       </div>
       <div class="row ${g.cols} g-3">${cards}</div>
     </div>`;
-  }).join('');
+  }).join('')
+  : `<div class="mb-4">${emptyBox('เลือกนักเรียนด้านบนเพื่อดูผลตรวจของ AI ทุกรอบงาน')}</div>`;
+
+  box.innerHTML = studentCards + classAverageGroupsHTML();
 
   paintStudentSummary();   // สรุปภาพรวมใช้ข้อมูลชุดเดียวกัน วาดพร้อมกันเสมอ
 }
@@ -1232,6 +1334,7 @@ async function loadAiOverview() {
     if (!data.success) { box.innerHTML = `<div class="text-center text-muted py-4">${esc(data.error)}</div>`; return; }
     aiOverviewList = data.list || [];
     paintAiOverview();
+    paintPhaseCards();   // การ์ดค่าเฉลี่ยทั้งชั้นใช้ข้อมูลชุดนี้
   } catch (err) {
     box.innerHTML = '<div class="text-center text-muted py-4">โหลดข้อมูลไม่สำเร็จ</div>';
   }
