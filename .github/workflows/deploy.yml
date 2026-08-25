@@ -3,9 +3,15 @@ name: Deploy to Plesk (FTP)
 # อัปโหลดไฟล์ขึ้นเซิร์ฟเวอร์ Plesk อัตโนมัติทุกครั้งที่โค้ดเข้า branch main
 #
 # ต้องตั้งค่า Secrets 3 ตัวใน GitHub ก่อน (Settings > Secrets and variables > Actions):
-#   FTP_SERVER   = 14.207.141.86                 (IP เซิร์ฟเวอร์ Plesk)
-#   FTP_USERNAME = chainatpit.com_iv4dxiaa9br    (System user / FTP username)
-#   FTP_PASSWORD = CukQ1jm@B1u2car*                       (รหัสผ่าน System user / FTP)
+#   FTP_SERVER   — IP หรือชื่อโฮสต์ของเซิร์ฟเวอร์ Plesk
+#   FTP_USERNAME — System user ของ subdomain
+#   FTP_PASSWORD — รหัสผ่านของ System user ตัวนั้น
+#
+# ดูค่าจริงทั้งสามได้ที่ Plesk > Websites & Domains > Hosting Access
+#
+# ⚠️ ห้ามจดค่าจริงลงในไฟล์นี้หรือไฟล์ใด ๆ ใน repo แม้จะเขียนเป็นคอมเมนต์ก็ตาม
+#    คอมเมนต์ถูกเผยแพร่พร้อมโค้ดเสมอ และ git เก็บทุกเวอร์ชันในอดีตไว้ถาวร
+#    ลบทีหลังจึงไม่ช่วย — ถ้าหลุดแล้วต้องเปลี่ยนรหัสใน Plesk สถานเดียว
 #
 # หมายเหตุสำคัญ:
 #   - server-dir ต้องชี้ไปที่ document root ของ subdomain (โฟลเดอร์ thaiessay.chainatpit.com)
