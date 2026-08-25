@@ -62,7 +62,8 @@
   และโฟลเดอร์ `icons/`
 
 > ไม่ต้องอัปโหลด `db_secrets.php` (ยังไม่มี จะสร้างในขั้นถัดไป)
-> และ `google_secrets.php` (สร้างเฉพาะถ้าใช้ Google)
+> `google_secrets.php` (สร้างเฉพาะถ้าใช้ Google)
+> และ `ai_secrets.php` (สร้างเฉพาะถ้าตั้งค่าผู้ช่วย AI จากไฟล์ — ดู `AI_SETUP.md`)
 
 ---
 

@@ -2,6 +2,7 @@
 // บังคับให้เริ่มเปิดใช้งาน Session และระบุประเภทการตอบกลับเป็น JSON
 require_once 'auth_helper.php';
 require_once 'thai_text_utils.php';
+require_once 'ai_config.php';
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Cache-Control: post-check=0, pre-check=0', false);
@@ -2139,6 +2140,380 @@ try {
                 ];
             }
             echo json_encode(['success' => true, 'report' => $report]);
+            break;
+
+        // ===================================================================
+        // ระบบให้ข้อเสนอแนะเรียงความอัตโนมัติด้วย AI (ดู ai_config.php)
+        // ===================================================================
+
+        // สถานะฟีเจอร์ AI สำหรับผู้ใช้ปัจจุบัน — ใช้ตัดสินว่าจะแสดงปุ่ม "ให้ AI ตรวจ" หรือไม่
+        case 'get_ai_status':
+            if (!isset($_SESSION['user'])) {
+                echo json_encode(['success' => false, 'error' => 'Not logged in']);
+                exit;
+            }
+            $aiUser = $_SESSION['user'];
+            $aiSet  = ai_settings($pdo);
+            $isStu  = ($aiUser['role'] === 'student');
+            // ผู้เชี่ยวชาญดูผลได้อย่างเดียว — สั่งให้ AI ตรวจไม่ได้ (บังคับฝั่งเซิร์ฟเวอร์เช่นเดียวกับ ai_review_essay)
+            $canAsk = in_array($aiUser['role'], ['student', 'teacher'], true);
+            $limit  = $isStu ? AI_DAILY_LIMIT_STUDENT : AI_DAILY_LIMIT_TEACHER;
+            $used   = ai_usage_today($pdo, $aiUser['id']);
+            echo json_encode([
+                'success'         => true,
+                'enabled'         => (bool)$aiSet['enabled'],
+                'configured'      => (bool)$aiSet['configured'],
+                'can_review'      => (bool)($canAsk && $aiSet['enabled'] && $aiSet['configured']
+                                      && (!$isStu || $aiSet['student_enabled'])),
+                'student_enabled' => (bool)$aiSet['student_enabled'],
+                'allowed_phases'  => $isStu ? $aiSet['student_phases'] : ai_all_phases(),
+                'quota_limit'     => $limit,
+                'quota_used'      => $used,
+                'quota_left'      => max(0, $limit - $used),
+                'min_words'       => AI_MIN_WORDS,
+                'rubric_max'      => ai_rubric_max(),
+            ]);
+            break;
+
+        // ครูอ่านการตั้งค่า AI (ไม่ส่ง API key จริงกลับไป — ส่งเฉพาะแบบปิดบัง)
+        case 'get_ai_settings':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้น']);
+                exit;
+            }
+            $aiSet = ai_settings($pdo);
+            $provList = [];
+            foreach (ai_providers() as $pk => $pv) {
+                $provList[] = [
+                    'key' => $pk, 'label' => $pv['label'],
+                    'default_model' => $pv['model'], 'default_base_url' => $pv['base_url'],
+                    'key_url' => $pv['key_url'],
+                ];
+            }
+            // สรุปการใช้งานย้อนหลัง 7 วัน ไว้ให้ครูดูว่าโควตาฟรีถูกใช้ไปเท่าไร
+            $usageRows = [];
+            try {
+                $usageRows = $pdo->query("
+                    SELECT DATE(created_at) AS d, COUNT(*) AS total, SUM(success) AS ok
+                    FROM ai_usage_log WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+                    GROUP BY DATE(created_at) ORDER BY d DESC
+                ")->fetchAll();
+            } catch (Exception $e) { /* ตารางอาจยังไม่ถูกสร้าง */ }
+
+            echo json_encode([
+                'success'   => true,
+                'providers' => $provList,
+                'settings'  => [
+                    'provider'        => $aiSet['provider'],
+                    'model'           => $aiSet['model'],
+                    'base_url'        => $aiSet['base_url'],
+                    'api_key_masked'  => ai_mask_key($aiSet['api_key']),
+                    'has_key'         => ($aiSet['api_key'] !== ''),
+                    'key_source'      => $aiSet['key_source'],
+                    'locked_by_file'  => ($aiSet['key_source'] === 'file'),
+                    'enabled'         => (bool)$aiSet['enabled'],
+                    'student_enabled' => (bool)$aiSet['student_enabled'],
+                    'student_phases'  => $aiSet['student_phases'],
+                    'configured'      => (bool)$aiSet['configured'],
+                ],
+                'usage'     => $usageRows,
+                'all_phases'=> ai_all_phases(),
+            ]);
+            break;
+
+        // ครูบันทึกการตั้งค่า AI
+        case 'save_ai_settings':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้น']);
+                exit;
+            }
+            if (isset($request_data['provider'])) {
+                $pv = trim((string)$request_data['provider']);
+                if (!array_key_exists($pv, ai_providers())) {
+                    echo json_encode(['success' => false, 'error' => 'ไม่รู้จักผู้ให้บริการที่เลือก']);
+                    exit;
+                }
+                ai_save_setting($pdo, 'ai_provider', $pv);
+            }
+            if (isset($request_data['model']))    ai_save_setting($pdo, 'ai_model',    mb_substr(trim((string)$request_data['model']), 0, 100, 'UTF-8'));
+            if (isset($request_data['base_url'])) ai_save_setting($pdo, 'ai_base_url', mb_substr(trim((string)$request_data['base_url']), 0, 200, 'UTF-8'));
+            // ส่ง api_key มาเป็นค่าว่าง = ไม่แก้ไขของเดิม, ส่ง '__CLEAR__' = ลบคีย์ทิ้ง
+            if (isset($request_data['api_key'])) {
+                $newKey = trim((string)$request_data['api_key']);
+                if ($newKey === '__CLEAR__')  ai_save_setting($pdo, 'ai_api_key', '');
+                elseif ($newKey !== '')       ai_save_setting($pdo, 'ai_api_key', $newKey);
+            }
+            if (isset($request_data['enabled']))         ai_save_setting($pdo, 'ai_enabled',         !empty($request_data['enabled']) ? '1' : '0');
+            if (isset($request_data['student_enabled'])) ai_save_setting($pdo, 'ai_student_enabled', !empty($request_data['student_enabled']) ? '1' : '0');
+            if (isset($request_data['student_phases']) && is_array($request_data['student_phases'])) {
+                $ph = array_values(array_intersect(array_map('strval', $request_data['student_phases']), ai_all_phases()));
+                ai_save_setting($pdo, 'ai_student_phases', implode(',', $ph));
+            }
+            echo json_encode(['success' => true]);
+            break;
+
+        // สั่งให้ AI ตรวจเรียงความ 1 ฉบับ แล้วบันทึกผลลงฐานข้อมูล (ตรวจซ้ำจะทับผลเดิม)
+        case 'ai_review_essay':
+            if (!isset($_SESSION['user'])) {
+                echo json_encode(['success' => false, 'error' => 'Not logged in']);
+                exit;
+            }
+            $aiUser  = $_SESSION['user'];
+            $aiRole  = $aiUser['role'];
+            $aiPhase = isset($request_data['essay_phase']) ? trim((string)$request_data['essay_phase']) : '';
+            $aiSid   = isset($request_data['student_id']) ? trim((string)$request_data['student_id']) : '';
+
+            if (!in_array($aiPhase, ai_all_phases(), true)) {
+                echo json_encode(['success' => false, 'error' => 'รอบงานไม่ถูกต้อง']);
+                exit;
+            }
+
+            // สิทธิ์: นักเรียนตรวจได้เฉพาะงานของตนเอง / ครูตรวจได้ทุกคน / ผู้เชี่ยวชาญไม่ให้สั่งตรวจ
+            if ($aiRole === 'student') {
+                $aiSid = $aiUser['id'];
+            } elseif ($aiRole === 'teacher') {
+                if ($aiSid === '') {
+                    echo json_encode(['success' => false, 'error' => 'ไม่ได้ระบุนักเรียนที่จะตรวจ']);
+                    exit;
+                }
+            } else {
+                echo json_encode(['success' => false, 'error' => 'บทบาทนี้ไม่มีสิทธิ์สั่งให้ AI ตรวจ']);
+                exit;
+            }
+
+            $aiSet = ai_settings($pdo);
+            if (!$aiSet['enabled']) {
+                echo json_encode(['success' => false, 'error' => 'คุณครูปิดการใช้งานระบบ AI ไว้']);
+                exit;
+            }
+            if (!$aiSet['configured']) {
+                echo json_encode(['success' => false, 'error' => 'ยังไม่ได้ตั้งค่า AI กรุณาให้คุณครูใส่ API key ในหน้า "ผู้ช่วย AI" ก่อน']);
+                exit;
+            }
+            if ($aiRole === 'student') {
+                if (!$aiSet['student_enabled']) {
+                    echo json_encode(['success' => false, 'error' => 'คุณครูยังไม่เปิดให้นักเรียนกดตรวจด้วย AI เอง']);
+                    exit;
+                }
+                if (!in_array($aiPhase, $aiSet['student_phases'], true)) {
+                    echo json_encode(['success' => false, 'error' => 'คุณครูไม่ได้เปิดให้ใช้ AI ตรวจในรอบงานนี้']);
+                    exit;
+                }
+            }
+
+            // โควตารายวัน (กันการกดรัวจนโควตาฟรีของผู้ให้บริการหมด)
+            $aiLimit = ($aiRole === 'student') ? AI_DAILY_LIMIT_STUDENT : AI_DAILY_LIMIT_TEACHER;
+            $aiUsed  = ai_usage_today($pdo, $aiUser['id']);
+            if ($aiUsed >= $aiLimit) {
+                echo json_encode(['success' => false, 'error' => 'วันนี้ใช้ AI ตรวจครบ ' . $aiLimit . ' ครั้งแล้ว กรุณาลองใหม่ในวันพรุ่งนี้']);
+                exit;
+            }
+
+            // ดึงเรียงความจริงจากฐานข้อมูล
+            $stmt = $pdo->prepare('
+                SELECT se.*, s.student_name FROM student_essays se
+                LEFT JOIN students s ON se.student_id = s.student_id
+                WHERE se.student_id = ? AND se.essay_phase = ?
+            ');
+            $stmt->execute([$aiSid, $aiPhase]);
+            $aiEssay = $stmt->fetch();
+            if (!$aiEssay) {
+                echo json_encode(['success' => false, 'error' => 'ยังไม่มีเรียงความของรอบนี้ในระบบ กรุณาบันทึกเรียงความก่อน']);
+                exit;
+            }
+
+            $aiIntro = (string)($aiEssay['intro_content'] ?? '');
+            $aiBody  = json_decode((string)($aiEssay['body_content'] ?? ''), true);
+            if (!is_array($aiBody)) $aiBody = ($aiEssay['body_content'] ?? '') !== '' ? [(string)$aiEssay['body_content']] : [];
+            $aiConcl = (string)($aiEssay['conclusion_content'] ?? '');
+            $aiFull  = trim($aiIntro . "\n" . implode("\n", $aiBody) . "\n" . $aiConcl);
+
+            if (mb_strlen($aiFull, 'UTF-8') > AI_MAX_CHARS) {
+                echo json_encode(['success' => false, 'error' => 'เรียงความยาวเกินกว่าที่ระบบจะส่งให้ AI ตรวจได้']);
+                exit;
+            }
+            $aiWords = count_thai_words($aiFull);
+            if ($aiWords < AI_MIN_WORDS) {
+                echo json_encode(['success' => false, 'error' => 'เรียงความสั้นเกินไป (ต้องมีอย่างน้อย ' . AI_MIN_WORDS . ' คำ) กรุณาเขียนเพิ่มก่อนให้ AI ตรวจ']);
+                exit;
+            }
+
+            // ส่งคำที่ระบบสงสัยว่าสะกดผิดไปเป็นข้อมูลประกอบการให้คะแนนข้อ 4.1
+            $aiHints = [];
+            try {
+                $aiHints = find_misspelled_thai_words($aiFull, load_confirmed_thai_words($pdo), 40);
+            } catch (Exception $e) { /* ไม่มีพจนานุกรมก็ตรวจต่อได้ */ }
+
+            $aiTopics = essay_topics_map($pdo);
+            $aiTopic  = (string)($aiTopics[essay_topic_phase($aiPhase)] ?? '');
+
+            // การเรียก API ภายนอกอาจใช้เวลาหลายสิบวินาที — ขยายเวลาทำงานของสคริปต์
+            @set_time_limit(150);
+
+            $aiPrompt = ai_build_prompt($aiTopic, $aiPhase, $aiIntro, $aiBody, $aiConcl, $aiWords, $aiHints);
+            $aiCall   = ai_call_model($aiSet, ai_system_prompt(), $aiPrompt);
+            if (!$aiCall['ok']) {
+                ai_log_usage($pdo, $aiUser['id'], $aiRole, $aiSid, $aiPhase, false, $aiCall['error']);
+                echo json_encode(['success' => false, 'error' => $aiCall['error']]);
+                exit;
+            }
+
+            $aiParsed = ai_parse_feedback($aiCall['text']);
+            if (!$aiParsed['ok']) {
+                ai_log_usage($pdo, $aiUser['id'], $aiRole, $aiSid, $aiPhase, false, $aiParsed['error']);
+                echo json_encode(['success' => false, 'error' => $aiParsed['error']]);
+                exit;
+            }
+            $aiData = $aiParsed['data'];
+
+            $stmt = $pdo->prepare('
+                INSERT INTO essay_ai_feedback
+                    (student_id, essay_phase, overall_comment, strengths, improvements, next_steps,
+                     encouragement, scores, total_score, max_score, quality_level,
+                     provider, model, requested_by, requested_role, raw_response)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                    overall_comment = VALUES(overall_comment),
+                    strengths       = VALUES(strengths),
+                    improvements    = VALUES(improvements),
+                    next_steps      = VALUES(next_steps),
+                    encouragement   = VALUES(encouragement),
+                    scores          = VALUES(scores),
+                    total_score     = VALUES(total_score),
+                    max_score       = VALUES(max_score),
+                    quality_level   = VALUES(quality_level),
+                    provider        = VALUES(provider),
+                    model           = VALUES(model),
+                    requested_by    = VALUES(requested_by),
+                    requested_role  = VALUES(requested_role),
+                    raw_response    = VALUES(raw_response),
+                    updated_at      = CURRENT_TIMESTAMP
+            ');
+            $jsonOpt = JSON_UNESCAPED_UNICODE;
+            $stmt->execute([
+                $aiSid, $aiPhase, $aiData['overall'],
+                json_encode($aiData['strengths'], $jsonOpt),
+                json_encode($aiData['improvements'], $jsonOpt),
+                json_encode($aiData['next_steps'], $jsonOpt),
+                $aiData['encouragement'],
+                json_encode($aiData['scores'], $jsonOpt),
+                $aiData['total_score'], $aiData['max_score'], $aiData['quality_level'],
+                $aiSet['provider'], $aiSet['model'], $aiUser['id'], $aiRole,
+                mb_substr($aiCall['text'], 0, 60000, 'UTF-8'),
+            ]);
+
+            ai_log_usage($pdo, $aiUser['id'], $aiRole, $aiSid, $aiPhase, true);
+
+            $aiData['student_id']   = $aiSid;
+            $aiData['student_name'] = formatNamePrefix((string)($aiEssay['student_name'] ?? ''));
+            $aiData['essay_phase']  = $aiPhase;
+            $aiData['phase_label']  = ai_phase_label($aiPhase);
+            $aiData['provider']     = $aiSet['provider'];
+            $aiData['model']        = $aiSet['model'];
+            $aiData['created_at']   = date('Y-m-d H:i:s');
+            $aiData['word_count']   = $aiWords;
+
+            echo json_encode([
+                'success'    => true,
+                'feedback'   => $aiData,
+                'quota_left' => max(0, $aiLimit - ($aiUsed + 1)),
+            ]);
+            break;
+
+        // ดึงผลตรวจของ AI — นักเรียนดูของตนเองได้, ครู/ผู้เชี่ยวชาญดูได้ทุกคน
+        // ระบุ essay_phase = ดึงรอบเดียว, ไม่ระบุ = ดึงทุกรอบของนักเรียนคนนั้น
+        case 'get_ai_feedback':
+            if (!isset($_SESSION['user'])) {
+                echo json_encode(['success' => false, 'error' => 'Not logged in']);
+                exit;
+            }
+            $aiUser  = $_SESSION['user'];
+            $aiSid   = isset($_GET['student_id']) ? trim($_GET['student_id']) : $aiUser['id'];
+            $aiPhase = isset($_GET['essay_phase']) ? trim($_GET['essay_phase']) : '';
+
+            // นักเรียนดูได้เฉพาะผลของตนเองเท่านั้น
+            if ($aiUser['role'] === 'student') $aiSid = $aiUser['id'];
+
+            $sql = '
+                SELECT f.*, s.student_name, s.classroom
+                FROM essay_ai_feedback f
+                LEFT JOIN students s ON f.student_id = s.student_id
+                WHERE f.student_id = ?
+            ';
+            $params = [$aiSid];
+            if ($aiPhase !== '') {
+                if (!in_array($aiPhase, ai_all_phases(), true)) {
+                    echo json_encode(['success' => false, 'error' => 'รอบงานไม่ถูกต้อง']);
+                    exit;
+                }
+                $sql .= ' AND f.essay_phase = ?';
+                $params[] = $aiPhase;
+            }
+            $sql .= ' ORDER BY FIELD(f.essay_phase, ' . implode(',', array_fill(0, count(ai_all_phases()), '?')) . ')';
+            $params = array_merge($params, ai_all_phases());
+
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $aiRows = array_map('ai_feedback_row_to_array', $stmt->fetchAll());
+
+            echo json_encode([
+                'success'  => true,
+                'found'    => count($aiRows) > 0,
+                'feedback' => ($aiPhase !== '') ? ($aiRows ? $aiRows[0] : null) : null,
+                'list'     => $aiRows,
+            ]);
+            break;
+
+        // ครู/ผู้เชี่ยวชาญ: ภาพรวมผลตรวจ AI ทั้งชั้น (โหมดเบา ไม่ดึงข้อเสนอแนะฉบับเต็ม)
+        case 'get_all_ai_feedback':
+            if (!isset($_SESSION['user']) || !in_array($_SESSION['user']['role'], ['teacher', 'expert'], true)) {
+                echo json_encode(['success' => false, 'error' => 'ต้องเป็นครูหรือผู้เชี่ยวชาญ']);
+                exit;
+            }
+            $stmt = $pdo->query('
+                SELECT f.student_id, f.essay_phase, f.total_score, f.max_score, f.quality_level,
+                       f.model, f.provider, f.requested_role, f.updated_at,
+                       s.student_name, s.classroom, s.student_group
+                FROM essay_ai_feedback f
+                LEFT JOIN students s ON f.student_id = s.student_id
+                ORDER BY s.classroom ASC, f.student_id ASC
+            ');
+            $aiList = [];
+            while ($r = $stmt->fetch()) {
+                $aiList[] = [
+                    'student_id'    => $r['student_id'],
+                    'student_name'  => formatNamePrefix((string)$r['student_name']),
+                    'classroom'     => $r['classroom'],
+                    'student_group' => $r['student_group'],
+                    'essay_phase'   => $r['essay_phase'],
+                    'phase_label'   => ai_phase_label($r['essay_phase']),
+                    'total_score'   => (float)$r['total_score'],
+                    'max_score'     => (float)$r['max_score'],
+                    'quality_level' => $r['quality_level'],
+                    'model'         => $r['model'],
+                    'provider'      => $r['provider'],
+                    'requested_role'=> $r['requested_role'],
+                    'updated_at'    => $r['updated_at'],
+                ];
+            }
+            echo json_encode(['success' => true, 'list' => $aiList]);
+            break;
+
+        // ครูลบผลตรวจ AI ของเรียงความฉบับใดฉบับหนึ่ง (เช่นผลที่ไม่เหมาะสม)
+        case 'delete_ai_feedback':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้น']);
+                exit;
+            }
+            $aiSid   = isset($request_data['student_id'])  ? trim((string)$request_data['student_id'])  : '';
+            $aiPhase = isset($request_data['essay_phase']) ? trim((string)$request_data['essay_phase']) : '';
+            if ($aiSid === '' || !in_array($aiPhase, ai_all_phases(), true)) {
+                echo json_encode(['success' => false, 'error' => 'ข้อมูลไม่ครบถ้วน']);
+                exit;
+            }
+            $stmt = $pdo->prepare('DELETE FROM essay_ai_feedback WHERE student_id = ? AND essay_phase = ?');
+            $stmt->execute([$aiSid, $aiPhase]);
+            echo json_encode(['success' => true, 'deleted' => $stmt->rowCount()]);
             break;
 
         default:
