@@ -215,6 +215,31 @@ require_once 'header.php';
         </div>
         <div id="spellCheckPreview" class="essay-view-doc d-none"></div>
       </div>
+
+      <!-- ผู้ช่วย AI: ให้ข้อเสนอแนะเรียงความรอบที่กำลังเปิดอยู่ -->
+      <div class="mb-4 p-3 rounded-3 border d-none" id="aiWriterBox"
+           style="border-color:#ddd6fe !important; background:#faf5ff;">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <div>
+            <span class="fw-bold text-dark">
+              <i class="bi bi-robot me-1" style="color:#6d28d9;"></i>ผู้ช่วย AI ตรวจเรียงความ
+            </span>
+            <div class="text-muted small mt-1" id="aiWriterHint">
+              บันทึกเรียงความก่อน แล้วให้ AI ช่วยอ่านและแนะนำแนวทางปรับปรุง
+            </div>
+          </div>
+          <div class="d-flex gap-2 flex-wrap">
+            <a href="ai_feedback.php" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+              <i class="bi bi-collection me-1"></i>ดูผลตรวจทุกรอบ
+            </a>
+            <button type="button" id="aiWriterBtn" class="btn btn-sm rounded-pill px-3 text-white"
+                    style="background:linear-gradient(135deg,#6d28d9,#0d7377);" onclick="runWriterAiReview()">
+              <i class="bi bi-stars me-1"></i>ให้ AI ตรวจรอบนี้
+            </button>
+          </div>
+        </div>
+        <div id="aiWriterResult" class="mt-3 d-none bg-white rounded-3 p-3 border"></div>
+      </div>
       </div>
 
     </div>
@@ -311,6 +336,7 @@ require_once 'header.php';
 </style>
 
 <script src="thai_review.js"></script>
+<script src="ai_review.js"></script>
 <script>
 const phaseLabels = {
   pretest:  'ก่อนเรียน (Pretest)',
@@ -760,6 +786,7 @@ async function loadEssayForPhase(phase, opts) {
     }
 
     checkAndOfferDraftRestore(phase);
+    refreshWriterAiPanel();
   } catch(err) {
     statusBadge.textContent = '⚠️ โหลดไม่ได้';
     statusBadge.className = 'badge bg-danger small';
@@ -982,6 +1009,8 @@ async function openSpellingReview() {
       await refreshEssayViewFromParts(intro, bodyParas, conclusion, data.word_count);
       clearDraftFromLocalStorage(currentEssayPhase);
       loadSavedList();
+      // เพิ่งบันทึกเสร็จ → ปุ่ม "ให้ AI ตรวจรอบนี้" ใช้ได้แล้ว
+      refreshWriterAiPanel();
     }
   });
 }
@@ -1032,6 +1061,8 @@ async function saveEssay() {
       // บันทึกขึ้นเซิร์ฟเวอร์สำเร็จแล้ว ไม่ต้องเก็บร่างสำรองในเครื่องอีกต่อไป
       clearDraftFromLocalStorage(currentEssayPhase);
       loadSavedList();
+      // เพิ่งบันทึกเสร็จ → ปุ่ม "ให้ AI ตรวจรอบนี้" ใช้ได้แล้ว
+      refreshWriterAiPanel();
     } else {
       showToast('เกิดข้อผิดพลาด: ' + data.error, 'error');
     }
@@ -1115,6 +1146,92 @@ document.getElementById('savedEssayList').addEventListener('click', (ev) => {
   if (phase) openEssayPhase(phase);
 });
 
+// ---------------------------------------------------------------------------
+// แผงผู้ช่วย AI ในหน้าเขียนเรียงความ (ดูตัวช่วยกลางใน ai_review.js)
+// ---------------------------------------------------------------------------
+let writerAiStatus = null;   // สถานะฟีเจอร์ AI ของนักเรียนคนนี้ (โหลดครั้งเดียวตอนเปิดหน้า)
+
+async function initWriterAi() {
+  writerAiStatus = await aiGetStatus();
+  const box = document.getElementById('aiWriterBox');
+  // ครูปิดฟีเจอร์ไว้ทั้งระบบ หรือยังไม่ได้ตั้งค่า → ไม่ต้องแสดงแผงนี้ให้นักเรียนสับสน
+  if (!writerAiStatus || !writerAiStatus.enabled || !writerAiStatus.configured) {
+    box.classList.add('d-none');
+    return;
+  }
+  box.classList.remove('d-none');
+  refreshWriterAiPanel();
+}
+
+// อัปเดตปุ่ม/คำอธิบาย และดึงผลตรวจเดิมของรอบที่เปิดอยู่
+async function refreshWriterAiPanel() {
+  if (!writerAiStatus || !writerAiStatus.enabled || !writerAiStatus.configured) return;
+
+  const btn    = document.getElementById('aiWriterBtn');
+  const hint   = document.getElementById('aiWriterHint');
+  const result = document.getElementById('aiWriterResult');
+  const phase  = currentEssayPhase;
+
+  let reason = '';
+  if (!writerAiStatus.student_enabled) {
+    reason = 'คุณครูยังไม่เปิดให้นักเรียนกดตรวจด้วย AI เอง';
+  } else if (writerAiStatus.allowed_phases.indexOf(phase) === -1) {
+    reason = 'คุณครูไม่ได้เปิดให้ใช้ AI ตรวจในรอบงานนี้';
+  } else if (writerAiStatus.quota_left <= 0) {
+    reason = 'วันนี้ใช้ AI ครบ ' + writerAiStatus.quota_limit + ' ครั้งแล้ว ลองใหม่พรุ่งนี้';
+  } else if (!currentPhaseHasSavedContent) {
+    reason = 'กดบันทึกเรียงความก่อน แล้วจึงให้ AI ตรวจได้';
+  }
+
+  btn.disabled = (reason !== '');
+  hint.textContent = reason || ('AI จะอ่านเรียงความที่บันทึกไว้ล่าสุดของรอบนี้ '
+    + '(เหลือโควตาวันนี้ ' + writerAiStatus.quota_left + ' ครั้ง)');
+
+  // แสดงผลตรวจเดิมของรอบนี้ถ้าเคยตรวจไว้แล้ว
+  result.classList.add('d-none');
+  result.innerHTML = '';
+  const fb = await aiGetFeedback(null, phase);
+  if (fb && fb.essay_phase === phase) {
+    result.innerHTML = aiFeedbackHTML(fb, { compact: true });
+    result.classList.remove('d-none');
+  }
+}
+
+async function runWriterAiReview() {
+  const btn    = document.getElementById('aiWriterBtn');
+  const result = document.getElementById('aiWriterResult');
+  const phase  = currentEssayPhase;
+  const original = btn.innerHTML;
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>AI กำลังอ่าน...';
+  result.classList.remove('d-none');
+  result.innerHTML = aiLoadingHTML('AI กำลังอ่านเรียงความและเขียนข้อเสนอแนะ',
+    'ปกติใช้เวลาประมาณ 15-40 วินาที กรุณาอย่าปิดหน้านี้');
+
+  try {
+    const data = await aiRequestReview(null, phase);
+    if (!data.success) {
+      result.innerHTML = aiErrorHTML(data.error || 'ตรวจไม่สำเร็จ');
+      showToast(data.error || 'ตรวจไม่สำเร็จ', 'error');
+      return;
+    }
+    if (writerAiStatus) {
+      writerAiStatus.quota_left = data.quota_left;
+      writerAiStatus.quota_used = writerAiStatus.quota_limit - data.quota_left;
+    }
+    result.innerHTML = aiFeedbackHTML(data.feedback, { compact: true });
+    showToast('AI ตรวจเรียงความเรียบร้อยแล้ว');
+  } finally {
+    btn.innerHTML = original;
+    btn.disabled = false;
+    if (writerAiStatus) {
+      document.getElementById('aiWriterHint').textContent =
+        'AI จะอ่านเรียงความที่บันทึกไว้ล่าสุดของรอบนี้ (เหลือโควตาวันนี้ ' + writerAiStatus.quota_left + ' ครั้ง)';
+    }
+  }
+}
+
 // Init
 (async function() {
   await loadEssayTopics();          // โหลดหัวข้อที่ครูกำหนด
@@ -1128,6 +1245,7 @@ document.getElementById('savedEssayList').addEventListener('click', (ev) => {
     setEssayUnit('task1');
   }
   await loadSavedList();
+  await initWriterAi();             // แผงผู้ช่วย AI (ซ่อนไว้ถ้าครูยังไม่เปิดใช้)
 })();
 </script>
 

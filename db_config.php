@@ -626,3 +626,65 @@ try {
 } catch (Exception $e) {
     // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
 }
+
+// ---------------------------------------------------------------------------
+// ตารางของระบบ "ให้ข้อเสนอแนะเรียงความอัตโนมัติด้วย AI"
+// ---------------------------------------------------------------------------
+// 1) app_settings        : ค่าตั้งค่าทั่วไปของระบบ (ครูกรอกผ่านหน้าเว็บ) เช่น ผู้ให้บริการ AI / โมเดล / API key
+// 2) essay_ai_feedback   : ผลการตรวจของ AI ต่อเรียงความ 1 ฉบับ (1 คน 1 รอบ = 1 แถว ตรวจใหม่ทับของเดิม)
+// 3) ai_usage_log        : บันทึกการเรียกใช้ AI ไว้จำกัดโควตารายวันและไว้ให้ครูตรวจสอบย้อนหลัง
+//
+// สำคัญ: คะแนนจาก AI เก็บแยกจากตาราง evaluations ของงานวิจัย จึงไม่ปะปนกับคะแนนครู/เพื่อน/ตนเอง
+try {
+    // ตรวจจากตารางที่ถูกสร้าง "เป็นลำดับสุดท้าย" — ถ้าตารางก่อนหน้าสร้างไม่สำเร็จ ครั้งต่อไปจะลองใหม่ทั้งชุด
+    $tAi = $pdo->query("SHOW TABLES LIKE 'ai_usage_log'");
+    if (!$tAi || $tAi->rowCount() === 0) {
+        safe_ddl($pdo, "
+            CREATE TABLE IF NOT EXISTS app_settings (
+                skey       VARCHAR(64) PRIMARY KEY,
+                svalue     TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+        safe_ddl($pdo, "
+            CREATE TABLE IF NOT EXISTS essay_ai_feedback (
+                id              INT AUTO_INCREMENT PRIMARY KEY,
+                student_id      VARCHAR(10)  NOT NULL,
+                essay_phase     VARCHAR(20)  NOT NULL,
+                overall_comment TEXT,
+                strengths       TEXT,          -- JSON array ของจุดแข็ง
+                improvements    LONGTEXT,      -- JSON array ของ {criterion, issue, suggestion, example}
+                next_steps      TEXT,          -- JSON array ของสิ่งที่ควรทำต่อ
+                encouragement   TEXT,
+                scores          TEXT,          -- JSON map รหัสเกณฑ์ => {raw, weighted, max, name, reason}
+                total_score     DECIMAL(6,2) NOT NULL DEFAULT 0,
+                max_score       DECIMAL(6,2) NOT NULL DEFAULT 0,
+                quality_level   VARCHAR(50)  DEFAULT NULL,
+                provider        VARCHAR(30)  DEFAULT NULL,
+                model           VARCHAR(100) DEFAULT NULL,
+                requested_by    VARCHAR(50)  DEFAULT NULL,
+                requested_role  VARCHAR(20)  DEFAULT NULL,
+                raw_response    LONGTEXT,
+                created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE,
+                UNIQUE KEY unique_ai_feedback (student_id, essay_phase)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+        safe_ddl($pdo, "
+            CREATE TABLE IF NOT EXISTS ai_usage_log (
+                id            INT AUTO_INCREMENT PRIMARY KEY,
+                user_id       VARCHAR(50) NOT NULL,
+                user_role     VARCHAR(20) DEFAULT NULL,
+                student_id    VARCHAR(10) DEFAULT NULL,
+                essay_phase   VARCHAR(20) DEFAULT NULL,
+                success       TINYINT(1) NOT NULL DEFAULT 1,
+                error_message VARCHAR(400) DEFAULT NULL,
+                created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_ai_usage_user_day (user_id, created_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+    }
+} catch (Exception $e) {
+    // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
+}

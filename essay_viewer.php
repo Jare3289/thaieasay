@@ -131,6 +131,10 @@ require_once 'header.php';
           <button class="btn btn-outline-primary btn-sm rounded-pill px-3" onclick="exportEssaysCSV()">
             <i class="bi bi-download me-1"></i>ส่งออก CSV
           </button>
+          <a href="ai_feedback.php" class="btn btn-sm rounded-pill px-3 text-white"
+             style="background:linear-gradient(135deg,#6d28d9,#0d7377);">
+            <i class="bi bi-robot me-1"></i>ผู้ช่วย AI
+          </a>
         </div>
       </div>
 
@@ -420,13 +424,21 @@ require_once 'header.php';
     }
 
     // มีเรียงความแล้ว: เปิด PDF (ครูแก้ไข/ลบได้ในหน้าเอกสาร essay_print.php ที่เปิดจากปุ่มนี้)
+    // และปุ่มหุ่นยนต์สำหรับสั่ง/ดูผลตรวจของ AI ในหน้า ai_feedback.php
     const tip = IS_TEACHER ? 'เปิดเอกสารเรียงความ — แก้ไข/ลบได้ในหน้านี้' : 'เปิด PDF เรียงความ';
     return `<td class="${cls}">
-      <button class="btn btn-sm btn-outline-danger rounded-circle p-0 d-inline-flex align-items-center justify-content-center"
-        style="width:32px;height:32px;" title="${tip} (${label})"
-        onclick='openEssayPdf(${sid}, ${pk})'>
-        <i class="bi bi-file-earmark-pdf-fill"></i>
-      </button>
+      <div class="d-inline-flex gap-1">
+        <button class="btn btn-sm btn-outline-danger rounded-circle p-0 d-inline-flex align-items-center justify-content-center"
+          style="width:32px;height:32px;" title="${tip} (${label})"
+          onclick='openEssayPdf(${sid}, ${pk})'>
+          <i class="bi bi-file-earmark-pdf-fill"></i>
+        </button>
+        <button class="btn btn-sm btn-outline-primary rounded-circle p-0 d-inline-flex align-items-center justify-content-center"
+          style="width:32px;height:32px;" title="ผู้ช่วย AI: ตรวจ/ดูข้อเสนอแนะของฉบับนี้ (${label})"
+          onclick='openAiFeedback(${sid}, ${pk})'>
+          <i class="bi bi-robot"></i>
+        </button>
+      </div>
     </td>`;
   }
 
@@ -488,6 +500,14 @@ require_once 'header.php';
         <tbody class="text-start">${bodyRows}</tbody>
       </table>
       <div class="text-muted small mt-2"><i class="bi bi-star-fill text-warning me-1"></i>D2 = ร่างที่ 2 (ร่างที่คุณครูใช้ให้คะแนน) · D1 = ร่างที่ 1</div>`;
+  }
+
+  // เปิดหน้าผู้ช่วย AI โดยเลือกนักเรียนและรอบงานไว้ให้พร้อมตรวจ/ดูผลทันที
+  function openAiFeedback(studentId, phase) {
+    const params = new URLSearchParams();
+    params.set('student_id', studentId);
+    params.set('phase', phase);
+    window.location.href = 'ai_feedback.php?' + params.toString();
   }
 
   // เปิดเรียงความของนักเรียนคนเดียว (รอบที่ระบุ) เป็นเอกสาร PDF ฝั่งเซิร์ฟเวอร์

@@ -544,3 +544,18 @@ body {
   .content-card,
   .app-content .page-panel { padding: 16px; }
 }
+
+/* ============================================================
+   ผลตรวจเรียงความจาก AI (ใช้ร่วมกันในหน้า ai_feedback.php และ essay_writer.php)
+   ============================================================ */
+.ai-crit-row td { vertical-align: top; }
+.ai-strength-card { border-left: 4px solid #10b981; background: #ecfdf5; }
+.ai-improve-card  { border-left: 4px solid #f59e0b; background: #fffbeb; }
+.ai-next-card     { border-left: 4px solid #3b82f6; background: #eff6ff; }
+.ai-score-bar {
+  height: 8px; border-radius: 999px; background: #e9ecef; overflow: hidden;
+}
+.ai-score-bar > span {
+  display: block; height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, #6d28d9, #0d7377);
+}

@@ -19,6 +19,7 @@ function teg_menu_for_role($role) {
       'main' => [
         ['หน้าหลัก',          'index.php',                 'bi-grid-1x2-fill',      'index'],
         ['บันทึกเรียงความ',    'essay_writer.php',          'bi-pencil-square',      'essay_writer'],
+        ['ผู้ช่วย AI ตรวจงาน',  'ai_feedback.php',           'bi-robot',              'ai_feedback'],
         ['ประเมินตนเอง',      'evaluation.php?mode=self',  'bi-person-check-fill',  'evaluation:self'],
         ['จับคู่เพื่อน',       'peer_matching.php',         'bi-people-fill',        'peer_matching'],
         ['ประเมินเพื่อน',      'evaluation.php?mode=peer',  'bi-clipboard-check',    'evaluation:peer'],
@@ -35,6 +36,7 @@ function teg_menu_for_role($role) {
         ['หน้าหลัก',            'index.php',                   'bi-grid-1x2-fill',   'index'],
         ['ประเมินผลงาน',       'evaluation.php?mode=expert',  'bi-clipboard-check', 'evaluation:expert'],
         ['เรียงความนักเรียน',   'essay_viewer.php',            'bi-journal-text',    'essay_viewer'],
+        ['ผลตรวจจาก AI',       'ai_feedback.php',             'bi-robot',           'ai_feedback'],
       ],
       'general' => [],
     ];
@@ -47,6 +49,7 @@ function teg_menu_for_role($role) {
       ['แดชบอร์ดวิจัย',       'dashboard.php',                'bi-bar-chart-line-fill','dashboard'],
       ['รายงานการส่งงาน',     'submission_report.php',        'bi-table',              'submission_report'],
       ['เรียงความนักเรียน',   'essay_viewer.php',             'bi-journal-text',       'essay_viewer'],
+      ['ผู้ช่วย AI ตรวจงาน',  'ai_feedback.php',              'bi-robot',              'ai_feedback'],
     ],
     'general' => [
       ['รายงานสะท้อนคิด',      'reflection_tools.php',         'bi-lightbulb-fill',     'reflection_tools'],

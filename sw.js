@@ -2,7 +2,7 @@
    กลยุทธ์แบบระมัดระวัง: แคชเฉพาะไฟล์สแตติก (ไอคอน/CSS) เท่านั้น
    ไม่แคชไฟล์ .php หรือ api.php เพื่อไม่ให้ข้อมูล session/คะแนน ค้างเก่า
    สำหรับการเปิดหน้า (navigation) ขณะออฟไลน์ จะแสดงหน้า offline.html แทน */
-const CACHE = 'teg-static-v3';
+const CACHE = 'teg-static-v4';
 const STATIC_ASSETS = [
   'index.css',
   'offline.html',
