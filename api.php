@@ -2541,11 +2541,34 @@ try {
             $stmt->execute($params);
             $aiRows = array_map('ai_feedback_row_to_array', $stmt->fetchAll());
 
+            // สถานะเรียงความของนักเรียนคนนี้ทุกรอบงาน — ใช้แยกว่า "ยังไม่ได้เขียน" กับ "เขียนแล้วแต่ยังไม่ตรวจ"
+            $aiEssays = [];
+            try {
+                $stmtE = $pdo->prepare('
+                    SELECT essay_phase, word_count, updated_at
+                      FROM student_essays
+                     WHERE student_id = ?
+                       AND (COALESCE(intro_content,\'\') <> \'\'
+                         OR COALESCE(body_content,\'\') <> \'\'
+                         OR COALESCE(conclusion_content,\'\') <> \'\')
+                ');
+                $stmtE->execute([$aiSid]);
+                while ($rE = $stmtE->fetch()) {
+                    $aiEssays[$rE['essay_phase']] = [
+                        'word_count' => (int)$rE['word_count'],
+                        'too_short'  => ((int)$rE['word_count'] < AI_MIN_WORDS),
+                        'updated_at' => (string)$rE['updated_at'],
+                    ];
+                }
+            } catch (Exception $e) { /* อ่านไม่ได้ก็ยังแสดงผลตรวจได้ตามปกติ */ }
+
             echo json_encode([
-                'success'  => true,
-                'found'    => count($aiRows) > 0,
-                'feedback' => ($aiPhase !== '') ? ($aiRows ? $aiRows[0] : null) : null,
-                'list'     => $aiRows,
+                'success'   => true,
+                'found'     => count($aiRows) > 0,
+                'feedback'  => ($aiPhase !== '') ? ($aiRows ? $aiRows[0] : null) : null,
+                'list'      => $aiRows,
+                'essays'    => $aiEssays,
+                'min_words' => AI_MIN_WORDS,
             ]);
             break;
 
