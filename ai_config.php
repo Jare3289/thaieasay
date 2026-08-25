@@ -21,8 +21,9 @@ if (!defined('AI_FEEDBACK_LOADED')) {
     define('AI_FEEDBACK_LOADED', true);
 
     // โควตากันการกดรัวจนเปลืองโควตาฟรีของผู้ให้บริการ (ต่อคน ต่อวัน)
-    define('AI_DAILY_LIMIT_STUDENT', 20);
-    define('AI_DAILY_LIMIT_TEACHER', 300);
+    // ครูเป็นผู้สั่งตรวจเพียงผู้เดียว และตรวจทีละทั้งรอบได้ (39 คน/รอบ × 6 รอบ = 234)
+    // จึงตั้งไว้ให้พอตรวจทั้งชั้นครบทุกรอบในวันเดียวแล้วยังเหลือสำหรับตรวจซ้ำบางฉบับ
+    define('AI_DAILY_LIMIT_TEACHER', 400);
     // ความยาวขั้นต่ำที่ยอมให้ส่งตรวจ (กันการส่งงานเปล่า ๆ ไปเปลืองโควตา)
     define('AI_MIN_WORDS', 40);
     // ตัดข้อความที่ยาวเกินไปก่อนส่ง (กันค่าใช้จ่าย/ข้อจำกัด token)
@@ -111,10 +112,6 @@ function ai_settings(PDO $pdo) {
         'api_key'         => '',
         'key_source'      => 'none',   // none | file | db
         'enabled'         => true,     // เปิดใช้ฟีเจอร์ AI ทั้งระบบหรือไม่
-        'student_enabled' => true,     // ให้นักเรียนกดตรวจเองได้หรือไม่
-        // รอบที่นักเรียนกดตรวจเองได้ — ค่าเริ่มต้นไม่รวมก่อนเรียน/หลังเรียน
-        // เพื่อรักษาความตรงของข้อมูลวิจัย (Pre-test / Post-test ควรวัดความสามารถจริง)
-        'student_phases'  => ['task1_d1', 'task1_d2', 'task2_d1', 'task2_d2'],
     ];
 
     // 1) ค่าที่ครูกรอกผ่านหน้าเว็บ (ตาราง app_settings)
@@ -128,12 +125,7 @@ function ai_settings(PDO $pdo) {
                 case 'ai_api_key':
                     if ((string)$r['svalue'] !== '') { $s['api_key'] = (string)$r['svalue']; $s['key_source'] = 'db'; }
                     break;
-                case 'ai_enabled':         $s['enabled']         = ((string)$r['svalue'] !== '0'); break;
-                case 'ai_student_enabled': $s['student_enabled'] = ((string)$r['svalue'] !== '0'); break;
-                case 'ai_student_phases':
-                    $list = array_values(array_filter(array_map('trim', explode(',', (string)$r['svalue']))));
-                    $s['student_phases'] = array_values(array_intersect($list, ai_all_phases()));
-                    break;
+                case 'ai_enabled':         $s['enabled']  = ((string)$r['svalue'] !== '0'); break;
             }
         }
     } catch (Exception $e) { /* ตารางอาจยังไม่ถูกสร้าง — ใช้ค่าเริ่มต้น */ }
@@ -163,7 +155,7 @@ function ai_settings(PDO $pdo) {
 
 /** บันทึกการตั้งค่า AI (เฉพาะคีย์ที่ส่งมา) แล้วล้าง cache ในหน่วยความจำ */
 function ai_save_setting(PDO $pdo, $key, $value) {
-    $allowed = ['ai_provider', 'ai_model', 'ai_base_url', 'ai_api_key', 'ai_enabled', 'ai_student_enabled', 'ai_student_phases'];
+    $allowed = ['ai_provider', 'ai_model', 'ai_base_url', 'ai_api_key', 'ai_enabled'];
     if (!in_array($key, $allowed, true)) return false;
     $stmt = $pdo->prepare('
         INSERT INTO app_settings (skey, svalue) VALUES (?, ?)
@@ -385,7 +377,8 @@ function ai_extract_api_error($body, $status) {
  */
 function ai_call_model(array $s, $systemPrompt, $userPrompt) {
     if (!$s['configured']) {
-        return ['ok' => false, 'text' => '', 'error' => 'ยังไม่ได้ตั้งค่า AI (ขาด API key หรือชื่อโมเดล) กรุณาให้คุณครูตั้งค่าในหน้า "ตั้งค่า AI"'];
+        return ['ok' => false, 'text' => '', 'finish' => '',
+                'error' => 'ยังไม่ได้ตั้งค่า AI (ขาด API key หรือชื่อโมเดล) กรุณาตั้งค่าในหน้า "ผู้ช่วย AI"'];
     }
 
     if ($s['kind'] === 'gemini') {
@@ -396,7 +389,10 @@ function ai_call_model(array $s, $systemPrompt, $userPrompt) {
             'generationConfig'   => [
                 'temperature'      => 0.4,
                 'responseMimeType' => 'application/json',
-                'maxOutputTokens'  => 4096,
+                // เดิมตั้งไว้ 4096 ซึ่งน้อยเกินไป: คำตอบเป็นภาษาไทย (กินโทเคนมากกว่าอังกฤษหลายเท่า)
+                // และโมเดลรุ่นใหม่ยังใช้โทเคนส่วนหนึ่งไป "คิด" ก่อนตอบ พอโควตาหมดกลางคัน
+                // JSON จะถูกตัดครึ่งแล้วอ่านไม่ออก ("รูปแบบไม่ใช่ JSON")
+                'maxOutputTokens'  => 32768,
             ],
         ];
         $res = ai_http_post_json($url, ['x-goog-api-key: ' . $s['api_key']], $payload);
@@ -410,11 +406,12 @@ function ai_call_model(array $s, $systemPrompt, $userPrompt) {
                 if (isset($part['text'])) $text .= $part['text'];
             }
         }
+        $reason = isset($obj['candidates'][0]['finishReason']) ? (string)$obj['candidates'][0]['finishReason'] : '';
         if (trim($text) === '') {
-            $reason = isset($obj['candidates'][0]['finishReason']) ? (string)$obj['candidates'][0]['finishReason'] : '';
-            return ['ok' => false, 'text' => '', 'error' => 'AI ไม่ได้ส่งเนื้อหากลับมา' . ($reason !== '' ? " (สาเหตุ: $reason)" : '')];
+            return ['ok' => false, 'text' => '', 'finish' => $reason,
+                    'error' => 'AI ไม่ได้ส่งเนื้อหากลับมา' . ($reason !== '' ? " (สาเหตุ: $reason)" : '')];
         }
-        return ['ok' => true, 'text' => $text, 'error' => ''];
+        return ['ok' => true, 'text' => $text, 'error' => '', 'finish' => $reason];
     }
 
     // มาตรฐาน OpenAI (typhoon / openrouter / groq / custom)
@@ -431,6 +428,7 @@ function ai_call_model(array $s, $systemPrompt, $userPrompt) {
             ['role' => 'user',   'content' => $userPrompt],
         ],
         'temperature' => 0.4,
+        'max_tokens'  => 8192,
     ];
 
     // ลองใช้โหมดบังคับ JSON ก่อน ถ้าโมเดลไม่รองรับค่อยยิงซ้ำแบบธรรมดา
@@ -443,9 +441,10 @@ function ai_call_model(array $s, $systemPrompt, $userPrompt) {
     if (!$res['ok']) return ['ok' => false, 'text' => '', 'error' => ai_extract_api_error($res['body'], $res['status'])];
 
     $obj  = json_decode($res['body'], true);
-    $text = isset($obj['choices'][0]['message']['content']) ? (string)$obj['choices'][0]['message']['content'] : '';
-    if (trim($text) === '') return ['ok' => false, 'text' => '', 'error' => 'AI ไม่ได้ส่งเนื้อหากลับมา'];
-    return ['ok' => true, 'text' => $text, 'error' => ''];
+    $text   = isset($obj['choices'][0]['message']['content']) ? (string)$obj['choices'][0]['message']['content'] : '';
+    $reason = isset($obj['choices'][0]['finish_reason']) ? (string)$obj['choices'][0]['finish_reason'] : '';
+    if (trim($text) === '') return ['ok' => false, 'text' => '', 'finish' => $reason, 'error' => 'AI ไม่ได้ส่งเนื้อหากลับมา'];
+    return ['ok' => true, 'text' => $text, 'error' => '', 'finish' => $reason];
 }
 
 /** ดึงก้อน JSON ออกจากข้อความที่ AI ตอบ (เผื่อมี ``` หรือคำอธิบายห่อไว้) */
@@ -462,7 +461,65 @@ function ai_extract_json($text) {
         $obj = json_decode(substr($t, $start, $end - $start + 1), true);
         if (is_array($obj)) return $obj;
     }
-    return null;
+    // ทางสุดท้าย: คำตอบอาจถูกตัดกลางคันเพราะชนเพดานโทเคน — ลองกู้เท่าที่มี
+    return ai_salvage_json($t);
+}
+
+/**
+ * กู้ JSON ที่ถูกตัดกลางคัน (เช่นโมเดลตอบยาวจนชนเพดานโทเคน)
+ * วิธี: ตัดค่าที่ค้างครึ่ง ๆ ทิ้ง แล้วปิดวงเล็บที่ยังเปิดค้างอยู่ให้ครบ
+ * คืน array ถ้ากู้สำเร็จ หรือ null ถ้ากู้ไม่ได้
+ */
+function ai_salvage_json($text) {
+    $t = (string)$text;
+    $start = strpos($t, '{');
+    if ($start === false) return null;
+    $t = substr($t, $start);
+
+    // เดินอ่านทีละอักขระเพื่อหาว่าข้อความจบลงกลางสตริงหรือไม่
+    $inStr = false; $esc = false; $strStart = -1;
+    for ($i = 0, $len = strlen($t); $i < $len; $i++) {
+        $c = $t[$i];
+        if ($inStr) {
+            if ($esc)            { $esc = false; continue; }
+            if ($c === '\\')     { $esc = true;  continue; }
+            if ($c === '"')      { $inStr = false; }
+            continue;
+        }
+        if ($c === '"') { $inStr = true; $strStart = $i; }
+    }
+    // จบกลางสตริง → ตัดสตริงที่ค้างทิ้งทั้งตัว
+    if ($inStr && $strStart >= 0) $t = substr($t, 0, $strStart);
+
+    // เก็บกวาดเศษท้ายที่ไม่สมบูรณ์ (คอมมา, โคลอน, ชื่อคีย์ที่ยังไม่มีค่า)
+    $t = rtrim($t);
+    for ($pass = 0; $pass < 3; $pass++) {
+        $t = preg_replace('/\s*[,:]\s*$/', '', $t);
+        $t = preg_replace('/,\s*"[^"]*"\s*$/', '', $t);   // ,"key" ค้าง
+        $t = preg_replace('/\{\s*"[^"]*"\s*$/', '{', $t); // {"key" ค้าง
+        $t = rtrim($t);
+    }
+
+    // นับวงเล็บที่ยังเปิดค้าง (นอกสตริง) แล้วปิดให้ครบตามลำดับย้อนกลับ
+    $stack = []; $inStr = false; $esc = false;
+    for ($i = 0, $len = strlen($t); $i < $len; $i++) {
+        $c = $t[$i];
+        if ($inStr) {
+            if ($esc)        { $esc = false; continue; }
+            if ($c === '\\') { $esc = true;  continue; }
+            if ($c === '"')  { $inStr = false; }
+            continue;
+        }
+        if ($c === '"')                 { $inStr = true; }
+        elseif ($c === '{' || $c === '[') { $stack[] = $c; }
+        elseif ($c === '}' || $c === ']') { array_pop($stack); }
+    }
+    while (!empty($stack)) {
+        $t .= (array_pop($stack) === '{') ? '}' : ']';
+    }
+
+    $obj = json_decode($t, true);
+    return is_array($obj) ? $obj : null;
 }
 
 /** ทำความสะอาดข้อความจาก AI ก่อนเก็บลงฐานข้อมูล */
@@ -479,7 +536,10 @@ function ai_clean_text($v, $maxLen = 2000) {
 function ai_parse_feedback($rawText) {
     $obj = ai_extract_json($rawText);
     if (!is_array($obj)) {
-        return ['ok' => false, 'data' => [], 'error' => 'อ่านคำตอบของ AI ไม่ได้ (รูปแบบไม่ใช่ JSON) กรุณากดตรวจใหม่อีกครั้ง'];
+        $peek = ai_clean_text(mb_substr(trim((string)$rawText), 0, 160, 'UTF-8'), 200);
+        return ['ok' => false, 'data' => [], 'error' =>
+            'อ่านคำตอบของ AI ไม่ได้ (ไม่ใช่ JSON ที่สมบูรณ์) กรุณากดตรวจใหม่อีกครั้ง'
+            . ($peek !== '' ? ' — คำตอบที่ได้ขึ้นต้นว่า: "' . $peek . '"' : ' — AI ไม่ได้ส่งข้อความใด ๆ กลับมา')];
     }
 
     $strengths = [];
