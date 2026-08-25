@@ -45,51 +45,92 @@ $aiPhases    = ai_all_phases();
       <i class="bi bi-info-circle me-1"></i>
       ข้อเสนอแนะและคะแนนจาก AI เป็นเพียง<strong>แนวทางเพื่อพัฒนางานเขียน</strong>
       ไม่ถูกนำไปรวมกับคะแนนจริงของครู เพื่อน หรือการประเมินตนเองในระบบประเมิน —
-      ข้อที่ AI ตรวจจากไฟล์พิมพ์แทนไม่ได้ (ความเรียบร้อย/ลายมือ) คุณครูกรอกคะแนนเองได้ในหน้านี้
-      เพื่อให้เห็นคะแนนรวม<strong>เต็ม 60 ตามเกณฑ์จริง</strong>
+      ข้อที่ AI ตรวจจากไฟล์พิมพ์แทนไม่ได้ (ความเรียบร้อย/ลายมือ) คุณครูเลือกระดับคะแนนเองได้ที่
+      <strong>ท้ายตาราง &quot;คะแนนรายเกณฑ์ (ประมาณการ)&quot;</strong> ของผลตรวจแต่ละฉบับ
+      เพื่อให้เห็นคะแนนรวม<strong>เต็ม 60 ตามเกณฑ์จริง</strong> —
+      หากนักเรียนแก้ไขต้นฉบับหลังตรวจ ระบบจะจัดเข้า<strong>คิวรอตรวจใหม่</strong>ให้อัตโนมัติ
     </div>
   </div>
 
   <!-- แถบสถานะระบบ AI -->
   <div id="aiStatusBar" class="alert border-0 rounded-3 small d-none" role="alert"></div>
 
-  <!-- แผงทำงานหลัก: เลือกเรียงความที่จะตรวจ / ดูผล -->
-  <div class="card border-0 shadow-sm rounded-4 mb-4" style="border-top:4px solid #0d7377 !important;">
-    <div class="card-header bg-white border-bottom py-3 px-4 rounded-top-4">
-      <h6 class="fw-bold text-dark mb-0">
-        <i class="bi bi-file-earmark-text text-primary me-2"></i>เลือกเรียงความที่จะ<?php echo $aiIsTeacher ? 'ตรวจหรือดูผล' : 'ดูผล'; ?>
-      </h6>
-    </div>
-    <div class="card-body p-4">
-      <div class="row g-3 align-items-end">
 <?php if (!$aiIsStudent): ?>
-        <div class="col-md-5">
-          <label class="form-label fw-bold small">นักเรียน</label>
-          <select id="aiStudentSelect" class="form-select border-2 rounded-3" onchange="onSelectionChange()">
-            <option value="">— กำลังโหลดรายชื่อ —</option>
-          </select>
+  <!-- คิวรอตรวจใหม่: นักเรียนแก้ไขต้นฉบับหลังจาก AI ตรวจไปแล้ว (ซ่อนไว้เมื่อคิวว่าง) -->
+  <div id="aiRecheckCard" class="card border-0 shadow-sm rounded-4 mb-4 d-none" style="border-top:4px solid #f59e0b !important;">
+    <div class="card-header bg-white border-bottom py-3 px-4 rounded-top-4">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div>
+          <h6 class="fw-bold text-dark mb-0">
+            <i class="bi bi-arrow-repeat text-warning me-2"></i>คิวรอตรวจใหม่
+            <span id="aiRecheckCount" class="badge bg-warning text-dark ms-1">0</span>
+          </h6>
+          <div class="text-muted small mt-1">
+            เรียงความที่นักเรียนแก้ไขต้นฉบับหลังจาก AI ตรวจไปแล้ว — ผลตรวจเดิมยังเป็นของฉบับก่อนแก้
+          </div>
         </div>
-<?php endif; ?>
-        <div class="col-md-<?php echo $aiIsStudent ? '12' : ($aiIsTeacher ? '4' : '7'); ?>">
-          <label class="form-label fw-bold small">รอบงาน</label>
-          <select id="aiPhaseSelect" class="form-select border-2 rounded-3" onchange="onSelectionChange()">
-            <?php foreach ($aiPhases as $ph): ?>
-            <option value="<?php echo $ph; ?>"><?php echo htmlspecialchars(ai_phase_label($ph)); ?></option>
-            <?php endforeach; ?>
-          </select>
-        </div>
-<?php if ($aiIsTeacher): ?>
-        <div class="col-md-3 d-grid">
-          <button id="aiReviewBtn" class="btn btn-lg fw-bold rounded-pill shadow-sm text-white"
-                  style="background: linear-gradient(135deg,#6d28d9,#0d7377);" onclick="runAiReview()">
-            <i class="bi bi-stars me-1"></i>ตรวจฉบับนี้
+        <div class="d-flex gap-2">
+          <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" onclick="loadRecheckQueue()">
+            <i class="bi bi-arrow-clockwise me-1"></i>รีเฟรช
           </button>
-        </div>
+<?php if ($aiIsTeacher): ?>
+          <button id="rcStartBtn" class="btn btn-warning btn-sm rounded-pill px-3 fw-bold" onclick="startRecheckQueue()">
+            <i class="bi bi-stars me-1"></i>ให้ AI ตรวจใหม่ทั้งคิว
+          </button>
+          <button id="rcStopBtn" class="btn btn-outline-danger btn-sm rounded-pill px-3 d-none" onclick="stopBatchReview()">
+            <i class="bi bi-stop-fill me-1"></i>หยุด
+          </button>
 <?php endif; ?>
+        </div>
       </div>
+      <div id="rcProgressWrap" class="mt-3 d-none">
+        <div class="d-flex justify-content-between small fw-bold mb-1">
+          <span id="rcProgressLabel">กำลังตรวจ...</span>
+          <span id="rcProgressCount">0 / 0</span>
+        </div>
+        <div class="progress" style="height:10px;">
+          <div id="rcProgressBar" class="progress-bar" role="progressbar"
+               style="width:0%; background:linear-gradient(90deg,#f59e0b,#d97706);"></div>
+        </div>
+      </div>
+      <div id="rcLog" class="mt-3 d-none border rounded-3" style="max-height:240px; overflow:auto;"></div>
+    </div>
+    <div class="card-body p-0">
+      <div id="aiRecheckList" style="max-height:300px; overflow:auto;"></div>
+    </div>
+  </div>
+<?php endif; ?>
+
+<?php if (!$aiIsStudent): ?>
+  <!-- เลือกนักเรียนที่จะดูผล (ครู/ผู้เชี่ยวชาญ) — รอบงานไม่ต้องเลือก เพราะขึ้นให้ครบทุกฉบับอยู่แล้ว -->
+  <div class="card border-0 shadow-sm rounded-4 mb-4" style="border-top:4px solid #0d7377 !important;">
+    <div class="card-body p-4">
+      <label class="form-label fw-bold small">นักเรียน</label>
+      <select id="aiStudentSelect" class="form-select border-2 rounded-3" onchange="onSelectionChange()">
+        <option value="">— กำลังโหลดรายชื่อ —</option>
+      </select>
       <div id="aiQuotaText" class="text-muted small mt-3"></div>
     </div>
   </div>
+<?php else: ?>
+  <div id="aiQuotaText" class="text-muted small mb-3"></div>
+<?php endif; ?>
+
+  <!-- ผลตรวจทุกรอบงานในหน้าเดียว — คลิกการ์ดเพื่อดูรายละเอียดการให้คะแนนและข้อเสนอแนะ -->
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+    <h6 class="fw-bold text-dark mb-0">
+      <i class="bi bi-grid-3x2-gap-fill text-primary me-2"></i>ผลตรวจของ AI ทุกรอบงาน
+    </h6>
+    <span class="text-muted small"><i class="bi bi-hand-index-thumb me-1"></i>คลิกการ์ดคะแนนเพื่อดูรายละเอียด</span>
+  </div>
+  <div id="aiPhaseCards" class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3 mb-4">
+    <div class="col-12"><div class="text-center text-muted py-4">
+      <i class="bi bi-hourglass-split me-2"></i>กำลังโหลด...
+    </div></div>
+  </div>
+
+  <!-- รายละเอียดการให้คะแนนและข้อมูลย้อนกลับของฉบับที่เลือก -->
+  <div id="aiFeedbackPanel"></div>
 
 <?php if ($aiIsTeacher): ?>
   <!-- แถบเครื่องมือของคุณครู — เก็บงานตั้งค่า/ตรวจทั้งรอบไว้ในลิ้นชัก ไม่ให้บังแผงผลตรวจซึ่งใช้บ่อยที่สุด -->
@@ -135,7 +176,7 @@ $aiPhases    = ai_all_phases();
           <div class="form-check mb-2">
             <input class="form-check-input" type="checkbox" id="batchSkipDone" checked onchange="paintBatchSummary()">
             <label class="form-check-label small" for="batchSkipDone">
-              ข้ามฉบับที่เคยตรวจแล้ว <span class="text-muted">(ประหยัดโควตา)</span>
+              ข้ามฉบับที่เคยตรวจแล้ว <span class="text-muted">(ประหยัดโควตา — ฉบับที่แก้ไขต้นฉบับหลังตรวจจะยังถูกตรวจใหม่ให้)</span>
             </label>
           </div>
           <div class="d-flex gap-2">
@@ -243,19 +284,15 @@ $aiPhases    = ai_all_phases();
   </div>
 <?php endif; ?>
 
-  <!-- ผลการตรวจ -->
-  <div id="aiFeedbackPanel">
-    <div class="text-center text-muted py-5">
-      <i class="bi bi-hourglass-split fs-3 d-block mb-2"></i>กำลังโหลด...
-    </div>
-  </div>
-
 <?php if (!$aiIsStudent): ?>
   <!-- ภาพรวมทั้งชั้น (ครู/ผู้เชี่ยวชาญ) -->
   <div class="card border-0 shadow-sm rounded-4 mt-4">
     <div class="card-header bg-white border-bottom py-3 px-4 rounded-top-4">
       <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-        <h6 class="fw-bold text-dark mb-0"><i class="bi bi-table text-secondary me-2"></i>ภาพรวมผลตรวจ AI ทั้งชั้น</h6>
+        <div>
+          <h6 class="fw-bold text-dark mb-0"><i class="bi bi-table text-secondary me-2"></i>ภาพรวมผลตรวจ AI ทั้งชั้น</h6>
+          <div class="text-muted small mt-1">คะแนนรวมของนักเรียนแต่ละคนทุกรอบงาน พร้อมค่าเฉลี่ยรายบุคคลและค่าเฉลี่ยทั้งชั้น</div>
+        </div>
         <button class="btn btn-outline-secondary btn-sm rounded-pill" onclick="loadAiOverview()">
           <i class="bi bi-arrow-clockwise me-1"></i>รีเฟรช
         </button>
@@ -267,16 +304,22 @@ $aiPhases    = ai_all_phases();
         </div>
         <div class="col-sm-6 col-lg-4">
           <select id="aiOverviewPhase" class="form-select form-select-sm rounded-3" onchange="paintAiOverview()">
-            <option value="">ทุกรอบงาน</option>
+            <option value="">ทุกรอบงาน (แสดงครบทุกคอลัมน์)</option>
             <?php foreach ($aiPhases as $ph): ?>
             <option value="<?php echo $ph; ?>"><?php echo htmlspecialchars(ai_phase_label($ph)); ?></option>
             <?php endforeach; ?>
           </select>
         </div>
         <div class="col-lg-3 d-flex align-items-center">
-          <div class="form-check mb-0">
-            <input class="form-check-input" type="checkbox" id="aiOverviewNeedScore" onchange="paintAiOverview()">
-            <label class="form-check-label small" for="aiOverviewNeedScore">เฉพาะที่รอคะแนนจากครู</label>
+          <div>
+            <div class="form-check mb-0">
+              <input class="form-check-input" type="checkbox" id="aiOverviewNeedScore" onchange="paintAiOverview()">
+              <label class="form-check-label small" for="aiOverviewNeedScore">เฉพาะที่รอคะแนนจากครู</label>
+            </div>
+            <div class="form-check mb-0">
+              <input class="form-check-input" type="checkbox" id="aiOverviewNeedRecheck" onchange="paintAiOverview()">
+              <label class="form-check-label small" for="aiOverviewNeedRecheck">เฉพาะที่รอตรวจใหม่</label>
+            </div>
           </div>
         </div>
       </div>
@@ -290,12 +333,76 @@ $aiPhases    = ai_all_phases();
 <?php endif; ?>
 </div>
 
+<style>
+  /* การ์ดคะแนนรายรอบงาน — คลิกเพื่อเปิดรายละเอียดการให้คะแนนและข้อมูลย้อนกลับ */
+  .ai-phase-card {
+    background: #ffffff;
+    border: 2px solid var(--border-gray);
+    transition: all 0.2s ease-in-out;
+    display: flex;
+    flex-direction: column;
+  }
+  .ai-phase-card[role="button"] { cursor: pointer; }
+  .ai-phase-card[role="button"]:hover {
+    border-color: #6d28d9;
+    box-shadow: 0 6px 18px rgba(109, 40, 217, 0.12);
+    transform: translateY(-2px);
+  }
+  .ai-phase-card[role="button"]:focus-visible { outline: 3px solid #ddd6fe; outline-offset: 2px; }
+  .ai-phase-card-active {
+    border-color: #6d28d9;
+    background: #faf7ff;
+    box-shadow: 0 6px 18px rgba(109, 40, 217, 0.15);
+  }
+  .ai-phase-card-empty { background: #f8fafc; border-style: dashed; }
+  .ai-phase-card .ai-score-bar { height: 8px; }
+
+  /* ตารางภาพรวมผลตรวจ AI — ใช้รูปแบบหัวตารางเดียวกับ "รายงานการส่งงานรายบุคคล" (submission_report.php) */
+  .ai-report-table { min-width: 760px; }
+  .ai-report-table th, .ai-report-table td { white-space: nowrap; text-align: center; font-size: 0.86rem; }
+  .ai-report-table thead th {
+    background: var(--light-slate);
+    color: var(--primary-navy);
+    font-weight: 700;
+    border-bottom: 2px solid var(--border-gray);
+    vertical-align: middle;
+    position: sticky;
+    z-index: 2;
+  }
+  .ai-report-table thead .report-head-group th { top: 0; }
+  .ai-report-table thead .report-head-sub th   { top: 42px; }
+  .ai-report-table thead .grp-unit1 { background: #eff6ff; color: #1d4ed8; }
+  .ai-report-table thead .grp-unit2 { background: #eef2ff; color: #3730a3; }
+  .ai-report-table tbody td { border-bottom: 1px solid var(--border-gray); }
+  .ai-report-table tbody .stu-id { font-family: monospace; color: #64748b; font-weight: 600; text-align: left; }
+  .ai-report-table tbody .stu-name { font-weight: 600; color: var(--primary-navy); text-align: left; white-space: normal; }
+  .ai-report-table tbody tr:hover td { background: var(--light-blue); }
+  .ai-cell-score { cursor: pointer; color: #0f172a; }
+  .ai-cell-score:hover { background: #ede9fe !important; }
+  .ai-cell-empty { color: #cbd5e1; }
+  .ai-cell-avg { background: #f8fafc; }
+  .ai-cell-wait { color: #d97706; font-weight: 700; margin-left: 2px; }
+  .ai-cell-stale { background: #fffbeb; }
+  .ai-cell-stale-icon { color: #d97706; margin-left: 3px; }
+  .ai-recheck-row { cursor: pointer; }
+  .ai-recheck-row:hover { background: #fffbeb; }
+  .ai-report-avg td {
+    background: #f1f5f9;
+    color: var(--primary-navy);
+    border-top: 2px solid var(--border-gray);
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+  }
+</style>
+
 <script src="ai_review.js"></script>
 <script>
 const AI_ROLE       = <?php echo json_encode($aiRole); ?>;
 const AI_IS_STUDENT = <?php echo $aiIsStudent ? 'true' : 'false'; ?>;
 const AI_IS_TEACHER = <?php echo $aiIsTeacher ? 'true' : 'false'; ?>;
 const AI_MY_ID      = <?php echo json_encode($sessionUser['id']); ?>;
+const AI_PHASES     = <?php echo json_encode($aiPhases); ?>;
 
 let aiStatus    = null;   // สถานะฟีเจอร์ AI ของผู้ใช้คนนี้
 let aiProviders = [];     // รายชื่อผู้ให้บริการ (เฉพาะครู)
@@ -309,8 +416,14 @@ function currentStudentId() {
   const el = document.getElementById('aiStudentSelect');
   return el ? el.value : '';
 }
+// รอบงานที่กำลังเปิดดูรายละเอียดอยู่ ('' = ยังไม่ได้เลือกการ์ดไหน)
+let selectedPhase  = '';
+let aiAllFeedback  = {};   // รหัสรอบงาน => ผลตรวจฉบับเต็ม (โหลดครั้งเดียวได้ครบทุกรอบ)
+let aiEssayStatus  = {};   // รหัสรอบงาน => สถานะเรียงความ {word_count, too_short, updated_at}
+let aiCardsReady   = false;   // โหลดข้อมูลการ์ดครบแล้วหรือยัง (กันการวาดการ์ดเปล่าแวบหนึ่งตอนเปิดหน้า)
+
 function currentPhase() {
-  return document.getElementById('aiPhaseSelect').value;
+  return selectedPhase;
 }
 
 // ---------------------------------------------------------------- สถานะระบบ
@@ -332,11 +445,11 @@ function paintStatusBar() {
   } else if (!aiStatus.configured) {
     cls = 'alert-warning';
     html = AI_IS_TEACHER
-      ? '<i class="bi bi-exclamation-triangle me-1"></i>ยังไม่ได้ตั้งค่า API key — กดปุ่ม "เปิด/ปิดการตั้งค่า" ด้านล่างเพื่อใส่คีย์ก่อนใช้งาน'
+      ? '<i class="bi bi-exclamation-triangle me-1"></i>ยังไม่ได้ตั้งค่า API key — กดปุ่ม "ตั้งค่าผู้ช่วย AI" ด้านล่างเพื่อใส่คีย์ก่อนใช้งาน'
       : '<i class="bi bi-exclamation-triangle me-1"></i>ระบบ AI ยังไม่พร้อมใช้งาน กรุณาแจ้งคุณครูให้ตั้งค่าก่อน';
   } else if (!AI_IS_TEACHER) {
     cls = 'alert-info';
-    html = '<i class="bi bi-eye me-1"></i>หน้านี้แสดงผลตรวจที่คุณครูให้ AI ตรวจไว้แล้ว — เลือกรอบงานด้านล่างเพื่อดู';
+    html = '<i class="bi bi-eye me-1"></i>หน้านี้แสดงผลตรวจที่คุณครูให้ AI ตรวจไว้แล้วครบทุกรอบงาน — คลิกการ์ดคะแนนเพื่อดูรายละเอียด';
   } else {
     html = '<i class="bi bi-check-circle me-1"></i>ผู้ช่วย AI พร้อมใช้งาน';
   }
@@ -345,50 +458,163 @@ function paintStatusBar() {
   bar.classList.remove('d-none');
 }
 
-// ปุ่ม "ให้ AI ตรวจ" ใช้ได้หรือไม่ ขึ้นกับสิทธิ์ + รอบที่เลือก + โควตาคงเหลือ
+// ข้อความโควตา/เหตุผลที่ยังสั่งตรวจไม่ได้ (ปุ่มสั่งตรวจย้ายไปอยู่บนการ์ดแต่ละใบแล้ว)
+function reviewBlockReason() {
+  if (!AI_IS_TEACHER) return 'เฉพาะคุณครูเท่านั้นที่สั่งให้ AI ตรวจได้';
+  if (!aiStatus) return 'กำลังตรวจสอบสถานะระบบ AI';
+  if (!aiStatus.can_review) return aiStatus.enabled ? 'ยังไม่ได้ตั้งค่า API key' : 'ผู้ช่วย AI ถูกปิดใช้งานอยู่';
+  if (aiStatus.quota_left <= 0) return 'วันนี้ใช้โควตาครบแล้ว (' + aiStatus.quota_limit + ' ครั้ง/วัน)';
+  if (!currentStudentId()) return 'กรุณาเลือกนักเรียนก่อน';
+  return '';
+}
+
 function updateReviewButton() {
-  const btn   = document.getElementById('aiReviewBtn');
   const quota = document.getElementById('aiQuotaText');
-  if (!btn) {
-    // นักเรียน/ผู้เชี่ยวชาญไม่มีปุ่มตรวจ — ไม่ต้องแสดงข้อความโควตา
-    if (quota) quota.textContent = '';
-    return;
-  }
+  if (!quota) return;
+  if (!AI_IS_TEACHER) { quota.textContent = ''; return; }
 
-  if (!aiStatus) { btn.disabled = true; return; }
-
-  let reason = '';
-  if (!aiStatus.can_review) {
-    reason = aiStatus.enabled ? 'ยังไม่ได้ตั้งค่า API key' : 'ผู้ช่วย AI ถูกปิดใช้งานอยู่';
-  } else if (aiStatus.quota_left <= 0) {
-    reason = 'วันนี้ใช้โควตาครบแล้ว (' + aiStatus.quota_limit + ' ครั้ง/วัน)';
-  } else if (!currentStudentId()) {
-    reason = 'กรุณาเลือกนักเรียนก่อน';
-  }
-
-  btn.disabled = (reason !== '');
-  btn.title = reason || 'ส่งเรียงความรอบนี้ให้ AI ตรวจ';
+  const reason = reviewBlockReason();
   quota.innerHTML = reason
     ? '<i class="bi bi-info-circle me-1"></i>' + esc(reason)
     : '<i class="bi bi-battery-half me-1"></i>วันนี้ใช้ไปแล้ว ' + aiStatus.quota_used + ' จาก ' + aiStatus.quota_limit
       + ' ครั้ง · เรียงความต้องยาวอย่างน้อย ' + aiStatus.min_words + ' คำ';
+  paintPhaseCards();   // ปุ่มบนการ์ดเปิด/ปิดตามสถานะโควตาด้วย
 }
 
 // ------------------------------------------------------------ ดึง/แสดงผลตรวจ
+// โหลดผลตรวจ "ทุกรอบงาน" ของนักเรียนคนที่เลือกในคำขอเดียว แล้ววาดเป็นการ์ดคะแนนทั้งหมด
 async function loadFeedback() {
+  const cards = document.getElementById('aiPhaseCards');
   const panel = document.getElementById('aiFeedbackPanel');
   const sid   = currentStudentId();
-  const phase = currentPhase();
+
+  aiAllFeedback = {};
+  aiEssayStatus = {};
+  aiCardsReady  = false;
+  panel.innerHTML = '';
+
   if (!sid) {
-    panel.innerHTML = emptyBox('เลือกนักเรียนเพื่อดูผลตรวจของ AI');
+    cards.innerHTML = `<div class="col-12">${emptyBox('เลือกนักเรียนด้านบนเพื่อดูผลตรวจของ AI ทุกรอบงาน')}</div>`;
     return;
   }
-  panel.innerHTML = `<div class="card border-0 shadow-sm rounded-4"><div class="card-body">${aiLoadingHTML('กำลังโหลดผลตรวจ...')}</div></div>`;
-  const fb = await aiGetFeedback(sid, phase);
-  if (!fb) {
-    panel.innerHTML = emptyBox('ยังไม่มีผลตรวจของ AI สำหรับรอบงานนี้ — กดปุ่ม "ให้ AI ตรวจ" ด้านบนเพื่อเริ่ม');
+
+  cards.innerHTML = `<div class="col-12"><div class="card border-0 shadow-sm rounded-4"><div class="card-body">`
+    + aiLoadingHTML('กำลังโหลดผลตรวจทุกรอบงาน...') + `</div></div></div>`;
+
+  try {
+    const params = new URLSearchParams({ action: 'get_ai_feedback' });
+    if (!AI_IS_STUDENT) params.set('student_id', sid);
+    const res  = await fetch('api.php?' + params.toString());
+    const data = await res.json();
+    if (data.success) {
+      (data.list || []).forEach(fb => { aiAllFeedback[fb.essay_phase] = fb; });
+      aiEssayStatus = data.essays || {};
+    }
+  } catch (err) {
+    cards.innerHTML = `<div class="col-12">${aiErrorHTML('โหลดผลตรวจไม่สำเร็จ กรุณาลองใหม่อีกครั้ง')}</div>`;
     return;
   }
+
+  // รอบที่เคยเปิดดูอยู่ยังมีผลตรวจไหม ถ้าไม่มีก็กลับไปหน้ารวมการ์ด
+  if (selectedPhase && !aiAllFeedback[selectedPhase]) selectedPhase = '';
+  aiCardsReady = true;
+  paintPhaseCards();
+  paintSelectedFeedback();
+}
+
+// การ์ด 1 ใบต่อ 1 รอบงาน — เห็นคะแนนของตัวเองครบทุกฉบับในหน้าเดียว
+function paintPhaseCards() {
+  const box = document.getElementById('aiPhaseCards');
+  if (!box || !aiCardsReady || !currentStudentId()) return;
+
+  const blocked = reviewBlockReason();
+  box.innerHTML = AI_PHASES.map(ph => {
+    const fb    = aiAllFeedback[ph];
+    const essay = aiEssayStatus[ph];
+    const label = AI_PHASE_LABELS[ph] || ph;
+    const on    = (selectedPhase === ph);
+
+    let body, foot = '', cls = 'ai-phase-card', badges = '';
+
+    if (fb) {
+      const fullMax  = Number(fb.full_max || fb.max_score || 60);
+      const combined = Number(fb.combined_total != null ? fb.combined_total : fb.total_score);
+      const pct      = fullMax > 0 ? Math.round((combined / fullMax) * 100) : 0;
+      const level    = (fb.manual_done && fb.full_quality_level) ? fb.full_quality_level : (fb.quality_level || '-');
+      if (!fb.manual_done) {
+        badges += '<span class="badge bg-warning text-dark">รอคะแนนครู</span>';
+      }
+      if (fb.needs_recheck) {
+        badges += '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning">'
+                + '<i class="bi bi-arrow-repeat me-1"></i>รอตรวจใหม่</span>';
+      }
+      body = `<div class="d-flex align-items-end gap-2">
+          <div class="display-6 fw-bold text-primary lh-1">${aiNum(combined)}</div>
+          <div class="text-muted pb-1">/ ${aiNum(fullMax)} คะแนน</div>
+        </div>
+        <div class="ai-score-bar mt-2"><span style="width:${pct}%"></span></div>
+        <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-1">
+          <span class="badge bg-primary-subtle text-primary-emphasis">ระดับ${fb.manual_done ? '' : 'โดยประมาณ'}: ${esc(level)}</span>
+          <span class="text-muted small">AI ${aiNum(fb.total_score)}/${aiNum(fb.max_score)}
+            · ครู ${fb.manual_done ? aiNum(fb.teacher_total) : '—'}/${aiNum(fb.manual_max)}</span>
+        </div>`;
+      foot = `<span class="fw-semibold text-primary"><i class="bi bi-card-list me-1"></i>${on ? 'กำลังแสดงรายละเอียด' : 'ดูรายละเอียดการให้คะแนน'}</span>`;
+    } else if (essay) {
+      cls += ' ai-phase-card-empty';
+      body = `<div class="text-muted"><i class="bi bi-hourglass-split me-1"></i>เขียนแล้ว ${essay.word_count} คำ · ยังไม่มีผลตรวจ</div>`
+           + (essay.too_short ? `<div class="small text-warning-emphasis mt-1">
+                <i class="bi bi-exclamation-triangle me-1"></i>สั้นกว่าเกณฑ์ ยังส่งให้ AI ตรวจไม่ได้</div>` : '');
+    } else {
+      cls += ' ai-phase-card-empty';
+      body = '<div class="text-muted"><i class="bi bi-file-earmark-x me-1"></i>ยังไม่ได้เขียนเรียงความรอบนี้</div>';
+    }
+
+    // ปุ่มสั่งตรวจของคุณครู อยู่บนการ์ดแต่ละใบ (ไม่ต้องเลือกรอบงานจากช่องเลือกอีก)
+    let reviewBtn = '';
+    if (AI_IS_TEACHER && essay && !essay.too_short) {
+      const dis = blocked ? ' disabled' : '';
+      reviewBtn = `<button class="btn btn-sm rounded-pill px-3 fw-bold text-white ai-phase-review-btn"
+              style="background:linear-gradient(135deg,#6d28d9,#0d7377);"${dis}
+              title="${esc(blocked || 'ส่งเรียงความรอบนี้ให้ AI ตรวจ')}"
+              onclick="event.stopPropagation(); runAiReview('${esc(ph)}')">
+        <i class="bi bi-stars me-1"></i>${fb ? 'ตรวจใหม่' : 'ให้ AI ตรวจ'}</button>`;
+    }
+
+    return `<div class="col">
+      <div class="${cls}${on ? ' ai-phase-card-active' : ''} h-100 p-3 rounded-4"
+           ${fb ? `role="button" tabindex="0" onclick="selectPhase('${esc(ph)}')"
+                  onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectPhase('${esc(ph)}');}"` : ''}>
+        <div class="d-flex align-items-start justify-content-between gap-2 mb-2 flex-wrap">
+          <span class="fw-bold text-dark">${esc(label)}</span>
+          <span class="d-flex gap-1 flex-wrap">${badges}</span>
+        </div>
+        ${body}
+        <div class="d-flex align-items-center justify-content-between gap-2 mt-3 flex-wrap">
+          <span class="small">${foot}</span>
+          ${reviewBtn}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// คลิกการ์ด → เปิด/ปิดรายละเอียดของรอบนั้น (คลิกใบเดิมซ้ำ = ปิด)
+function selectPhase(phase) {
+  selectedPhase = (selectedPhase === phase) ? '' : phase;
+  paintPhaseCards();
+  paintSelectedFeedback();
+  if (selectedPhase) {
+    const panel = document.getElementById('aiFeedbackPanel');
+    if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+// วาดรายละเอียดของฉบับที่เลือกไว้ (ไม่ได้เลือก = ไม่แสดงอะไร ให้การ์ดเป็นพระเอก)
+function paintSelectedFeedback() {
+  const panel = document.getElementById('aiFeedbackPanel');
+  if (!panel) return;
+  const fb = selectedPhase ? aiAllFeedback[selectedPhase] : null;
+  if (!fb) { panel.innerHTML = ''; return; }
   renderFeedback(fb);
 }
 
@@ -396,29 +622,45 @@ function emptyBox(msg) {
   return `<div class="card border-0 shadow-sm rounded-4"><div class="card-body">${aiEmptyHTML(msg)}</div></div>`;
 }
 
-// วาดผลตรวจลงในการ์ด (ครูเห็นปุ่มลบด้วย)
+// วาดรายละเอียดของฉบับที่เลือกลงในการ์ดใหญ่ใต้แถวการ์ดคะแนน (ครูเห็นปุ่มลบด้วย)
 function renderFeedback(fb) {
+  const phase = fb.essay_phase || selectedPhase;
   document.getElementById('aiFeedbackPanel').innerHTML =
-    `<div class="card border-0 shadow-sm rounded-4 mb-4"><div class="card-body p-4">`
+    `<div class="card border-0 shadow-sm rounded-4 mb-4" style="border-top:4px solid #6d28d9 !important;">
+       <div class="card-header bg-white border-bottom py-2 px-4 rounded-top-4 d-flex align-items-center justify-content-between flex-wrap gap-2">
+         <span class="fw-bold text-dark small">
+           <i class="bi bi-card-list text-primary me-2"></i>รายละเอียดการให้คะแนนและข้อมูลย้อนกลับ ·
+           ${esc(fb.phase_label || AI_PHASE_LABELS[phase] || phase)}
+         </span>
+         <button class="btn btn-link btn-sm text-secondary text-decoration-none p-0" onclick="selectPhase('${esc(phase)}')">
+           <i class="bi bi-x-lg me-1"></i>ปิดรายละเอียด
+         </button>
+       </div>
+       <div class="card-body p-4">`
     + aiFeedbackHTML(fb, {
-        deleteAction: AI_IS_TEACHER ? 'deleteFeedback()' : '',
-        manualAction: AI_IS_TEACHER ? 'saveManualScores()' : ''
+        deleteAction:  AI_IS_TEACHER ? 'deleteFeedback()'  : '',
+        manualAction:  AI_IS_TEACHER ? 'saveManualScores()' : '',
+        recheckAction: AI_IS_TEACHER ? `runAiReview('${phase}')` : ''
       })
     + `</div></div>`;
 }
 
 // -------------------------------------------------------------- สั่งให้ตรวจ
-async function runAiReview() {
-  const btn   = document.getElementById('aiReviewBtn');
-  const sid   = currentStudentId();
-  const phase = currentPhase();
-  if (!sid) { showToast('กรุณาเลือกนักเรียนก่อน', 'error'); return; }
+// เรียกจากปุ่มบนการ์ดของรอบงานนั้น ๆ หรือจากปุ่ม "ตรวจใหม่" ในแถบเตือนของรายละเอียด
+let aiReviewRunning = false;
 
-  const original = btn.innerHTML;
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>AI กำลังอ่าน...';
+async function runAiReview(phase) {
+  const sid = currentStudentId();
+  phase = phase || currentPhase();
+  if (!sid)   { showToast('กรุณาเลือกนักเรียนก่อน', 'error'); return; }
+  if (!phase) { showToast('กรุณาเลือกรอบงานที่จะตรวจ', 'error'); return; }
+  if (aiReviewRunning) return;
+
+  aiReviewRunning = true;
+  selectedPhase = phase;
+  document.querySelectorAll('.ai-phase-review-btn').forEach(b => { b.disabled = true; });
   document.getElementById('aiFeedbackPanel').innerHTML =
-    `<div class="card border-0 shadow-sm rounded-4"><div class="card-body">`
+    `<div class="card border-0 shadow-sm rounded-4 mb-4"><div class="card-body">`
     + aiLoadingHTML('AI กำลังอ่านเรียงความและเขียนข้อเสนอแนะ', 'ปกติใช้เวลาประมาณ 15-40 วินาที กรุณาอย่าปิดหน้านี้')
     + `</div></div>`;
 
@@ -433,20 +675,23 @@ async function runAiReview() {
       aiStatus.quota_left = data.quota_left;
       aiStatus.quota_used = aiStatus.quota_limit - data.quota_left;
     }
+    aiAllFeedback[phase] = data.feedback;
+    paintPhaseCards();
     renderFeedback(data.feedback);
     showToast('AI ตรวจเรียงความเรียบร้อยแล้ว');
-    if (!AI_IS_STUDENT) loadAiOverview();
+    if (!AI_IS_STUDENT) { loadAiOverview(); loadRecheckQueue(); }
   } finally {
-    btn.innerHTML = original;
+    aiReviewRunning = false;
     updateReviewButton();
   }
 }
 
 // ครูบันทึกคะแนนข้อที่ AI ตรวจแทนไม่ได้ (เช่น 4.3 ความเรียบร้อย/ลายมือ) — รวมกับคะแนน AI ให้ครบเต็ม 60
 async function saveManualScores() {
+  // การ์ดเกณฑ์เป็นปุ่มวิทยุแบบเดียวกับหน้า evaluation.php — เก็บเฉพาะข้อที่คุณครูเลือกไว้จริง
   const scores = {};
-  document.querySelectorAll('.ai-manual-input').forEach(el => {
-    if (el.value !== '') scores[el.dataset.manualId] = Number(el.value);
+  document.querySelectorAll('.ai-manual-input:checked').forEach(el => {
+    scores[el.dataset.manualId] = Number(el.value);
   });
 
   try {
@@ -462,7 +707,11 @@ async function saveManualScores() {
     });
     const data = await res.json();
     if (!data.success) { showToast(data.error || 'บันทึกคะแนนไม่สำเร็จ', 'error'); return; }
-    if (data.feedback) renderFeedback(data.feedback);
+    if (data.feedback) {
+      aiAllFeedback[data.feedback.essay_phase] = data.feedback;
+      paintPhaseCards();
+      renderFeedback(data.feedback);
+    }
     showToast(Object.keys(scores).length ? 'บันทึกคะแนนของครูเรียบร้อยแล้ว' : 'ล้างคะแนนของครูแล้ว');
     loadAiOverview();
   } catch (err) {
@@ -481,16 +730,74 @@ async function deleteFeedback() {
     const data = await res.json();
     if (!data.success) { showToast(data.error || 'ลบไม่สำเร็จ', 'error'); return; }
     showToast('ลบผลตรวจเรียบร้อยแล้ว');
+    selectedPhase = '';
     loadFeedback();
     loadAiOverview();
+    loadRecheckQueue();
   } catch (err) {
     showToast('เชื่อมต่อไม่สำเร็จ', 'error');
   }
 }
 
 function onSelectionChange() {
+  selectedPhase = '';
   updateReviewButton();
   loadFeedback();
+}
+
+// ------------------------------------------ คิวรอตรวจใหม่ (ครู/ผชช.)
+// นักเรียนกดบันทึกเรียงความที่เคยให้ AI ตรวจไปแล้ว → ฝั่งเซิร์ฟเวอร์ทำเครื่องหมายไว้ให้เอง
+// หน้านี้จึงแค่ดึงรายการมาแสดง และให้คุณครูสั่งตรวจใหม่ทั้งคิวได้ในคลิกเดียว
+let aiRecheckList = [];
+
+async function loadRecheckQueue() {
+  const card = document.getElementById('aiRecheckCard');
+  if (!card) return;
+  try {
+    const res  = await fetch('api.php?action=get_ai_recheck_queue');
+    const data = await res.json();
+    aiRecheckList = (data.success && Array.isArray(data.queue)) ? data.queue : [];
+  } catch (err) {
+    aiRecheckList = [];
+  }
+  paintRecheckQueue();
+}
+
+function paintRecheckQueue() {
+  const card = document.getElementById('aiRecheckCard');
+  const list = document.getElementById('aiRecheckList');
+  if (!card || !list) return;
+
+  // คิวว่าง = ไม่ต้องรบกวนสายตา ซ่อนการ์ดทั้งใบ
+  if (!aiRecheckList.length) {
+    card.classList.add('d-none');
+    list.innerHTML = '';
+    return;
+  }
+  card.classList.remove('d-none');
+  document.getElementById('aiRecheckCount').textContent = aiRecheckList.length;
+
+  const ready = aiRecheckList.filter(r => !r.too_short).length;
+  const btn = document.getElementById('rcStartBtn');
+  if (btn) {
+    btn.disabled = (ready === 0);
+    btn.innerHTML = `<i class="bi bi-stars me-1"></i>ให้ AI ตรวจใหม่ทั้งคิว (${ready})`;
+  }
+
+  list.innerHTML = aiRecheckList.map(r => {
+    const when = r.recheck_marked_at ? String(r.recheck_marked_at).replace('T', ' ').slice(0, 16) : '';
+    return `<div class="px-4 py-2 border-bottom small d-flex align-items-center gap-2 flex-wrap ai-recheck-row"
+                 onclick="jumpTo('${esc(r.student_id)}','${esc(r.essay_phase)}')">
+      <span class="fw-semibold text-nowrap">${esc(r.student_id)}</span>
+      <span class="flex-grow-1">${esc(r.student_name || '-')}${r.classroom
+        ? ` <span class="badge bg-info-subtle text-info-emphasis">ห้อง ${esc(r.classroom)}</span>` : ''}</span>
+      <span class="badge bg-light text-dark border text-nowrap">${esc(r.phase_label)}</span>
+      ${r.too_short
+        ? '<span class="badge bg-secondary-subtle text-secondary-emphasis text-nowrap">สั้นเกินเกณฑ์ ยังตรวจไม่ได้</span>'
+        : '<span class="badge bg-warning text-dark text-nowrap">รอตรวจใหม่</span>'}
+      ${when ? `<span class="text-muted text-nowrap">แก้เมื่อ ${esc(when)}</span>` : ''}
+    </div>`;
+  }).join('');
 }
 
 // ------------------------------------------------- ภาพรวมทั้งชั้น (ครู/ผชช.)
@@ -510,6 +817,41 @@ async function loadAiOverview() {
   }
 }
 
+// คอลัมน์ของตารางภาพรวม — จัดหัวตารางแบบเดียวกับ "รายงานการส่งงานรายบุคคล" ในหน้า submission_report.php
+const AI_OVERVIEW_COLS = [
+  { key: 'pretest',  label: 'ก่อนเรียน',  grp: '' },
+  { key: 'task1_d1', label: 'D1.1',       grp: 'grp-unit1' },
+  { key: 'task1_d2', label: 'D1.2',       grp: 'grp-unit1' },
+  { key: 'task2_d1', label: 'D2.1',       grp: 'grp-unit2' },
+  { key: 'task2_d2', label: 'D2.2',       grp: 'grp-unit2' },
+  { key: 'posttest', label: 'หลังเรียน',  grp: '' },
+];
+
+// ตัดทศนิยมท้ายที่ไม่จำเป็นออก (45.00 → 45, 45.50 → 45.5)
+function aiNum(v) {
+  const n = Math.round(parseFloat(v) * 100) / 100;
+  return isNaN(n) ? '-' : String(n);
+}
+
+// รวมผลตรวจรายฉบับให้เป็นรายบุคคล 1 แถว (คอลัมน์ละ 1 รอบงาน)
+function aiOverviewByStudent() {
+  const map = new Map();
+  aiOverviewList.forEach(r => {
+    let stu = map.get(r.student_id);
+    if (!stu) {
+      stu = {
+        student_id:   r.student_id,
+        student_name: r.student_name,
+        classroom:    r.classroom,
+        cells:        {},
+      };
+      map.set(r.student_id, stu);
+    }
+    stu.cells[r.essay_phase] = r;
+  });
+  return Array.from(map.values());
+}
+
 function paintAiOverview() {
   const box = document.getElementById('aiOverviewBox');
   if (!box) return;
@@ -521,59 +863,134 @@ function paintAiOverview() {
   const kw        = (document.getElementById('aiOverviewSearch').value || '').trim().toLowerCase();
   const phase     = document.getElementById('aiOverviewPhase').value;
   const needScore = document.getElementById('aiOverviewNeedScore').checked;
+  const needRecheckOnly = document.getElementById('aiOverviewNeedRecheck').checked;
 
-  const list = aiOverviewList.filter(r => {
-    if (phase && r.essay_phase !== phase) return false;
-    if (needScore && r.manual_done) return false;
+  // เลือกรอบงานไว้ = ดูเฉพาะคอลัมน์นั้น (ค่าเฉลี่ยคิดจากคอลัมน์ที่แสดงอยู่)
+  const cols = phase ? AI_OVERVIEW_COLS.filter(c => c.key === phase) : AI_OVERVIEW_COLS;
+  const fullMax = aiOverviewList[0] ? aiOverviewList[0].full_max : 60;
+
+  const students = aiOverviewByStudent().filter(stu => {
+    const shown = cols.map(c => stu.cells[c.key]).filter(Boolean);
+    if (!shown.length) return false;                                   // ไม่มีผลตรวจในคอลัมน์ที่ดูอยู่
+    if (needScore && !shown.some(r => !r.manual_done)) return false;   // ให้คะแนนครบแล้วทุกฉบับ
+    if (needRecheckOnly && !shown.some(r => r.needs_recheck)) return false;  // ไม่มีฉบับที่รอตรวจใหม่
     if (!kw) return true;
-    return [r.student_id, r.student_name, r.classroom].join(' ').toLowerCase().indexOf(kw) >= 0;
+    return [stu.student_id, stu.student_name, stu.classroom].join(' ').toLowerCase().indexOf(kw) >= 0;
   });
 
-  if (!list.length) {
+  if (!students.length) {
     box.innerHTML = '<div class="text-center text-muted py-5"><i class="bi bi-search fs-3 d-block mb-2"></i>ไม่พบรายการที่ตรงกับตัวกรอง</div>';
     return;
   }
 
-  const waiting = aiOverviewList.filter(r => !r.manual_done).length;
-  const rows = list.map(r => `
-    <tr style="cursor:pointer;" onclick="jumpTo('${esc(r.student_id)}','${esc(r.essay_phase)}')">
-      <td class="fw-semibold text-nowrap">${esc(r.student_id)}</td>
-      <td>${esc(r.student_name)}${r.classroom ? ` <span class="badge bg-info-subtle text-info-emphasis small">ห้อง ${esc(r.classroom)}</span>` : ''}</td>
-      <td class="small text-nowrap">${esc(r.phase_label)}</td>
-      <td class="text-center fw-bold text-nowrap">${r.total_score} <span class="text-muted fw-normal">/ ${r.max_score}</span></td>
-      <td class="text-center text-nowrap">
-        ${r.manual_done
-          ? `<span class="fw-bold">${r.combined_total}</span> <span class="text-muted fw-normal">/ ${r.full_max}</span>`
-          : `<span class="badge bg-warning text-dark">รอคะแนนครู</span>`}
-      </td>
-      <td class="text-center small text-nowrap">${esc(r.quality_level || '-')}</td>
-      <td class="small text-muted text-nowrap">${esc(String(r.updated_at || '').slice(0, 16))}</td>
-    </tr>`).join('');
+  // ผลรวมรายคอลัมน์ ไว้คิดค่าเฉลี่ยทั้งชั้นในแถวท้ายตาราง
+  const colSum = {}, colCount = {};
+  cols.forEach(c => { colSum[c.key] = 0; colCount[c.key] = 0; });
+  let gradedCells = 0, waiting = 0, stale = 0;
+
+  const rows = students.map(stu => {
+    let sum = 0, cnt = 0;
+    const cells = cols.map(c => {
+      const r = stu.cells[c.key];
+      if (!r) {
+        return '<td class="ai-cell-empty"><i class="bi bi-dash-circle" title="ยังไม่ได้ให้ AI ตรวจรอบนี้"></i></td>';
+      }
+      sum += r.combined_total; cnt++;
+      colSum[c.key] += r.combined_total; colCount[c.key]++;
+      gradedCells++;
+      if (!r.manual_done) waiting++;
+      if (r.needs_recheck) stale++;
+      const tip = `${aiEsc(r.phase_label)} · AI ${aiNum(r.total_score)}/${aiNum(r.max_score)}`
+                + ` · ครู ${r.manual_done ? aiNum(r.teacher_total) : 'ยังไม่ให้'}/${aiNum(r.full_max - r.max_score)}`
+                + ` · รวม ${aiNum(r.combined_total)}/${aiNum(r.full_max)}`
+                + (r.quality_level ? ` · ระดับ ${aiEsc(r.quality_level)}` : '')
+                + (r.needs_recheck ? ' · ต้นฉบับถูกแก้หลังตรวจ รอตรวจใหม่' : '');
+      return `<td class="ai-cell-score${r.needs_recheck ? ' ai-cell-stale' : ''}" title="${tip}"
+                  onclick="jumpTo('${esc(stu.student_id)}','${esc(c.key)}')">
+        <span class="fw-bold">${aiNum(r.combined_total)}</span>${r.manual_done
+          ? ''
+          : '<span class="ai-cell-wait" title="ยังรอคะแนนข้อที่คุณครูต้องให้เอง">*</span>'}${r.needs_recheck
+          ? '<i class="bi bi-arrow-repeat ai-cell-stale-icon" title="ต้นฉบับถูกแก้หลังตรวจ รอตรวจใหม่"></i>'
+          : ''}
+      </td>`;
+    }).join('');
+
+    const avg = cnt ? aiNum(sum / cnt) : '-';
+    return `<tr>
+      <td class="stu-id text-start">${esc(stu.student_id)}</td>
+      <td class="stu-name">${esc(stu.student_name || '-')}${stu.classroom
+        ? ` <span class="badge bg-info-subtle text-info-emphasis small">ห้อง ${esc(stu.classroom)}</span>` : ''}</td>
+      ${cells}
+      <td class="ai-cell-avg fw-bold">${avg}<span class="text-muted fw-normal small"> / ${aiNum(fullMax)}</span></td>
+    </tr>`;
+  }).join('');
+
+  // แถวค่าเฉลี่ยทั้งชั้น (เฉลี่ยเฉพาะฉบับที่ตรวจแล้วในแต่ละรอบ)
+  let allSum = 0, allCount = 0;
+  const avgCells = cols.map(c => {
+    if (!colCount[c.key]) return '<td class="ai-cell-empty">-</td>';
+    allSum += colSum[c.key]; allCount += colCount[c.key];
+    return `<td class="fw-bold" title="เฉลี่ยจาก ${colCount[c.key]} ฉบับ">${aiNum(colSum[c.key] / colCount[c.key])}</td>`;
+  }).join('');
+  const allAvg = allCount ? aiNum(allSum / allCount) : '-';
+
+  const headGroups = phase
+    ? `<tr class="report-head-group">
+         <th rowspan="2" class="text-start align-middle">รหัสนักเรียน</th>
+         <th rowspan="2" class="text-start align-middle">ชื่อ-สกุลผู้เรียน</th>
+         <th rowspan="2" class="align-middle">${esc(cols[0].label)}</th>
+         <th rowspan="2" class="align-middle">เฉลี่ย</th>
+       </tr>
+       <tr class="report-head-sub"></tr>`
+    : `<tr class="report-head-group">
+         <th rowspan="2" class="text-start align-middle">รหัสนักเรียน</th>
+         <th rowspan="2" class="text-start align-middle">ชื่อ-สกุลผู้เรียน</th>
+         <th rowspan="2" class="align-middle">ก่อนเรียน</th>
+         <th colspan="2" class="grp-unit1">หน่วยการเรียนที่ 1</th>
+         <th colspan="2" class="grp-unit2">หน่วยการเรียนที่ 2</th>
+         <th rowspan="2" class="align-middle">หลังเรียน</th>
+         <th rowspan="2" class="align-middle">เฉลี่ย</th>
+       </tr>
+       <tr class="report-head-sub">
+         <th class="grp-unit1">D1.1</th>
+         <th class="grp-unit1">D1.2</th>
+         <th class="grp-unit2">D2.1</th>
+         <th class="grp-unit2">D2.2</th>
+       </tr>`;
 
   box.innerHTML = `
-    <table class="table table-hover table-bordered align-middle mb-0">
-      <thead class="table-light" style="position:sticky; top:0; z-index:1;">
-        <tr>
-          <th class="text-nowrap">รหัส</th><th>ชื่อสกุล</th><th class="text-nowrap">รอบงาน</th>
-          <th class="text-center text-nowrap">คะแนน AI</th>
-          <th class="text-center text-nowrap">รวมเต็ม ${aiOverviewList[0] ? aiOverviewList[0].full_max : 60}</th>
-          <th class="text-center text-nowrap">ระดับ</th><th class="text-nowrap">ตรวจเมื่อ</th>
-        </tr>
-      </thead>
+    <table class="table table-hover align-middle mb-0 ai-report-table">
+      <thead>${headGroups}</thead>
       <tbody>${rows}</tbody>
+      <tfoot>
+        <tr class="ai-report-avg">
+          <td colspan="2" class="text-start fw-bold">เฉลี่ยทั้งชั้น (${students.length} คน)</td>
+          ${avgCells}
+          <td class="fw-bold">${allAvg}</td>
+        </tr>
+      </tfoot>
     </table>
     <div class="px-3 py-2 small text-muted border-top bg-light">
-      แสดง ${list.length} จาก ${aiOverviewList.length} รายการ
-      ${waiting > 0 ? ` · <span class="text-warning-emphasis fw-semibold">รอคุณครูให้คะแนนข้อที่ AI ตรวจแทนไม่ได้อีก ${waiting} รายการ</span>` : ''}
+      คะแนนในตารางคือคะแนนรวมเต็ม ${aiNum(fullMax)} (AI ประเมิน + ข้อที่คุณครูให้เอง) · คลิกที่ช่องคะแนนเพื่อเปิดผลตรวจฉบับนั้น
+      · แสดง ${students.length} คน จากผลตรวจ ${gradedCells} ฉบับ
+      ${waiting > 0 ? `<br><span class="text-warning-emphasis fw-semibold">
+          <i class="bi bi-asterisk me-1"></i>ช่องที่มีเครื่องหมาย * ยังรอคุณครูให้คะแนนข้อที่ AI ตรวจแทนไม่ได้ อีก ${waiting} ฉบับ</span>` : ''}
+      ${stale > 0 ? `<br><span class="text-warning-emphasis fw-semibold">
+          <i class="bi bi-arrow-repeat me-1"></i>ช่องที่มีสัญลักษณ์วนซ้ำ คือฉบับที่นักเรียนแก้ไขต้นฉบับหลัง AI ตรวจ รอตรวจใหม่ ${stale} ฉบับ</span>` : ''}
     </div>`;
 }
 
-function jumpTo(sid, phase) {
+async function jumpTo(sid, phase) {
   const sSel = document.getElementById('aiStudentSelect');
-  if (sSel) sSel.value = sid;
-  document.getElementById('aiPhaseSelect').value = phase;
-  onSelectionChange();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (sSel && sSel.value !== sid) { sSel.value = sid; }
+  selectedPhase = '';
+  updateReviewButton();
+  await loadFeedback();
+  if (aiAllFeedback[phase]) {
+    selectPhase(phase);
+  } else {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 }
 
 async function loadStudents() {
@@ -642,9 +1059,10 @@ async function loadBatchTargets() {
 }
 
 // รายการที่จะตรวจจริงในรอบนี้ (ขึ้นกับว่าติ๊ก "ข้ามฉบับที่เคยตรวจแล้ว" ไว้ไหม)
+// ฉบับที่นักเรียนแก้ต้นฉบับหลังตรวจ ถือว่ายังไม่ได้ตรวจฉบับล่าสุด จึงไม่ถูกข้ามแม้ติ๊กไว้
 function batchQueue() {
   const skipDone = document.getElementById('batchSkipDone').checked;
-  return skipDone ? batchTargets.filter(t => !t.reviewed) : batchTargets.slice();
+  return skipDone ? batchTargets.filter(t => !t.reviewed || t.needs_recheck) : batchTargets.slice();
 }
 
 function paintBatchSummary() {
@@ -658,12 +1076,17 @@ function paintBatchSummary() {
   const queue = batchQueue();
   const done  = batchTargets.filter(t => t.reviewed).length;
   const tooShort = batchTargets.__tooShort || 0;
+  const reQueued = batchTargets.filter(t => t.needs_recheck).length;
 
   // ประเมินเวลาคร่าว ๆ: AI ใช้เวลาราว 25 วินาทีต่อฉบับ บวกจังหวะพักระหว่างฉบับ
   const mins = Math.max(1, Math.round(queue.length * (25000 + BATCH_GAP_MS) / 60000));
 
   let html = `<i class="bi bi-list-check me-1"></i>ส่งแล้ว <strong>${batchTargets.length}</strong> ฉบับ`
     + ` · ตรวจไปแล้ว <strong>${done}</strong> · <strong class="text-primary">จะตรวจรอบนี้ ${queue.length} ฉบับ</strong>`;
+  if (reQueued > 0) {
+    html += `<br><i class="bi bi-arrow-repeat text-warning me-1"></i>`
+      + `<strong class="text-warning-emphasis">รอตรวจใหม่ ${reQueued} ฉบับ</strong> (นักเรียนแก้ไขต้นฉบับหลัง AI ตรวจไปแล้ว)`;
+  }
   if (tooShort > 0) {
     html += `<br><i class="bi bi-exclamation-triangle text-warning me-1"></i>`
       + `ข้าม ${tooShort} ฉบับที่สั้นกว่า ${batchTargets.__minWords} คำ (ระบบไม่ส่งให้ AI ตรวจ)`;
@@ -679,8 +1102,15 @@ function paintBatchSummary() {
   btn.disabled = (queue.length === 0);
 }
 
-function batchLogLine(icon, cls, name, msg) {
-  const log = document.getElementById('batchLog');
+// ---- ตัวช่วยแสดงผลระหว่างตรวจเป็นชุด (ใช้ร่วมกันทั้ง "ตรวจทั้งรอบ" และ "ตรวจใหม่ทั้งคิว") ----
+const REVIEW_UI_BATCH   = { wrap: 'batchProgressWrap', label: 'batchProgressLabel',
+                            count: 'batchProgressCount', bar: 'batchProgressBar', log: 'batchLog' };
+const REVIEW_UI_RECHECK = { wrap: 'rcProgressWrap', label: 'rcProgressLabel',
+                            count: 'rcProgressCount', bar: 'rcProgressBar', log: 'rcLog' };
+
+function reviewLogLine(ui, icon, cls, name, msg) {
+  const log = document.getElementById(ui.log);
+  if (!log) return;
   log.classList.remove('d-none');
   const row = document.createElement('div');
   row.className = 'px-3 py-2 border-bottom small d-flex gap-2 align-items-start';
@@ -691,17 +1121,75 @@ function batchLogLine(icon, cls, name, msg) {
   log.scrollTop = log.scrollHeight;
 }
 
-function setBatchProgress(done, total, label) {
-  document.getElementById('batchProgressWrap').classList.remove('d-none');
-  document.getElementById('batchProgressCount').textContent = done + ' / ' + total;
-  document.getElementById('batchProgressLabel').textContent = label;
+function setReviewProgress(ui, done, total, label) {
+  const wrap = document.getElementById(ui.wrap);
+  if (!wrap) return;
+  wrap.classList.remove('d-none');
+  document.getElementById(ui.count).textContent = done + ' / ' + total;
+  document.getElementById(ui.label).textContent = label;
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-  document.getElementById('batchProgressBar').style.width = pct + '%';
+  document.getElementById(ui.bar).style.width = pct + '%';
 }
 
 function stopBatchReview() {
   batchStopRequested = true;
-  document.getElementById('batchProgressLabel').textContent = 'กำลังหยุดหลังตรวจฉบับปัจจุบันเสร็จ...';
+  ['batchProgressLabel', 'rcProgressLabel'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = 'กำลังหยุดหลังตรวจฉบับปัจจุบันเสร็จ...';
+  });
+}
+
+/**
+ * ไล่ให้ AI ตรวจตามรายการที่ส่งมาทีละฉบับ
+ * items = [{ student_id, student_name, essay_phase, note }]
+ * คืนค่า { ok, failed } — ผู้เรียกเป็นคนจัดการปุ่ม/ข้อความสรุปเอง
+ */
+async function runReviewQueue(items, ui) {
+  let ok = 0, failed = 0, i = 0;
+  for (const t of items) {
+    if (batchStopRequested) {
+      reviewLogLine(ui, 'bi-stop-circle', 'text-secondary', 'หยุดตามคำสั่ง', `ตรวจไปแล้ว ${i} ฉบับ`);
+      break;
+    }
+    const who = t.student_name + (t.note ? ` (${t.note})` : '');
+    setReviewProgress(ui, i, items.length, `กำลังตรวจ: ${who}`);
+
+    let data = await aiRequestReview(t.student_id, t.essay_phase);
+
+    // โดนจำกัดจำนวนคำขอต่อนาที → พักแล้วลองใหม่อีกครั้งเดียว
+    if (!data.success && /โควตาฟรีของผู้ให้บริการ|429/.test(data.error || '')) {
+      reviewLogLine(ui, 'bi-hourglass-split', 'text-warning', who, 'ผู้ให้บริการจำกัดอัตราคำขอ กำลังพักแล้วลองใหม่');
+      await sleep(BATCH_RATELIMIT_MS);
+      if (batchStopRequested) break;
+      data = await aiRequestReview(t.student_id, t.essay_phase);
+    }
+
+    i++;
+    if (data.success) {
+      ok++;
+      t.reviewed = true;
+      t.needs_recheck = false;
+      const fb = data.feedback || {};
+      reviewLogLine(ui, 'bi-check-circle-fill', 'text-success', who,
+        `${fb.total_score}/${fb.max_score} · ${fb.quality_level || '-'}`);
+      if (typeof data.quota_left === 'number' && aiStatus) {
+        aiStatus.quota_left = data.quota_left;
+        aiStatus.quota_used = aiStatus.quota_limit - data.quota_left;
+      }
+    } else {
+      failed++;
+      reviewLogLine(ui, 'bi-x-circle-fill', 'text-danger', who, data.error || 'ตรวจไม่สำเร็จ');
+      // โควตารายวันหมด = ตรวจต่อไปก็ไม่ผ่าน หยุดทั้งชุดเลยดีกว่าปล่อยให้พังทีละฉบับ
+      if (/ใช้ AI ตรวจครบ/.test(data.error || '')) {
+        reviewLogLine(ui, 'bi-battery', 'text-danger', 'หยุดอัตโนมัติ', 'โควตารายวันหมดแล้ว');
+        break;
+      }
+    }
+
+    setReviewProgress(ui, i, items.length, `ตรวจแล้ว ${i} จาก ${items.length} ฉบับ`);
+    if (i < items.length && !batchStopRequested) await sleep(BATCH_GAP_MS);
+  }
+  return { ok, failed };
 }
 
 async function startBatchReview() {
@@ -709,9 +1197,12 @@ async function startBatchReview() {
   const queue = batchQueue();
   if (!queue.length) return;
 
-  const phaseLabel = AI_PHASE_LABELS[document.getElementById('batchPhase').value] || '';
-  if (!confirm(`เริ่มให้ AI ตรวจ ${queue.length} ฉบับของ "${phaseLabel}" ใช่ไหม?\n\n`
-      + `ใช้เวลาประมาณ ${Math.max(1, Math.round(queue.length * 27000 / 60000))} นาที `
+  const phase      = document.getElementById('batchPhase').value;
+  const phaseLabel = AI_PHASE_LABELS[phase] || '';
+  const reQueued   = queue.filter(t => t.needs_recheck).length;
+  if (!confirm(`เริ่มให้ AI ตรวจ ${queue.length} ฉบับของ "${phaseLabel}" ใช่ไหม?\n`
+      + (reQueued ? `(ในจำนวนนี้เป็นฉบับที่แก้ไขต้นฉบับแล้วรอตรวจใหม่ ${reQueued} ฉบับ)\n` : '')
+      + `\nใช้เวลาประมาณ ${Math.max(1, Math.round(queue.length * 27000 / 60000))} นาที `
       + `กรุณาเปิดหน้านี้ค้างไว้จนกว่าจะเสร็จ`)) return;
 
   batchRunning = true;
@@ -722,60 +1213,69 @@ async function startBatchReview() {
   document.getElementById('batchRoom').disabled = true;
   document.getElementById('batchLog').innerHTML = '';
 
-  let ok = 0, failed = 0, i = 0;
+  let res = { ok: 0, failed: 0 };
   try {
-    for (const t of queue) {
-      if (batchStopRequested) { batchLogLine('bi-stop-circle', 'text-secondary', 'หยุดตามคำสั่ง', `ตรวจไปแล้ว ${i} ฉบับ`); break; }
-
-      setBatchProgress(i, queue.length, `กำลังตรวจ: ${t.student_name}`);
-
-      let data = await aiRequestReview(t.student_id, document.getElementById('batchPhase').value);
-
-      // โดนจำกัดจำนวนคำขอต่อนาที → พักแล้วลองใหม่อีกครั้งเดียว
-      if (!data.success && /โควตาฟรีของผู้ให้บริการ|429/.test(data.error || '')) {
-        batchLogLine('bi-hourglass-split', 'text-warning', t.student_name, 'ผู้ให้บริการจำกัดอัตราคำขอ กำลังพักแล้วลองใหม่');
-        await sleep(BATCH_RATELIMIT_MS);
-        if (batchStopRequested) break;
-        data = await aiRequestReview(t.student_id, document.getElementById('batchPhase').value);
-      }
-
-      i++;
-      if (data.success) {
-        ok++;
-        t.reviewed = true;
-        const fb = data.feedback || {};
-        batchLogLine('bi-check-circle-fill', 'text-success', t.student_name,
-          `${fb.total_score}/${fb.max_score} · ${fb.quality_level || '-'}`);
-        if (typeof data.quota_left === 'number' && aiStatus) {
-          aiStatus.quota_left = data.quota_left;
-          aiStatus.quota_used = aiStatus.quota_limit - data.quota_left;
-        }
-      } else {
-        failed++;
-        batchLogLine('bi-x-circle-fill', 'text-danger', t.student_name, data.error || 'ตรวจไม่สำเร็จ');
-        // โควตารายวันหมด = ตรวจต่อไปก็ไม่ผ่าน หยุดทั้งชุดเลยดีกว่าปล่อยให้พังทีละฉบับ
-        if (/ใช้ AI ตรวจครบ/.test(data.error || '')) {
-          batchLogLine('bi-battery', 'text-danger', 'หยุดอัตโนมัติ', 'โควตารายวันหมดแล้ว');
-          break;
-        }
-      }
-
-      setBatchProgress(i, queue.length, `ตรวจแล้ว ${i} จาก ${queue.length} ฉบับ`);
-      if (i < queue.length && !batchStopRequested) await sleep(BATCH_GAP_MS);
-    }
+    res = await runReviewQueue(queue.map(t => ({
+      student_id:   t.student_id,
+      student_name: t.student_name,
+      essay_phase:  phase,
+      note:         t.needs_recheck ? 'ตรวจใหม่' : '',
+    })), REVIEW_UI_BATCH);
   } finally {
     batchRunning = false;
     document.getElementById('batchStopBtn').classList.add('d-none');
     document.getElementById('batchPhase').disabled = false;
     document.getElementById('batchRoom').disabled = false;
     document.getElementById('batchProgressLabel').textContent =
-      `เสร็จสิ้น — สำเร็จ ${ok} ฉบับ` + (failed ? ` · ไม่สำเร็จ ${failed} ฉบับ` : '');
-    showToast(`ตรวจเสร็จแล้ว: สำเร็จ ${ok} ฉบับ` + (failed ? `, ไม่สำเร็จ ${failed} ฉบับ` : ''),
-      failed ? 'error' : 'success');
-    paintBatchSummary();
+      `เสร็จสิ้น — สำเร็จ ${res.ok} ฉบับ` + (res.failed ? ` · ไม่สำเร็จ ${res.failed} ฉบับ` : '');
+    showToast(`ตรวจเสร็จแล้ว: สำเร็จ ${res.ok} ฉบับ` + (res.failed ? `, ไม่สำเร็จ ${res.failed} ฉบับ` : ''),
+      res.failed ? 'error' : 'success');
+    loadBatchTargets();
     updateReviewButton();
     loadAiOverview();
+    loadRecheckQueue();
     loadFeedback();
+  }
+}
+
+// --------------------------------------- ตรวจใหม่ทั้งคิว (ต้นฉบับถูกแก้หลังตรวจ)
+async function startRecheckQueue() {
+  if (batchRunning) { showToast('กำลังตรวจชุดอื่นอยู่ กรุณารอให้เสร็จก่อน', 'error'); return; }
+  const items = aiRecheckList.filter(r => !r.too_short);
+  if (!items.length) { showToast('ไม่มีฉบับที่พร้อมตรวจใหม่', 'error'); return; }
+  if (!confirm(`ให้ AI ตรวจใหม่ ${items.length} ฉบับที่นักเรียนแก้ไขต้นฉบับแล้ว ใช่ไหม?\n\n`
+      + `ใช้เวลาประมาณ ${Math.max(1, Math.round(items.length * 27000 / 60000))} นาที `
+      + `กรุณาเปิดหน้านี้ค้างไว้จนกว่าจะเสร็จ`)) return;
+
+  batchRunning = true;
+  batchStopRequested = false;
+  const startBtn = document.getElementById('rcStartBtn');
+  const stopBtn  = document.getElementById('rcStopBtn');
+  if (startBtn) startBtn.disabled = true;
+  if (stopBtn)  stopBtn.classList.remove('d-none');
+  document.getElementById('rcLog').innerHTML = '';
+
+  let res = { ok: 0, failed: 0 };
+  try {
+    res = await runReviewQueue(items.map(r => ({
+      student_id:   r.student_id,
+      student_name: r.student_name,
+      essay_phase:  r.essay_phase,
+      note:         r.phase_label,
+    })), REVIEW_UI_RECHECK);
+  } finally {
+    batchRunning = false;
+    if (startBtn) startBtn.disabled = false;
+    if (stopBtn)  stopBtn.classList.add('d-none');
+    document.getElementById('rcProgressLabel').textContent =
+      `เสร็จสิ้น — สำเร็จ ${res.ok} ฉบับ` + (res.failed ? ` · ไม่สำเร็จ ${res.failed} ฉบับ` : '');
+    showToast(`ตรวจใหม่เสร็จแล้ว: สำเร็จ ${res.ok} ฉบับ` + (res.failed ? `, ไม่สำเร็จ ${res.failed} ฉบับ` : ''),
+      res.failed ? 'error' : 'success');
+    updateReviewButton();
+    loadAiOverview();
+    loadRecheckQueue();
+    loadFeedback();
+    if (document.getElementById('batchSummary')) loadBatchTargets();
   }
 }
 
@@ -899,7 +1399,6 @@ async function clearApiKey() {
 (async function () {
   const url = new URLSearchParams(window.location.search);
   const ph  = url.get('phase');
-  if (ph && AI_PHASE_LABELS[ph]) document.getElementById('aiPhaseSelect').value = ph;
 
   if (!AI_IS_STUDENT) {
     await loadStudents();
@@ -917,7 +1416,12 @@ async function clearApiKey() {
   await loadBatchTargets();
 <?php endif; ?>
   await loadFeedback();
-  if (!AI_IS_STUDENT) loadAiOverview();
+  // มีรอบงานระบุมาทาง URL (เช่นลิงก์จากหน้าเรียงความนักเรียน) → เปิดรายละเอียดฉบับนั้นให้ทันที
+  if (ph && aiAllFeedback[ph]) selectPhase(ph);
+  if (!AI_IS_STUDENT) {
+    loadAiOverview();
+    loadRecheckQueue();
+  }
 })();
 </script>
 

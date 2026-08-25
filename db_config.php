@@ -669,6 +669,9 @@ try {
                 requested_by    VARCHAR(50)  DEFAULT NULL,
                 requested_role  VARCHAR(20)  DEFAULT NULL,
                 raw_response    LONGTEXT,
+                essay_hash      CHAR(40)     DEFAULT NULL,  -- ลายนิ้วมือเนื้อหาเรียงความ ณ ตอนที่ AI ตรวจ
+                recheck_needed  TINYINT(1)   NOT NULL DEFAULT 0,  -- 1 = ต้นฉบับถูกแก้หลังตรวจ รอตรวจใหม่
+                recheck_marked_at DATETIME   DEFAULT NULL,
                 created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE,
@@ -702,6 +705,19 @@ try {
         safe_ddl($pdo, "ALTER TABLE essay_ai_feedback ADD COLUMN teacher_total DECIMAL(6,2) NOT NULL DEFAULT 0 AFTER teacher_scores");
         safe_ddl($pdo, "ALTER TABLE essay_ai_feedback ADD COLUMN teacher_by VARCHAR(50) DEFAULT NULL AFTER teacher_total");
         safe_ddl($pdo, "ALTER TABLE essay_ai_feedback ADD COLUMN teacher_scored_at DATETIME DEFAULT NULL AFTER teacher_by");
+    }
+} catch (Exception $e) {
+    // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
+}
+
+// เพิ่มคอลัมน์ "คิวตรวจใหม่" ให้ตาราง essay_ai_feedback (ฐานข้อมูลที่สร้างไว้ก่อนหน้านี้)
+// เมื่อนักเรียนแก้ไขต้นฉบับหลัง AI ตรวจไปแล้ว ระบบจะทำเครื่องหมายไว้ให้คุณครูสั่งตรวจใหม่
+try {
+    $colRc = $pdo->query("SHOW COLUMNS FROM essay_ai_feedback LIKE 'recheck_needed'");
+    if ($colRc && $colRc->rowCount() === 0) {
+        safe_ddl($pdo, "ALTER TABLE essay_ai_feedback ADD COLUMN essay_hash CHAR(40) DEFAULT NULL AFTER raw_response");
+        safe_ddl($pdo, "ALTER TABLE essay_ai_feedback ADD COLUMN recheck_needed TINYINT(1) NOT NULL DEFAULT 0 AFTER essay_hash");
+        safe_ddl($pdo, "ALTER TABLE essay_ai_feedback ADD COLUMN recheck_marked_at DATETIME DEFAULT NULL AFTER recheck_needed");
     }
 } catch (Exception $e) {
     // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ

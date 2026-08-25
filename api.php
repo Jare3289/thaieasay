@@ -1825,7 +1825,18 @@ try {
                     updated_at         = CURRENT_TIMESTAMP
             ');
             $stmt->execute([$studentId, $essayPhase, $intro, $bodyJson, $conclusion, $wordCount]);
-            echo json_encode(['success' => true, 'word_count' => $wordCount]);
+
+            // เคยให้ AI ตรวจฉบับนี้ไปแล้วและเนื้อหาเปลี่ยนไปจริง → เข้าคิวให้คุณครูสั่ง AI ตรวจใหม่
+            $reQueued = ai_mark_essay_recheck($pdo, $studentId, $essayPhase, ai_essay_hash($intro, $bodyArr, $conclusion));
+
+            echo json_encode([
+                'success'      => true,
+                'word_count'   => $wordCount,
+                'ai_requeued'  => $reQueued,
+                'ai_requeue_message' => $reQueued
+                    ? 'ต้นฉบับนี้เคยให้ AI ตรวจไว้แล้ว ระบบได้จัดเข้าคิวให้คุณครูสั่ง AI ตรวจใหม่อีกครั้ง'
+                    : '',
+            ]);
             break;
 
         // Essay: หัวข้อเรียงความที่ครูกำหนดต่อรอบ (ก่อนเรียน/หน่วยที่ 1/หลังเรียน)
@@ -2347,8 +2358,9 @@ try {
                 INSERT INTO essay_ai_feedback
                     (student_id, essay_phase, overall_comment, strengths, improvements, next_steps,
                      encouragement, scores, total_score, max_score, quality_level,
-                     provider, model, requested_by, requested_role, raw_response)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     provider, model, requested_by, requested_role, raw_response,
+                     essay_hash, recheck_needed, recheck_marked_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL)
                 ON DUPLICATE KEY UPDATE
                     overall_comment = VALUES(overall_comment),
                     strengths       = VALUES(strengths),
@@ -2364,6 +2376,9 @@ try {
                     requested_by    = VALUES(requested_by),
                     requested_role  = VALUES(requested_role),
                     raw_response    = VALUES(raw_response),
+                    essay_hash      = VALUES(essay_hash),
+                    recheck_needed  = 0,
+                    recheck_marked_at = NULL,
                     updated_at      = CURRENT_TIMESTAMP
             ');
             $jsonOpt = JSON_UNESCAPED_UNICODE;
@@ -2377,6 +2392,8 @@ try {
                 $aiData['total_score'], $aiData['max_score'], $aiData['quality_level'],
                 $aiSet['provider'], $aiSet['model'], $aiUser['id'], $aiRole,
                 mb_substr($aiCall['text'], 0, 60000, 'UTF-8'),
+                // ลายนิ้วมือของต้นฉบับที่เพิ่งตรวจ ไว้เทียบว่านักเรียนแก้ไขต่อหรือไม่
+                ai_essay_hash($aiIntro, $aiBody, $aiConcl),
             ]);
 
             ai_log_usage($pdo, $aiUser['id'], $aiRole, $aiSid, $aiPhase, true);
@@ -2407,6 +2424,8 @@ try {
             $aiData['model']        = $aiSet['model'];
             $aiData['created_at']   = date('Y-m-d H:i:s');
             $aiData['word_count']   = $aiWords;
+            $aiData['needs_recheck']     = false;
+            $aiData['recheck_marked_at'] = '';
 
             echo json_encode([
                 'success'    => true,
@@ -2434,7 +2453,8 @@ try {
             // ดึงเฉพาะเรียงความที่มีเนื้อหาจริง พร้อมบอกว่าเคยให้ AI ตรวจไปแล้วหรือยัง
             $sql = "
                 SELECT se.student_id, se.word_count, s.student_name, s.classroom, s.student_group,
-                       f.updated_at AS reviewed_at
+                       f.updated_at AS reviewed_at,
+                       f.recheck_needed, f.recheck_marked_at
                 FROM student_essays se
                 JOIN students s ON s.student_id = se.student_id
                 LEFT JOIN essay_ai_feedback f
@@ -2452,11 +2472,13 @@ try {
             $stmt = $pdo->prepare($sql);
             $stmt->execute($bParams);
 
-            $bTargets = [];
+            $bTargets  = [];
             $bTooShort = 0;
+            $bRecheck  = 0;
             while ($r = $stmt->fetch()) {
                 // เรียงความสั้นเกินเกณฑ์จะถูกเซิร์ฟเวอร์ปฏิเสธอยู่ดี — คัดออกตั้งแต่ต้นเพื่อไม่ให้เปลืองรอบเรียก
                 if ((int)$r['word_count'] < AI_MIN_WORDS) { $bTooShort++; continue; }
+                if (!empty($r['recheck_needed'])) $bRecheck++;
                 $bTargets[] = [
                     'student_id'   => $r['student_id'],
                     'student_name' => formatNamePrefix((string)$r['student_name']),
@@ -2464,6 +2486,9 @@ try {
                     'word_count'   => (int)$r['word_count'],
                     'reviewed'     => !empty($r['reviewed_at']),
                     'reviewed_at'  => $r['reviewed_at'],
+                    // ตรวจไปแล้วแต่นักเรียนแก้ต้นฉบับต่อ → ต้องตรวจใหม่ แม้จะติ๊ก "ข้ามฉบับที่เคยตรวจแล้ว"
+                    'needs_recheck'     => !empty($r['recheck_needed']),
+                    'recheck_marked_at' => (string)($r['recheck_marked_at'] ?? ''),
                 ];
             }
 
@@ -2474,6 +2499,7 @@ try {
                 'phase_label' => ai_phase_label($bPhase),
                 'targets'     => $bTargets,
                 'too_short'   => $bTooShort,
+                'recheck'     => $bRecheck,
                 'min_words'   => AI_MIN_WORDS,
                 'quota_left'  => max(0, AI_DAILY_LIMIT_TEACHER - $bQuotaUsed),
             ]);
@@ -2515,11 +2541,34 @@ try {
             $stmt->execute($params);
             $aiRows = array_map('ai_feedback_row_to_array', $stmt->fetchAll());
 
+            // สถานะเรียงความของนักเรียนคนนี้ทุกรอบงาน — ใช้แยกว่า "ยังไม่ได้เขียน" กับ "เขียนแล้วแต่ยังไม่ตรวจ"
+            $aiEssays = [];
+            try {
+                $stmtE = $pdo->prepare('
+                    SELECT essay_phase, word_count, updated_at
+                      FROM student_essays
+                     WHERE student_id = ?
+                       AND (COALESCE(intro_content,\'\') <> \'\'
+                         OR COALESCE(body_content,\'\') <> \'\'
+                         OR COALESCE(conclusion_content,\'\') <> \'\')
+                ');
+                $stmtE->execute([$aiSid]);
+                while ($rE = $stmtE->fetch()) {
+                    $aiEssays[$rE['essay_phase']] = [
+                        'word_count' => (int)$rE['word_count'],
+                        'too_short'  => ((int)$rE['word_count'] < AI_MIN_WORDS),
+                        'updated_at' => (string)$rE['updated_at'],
+                    ];
+                }
+            } catch (Exception $e) { /* อ่านไม่ได้ก็ยังแสดงผลตรวจได้ตามปกติ */ }
+
             echo json_encode([
-                'success'  => true,
-                'found'    => count($aiRows) > 0,
-                'feedback' => ($aiPhase !== '') ? ($aiRows ? $aiRows[0] : null) : null,
-                'list'     => $aiRows,
+                'success'   => true,
+                'found'     => count($aiRows) > 0,
+                'feedback'  => ($aiPhase !== '') ? ($aiRows ? $aiRows[0] : null) : null,
+                'list'      => $aiRows,
+                'essays'    => $aiEssays,
+                'min_words' => AI_MIN_WORDS,
             ]);
             break;
 
@@ -2532,6 +2581,7 @@ try {
             $stmt = $pdo->query('
                 SELECT f.student_id, f.essay_phase, f.total_score, f.max_score, f.quality_level,
                        f.teacher_total, f.teacher_scores,
+                       f.recheck_needed, f.recheck_marked_at,
                        f.model, f.provider, f.requested_role, f.updated_at,
                        s.student_name, s.classroom, s.student_group
                 FROM essay_ai_feedback f
@@ -2564,9 +2614,49 @@ try {
                     'provider'      => $r['provider'],
                     'requested_role'=> $r['requested_role'],
                     'updated_at'    => $r['updated_at'],
+                    'needs_recheck'     => !empty($r['recheck_needed']),
+                    'recheck_marked_at' => (string)($r['recheck_marked_at'] ?? ''),
                 ];
             }
             echo json_encode(['success' => true, 'list' => $aiList]);
+            break;
+
+        // ครู/ผู้เชี่ยวชาญ: คิว "รอตรวจใหม่" — เรียงความที่นักเรียนแก้ไขต้นฉบับหลังจาก AI ตรวจไปแล้ว
+        case 'get_ai_recheck_queue':
+            if (!isset($_SESSION['user']) || !in_array($_SESSION['user']['role'], ['teacher', 'expert'], true)) {
+                echo json_encode(['success' => false, 'error' => 'ต้องเป็นครูหรือผู้เชี่ยวชาญ']);
+                exit;
+            }
+            $aiQueue = [];
+            try {
+                $stmt = $pdo->query("
+                    SELECT f.student_id, f.essay_phase, f.recheck_marked_at, f.updated_at AS reviewed_at,
+                           f.total_score, f.max_score,
+                           se.word_count, s.student_name, s.classroom
+                      FROM essay_ai_feedback f
+                      LEFT JOIN students s ON s.student_id = f.student_id
+                      LEFT JOIN student_essays se
+                             ON se.student_id = f.student_id AND se.essay_phase = f.essay_phase
+                     WHERE f.recheck_needed = 1
+                     ORDER BY f.recheck_marked_at DESC, s.classroom ASC, f.student_id ASC
+                ");
+                while ($r = $stmt->fetch()) {
+                    $aiQueue[] = [
+                        'student_id'        => $r['student_id'],
+                        'student_name'      => formatNamePrefix((string)$r['student_name']),
+                        'classroom'         => $r['classroom'],
+                        'essay_phase'       => $r['essay_phase'],
+                        'phase_label'       => ai_phase_label($r['essay_phase']),
+                        'word_count'        => (int)$r['word_count'],
+                        'too_short'         => ((int)$r['word_count'] < AI_MIN_WORDS),
+                        'recheck_marked_at' => (string)$r['recheck_marked_at'],
+                        'reviewed_at'       => (string)$r['reviewed_at'],
+                    ];
+                }
+            } catch (Exception $e) {
+                // ฐานข้อมูลเก่ายังไม่มีคอลัมน์คิว — ถือว่าไม่มีอะไรรอตรวจใหม่
+            }
+            echo json_encode(['success' => true, 'queue' => $aiQueue, 'min_words' => AI_MIN_WORDS]);
             break;
 
         // ครูกรอกคะแนนข้อที่ AI ตรวจแทนไม่ได้ (เช่น 4.3 ความเรียบร้อย/ลายมือ) ให้คะแนนรวมครบเต็ม 60

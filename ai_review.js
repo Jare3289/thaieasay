@@ -88,11 +88,18 @@ function aiErrorHTML(msg) {
   </div>`;
 }
 
+/* ล้างระดับคะแนนที่คุณครูเลือกไว้ของข้อหนึ่ง (กลับไปเป็น "ยังไม่ให้คะแนน") */
+function aiClearManualInput(itemId) {
+  document.querySelectorAll('.ai-manual-input[data-manual-id="' + itemId + '"]')
+    .forEach(el => { el.checked = false; });
+}
+
 /**
  * สร้าง HTML ของผลตรวจ AI
  * opts.compact = true : แบบย่อ (ใช้ในหน้าเขียนเรียงความ — ไม่แสดงตารางคะแนนรายข้อ)
  * opts.deleteAction    : โค้ด onclick ของปุ่มลบ (ครูเท่านั้น) เว้นว่างไว้ = ไม่แสดงปุ่ม
  * opts.manualAction    : โค้ด onclick ของปุ่มบันทึกคะแนนที่ครูให้เอง (ครูเท่านั้น) เว้นว่าง = ดูอย่างเดียว
+ * opts.recheckAction   : โค้ด onclick ของปุ่ม "ให้ AI ตรวจใหม่" ที่ขึ้นเมื่อต้นฉบับถูกแก้หลังตรวจ (ครูเท่านั้น)
  */
 function aiFeedbackHTML(fb, opts) {
   opts = opts || {};
@@ -111,25 +118,65 @@ function aiFeedbackHTML(fb, opts) {
     `<div class="p-3 rounded-3 mb-2 ai-strength-card"><i class="bi bi-check-circle-fill text-success me-2"></i>${aiEsc(s)}</div>`
   ).join('') || '<div class="text-muted small mb-2">— ไม่มีข้อมูล —</div>';
 
+  // จุดที่ควรปรับปรุง — แยกให้เห็นชัดเป็น 2 ช่อง "บกพร่องอะไร" กับ "แก้อย่างไร"
+  // พร้อมบอกว่าเป็นเกณฑ์ข้อไหน และข้อนั้น AI ให้กี่คะแนน เสียคะแนนไปเท่าไร
   const improvements = (fb.improvements || []).map((it, i) => {
-    const critName = (fb.scores && fb.scores[it.criterion]) ? fb.scores[it.criterion].name : '';
-    return `<div class="p-3 rounded-3 mb-2 ai-improve-card">
-      <div class="fw-bold text-dark mb-1">
-        <span class="badge bg-warning text-dark me-1">${i + 1}</span>
-        ${it.criterion ? `ข้อ ${aiEsc(it.criterion)} ${aiEsc(critName)}` : 'จุดที่ควรปรับปรุง'}
+    const c        = (fb.scores && fb.scores[it.criterion]) ? fb.scores[it.criterion] : null;
+    const critName = c ? (c.name || '') : '';
+    const lost     = c ? Math.round((c.max - c.weighted) * 100) / 100 : 0;
+    const scoreTag = c
+      ? `AI ให้ ${c.weighted} / ${c.max} คะแนน${lost > 0 ? ' · เสียไป ' + lost + ' คะแนน' : ''}`
+      : '';
+    return `<div class="ai-improve-card rounded-3 mb-3 overflow-hidden">
+      <div class="ai-improve-head d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <span class="fw-bold text-dark">
+          <span class="badge bg-warning text-dark me-1">จุดที่ ${i + 1}</span>
+          ${it.criterion ? `ข้อ ${aiEsc(it.criterion)} ${aiEsc(critName)}` : 'ภาพรวมของงานเขียน'}
+        </span>
+        ${scoreTag ? `<span class="badge bg-white border text-secondary fw-semibold">${aiEsc(scoreTag)}</span>` : ''}
       </div>
-      ${it.issue ? `<div class="small mb-2"><span class="fw-semibold text-danger-emphasis">สิ่งที่พบ:</span> ${aiEsc(it.issue)}</div>` : ''}
-      ${it.suggestion ? `<div class="small mb-2"><span class="fw-semibold text-success-emphasis">ลองแก้แบบนี้:</span> ${aiEsc(it.suggestion)}</div>` : ''}
-      ${it.example ? `<div class="small fst-italic text-muted"><i class="bi bi-quote me-1"></i>${aiEsc(it.example)}</div>` : ''}
+      <div class="p-3">
+        <div class="ai-fix-block ai-fix-issue mb-2">
+          <div class="ai-fix-head text-danger-emphasis"><i class="bi bi-exclamation-octagon-fill me-1"></i>บกพร่องอะไร</div>
+          <div class="small">${it.issue ? aiEsc(it.issue) : '— AI ไม่ได้ระบุ —'}</div>
+        </div>
+        <div class="ai-fix-block ai-fix-how">
+          <div class="ai-fix-head text-success-emphasis"><i class="bi bi-wrench-adjustable me-1"></i>แก้อย่างไร</div>
+          <div class="small">${it.suggestion ? aiEsc(it.suggestion) : '— AI ไม่ได้ระบุ —'}</div>
+          ${it.example ? `<div class="ai-fix-example mt-2 small">
+            <span class="fw-semibold"><i class="bi bi-quote me-1"></i>ตัวอย่างหลังแก้:</span>
+            <span class="fst-italic">${aiEsc(it.example)}</span>
+          </div>` : ''}
+        </div>
+      </div>
     </div>`;
   }).join('') || '<div class="text-muted small mb-2">— ไม่มีข้อมูล —</div>';
+
+  // แถบเตือนเมื่อนักเรียนแก้ไขต้นฉบับหลังจาก AI ตรวจไปแล้ว — ผลตรวจที่เห็นเป็นของฉบับก่อนแก้
+  const markedAt = fb.recheck_marked_at ? String(fb.recheck_marked_at).replace('T', ' ').slice(0, 16) : '';
+  const recheckBox = fb.needs_recheck
+    ? `<div class="ai-recheck-alert rounded-3 p-3 mb-3 d-flex align-items-start gap-3 flex-wrap">
+         <i class="bi bi-arrow-repeat fs-4 text-warning-emphasis"></i>
+         <div class="flex-grow-1">
+           <div class="fw-bold text-warning-emphasis">ต้นฉบับถูกแก้ไขหลังจาก AI ตรวจ — อยู่ในคิวรอตรวจใหม่</div>
+           <div class="small text-muted">
+             ผลตรวจและคะแนนด้านล่างเป็นของฉบับ<strong>ก่อนแก้ไข</strong>
+             ${markedAt ? ` · นักเรียนบันทึกฉบับแก้ไขเมื่อ ${aiEsc(markedAt)}` : ''}
+             ${opts.recheckAction ? '' : ' · รอคุณครูสั่งให้ AI ตรวจใหม่อีกครั้ง'}
+           </div>
+         </div>
+         ${opts.recheckAction ? `<button class="btn btn-warning fw-bold rounded-pill px-4" onclick="${opts.recheckAction}">
+           <i class="bi bi-stars me-1"></i>ให้ AI ตรวจใหม่ตอนนี้
+         </button>` : ''}
+       </div>`
+    : '';
 
   const nextSteps = (fb.next_steps || []).map(s =>
     `<div class="p-3 rounded-3 mb-2 ai-next-card"><i class="bi bi-arrow-right-circle-fill text-primary me-2"></i>${aiEsc(s)}</div>`
   ).join('');
 
   // ---- ส่วนคะแนนที่ "ครูต้องให้เอง" (AI ตรวจจากไฟล์พิมพ์แทนไม่ได้ เช่น ข้อ 4.3 ลายมือ/ความเรียบร้อย) ----
-  // ครูเลือกระดับคะแนน 0-4 ได้ตรงนี้เลย ระบบคูณตัวถ่วงน้ำหนักให้เอง แล้วรวมเป็นคะแนนเต็ม 60
+  // แถวต่อท้ายตารางคะแนนรายเกณฑ์ ให้เห็นคะแนนครบทุกข้อในตารางเดียว ส่วนช่องให้คะแนนอยู่ใต้ตาราง
   const manualRows = manualItems.map(it => {
     const cur  = teacherScores[it.id];
     const has  = !!cur;
@@ -140,6 +187,7 @@ function aiFeedbackHTML(fb, opts) {
       <td>${aiEsc(it.name)}
         <div class="text-muted small mt-1">
           <i class="bi bi-person-check me-1"></i>ครูเป็นผู้ให้คะแนนข้อนี้${lv ? ' · ระดับ ' + aiEsc(lv.label) : ''}
+          ${opts.manualAction && !has ? ' · <span class="text-warning-emphasis">เลือกระดับได้ที่แผงใต้ตารางนี้</span>' : ''}
         </div>
       </td>
       <td class="text-center text-nowrap fw-bold">
@@ -150,36 +198,67 @@ function aiFeedbackHTML(fb, opts) {
     </tr>`;
   }).join('');
 
+  // แผงให้คะแนนของครู — วางไว้ใต้ตาราง "คะแนนรายเกณฑ์ (ประมาณการ)" และใช้การ์ดเกณฑ์
+  // หน้าตาเดียวกับข้อ 4.3 ความเรียบร้อย ในหน้า evaluation.php เพื่อให้คุณครูอ่านเกณฑ์แล้วเลือกได้ทันที
   let manualBox = '';
   if (manualItems.length && !opts.compact) {
-    const cards = manualItems.map(it => {
-      const cur = teacherScores[it.id];
+    const blocks = manualItems.map(it => {
+      const cur    = teacherScores[it.id];
       const rawVal = cur ? String(cur.raw) : '';
       const levels = (it.levels && it.levels.length)
         ? it.levels
         : [4, 3, 2, 1, 0].map(n => ({ score: n, label: String(n), desc: '' }));
-      if (opts.manualAction) {
-        const options = levels.map(l =>
-          `<option value="${l.score}"${rawVal === String(l.score) ? ' selected' : ''}>${l.score} คะแนน — ${aiEsc(l.label)}${l.desc ? ' · ' + aiEsc(l.desc) : ''}</option>`
-        ).join('');
-        return `<div class="mb-3">
-          <label class="form-label fw-bold small mb-1">ข้อ ${aiEsc(it.id)} ${aiEsc(it.name)}
-            <span class="text-muted fw-normal">(คะแนนเต็ม ${it.max})</span></label>
-          <select class="form-select border-2 rounded-3 ai-manual-input" data-manual-id="${aiEsc(it.id)}">
-            <option value=""${rawVal === '' ? ' selected' : ''}>— ยังไม่ให้คะแนน —</option>
-            ${options}
-          </select>
+      const lv = cur ? levels.find(l => Number(l.score) === Number(cur.raw)) : null;
+
+      // ป้ายบอกว่าข้อนี้คุณครูให้ไว้เท่าไรแล้ว (หรือยังไม่ได้ให้)
+      const given = cur
+        ? `<span class="badge rounded-pill px-3 py-2" style="background:#d1fae5; color:#065f46; border:1px solid #a7f3d0;">
+             <i class="bi bi-person-check me-1"></i>คะแนนที่ให้ไว้: ${lv ? aiEsc(lv.label) + ' · ' : ''}${cur.weighted} / ${it.max} คะแนน</span>`
+        : `<span class="badge rounded-pill px-3 py-2" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a;">
+             <i class="bi bi-hourglass-split me-1"></i>ยังไม่ได้ให้คะแนนข้อนี้</span>`;
+
+      // ผู้ที่ไม่มีสิทธิ์ให้คะแนน (นักเรียน/ผู้เชี่ยวชาญ) เห็นเป็นบรรทัดสรุปอย่างเดียว
+      if (!opts.manualAction) {
+        return `<div class="mb-2">
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <span class="fw-bold text-dark">ข้อ ${aiEsc(it.id)} ${aiEsc(it.name)}
+              <span class="text-muted fw-normal">(คะแนนเต็ม ${it.max})</span></span>
+            ${given}
+          </div>
+          ${lv && lv.desc ? `<div class="text-muted small mt-1">${aiEsc(lv.desc)}</div>` : ''}
         </div>`;
       }
-      const lv = cur ? levels.find(l => Number(l.score) === Number(cur.raw)) : null;
-      return `<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-1">
-        <span class="small">ข้อ ${aiEsc(it.id)} ${aiEsc(it.name)}</span>
-        <span class="fw-bold small">${cur ? `${cur.weighted} / ${it.max}${lv ? ' · ' + aiEsc(lv.label) : ''}`
-                                          : '<span class="text-muted fw-normal">คุณครูยังไม่ได้ให้คะแนนข้อนี้</span>'}</span>
+
+      const cards = levels.map(l => `
+        <div class="col">
+          <input type="radio" name="ai_manual_${aiEsc(it.id)}" value="${l.score}" data-manual-id="${aiEsc(it.id)}"
+                 id="aiopt_${aiEsc(it.id)}_${l.score}" class="score-radio ai-manual-input"${rawVal === String(l.score) ? ' checked' : ''}>
+          <label for="aiopt_${aiEsc(it.id)}_${l.score}" class="rubric-card w-100 text-start">
+            <div class="d-flex justify-content-between align-items-start mb-2 gap-2">
+              <span class="fw-bold fs-6 text-dark">${aiEsc(l.label)}</span>
+              <div class="check-circle"><i class="bi bi-check-lg"></i></div>
+            </div>
+            <p class="text-secondary mb-0" style="font-size: 13px; line-height: 1.5; font-weight: 400;">${aiEsc(l.desc || '')}</p>
+          </label>
+        </div>`).join('');
+
+      return `<div class="mb-3 text-start">
+        <div class="mb-2 d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <h6 class="fw-bold mb-0 text-dark">ข้อ ${aiEsc(it.id)} ${aiEsc(it.name)}
+            <span class="text-muted fw-normal">(คะแนนเต็ม ${it.max})</span></h6>
+          <div class="d-flex align-items-center flex-wrap gap-2">
+            ${given}
+            <button type="button" class="btn btn-link btn-sm text-secondary text-decoration-none p-0"
+                    onclick="aiClearManualInput('${aiEsc(it.id)}')">
+              <i class="bi bi-eraser me-1"></i>ล้างคะแนนข้อนี้
+            </button>
+          </div>
+        </div>
+        <div class="row row-cols-1 row-cols-md-3 row-cols-lg-5 g-3">${cards}</div>
       </div>`;
     }).join('');
 
-    manualBox = `<div class="card border-0 rounded-4 mb-4" style="background:#f4f9f4; border-left:4px solid #198754 !important;">
+    manualBox = `<div class="card border-0 rounded-4 mt-3" style="background:#f4f9f4; border-left:4px solid #198754 !important;">
       <div class="card-body p-3 p-md-4">
         <h6 class="fw-bold text-success mb-1">
           <i class="bi bi-pencil-square me-2"></i>คะแนนส่วนที่คุณครูให้เอง
@@ -190,7 +269,7 @@ function aiFeedbackHTML(fb, opts) {
           ${opts.manualAction ? 'เลือกระดับคะแนนแล้วกดบันทึก คะแนนจะไปรวมกับคะแนนของ AI ให้ครบเต็ม ' + fullMax
                               : 'คุณครูเป็นผู้ให้คะแนนข้อนี้'}
         </div>
-        ${cards}
+        ${blocks}
         ${opts.manualAction ? `<div class="d-flex justify-content-end">
           <button class="btn btn-success rounded-pill px-4 fw-bold" onclick="${opts.manualAction}">
             <i class="bi bi-check2-circle me-1"></i>บันทึกคะแนนของครู
@@ -230,7 +309,8 @@ function aiFeedbackHTML(fb, opts) {
             </tr>
           </tfoot>
         </table>
-      </div>`;
+      </div>
+      ${manualBox}`;
   }
 
   const when = fb.created_at ? String(fb.created_at).replace('T', ' ').slice(0, 16) : '-';
@@ -248,6 +328,8 @@ function aiFeedbackHTML(fb, opts) {
       </div>
       ${deleteBtn}
     </div>
+
+    ${recheckBox}
 
     <div class="row g-3 mb-4">
       <div class="col-lg-5">
@@ -281,8 +363,6 @@ function aiFeedbackHTML(fb, opts) {
         </div>
       </div>
     </div>
-
-    ${manualBox}
 
     <h6 class="fw-bold text-success mb-2"><i class="bi bi-hand-thumbs-up-fill me-2"></i>จุดแข็งของงานชิ้นนี้</h6>
     ${strengths}

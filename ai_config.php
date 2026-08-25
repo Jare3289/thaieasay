@@ -705,6 +705,52 @@ function ai_parse_feedback($rawText) {
     return ['ok' => true, 'data' => $data, 'error' => ''];
 }
 
+/**
+ * ลายนิ้วมือของเนื้อหาเรียงความ 1 ฉบับ (ส่วนนำ + เนื้อเรื่องทุกย่อหน้า + สรุป)
+ * ใช้เทียบว่าต้นฉบับถูกแก้ไขไปจากตอนที่ AI ตรวจไว้หรือไม่ — ถ้าเหมือนเดิมเป๊ะ ไม่ต้องตรวจใหม่
+ * ไม่รวบช่องว่างให้ เพราะการเว้นวรรคเป็นเกณฑ์การให้คะแนนข้อ 4.2 อยู่แล้ว
+ */
+function ai_essay_hash($intro, $bodyArr, $conclusion) {
+    if (!is_array($bodyArr)) {
+        $bodyArr = ($bodyArr === null || $bodyArr === '') ? [] : [(string)$bodyArr];
+    }
+    $parts = array_merge(
+        [trim((string)$intro)],
+        array_map(function ($p) { return trim((string)$p); }, $bodyArr),
+        [trim((string)$conclusion)]
+    );
+    return sha1(implode("\x1f", $parts));
+}
+
+/**
+ * นักเรียนบันทึกต้นฉบับใหม่ → ถ้าเรียงความฉบับนี้เคยให้ AI ตรวจไว้แล้วและเนื้อหาเปลี่ยนไปจริง
+ * ให้ทำเครื่องหมาย "รอตรวจใหม่" ไว้ในผลตรวจเดิม เพื่อเข้าคิวให้คุณครูสั่ง AI ตรวจซ้ำ
+ * ถ้านักเรียนแก้แล้วย้อนกลับมาเหมือนเดิมเป๊ะ ระบบจะถอดออกจากคิวให้เอง
+ * คืนค่า true เมื่อฉบับนี้ถูกจัดเข้าคิวตรวจใหม่
+ */
+function ai_mark_essay_recheck(PDO $pdo, $studentId, $phase, $hash) {
+    try {
+        $stmt = $pdo->prepare('SELECT essay_hash FROM essay_ai_feedback WHERE student_id = ? AND essay_phase = ?');
+        $stmt->execute([$studentId, $phase]);
+        $row = $stmt->fetch();
+        if (!$row) return false;   // ยังไม่เคยให้ AI ตรวจฉบับนี้ — ไม่มีอะไรต้องเข้าคิว
+
+        // ผลตรวจเก่าที่บันทึกไว้ก่อนมีระบบคิว (ไม่มีลายนิ้วมือ) ถือว่าต้องตรวจใหม่ไว้ก่อน
+        $old  = (string)($row['essay_hash'] ?? '');
+        $same = ($old !== '' && $old === $hash);
+
+        $upd = $pdo->prepare('
+            UPDATE essay_ai_feedback
+               SET recheck_needed = ?, recheck_marked_at = ?
+             WHERE student_id = ? AND essay_phase = ?
+        ');
+        $upd->execute([$same ? 0 : 1, $same ? null : date('Y-m-d H:i:s'), $studentId, $phase]);
+        return !$same;
+    } catch (Exception $e) {
+        return false;   // ฐานข้อมูลยังไม่มีคอลัมน์คิว — ไม่ควรทำให้การบันทึกเรียงความพัง
+    }
+}
+
 /** นับจำนวนครั้งที่ผู้ใช้คนนี้เรียก AI ไปแล้ววันนี้ (กันการกดรัวจนโควตาฟรีหมด) */
 function ai_usage_today(PDO $pdo, $userId) {
     try {
@@ -754,6 +800,9 @@ function ai_feedback_row_to_array(array $row) {
         'requested_by'  => (string)$row['requested_by'],
         'requested_role'=> (string)$row['requested_role'],
         'created_at'    => (string)$row['created_at'],
+        // ต้นฉบับถูกแก้ไขหลัง AI ตรวจหรือยัง (ใช้แสดงป้าย "รอตรวจใหม่" และจัดคิวตรวจซ้ำ)
+        'needs_recheck'     => !empty($row['recheck_needed']),
+        'recheck_marked_at' => (string)($row['recheck_marked_at'] ?? ''),
     ];
     return ai_attach_manual(
         $out,
