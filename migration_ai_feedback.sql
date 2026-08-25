@@ -28,6 +28,10 @@ CREATE TABLE IF NOT EXISTS essay_ai_feedback (
     next_steps      TEXT,
     encouragement   TEXT,
     scores          TEXT,
+    teacher_scores  TEXT,
+    teacher_total   DECIMAL(6,2) NOT NULL DEFAULT 0,
+    teacher_by      VARCHAR(50)  DEFAULT NULL,
+    teacher_scored_at DATETIME   DEFAULT NULL,
     total_score     DECIMAL(6,2) NOT NULL DEFAULT 0,
     max_score       DECIMAL(6,2) NOT NULL DEFAULT 0,
     quality_level   VARCHAR(50)  DEFAULT NULL,
@@ -41,6 +45,13 @@ CREATE TABLE IF NOT EXISTS essay_ai_feedback (
     FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE,
     UNIQUE KEY unique_ai_feedback (student_id, essay_phase)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 2.1) ฐานข้อมูลที่สร้างตารางนี้ไว้ก่อนหน้า ให้เพิ่มคอลัมน์ "คะแนนที่ครูให้เอง" ด้วยคำสั่งด้านล่าง
+--      (ระบบ auto-migration ใน db_config.php ทำให้อัตโนมัติอยู่แล้ว — รันซ้ำจะขึ้น error ว่ามีคอลัมน์อยู่แล้ว ข้ามได้เลย)
+-- ALTER TABLE essay_ai_feedback ADD COLUMN teacher_scores TEXT NULL AFTER scores;
+-- ALTER TABLE essay_ai_feedback ADD COLUMN teacher_total DECIMAL(6,2) NOT NULL DEFAULT 0 AFTER teacher_scores;
+-- ALTER TABLE essay_ai_feedback ADD COLUMN teacher_by VARCHAR(50) DEFAULT NULL AFTER teacher_total;
+-- ALTER TABLE essay_ai_feedback ADD COLUMN teacher_scored_at DATETIME DEFAULT NULL AFTER teacher_by;
 
 -- 3) บันทึกการเรียกใช้ AI — ใช้จำกัดโควตารายวันและให้ครูตรวจสอบย้อนหลังได้
 CREATE TABLE IF NOT EXISTS ai_usage_log (

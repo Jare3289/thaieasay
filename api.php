@@ -2381,6 +2381,24 @@ try {
 
             ai_log_usage($pdo, $aiUser['id'], $aiRole, $aiSid, $aiPhase, true);
 
+            // คะแนนข้อที่ครูให้เองไว้ก่อนหน้า (ถ้ามี) ยังอยู่ครบ — ดึงกลับมาแสดงคู่กับผลตรวจรอบใหม่
+            $aiTeacherRow = ['teacher_scores' => '', 'teacher_total' => 0, 'teacher_by' => '', 'teacher_scored_at' => ''];
+            try {
+                $stmtT = $pdo->prepare('SELECT teacher_scores, teacher_total, teacher_by, teacher_scored_at
+                                        FROM essay_ai_feedback WHERE student_id = ? AND essay_phase = ?');
+                $stmtT->execute([$aiSid, $aiPhase]);
+                $rowT = $stmtT->fetch();
+                if ($rowT) $aiTeacherRow = $rowT;
+            } catch (Exception $e) { /* ไม่มีคอลัมน์/อ่านไม่ได้ ก็แสดงเป็นยังไม่ให้คะแนน */ }
+            $aiTeacherScores = json_decode((string)$aiTeacherRow['teacher_scores'], true);
+            $aiData = ai_attach_manual(
+                $aiData,
+                is_array($aiTeacherScores) ? $aiTeacherScores : [],
+                $aiTeacherRow['teacher_total'] ?? 0,
+                $aiTeacherRow['teacher_by'] ?? '',
+                (string)($aiTeacherRow['teacher_scored_at'] ?? '')
+            );
+
             $aiData['student_id']   = $aiSid;
             $aiData['student_name'] = formatNamePrefix((string)($aiEssay['student_name'] ?? ''));
             $aiData['essay_phase']  = $aiPhase;
@@ -2513,12 +2531,19 @@ try {
             }
             $stmt = $pdo->query('
                 SELECT f.student_id, f.essay_phase, f.total_score, f.max_score, f.quality_level,
+                       f.teacher_total, f.teacher_scores,
                        f.model, f.provider, f.requested_role, f.updated_at,
                        s.student_name, s.classroom, s.student_group
                 FROM essay_ai_feedback f
                 LEFT JOIN students s ON f.student_id = s.student_id
                 ORDER BY s.classroom ASC, f.student_id ASC
             ');
+            // ครูให้คะแนนข้อที่ AI ตรวจแทนไม่ได้ครบแล้วหรือยัง (ใช้ทำเครื่องหมายเตือนในตารางภาพรวม)
+            $aiManualCount = count(ai_rubric_manual());
+            $aiManualDone  = function ($json) use ($aiManualCount) {
+                $d = json_decode((string)$json, true);
+                return is_array($d) && count($d) >= $aiManualCount;
+            };
             $aiList = [];
             while ($r = $stmt->fetch()) {
                 $aiList[] = [
@@ -2530,6 +2555,10 @@ try {
                     'phase_label'   => ai_phase_label($r['essay_phase']),
                     'total_score'   => (float)$r['total_score'],
                     'max_score'     => (float)$r['max_score'],
+                    'teacher_total' => (float)($r['teacher_total'] ?? 0),
+                    'manual_done'   => $aiManualDone($r['teacher_scores'] ?? ''),
+                    'combined_total'=> round((float)$r['total_score'] + (float)($r['teacher_total'] ?? 0), 2),
+                    'full_max'      => ai_full_max(),
                     'quality_level' => $r['quality_level'],
                     'model'         => $r['model'],
                     'provider'      => $r['provider'],
@@ -2538,6 +2567,53 @@ try {
                 ];
             }
             echo json_encode(['success' => true, 'list' => $aiList]);
+            break;
+
+        // ครูกรอกคะแนนข้อที่ AI ตรวจแทนไม่ได้ (เช่น 4.3 ความเรียบร้อย/ลายมือ) ให้คะแนนรวมครบเต็ม 60
+        case 'save_ai_manual_score':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้นที่ให้คะแนนได้']);
+                exit;
+            }
+            $aiUser  = $_SESSION['user'];
+            $aiSid   = isset($request_data['student_id'])  ? trim((string)$request_data['student_id'])  : '';
+            $aiPhase = isset($request_data['essay_phase']) ? trim((string)$request_data['essay_phase']) : '';
+            $aiRaw   = isset($request_data['scores']) && is_array($request_data['scores']) ? $request_data['scores'] : [];
+            if ($aiSid === '' || !in_array($aiPhase, ai_all_phases(), true)) {
+                echo json_encode(['success' => false, 'error' => 'ข้อมูลไม่ครบถ้วน']);
+                exit;
+            }
+
+            $stmt = $pdo->prepare('SELECT id FROM essay_ai_feedback WHERE student_id = ? AND essay_phase = ?');
+            $stmt->execute([$aiSid, $aiPhase]);
+            if (!$stmt->fetch()) {
+                echo json_encode(['success' => false, 'error' => 'ยังไม่มีผลตรวจของ AI สำหรับเรียงความฉบับนี้ กรุณาให้ AI ตรวจก่อน']);
+                exit;
+            }
+
+            $aiManual = ai_build_manual_scores($aiRaw);
+            $stmt = $pdo->prepare('
+                UPDATE essay_ai_feedback
+                   SET teacher_scores = ?, teacher_total = ?, teacher_by = ?, teacher_scored_at = NOW()
+                 WHERE student_id = ? AND essay_phase = ?
+            ');
+            $stmt->execute([
+                json_encode($aiManual['scores'], JSON_UNESCAPED_UNICODE),
+                $aiManual['total'], $aiUser['id'], $aiSid, $aiPhase,
+            ]);
+
+            $stmt = $pdo->prepare('
+                SELECT f.*, s.student_name, s.classroom
+                  FROM essay_ai_feedback f
+                  LEFT JOIN students s ON f.student_id = s.student_id
+                 WHERE f.student_id = ? AND f.essay_phase = ?
+            ');
+            $stmt->execute([$aiSid, $aiPhase]);
+            $aiRow = $stmt->fetch();
+            echo json_encode([
+                'success'  => true,
+                'feedback' => $aiRow ? ai_feedback_row_to_array($aiRow) : null,
+            ]);
             break;
 
         // ครูลบผลตรวจ AI ของเรียงความฉบับใดฉบับหนึ่ง (เช่นผลที่ไม่เหมาะสม)

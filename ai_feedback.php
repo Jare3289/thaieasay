@@ -44,24 +44,136 @@ $aiPhases    = ai_all_phases();
     <div class="bg-light border-top px-4 py-2 small text-muted">
       <i class="bi bi-info-circle me-1"></i>
       ข้อเสนอแนะและคะแนนจาก AI เป็นเพียง<strong>แนวทางเพื่อพัฒนางานเขียน</strong>
-      ไม่ใช่คะแนนจริง และไม่ถูกนำไปรวมกับคะแนนของครู เพื่อน หรือการประเมินตนเอง
+      ไม่ถูกนำไปรวมกับคะแนนจริงของครู เพื่อน หรือการประเมินตนเองในระบบประเมิน —
+      ข้อที่ AI ตรวจจากไฟล์พิมพ์แทนไม่ได้ (ความเรียบร้อย/ลายมือ) คุณครูกรอกคะแนนเองได้ในหน้านี้
+      เพื่อให้เห็นคะแนนรวม<strong>เต็ม 60 ตามเกณฑ์จริง</strong>
     </div>
   </div>
 
   <!-- แถบสถานะระบบ AI -->
   <div id="aiStatusBar" class="alert border-0 rounded-3 small d-none" role="alert"></div>
 
+  <!-- แผงทำงานหลัก: เลือกเรียงความที่จะตรวจ / ดูผล -->
+  <div class="card border-0 shadow-sm rounded-4 mb-4" style="border-top:4px solid #0d7377 !important;">
+    <div class="card-header bg-white border-bottom py-3 px-4 rounded-top-4">
+      <h6 class="fw-bold text-dark mb-0">
+        <i class="bi bi-file-earmark-text text-primary me-2"></i>เลือกเรียงความที่จะ<?php echo $aiIsTeacher ? 'ตรวจหรือดูผล' : 'ดูผล'; ?>
+      </h6>
+    </div>
+    <div class="card-body p-4">
+      <div class="row g-3 align-items-end">
+<?php if (!$aiIsStudent): ?>
+        <div class="col-md-5">
+          <label class="form-label fw-bold small">นักเรียน</label>
+          <select id="aiStudentSelect" class="form-select border-2 rounded-3" onchange="onSelectionChange()">
+            <option value="">— กำลังโหลดรายชื่อ —</option>
+          </select>
+        </div>
+<?php endif; ?>
+        <div class="col-md-<?php echo $aiIsStudent ? '12' : ($aiIsTeacher ? '4' : '7'); ?>">
+          <label class="form-label fw-bold small">รอบงาน</label>
+          <select id="aiPhaseSelect" class="form-select border-2 rounded-3" onchange="onSelectionChange()">
+            <?php foreach ($aiPhases as $ph): ?>
+            <option value="<?php echo $ph; ?>"><?php echo htmlspecialchars(ai_phase_label($ph)); ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
 <?php if ($aiIsTeacher): ?>
+        <div class="col-md-3 d-grid">
+          <button id="aiReviewBtn" class="btn btn-lg fw-bold rounded-pill shadow-sm text-white"
+                  style="background: linear-gradient(135deg,#6d28d9,#0d7377);" onclick="runAiReview()">
+            <i class="bi bi-stars me-1"></i>ตรวจฉบับนี้
+          </button>
+        </div>
+<?php endif; ?>
+      </div>
+      <div id="aiQuotaText" class="text-muted small mt-3"></div>
+    </div>
+  </div>
+
+<?php if ($aiIsTeacher): ?>
+  <!-- แถบเครื่องมือของคุณครู — เก็บงานตั้งค่า/ตรวจทั้งรอบไว้ในลิ้นชัก ไม่ให้บังแผงผลตรวจซึ่งใช้บ่อยที่สุด -->
+  <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    <span class="fw-bold text-muted small me-1"><i class="bi bi-tools me-1"></i>เครื่องมือของคุณครู</span>
+    <button class="btn btn-outline-primary btn-sm rounded-pill px-3" type="button"
+            data-bs-toggle="collapse" data-bs-target="#aiBatchCard">
+      <i class="bi bi-lightning-charge-fill me-1"></i>ตรวจทั้งรอบรวดเดียว
+    </button>
+    <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" type="button"
+            data-bs-toggle="collapse" data-bs-target="#aiSettingsCard">
+      <i class="bi bi-sliders me-1"></i>ตั้งค่าผู้ช่วย AI
+    </button>
+  </div>
+  <div class="collapse" id="aiBatchCard">
+  <!-- ตรวจทั้งรอบรวดเดียว (ครูเท่านั้น) -->
+  <div class="card border-0 shadow-sm rounded-4 mb-4" style="border-top:4px solid #6d28d9 !important;">
+    <div class="card-header bg-white border-bottom py-3 px-4 rounded-top-4">
+      <h6 class="fw-bold text-dark mb-0">
+        <i class="bi bi-lightning-charge-fill text-warning me-2"></i>ตรวจทั้งรอบรวดเดียว
+      </h6>
+      <div class="text-muted small mt-1">
+        เลือกรอบงานแล้วกดครั้งเดียว ระบบจะไล่ตรวจเรียงความของนักเรียนทีละฉบับจนครบ
+      </div>
+    </div>
+    <div class="card-body p-4">
+      <div class="row g-3 align-items-end">
+        <div class="col-md-4">
+          <label class="form-label fw-bold small">รอบงานที่จะตรวจ</label>
+          <select id="batchPhase" class="form-select border-2 rounded-3" onchange="loadBatchTargets()">
+            <?php foreach ($aiPhases as $ph): ?>
+            <option value="<?php echo $ph; ?>"><?php echo htmlspecialchars(ai_phase_label($ph)); ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-bold small">ห้องเรียน</label>
+          <select id="batchRoom" class="form-select border-2 rounded-3" onchange="loadBatchTargets()">
+            <option value="">ทุกห้องเรียน</option>
+          </select>
+        </div>
+        <div class="col-md-5">
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="batchSkipDone" checked onchange="paintBatchSummary()">
+            <label class="form-check-label small" for="batchSkipDone">
+              ข้ามฉบับที่เคยตรวจแล้ว <span class="text-muted">(ประหยัดโควตา)</span>
+            </label>
+          </div>
+          <div class="d-flex gap-2">
+            <button id="batchStartBtn" class="btn fw-bold rounded-pill px-4 text-white flex-grow-1"
+                    style="background:linear-gradient(135deg,#6d28d9,#0d7377);" onclick="startBatchReview()">
+              <i class="bi bi-play-fill me-1"></i>เริ่มตรวจทั้งรอบ
+            </button>
+            <button id="batchStopBtn" class="btn btn-outline-danger rounded-pill px-3 d-none" onclick="stopBatchReview()">
+              <i class="bi bi-stop-fill me-1"></i>หยุด
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="batchSummary" class="mt-3 small text-muted">กำลังโหลดรายการ...</div>
+
+      <div id="batchProgressWrap" class="mt-3 d-none">
+        <div class="d-flex justify-content-between small fw-bold mb-1">
+          <span id="batchProgressLabel">กำลังตรวจ...</span>
+          <span id="batchProgressCount">0 / 0</span>
+        </div>
+        <div class="progress" style="height:10px;">
+          <div id="batchProgressBar" class="progress-bar" role="progressbar"
+               style="width:0%; background:linear-gradient(90deg,#6d28d9,#0d7377);"></div>
+        </div>
+      </div>
+
+      <div id="batchLog" class="mt-3 d-none border rounded-3" style="max-height:320px; overflow:auto;"></div>
+    </div>
+  </div>
+  </div>
+  <div class="collapse" id="aiSettingsCard">
   <!-- ตั้งค่า AI (เฉพาะครู) -->
   <div class="card border-0 shadow-sm rounded-4 mb-4">
-    <div class="card-header bg-white border-bottom py-3 px-4 rounded-top-4 d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div class="card-header bg-white border-bottom py-3 px-4 rounded-top-4">
       <h6 class="fw-bold text-dark mb-0"><i class="bi bi-sliders text-primary me-2"></i>ตั้งค่าผู้ช่วย AI</h6>
-      <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" type="button"
-              data-bs-toggle="collapse" data-bs-target="#aiSettingsBody">
-        <i class="bi bi-chevron-expand me-1"></i>เปิด/ปิดการตั้งค่า
-      </button>
     </div>
-    <div class="collapse" id="aiSettingsBody">
+    <div id="aiSettingsBody">
       <div class="card-body p-4">
         <div class="alert alert-primary border-0 rounded-3 small">
           <i class="bi bi-key-fill me-1"></i>
@@ -128,104 +240,8 @@ $aiPhases    = ai_all_phases();
       </div>
     </div>
   </div>
-<?php endif; ?>
-
-<?php if ($aiIsTeacher): ?>
-  <!-- ตรวจทั้งรอบรวดเดียว (ครูเท่านั้น) -->
-  <div class="card border-0 shadow-sm rounded-4 mb-4" style="border-top:4px solid #6d28d9 !important;">
-    <div class="card-header bg-white border-bottom py-3 px-4 rounded-top-4">
-      <h6 class="fw-bold text-dark mb-0">
-        <i class="bi bi-lightning-charge-fill text-warning me-2"></i>ตรวจทั้งรอบรวดเดียว
-      </h6>
-      <div class="text-muted small mt-1">
-        เลือกรอบงานแล้วกดครั้งเดียว ระบบจะไล่ตรวจเรียงความของนักเรียนทีละฉบับจนครบ
-      </div>
-    </div>
-    <div class="card-body p-4">
-      <div class="row g-3 align-items-end">
-        <div class="col-md-4">
-          <label class="form-label fw-bold small">รอบงานที่จะตรวจ</label>
-          <select id="batchPhase" class="form-select border-2 rounded-3" onchange="loadBatchTargets()">
-            <?php foreach ($aiPhases as $ph): ?>
-            <option value="<?php echo $ph; ?>"><?php echo htmlspecialchars(ai_phase_label($ph)); ?></option>
-            <?php endforeach; ?>
-          </select>
-        </div>
-        <div class="col-md-3">
-          <label class="form-label fw-bold small">ห้องเรียน</label>
-          <select id="batchRoom" class="form-select border-2 rounded-3" onchange="loadBatchTargets()">
-            <option value="">ทุกห้องเรียน</option>
-          </select>
-        </div>
-        <div class="col-md-5">
-          <div class="form-check mb-2">
-            <input class="form-check-input" type="checkbox" id="batchSkipDone" checked onchange="paintBatchSummary()">
-            <label class="form-check-label small" for="batchSkipDone">
-              ข้ามฉบับที่เคยตรวจแล้ว <span class="text-muted">(ประหยัดโควตา)</span>
-            </label>
-          </div>
-          <div class="d-flex gap-2">
-            <button id="batchStartBtn" class="btn fw-bold rounded-pill px-4 text-white flex-grow-1"
-                    style="background:linear-gradient(135deg,#6d28d9,#0d7377);" onclick="startBatchReview()">
-              <i class="bi bi-play-fill me-1"></i>เริ่มตรวจทั้งรอบ
-            </button>
-            <button id="batchStopBtn" class="btn btn-outline-danger rounded-pill px-3 d-none" onclick="stopBatchReview()">
-              <i class="bi bi-stop-fill me-1"></i>หยุด
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div id="batchSummary" class="mt-3 small text-muted">กำลังโหลดรายการ...</div>
-
-      <div id="batchProgressWrap" class="mt-3 d-none">
-        <div class="d-flex justify-content-between small fw-bold mb-1">
-          <span id="batchProgressLabel">กำลังตรวจ...</span>
-          <span id="batchProgressCount">0 / 0</span>
-        </div>
-        <div class="progress" style="height:10px;">
-          <div id="batchProgressBar" class="progress-bar" role="progressbar"
-               style="width:0%; background:linear-gradient(90deg,#6d28d9,#0d7377);"></div>
-        </div>
-      </div>
-
-      <div id="batchLog" class="mt-3 d-none border rounded-3" style="max-height:320px; overflow:auto;"></div>
-    </div>
   </div>
 <?php endif; ?>
-
-  <!-- เลือกงานที่จะตรวจ / ดูผล -->
-  <div class="card border-0 shadow-sm rounded-4 mb-4">
-    <div class="card-body p-4">
-      <div class="row g-3 align-items-end">
-<?php if (!$aiIsStudent): ?>
-        <div class="col-md-5">
-          <label class="form-label fw-bold small">นักเรียน</label>
-          <select id="aiStudentSelect" class="form-select border-2 rounded-3" onchange="onSelectionChange()">
-            <option value="">— กำลังโหลดรายชื่อ —</option>
-          </select>
-        </div>
-<?php endif; ?>
-        <div class="col-md-<?php echo $aiIsStudent ? '12' : ($aiIsTeacher ? '4' : '7'); ?>">
-          <label class="form-label fw-bold small">รอบงาน</label>
-          <select id="aiPhaseSelect" class="form-select border-2 rounded-3" onchange="onSelectionChange()">
-            <?php foreach ($aiPhases as $ph): ?>
-            <option value="<?php echo $ph; ?>"><?php echo htmlspecialchars(ai_phase_label($ph)); ?></option>
-            <?php endforeach; ?>
-          </select>
-        </div>
-<?php if ($aiIsTeacher): ?>
-        <div class="col-md-3 d-grid">
-          <button id="aiReviewBtn" class="btn btn-lg fw-bold rounded-pill shadow-sm text-white"
-                  style="background: linear-gradient(135deg,#6d28d9,#0d7377);" onclick="runAiReview()">
-            <i class="bi bi-stars me-1"></i>ตรวจฉบับนี้
-          </button>
-        </div>
-<?php endif; ?>
-      </div>
-      <div id="aiQuotaText" class="text-muted small mt-3"></div>
-    </div>
-  </div>
 
   <!-- ผลการตรวจ -->
   <div id="aiFeedbackPanel">
@@ -237,11 +253,33 @@ $aiPhases    = ai_all_phases();
 <?php if (!$aiIsStudent): ?>
   <!-- ภาพรวมทั้งชั้น (ครู/ผู้เชี่ยวชาญ) -->
   <div class="card border-0 shadow-sm rounded-4 mt-4">
-    <div class="card-header bg-white border-bottom py-3 px-4 rounded-top-4 d-flex align-items-center justify-content-between flex-wrap gap-2">
-      <h6 class="fw-bold text-dark mb-0"><i class="bi bi-table text-secondary me-2"></i>ภาพรวมผลตรวจ AI ทั้งชั้น</h6>
-      <button class="btn btn-outline-secondary btn-sm rounded-pill" onclick="loadAiOverview()">
-        <i class="bi bi-arrow-clockwise me-1"></i>รีเฟรช
-      </button>
+    <div class="card-header bg-white border-bottom py-3 px-4 rounded-top-4">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <h6 class="fw-bold text-dark mb-0"><i class="bi bi-table text-secondary me-2"></i>ภาพรวมผลตรวจ AI ทั้งชั้น</h6>
+        <button class="btn btn-outline-secondary btn-sm rounded-pill" onclick="loadAiOverview()">
+          <i class="bi bi-arrow-clockwise me-1"></i>รีเฟรช
+        </button>
+      </div>
+      <div class="row g-2 mt-2">
+        <div class="col-sm-6 col-lg-5">
+          <input type="search" id="aiOverviewSearch" class="form-control form-control-sm rounded-3"
+                 placeholder="ค้นหารหัส / ชื่อ / ห้อง" oninput="paintAiOverview()">
+        </div>
+        <div class="col-sm-6 col-lg-4">
+          <select id="aiOverviewPhase" class="form-select form-select-sm rounded-3" onchange="paintAiOverview()">
+            <option value="">ทุกรอบงาน</option>
+            <?php foreach ($aiPhases as $ph): ?>
+            <option value="<?php echo $ph; ?>"><?php echo htmlspecialchars(ai_phase_label($ph)); ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div class="col-lg-3 d-flex align-items-center">
+          <div class="form-check mb-0">
+            <input class="form-check-input" type="checkbox" id="aiOverviewNeedScore" onchange="paintAiOverview()">
+            <label class="form-check-label small" for="aiOverviewNeedScore">เฉพาะที่รอคะแนนจากครู</label>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="card-body p-0">
       <div id="aiOverviewBox" style="max-height:520px; overflow:auto;">
@@ -362,7 +400,10 @@ function emptyBox(msg) {
 function renderFeedback(fb) {
   document.getElementById('aiFeedbackPanel').innerHTML =
     `<div class="card border-0 shadow-sm rounded-4 mb-4"><div class="card-body p-4">`
-    + aiFeedbackHTML(fb, { deleteAction: AI_IS_TEACHER ? 'deleteFeedback()' : '' })
+    + aiFeedbackHTML(fb, {
+        deleteAction: AI_IS_TEACHER ? 'deleteFeedback()' : '',
+        manualAction: AI_IS_TEACHER ? 'saveManualScores()' : ''
+      })
     + `</div></div>`;
 }
 
@@ -401,6 +442,34 @@ async function runAiReview() {
   }
 }
 
+// ครูบันทึกคะแนนข้อที่ AI ตรวจแทนไม่ได้ (เช่น 4.3 ความเรียบร้อย/ลายมือ) — รวมกับคะแนน AI ให้ครบเต็ม 60
+async function saveManualScores() {
+  const scores = {};
+  document.querySelectorAll('.ai-manual-input').forEach(el => {
+    if (el.value !== '') scores[el.dataset.manualId] = Number(el.value);
+  });
+
+  try {
+    const res = await fetch('api.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'save_ai_manual_score',
+        student_id: currentStudentId(),
+        essay_phase: currentPhase(),
+        scores
+      })
+    });
+    const data = await res.json();
+    if (!data.success) { showToast(data.error || 'บันทึกคะแนนไม่สำเร็จ', 'error'); return; }
+    if (data.feedback) renderFeedback(data.feedback);
+    showToast(Object.keys(scores).length ? 'บันทึกคะแนนของครูเรียบร้อยแล้ว' : 'ล้างคะแนนของครูแล้ว');
+    loadAiOverview();
+  } catch (err) {
+    showToast('เชื่อมต่อไม่สำเร็จ', 'error');
+  }
+}
+
 async function deleteFeedback() {
   if (!confirm('ยืนยันลบผลตรวจของ AI สำหรับเรียงความฉบับนี้?')) return;
   try {
@@ -425,6 +494,8 @@ function onSelectionChange() {
 }
 
 // ------------------------------------------------- ภาพรวมทั้งชั้น (ครู/ผชช.)
+let aiOverviewList = [];   // ผลตรวจทั้งชั้นที่โหลดมาแล้ว (กรองในหน้าเว็บ ไม่ต้องยิง API ซ้ำ)
+
 async function loadAiOverview() {
   const box = document.getElementById('aiOverviewBox');
   if (!box) return;
@@ -432,32 +503,69 @@ async function loadAiOverview() {
     const res  = await fetch('api.php?action=get_all_ai_feedback');
     const data = await res.json();
     if (!data.success) { box.innerHTML = `<div class="text-center text-muted py-4">${esc(data.error)}</div>`; return; }
-    if (!data.list.length) {
-      box.innerHTML = '<div class="text-center text-muted py-5"><i class="bi bi-inbox fs-3 d-block mb-2"></i>ยังไม่มีผลตรวจของ AI</div>';
-      return;
-    }
-    const rows = data.list.map(r => `
-      <tr style="cursor:pointer;" onclick="jumpTo('${esc(r.student_id)}','${esc(r.essay_phase)}')">
-        <td class="fw-semibold text-nowrap">${esc(r.student_id)}</td>
-        <td>${esc(r.student_name)}${r.classroom ? ` <span class="badge bg-info-subtle text-info-emphasis small">ห้อง ${esc(r.classroom)}</span>` : ''}</td>
-        <td class="small text-nowrap">${esc(r.phase_label)}</td>
-        <td class="text-center fw-bold text-nowrap">${r.total_score} <span class="text-muted fw-normal">/ ${r.max_score}</span></td>
-        <td class="text-center small text-nowrap">${esc(r.quality_level || '-')}</td>
-        <td class="small text-muted text-nowrap">${esc(String(r.updated_at || '').slice(0, 16))}</td>
-      </tr>`).join('');
-    box.innerHTML = `
-      <table class="table table-hover table-bordered align-middle mb-0">
-        <thead class="table-light" style="position:sticky; top:0; z-index:1;">
-          <tr>
-            <th class="text-nowrap">รหัส</th><th>ชื่อสกุล</th><th class="text-nowrap">รอบงาน</th>
-            <th class="text-center text-nowrap">คะแนน AI</th><th class="text-center text-nowrap">ระดับ</th><th class="text-nowrap">ตรวจเมื่อ</th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>`;
+    aiOverviewList = data.list || [];
+    paintAiOverview();
   } catch (err) {
     box.innerHTML = '<div class="text-center text-muted py-4">โหลดข้อมูลไม่สำเร็จ</div>';
   }
+}
+
+function paintAiOverview() {
+  const box = document.getElementById('aiOverviewBox');
+  if (!box) return;
+  if (!aiOverviewList.length) {
+    box.innerHTML = '<div class="text-center text-muted py-5"><i class="bi bi-inbox fs-3 d-block mb-2"></i>ยังไม่มีผลตรวจของ AI</div>';
+    return;
+  }
+
+  const kw        = (document.getElementById('aiOverviewSearch').value || '').trim().toLowerCase();
+  const phase     = document.getElementById('aiOverviewPhase').value;
+  const needScore = document.getElementById('aiOverviewNeedScore').checked;
+
+  const list = aiOverviewList.filter(r => {
+    if (phase && r.essay_phase !== phase) return false;
+    if (needScore && r.manual_done) return false;
+    if (!kw) return true;
+    return [r.student_id, r.student_name, r.classroom].join(' ').toLowerCase().indexOf(kw) >= 0;
+  });
+
+  if (!list.length) {
+    box.innerHTML = '<div class="text-center text-muted py-5"><i class="bi bi-search fs-3 d-block mb-2"></i>ไม่พบรายการที่ตรงกับตัวกรอง</div>';
+    return;
+  }
+
+  const waiting = aiOverviewList.filter(r => !r.manual_done).length;
+  const rows = list.map(r => `
+    <tr style="cursor:pointer;" onclick="jumpTo('${esc(r.student_id)}','${esc(r.essay_phase)}')">
+      <td class="fw-semibold text-nowrap">${esc(r.student_id)}</td>
+      <td>${esc(r.student_name)}${r.classroom ? ` <span class="badge bg-info-subtle text-info-emphasis small">ห้อง ${esc(r.classroom)}</span>` : ''}</td>
+      <td class="small text-nowrap">${esc(r.phase_label)}</td>
+      <td class="text-center fw-bold text-nowrap">${r.total_score} <span class="text-muted fw-normal">/ ${r.max_score}</span></td>
+      <td class="text-center text-nowrap">
+        ${r.manual_done
+          ? `<span class="fw-bold">${r.combined_total}</span> <span class="text-muted fw-normal">/ ${r.full_max}</span>`
+          : `<span class="badge bg-warning text-dark">รอคะแนนครู</span>`}
+      </td>
+      <td class="text-center small text-nowrap">${esc(r.quality_level || '-')}</td>
+      <td class="small text-muted text-nowrap">${esc(String(r.updated_at || '').slice(0, 16))}</td>
+    </tr>`).join('');
+
+  box.innerHTML = `
+    <table class="table table-hover table-bordered align-middle mb-0">
+      <thead class="table-light" style="position:sticky; top:0; z-index:1;">
+        <tr>
+          <th class="text-nowrap">รหัส</th><th>ชื่อสกุล</th><th class="text-nowrap">รอบงาน</th>
+          <th class="text-center text-nowrap">คะแนน AI</th>
+          <th class="text-center text-nowrap">รวมเต็ม ${aiOverviewList[0] ? aiOverviewList[0].full_max : 60}</th>
+          <th class="text-center text-nowrap">ระดับ</th><th class="text-nowrap">ตรวจเมื่อ</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="px-3 py-2 small text-muted border-top bg-light">
+      แสดง ${list.length} จาก ${aiOverviewList.length} รายการ
+      ${waiting > 0 ? ` · <span class="text-warning-emphasis fw-semibold">รอคุณครูให้คะแนนข้อที่ AI ตรวจแทนไม่ได้อีก ${waiting} รายการ</span>` : ''}
+    </div>`;
 }
 
 function jumpTo(sid, phase) {

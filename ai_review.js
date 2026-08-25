@@ -92,10 +92,20 @@ function aiErrorHTML(msg) {
  * สร้าง HTML ของผลตรวจ AI
  * opts.compact = true : แบบย่อ (ใช้ในหน้าเขียนเรียงความ — ไม่แสดงตารางคะแนนรายข้อ)
  * opts.deleteAction    : โค้ด onclick ของปุ่มลบ (ครูเท่านั้น) เว้นว่างไว้ = ไม่แสดงปุ่ม
+ * opts.manualAction    : โค้ด onclick ของปุ่มบันทึกคะแนนที่ครูให้เอง (ครูเท่านั้น) เว้นว่าง = ดูอย่างเดียว
  */
 function aiFeedbackHTML(fb, opts) {
   opts = opts || {};
-  const pct = fb.max_score > 0 ? Math.round((fb.total_score / fb.max_score) * 100) : 0;
+
+  // คะแนนแบ่งเป็น 2 ส่วน: ส่วนที่ AI ประเมินได้ (58) + ส่วนที่ครูต้องให้เอง (2) = เต็ม 60 ตามเกณฑ์จริงของครู
+  const manualItems   = fb.manual_items || [];
+  const teacherScores = fb.teacher_scores || {};
+  const manualMax     = Number(fb.manual_max || 0);
+  const fullMax       = Number(fb.full_max || fb.max_score || 0);
+  const teacherTotal  = Number(fb.teacher_total || 0);
+  const combined      = Number(fb.combined_total != null ? fb.combined_total : fb.total_score);
+  const manualDone    = manualItems.length > 0 ? !!fb.manual_done : true;
+  const pct           = fullMax > 0 ? Math.round((combined / fullMax) * 100) : 0;
 
   const strengths = (fb.strengths || []).map(s =>
     `<div class="p-3 rounded-3 mb-2 ai-strength-card"><i class="bi bi-check-circle-fill text-success me-2"></i>${aiEsc(s)}</div>`
@@ -118,6 +128,78 @@ function aiFeedbackHTML(fb, opts) {
     `<div class="p-3 rounded-3 mb-2 ai-next-card"><i class="bi bi-arrow-right-circle-fill text-primary me-2"></i>${aiEsc(s)}</div>`
   ).join('');
 
+  // ---- ส่วนคะแนนที่ "ครูต้องให้เอง" (AI ตรวจจากไฟล์พิมพ์แทนไม่ได้ เช่น ข้อ 4.3 ลายมือ/ความเรียบร้อย) ----
+  // ครูเลือกระดับคะแนน 0-4 ได้ตรงนี้เลย ระบบคูณตัวถ่วงน้ำหนักให้เอง แล้วรวมเป็นคะแนนเต็ม 60
+  const manualRows = manualItems.map(it => {
+    const cur  = teacherScores[it.id];
+    const has  = !!cur;
+    const cpct = (has && it.max > 0) ? Math.round((cur.weighted / it.max) * 100) : 0;
+    const lv   = has ? (it.levels || []).find(l => Number(l.score) === Number(cur.raw)) : null;
+    return `<tr class="ai-crit-row">
+      <td class="text-nowrap fw-semibold">${aiEsc(it.id)}</td>
+      <td>${aiEsc(it.name)}
+        <div class="text-muted small mt-1">
+          <i class="bi bi-person-check me-1"></i>ครูเป็นผู้ให้คะแนนข้อนี้${lv ? ' · ระดับ ' + aiEsc(lv.label) : ''}
+        </div>
+      </td>
+      <td class="text-center text-nowrap fw-bold">
+        ${has ? `${cur.weighted} <span class="text-muted fw-normal">/ ${it.max}</span>`
+              : `<span class="text-warning-emphasis small">รอครูให้คะแนน</span>`}
+      </td>
+      <td style="min-width:110px;"><div class="ai-score-bar"><span style="width:${cpct}%"></span></div></td>
+    </tr>`;
+  }).join('');
+
+  let manualBox = '';
+  if (manualItems.length && !opts.compact) {
+    const cards = manualItems.map(it => {
+      const cur = teacherScores[it.id];
+      const rawVal = cur ? String(cur.raw) : '';
+      const levels = (it.levels && it.levels.length)
+        ? it.levels
+        : [4, 3, 2, 1, 0].map(n => ({ score: n, label: String(n), desc: '' }));
+      if (opts.manualAction) {
+        const options = levels.map(l =>
+          `<option value="${l.score}"${rawVal === String(l.score) ? ' selected' : ''}>${l.score} คะแนน — ${aiEsc(l.label)}${l.desc ? ' · ' + aiEsc(l.desc) : ''}</option>`
+        ).join('');
+        return `<div class="mb-3">
+          <label class="form-label fw-bold small mb-1">ข้อ ${aiEsc(it.id)} ${aiEsc(it.name)}
+            <span class="text-muted fw-normal">(คะแนนเต็ม ${it.max})</span></label>
+          <select class="form-select border-2 rounded-3 ai-manual-input" data-manual-id="${aiEsc(it.id)}">
+            <option value=""${rawVal === '' ? ' selected' : ''}>— ยังไม่ให้คะแนน —</option>
+            ${options}
+          </select>
+        </div>`;
+      }
+      const lv = cur ? levels.find(l => Number(l.score) === Number(cur.raw)) : null;
+      return `<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-1">
+        <span class="small">ข้อ ${aiEsc(it.id)} ${aiEsc(it.name)}</span>
+        <span class="fw-bold small">${cur ? `${cur.weighted} / ${it.max}${lv ? ' · ' + aiEsc(lv.label) : ''}`
+                                          : '<span class="text-muted fw-normal">คุณครูยังไม่ได้ให้คะแนนข้อนี้</span>'}</span>
+      </div>`;
+    }).join('');
+
+    manualBox = `<div class="card border-0 rounded-4 mb-4" style="background:#f4f9f4; border-left:4px solid #198754 !important;">
+      <div class="card-body p-3 p-md-4">
+        <h6 class="fw-bold text-success mb-1">
+          <i class="bi bi-pencil-square me-2"></i>คะแนนส่วนที่คุณครูให้เอง
+          <span class="text-muted fw-normal small">(เต็ม ${manualMax} คะแนน)</span>
+        </h6>
+        <div class="text-muted small mb-3">
+          ข้อนี้ AI ประเมินจากไฟล์ที่พิมพ์ไม่ได้ ต้องดูจากต้นฉบับที่นักเรียนเขียนด้วยมือ —
+          ${opts.manualAction ? 'เลือกระดับคะแนนแล้วกดบันทึก คะแนนจะไปรวมกับคะแนนของ AI ให้ครบเต็ม ' + fullMax
+                              : 'คุณครูเป็นผู้ให้คะแนนข้อนี้'}
+        </div>
+        ${cards}
+        ${opts.manualAction ? `<div class="d-flex justify-content-end">
+          <button class="btn btn-success rounded-pill px-4 fw-bold" onclick="${opts.manualAction}">
+            <i class="bi bi-check2-circle me-1"></i>บันทึกคะแนนของครู
+          </button>
+        </div>` : ''}
+      </div>
+    </div>`;
+  }
+
   // ตารางคะแนนรายเกณฑ์ (ซ่อนในโหมดย่อ)
   let scoreTable = '';
   if (!opts.compact) {
@@ -139,7 +221,14 @@ function aiFeedbackHTML(fb, opts) {
             <tr><th style="width:60px;">ข้อ</th><th>เกณฑ์ / เหตุผล</th>
                 <th class="text-center" style="width:110px;">คะแนน</th><th style="width:130px;">สัดส่วน</th></tr>
           </thead>
-          <tbody>${critRows || '<tr><td colspan="4" class="text-muted text-center">— ไม่มีข้อมูลคะแนน —</td></tr>'}</tbody>
+          <tbody>${critRows || '<tr><td colspan="4" class="text-muted text-center">— ไม่มีข้อมูลคะแนน —</td></tr>'}${manualRows}</tbody>
+          <tfoot class="table-light">
+            <tr class="fw-bold">
+              <td colspan="2" class="text-end">คะแนนรวมตามเกณฑ์ของครู</td>
+              <td class="text-center text-nowrap">${combined} <span class="text-muted fw-normal">/ ${fullMax}</span></td>
+              <td><div class="ai-score-bar"><span style="width:${pct}%"></span></div></td>
+            </tr>
+          </tfoot>
         </table>
       </div>`;
   }
@@ -161,25 +250,39 @@ function aiFeedbackHTML(fb, opts) {
     </div>
 
     <div class="row g-3 mb-4">
-      <div class="col-md-4">
-        <div class="p-3 rounded-3 bg-light text-center h-100">
-          <div class="text-muted small mb-1">คะแนนโดยประมาณจาก AI</div>
-          <div class="fs-3 fw-bold text-primary">${fb.total_score} <span class="fs-6 text-muted fw-normal">/ ${fb.max_score}</span></div>
+      <div class="col-lg-5">
+        <div class="p-3 rounded-3 bg-light h-100">
+          <div class="text-muted small mb-1">คะแนนรวมตามเกณฑ์ของครู</div>
+          <div class="d-flex align-items-end gap-2">
+            <div class="fs-2 fw-bold text-primary lh-1">${combined}</div>
+            <div class="text-muted fw-normal pb-1">/ ${fullMax}</div>
+            ${manualDone ? '' : '<span class="badge bg-warning text-dark ms-auto mb-1">ยังให้คะแนนไม่ครบ</span>'}
+          </div>
           <div class="ai-score-bar mt-2"><span style="width:${pct}%"></span></div>
-          <div class="text-muted mt-2" style="font-size:0.75rem;">
-            ไม่รวมข้อ 4.3 ความเรียบร้อย/ลายมือ ซึ่งต้องดูจากต้นฉบับที่เขียนด้วยมือ
+          <div class="d-flex justify-content-between small mt-2">
+            <span><i class="bi bi-robot me-1 text-primary"></i>AI ประเมิน</span>
+            <span class="fw-semibold">${fb.total_score} / ${fb.max_score}</span>
+          </div>
+          <div class="d-flex justify-content-between small">
+            <span><i class="bi bi-person-check me-1 text-success"></i>ครูให้เอง</span>
+            <span class="fw-semibold">${manualDone ? teacherTotal : '—'} / ${manualMax}</span>
           </div>
         </div>
       </div>
-      <div class="col-md-8">
+      <div class="col-lg-7">
         <div class="p-3 rounded-3 bg-light h-100">
-          <div class="mb-2">
-            <span class="badge bg-primary-subtle text-primary-emphasis">ระดับคุณภาพโดยประมาณ: ${aiEsc(fb.quality_level || '-')}</span>
+          <div class="mb-2 d-flex flex-wrap gap-2">
+            <span class="badge bg-primary-subtle text-primary-emphasis">
+              ระดับคุณภาพ${manualDone ? '' : 'โดยประมาณ'}: ${aiEsc((manualDone && fb.full_quality_level) ? fb.full_quality_level : (fb.quality_level || '-'))}
+            </span>
+            ${manualDone ? '' : `<span class="badge bg-light text-muted border">ยังขาดคะแนนข้อที่ครูต้องให้เอง (เต็ม ${manualMax})</span>`}
           </div>
           <div class="text-dark" style="line-height:1.8;">${aiEsc(fb.overall || '')}</div>
         </div>
       </div>
     </div>
+
+    ${manualBox}
 
     <h6 class="fw-bold text-success mb-2"><i class="bi bi-hand-thumbs-up-fill me-2"></i>จุดแข็งของงานชิ้นนี้</h6>
     ${strengths}
@@ -197,6 +300,7 @@ function aiFeedbackHTML(fb, opts) {
     <div class="text-muted mt-3" style="font-size:0.75rem;">
       <i class="bi bi-cpu me-1"></i>ตรวจโดยโมเดล ${aiEsc(fb.model || '-')} (${aiEsc(fb.provider || '-')}) · เมื่อ ${aiEsc(when)}
       ${fb.requested_role === 'teacher' ? ' · สั่งตรวจโดยคุณครู' : ''}
-      <br><i class="bi bi-info-circle me-1"></i>ข้อเสนอแนะนี้เป็นแนวทางเพื่อพัฒนางานเขียน ไม่ใช่คะแนนจริง และไม่ถูกนำไปรวมกับคะแนนของครู เพื่อน หรือการประเมินตนเอง
+      <br><i class="bi bi-info-circle me-1"></i>ข้อเสนอแนะนี้เป็นแนวทางเพื่อพัฒนางานเขียน คะแนนรวมเต็ม ${fullMax} คิดจากคะแนนที่ AI ประเมิน (${fb.max_score}) บวกข้อที่คุณครูให้เอง (${manualMax})
+      และไม่ถูกนำไปรวมกับคะแนนจริงของครู เพื่อน หรือการประเมินตนเองในระบบประเมิน
     </div>`;
 }
