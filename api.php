@@ -2154,24 +2154,21 @@ try {
             }
             $aiUser = $_SESSION['user'];
             $aiSet  = ai_settings($pdo);
-            $isStu  = ($aiUser['role'] === 'student');
-            // ผู้เชี่ยวชาญดูผลได้อย่างเดียว — สั่งให้ AI ตรวจไม่ได้ (บังคับฝั่งเซิร์ฟเวอร์เช่นเดียวกับ ai_review_essay)
-            $canAsk = in_array($aiUser['role'], ['student', 'teacher'], true);
-            $limit  = $isStu ? AI_DAILY_LIMIT_STUDENT : AI_DAILY_LIMIT_TEACHER;
-            $used   = ai_usage_today($pdo, $aiUser['id']);
+            // เฉพาะครูเท่านั้นที่สั่งให้ AI ตรวจได้ นักเรียนและผู้เชี่ยวชาญดูผลได้อย่างเดียว
+            $isTeacher = ($aiUser['role'] === 'teacher');
+            $limit     = AI_DAILY_LIMIT_TEACHER;
+            $used      = $isTeacher ? ai_usage_today($pdo, $aiUser['id']) : 0;
             echo json_encode([
-                'success'         => true,
-                'enabled'         => (bool)$aiSet['enabled'],
-                'configured'      => (bool)$aiSet['configured'],
-                'can_review'      => (bool)($canAsk && $aiSet['enabled'] && $aiSet['configured']
-                                      && (!$isStu || $aiSet['student_enabled'])),
-                'student_enabled' => (bool)$aiSet['student_enabled'],
-                'allowed_phases'  => $isStu ? $aiSet['student_phases'] : ai_all_phases(),
-                'quota_limit'     => $limit,
-                'quota_used'      => $used,
-                'quota_left'      => max(0, $limit - $used),
-                'min_words'       => AI_MIN_WORDS,
-                'rubric_max'      => ai_rubric_max(),
+                'success'        => true,
+                'enabled'        => (bool)$aiSet['enabled'],
+                'configured'     => (bool)$aiSet['configured'],
+                'can_review'     => (bool)($isTeacher && $aiSet['enabled'] && $aiSet['configured']),
+                'allowed_phases' => ai_all_phases(),
+                'quota_limit'    => $limit,
+                'quota_used'     => $used,
+                'quota_left'     => max(0, $limit - $used),
+                'min_words'      => AI_MIN_WORDS,
+                'rubric_max'     => ai_rubric_max(),
             ]);
             break;
 
@@ -2212,8 +2209,6 @@ try {
                     'key_source'      => $aiSet['key_source'],
                     'locked_by_file'  => ($aiSet['key_source'] === 'file'),
                     'enabled'         => (bool)$aiSet['enabled'],
-                    'student_enabled' => (bool)$aiSet['student_enabled'],
-                    'student_phases'  => $aiSet['student_phases'],
                     'configured'      => (bool)$aiSet['configured'],
                 ],
                 'usage'     => $usageRows,
@@ -2243,12 +2238,7 @@ try {
                 if ($newKey === '__CLEAR__')  ai_save_setting($pdo, 'ai_api_key', '');
                 elseif ($newKey !== '')       ai_save_setting($pdo, 'ai_api_key', $newKey);
             }
-            if (isset($request_data['enabled']))         ai_save_setting($pdo, 'ai_enabled',         !empty($request_data['enabled']) ? '1' : '0');
-            if (isset($request_data['student_enabled'])) ai_save_setting($pdo, 'ai_student_enabled', !empty($request_data['student_enabled']) ? '1' : '0');
-            if (isset($request_data['student_phases']) && is_array($request_data['student_phases'])) {
-                $ph = array_values(array_intersect(array_map('strval', $request_data['student_phases']), ai_all_phases()));
-                ai_save_setting($pdo, 'ai_student_phases', implode(',', $ph));
-            }
+            if (isset($request_data['enabled'])) ai_save_setting($pdo, 'ai_enabled', !empty($request_data['enabled']) ? '1' : '0');
             echo json_encode(['success' => true]);
             break;
 
@@ -2268,16 +2258,13 @@ try {
                 exit;
             }
 
-            // สิทธิ์: นักเรียนตรวจได้เฉพาะงานของตนเอง / ครูตรวจได้ทุกคน / ผู้เชี่ยวชาญไม่ให้สั่งตรวจ
-            if ($aiRole === 'student') {
-                $aiSid = $aiUser['id'];
-            } elseif ($aiRole === 'teacher') {
-                if ($aiSid === '') {
-                    echo json_encode(['success' => false, 'error' => 'ไม่ได้ระบุนักเรียนที่จะตรวจ']);
-                    exit;
-                }
-            } else {
-                echo json_encode(['success' => false, 'error' => 'บทบาทนี้ไม่มีสิทธิ์สั่งให้ AI ตรวจ']);
+            // เฉพาะครูเท่านั้นที่สั่งให้ AI ตรวจได้ (นักเรียน/ผู้เชี่ยวชาญดูผลได้อย่างเดียว)
+            if ($aiRole !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้นที่สั่งให้ AI ตรวจได้']);
+                exit;
+            }
+            if ($aiSid === '') {
+                echo json_encode(['success' => false, 'error' => 'ไม่ได้ระบุนักเรียนที่จะตรวจ']);
                 exit;
             }
 
@@ -2287,22 +2274,12 @@ try {
                 exit;
             }
             if (!$aiSet['configured']) {
-                echo json_encode(['success' => false, 'error' => 'ยังไม่ได้ตั้งค่า AI กรุณาให้คุณครูใส่ API key ในหน้า "ผู้ช่วย AI" ก่อน']);
+                echo json_encode(['success' => false, 'error' => 'ยังไม่ได้ตั้งค่า AI กรุณาใส่ API key ในหน้า "ผู้ช่วย AI" ก่อน']);
                 exit;
-            }
-            if ($aiRole === 'student') {
-                if (!$aiSet['student_enabled']) {
-                    echo json_encode(['success' => false, 'error' => 'คุณครูยังไม่เปิดให้นักเรียนกดตรวจด้วย AI เอง']);
-                    exit;
-                }
-                if (!in_array($aiPhase, $aiSet['student_phases'], true)) {
-                    echo json_encode(['success' => false, 'error' => 'คุณครูไม่ได้เปิดให้ใช้ AI ตรวจในรอบงานนี้']);
-                    exit;
-                }
             }
 
             // โควตารายวัน (กันการกดรัวจนโควตาฟรีของผู้ให้บริการหมด)
-            $aiLimit = ($aiRole === 'student') ? AI_DAILY_LIMIT_STUDENT : AI_DAILY_LIMIT_TEACHER;
+            $aiLimit = AI_DAILY_LIMIT_TEACHER;
             $aiUsed  = ai_usage_today($pdo, $aiUser['id']);
             if ($aiUsed >= $aiLimit) {
                 echo json_encode(['success' => false, 'error' => 'วันนี้ใช้ AI ตรวจครบ ' . $aiLimit . ' ครั้งแล้ว กรุณาลองใหม่ในวันพรุ่งนี้']);
@@ -2417,6 +2394,70 @@ try {
                 'success'    => true,
                 'feedback'   => $aiData,
                 'quota_left' => max(0, $aiLimit - ($aiUsed + 1)),
+            ]);
+            break;
+
+        // ครู: รายชื่อเรียงความที่ "พร้อมให้ AI ตรวจ" ในรอบงานหนึ่ง สำหรับโหมดตรวจทั้งรอบ
+        // หน้าเว็บจะวนเรียก ai_review_essay ทีละคนตามรายการนี้ (ไม่ตรวจรวดเดียวในคำขอเดียว
+        // เพราะ PHP บนโฮสต์มีเพดานเวลาทำงาน และผู้ให้บริการ AI จำกัดจำนวนคำขอต่อนาที)
+        case 'get_ai_batch_targets':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้น']);
+                exit;
+            }
+            $bPhase = isset($_GET['essay_phase']) ? trim($_GET['essay_phase']) : '';
+            if (!in_array($bPhase, ai_all_phases(), true)) {
+                echo json_encode(['success' => false, 'error' => 'รอบงานไม่ถูกต้อง']);
+                exit;
+            }
+            $bGroup = isset($_GET['group']) ? trim($_GET['group']) : '';
+            $bRoom  = isset($_GET['classroom']) ? trim($_GET['classroom']) : '';
+
+            // ดึงเฉพาะเรียงความที่มีเนื้อหาจริง พร้อมบอกว่าเคยให้ AI ตรวจไปแล้วหรือยัง
+            $sql = "
+                SELECT se.student_id, se.word_count, s.student_name, s.classroom, s.student_group,
+                       f.updated_at AS reviewed_at
+                FROM student_essays se
+                JOIN students s ON s.student_id = se.student_id
+                LEFT JOIN essay_ai_feedback f
+                       ON f.student_id = se.student_id AND f.essay_phase = se.essay_phase
+                WHERE se.essay_phase = ?
+                  AND (COALESCE(se.intro_content,'') <> ''
+                    OR COALESCE(se.body_content,'') <> ''
+                    OR COALESCE(se.conclusion_content,'') <> '')
+            ";
+            $bParams = [$bPhase];
+            if ($bGroup !== '') { $sql .= ' AND s.student_group = ?'; $bParams[] = $bGroup; }
+            if ($bRoom  !== '') { $sql .= ' AND s.classroom = ?';     $bParams[] = $bRoom; }
+            $sql .= ' ORDER BY s.classroom ASC, se.student_id ASC';
+
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($bParams);
+
+            $bTargets = [];
+            $bTooShort = 0;
+            while ($r = $stmt->fetch()) {
+                // เรียงความสั้นเกินเกณฑ์จะถูกเซิร์ฟเวอร์ปฏิเสธอยู่ดี — คัดออกตั้งแต่ต้นเพื่อไม่ให้เปลืองรอบเรียก
+                if ((int)$r['word_count'] < AI_MIN_WORDS) { $bTooShort++; continue; }
+                $bTargets[] = [
+                    'student_id'   => $r['student_id'],
+                    'student_name' => formatNamePrefix((string)$r['student_name']),
+                    'classroom'    => $r['classroom'],
+                    'word_count'   => (int)$r['word_count'],
+                    'reviewed'     => !empty($r['reviewed_at']),
+                    'reviewed_at'  => $r['reviewed_at'],
+                ];
+            }
+
+            $bQuotaUsed = ai_usage_today($pdo, $_SESSION['user']['id']);
+            echo json_encode([
+                'success'     => true,
+                'phase'       => $bPhase,
+                'phase_label' => ai_phase_label($bPhase),
+                'targets'     => $bTargets,
+                'too_short'   => $bTooShort,
+                'min_words'   => AI_MIN_WORDS,
+                'quota_left'  => max(0, AI_DAILY_LIMIT_TEACHER - $bQuotaUsed),
             ]);
             break;
 
