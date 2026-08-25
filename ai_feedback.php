@@ -607,11 +607,16 @@ function aiPctColor(pct) {
 }
 
 // กราฟเส้นพัฒนาการคะแนนรวมข้ามรอบงาน (SVG ล้วน ไม่ต้องพึ่งไลบรารีภายนอก)
-function aiTrendChartSVG(points, fullMax) {
-  const W = 560, H = 230, L = 38, R = 14, T = 18, B = 34;
+// กราฟเส้นพัฒนาการคะแนนรวมข้ามรอบงาน (SVG ล้วน ไม่ต้องพึ่งไลบรารีภายนอก)
+// แกนนอนขึ้นครบทุกรอบงานเสมอ (ก่อนเรียน · D1.1 · D1.2 · D2.1 · D2.2 · หลังเรียน)
+// รอบที่ยังไม่ได้ตรวจจะเว้นไว้เป็นจุดจาง ๆ ให้เห็นว่ายังขาดช่วงไหน
+function aiTrendChartSVG(slots, fullMax) {
+  const W = 560, H = 236, L = 38, R = 14, T = 18, B = 40;
   const pw = W - L - R, phh = H - T - B;
+  const n  = slots.length;
   const yOf = v => T + (1 - (v / fullMax)) * phh;
-  const xOf = i => points.length > 1 ? L + (i / (points.length - 1)) * pw : L + pw / 2;
+  const xOf = i => n > 1 ? L + (i / (n - 1)) * pw : L + pw / 2;
+  const base = T + phh;
 
   // เส้นอ้างอิงตามเกณฑ์ระดับคุณภาพ ให้เห็นว่าคะแนนอยู่ช่วงระดับไหน
   const marks = [
@@ -625,24 +630,45 @@ function aiTrendChartSVG(points, fullMax) {
     <text x="${L - 6}" y="${(yOf(m.v) + 3).toFixed(1)}" text-anchor="end"
           font-size="9" fill="#94a3b8">${esc(m.label)}</text>`).join('');
 
-  const line = points.length > 1
-    ? `<polyline fill="none" stroke="url(#aiTrendGrad)" stroke-width="3" stroke-linejoin="round"
-                 stroke-linecap="round" points="${points.map((p, i) => xOf(i).toFixed(1) + ',' + yOf(p.value).toFixed(1)).join(' ')}"></polyline>`
-    : '';
-  const area = points.length > 1
-    ? `<polygon fill="url(#aiTrendFill)" points="${L},${T + phh} ${points.map((p, i) => xOf(i).toFixed(1) + ',' + yOf(p.value).toFixed(1)).join(' ')} ${(W - R)},${T + phh}"></polygon>`
+  // ลำดับของรอบที่มีคะแนนแล้ว (ใช้ลากเส้นเชื่อม)
+  const have = slots.map((sl, i) => (sl.value === null || sl.value === undefined) ? -1 : i).filter(i => i >= 0);
+
+  // เชื่อมทีละช่วง — ถ้าข้ามรอบที่ยังไม่ได้ตรวจ ให้เป็นเส้นประ บอกว่าช่วงนั้นไม่มีข้อมูล
+  const segs = have.slice(1).map((cur, k) => {
+    const prev = have[k];
+    const gap  = (cur - prev) > 1;
+    return `<line x1="${xOf(prev).toFixed(1)}" y1="${yOf(slots[prev].value).toFixed(1)}"
+                  x2="${xOf(cur).toFixed(1)}"  y2="${yOf(slots[cur].value).toFixed(1)}"
+                  stroke="url(#aiTrendGrad)" stroke-width="3" stroke-linecap="round"
+                  ${gap ? 'stroke-dasharray="6 5" stroke-opacity="0.55"' : ''}></line>`;
+  }).join('');
+
+  const area = have.length > 1
+    ? `<polygon fill="url(#aiTrendFill)" points="${xOf(have[0]).toFixed(1)},${base}
+        ${have.map(i => xOf(i).toFixed(1) + ',' + yOf(slots[i].value).toFixed(1)).join(' ')}
+        ${xOf(have[have.length - 1]).toFixed(1)},${base}"></polygon>`
     : '';
 
   // ดึงป้ายของจุดริมซ้าย/ริมขวาเข้ามาเล็กน้อย ไม่ให้ตัวเลขล้นไปทับป้ายระดับหรือขอบกราฟ
   const labelX = i => Math.max(L + 14, Math.min(W - R - 14, xOf(i)));
-  const dots = points.map((p, i) => `
-    <circle cx="${xOf(i).toFixed(1)}" cy="${yOf(p.value).toFixed(1)}" r="5.5" fill="#ffffff" stroke="#6d28d9" stroke-width="3"></circle>
-    <text x="${labelX(i).toFixed(1)}" y="${(yOf(p.value) - 12).toFixed(1)}" text-anchor="middle"
-          font-size="12" font-weight="700" fill="#4c1d95">${aiNum(p.value)}</text>
-    <text x="${labelX(i).toFixed(1)}" y="${H - 12}" text-anchor="middle" font-size="10" fill="#64748b">${esc(p.label)}</text>`).join('');
 
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="230" role="img"
-               aria-label="กราฟพัฒนาการคะแนนรวมของแต่ละรอบงาน">
+  const dots = slots.map((sl, i) => {
+    const x = xOf(i).toFixed(1), lx = labelX(i).toFixed(1);
+    // รอบที่ยังไม่ได้ตรวจ: จุดจาง ๆ บนแกน พร้อมป้าย "ยังไม่ตรวจ"
+    if (sl.value === null || sl.value === undefined) {
+      return `<line x1="${x}" y1="${T}" x2="${x}" y2="${base}" stroke="#f1f5f9" stroke-width="1"></line>
+        <circle cx="${x}" cy="${base}" r="3.5" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"></circle>
+        <text x="${lx}" y="${base - 9}" text-anchor="middle" font-size="9" fill="#cbd5e1">ยังไม่ตรวจ</text>
+        <text x="${lx}" y="${H - 12}" text-anchor="middle" font-size="10" fill="#cbd5e1">${esc(sl.label)}</text>`;
+    }
+    return `<circle cx="${x}" cy="${yOf(sl.value).toFixed(1)}" r="5.5" fill="#ffffff" stroke="#6d28d9" stroke-width="3"></circle>
+      <text x="${lx}" y="${(yOf(sl.value) - 12).toFixed(1)}" text-anchor="middle"
+            font-size="12" font-weight="700" fill="#4c1d95">${aiNum(sl.value)}</text>
+      <text x="${lx}" y="${H - 12}" text-anchor="middle" font-size="10" font-weight="600" fill="#475569">${esc(sl.label)}</text>`;
+  }).join('');
+
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="236" role="img"
+               aria-label="กราฟพัฒนาการคะแนนรวมของทุกรอบงาน">
     <defs>
       <linearGradient id="aiTrendGrad" x1="0" y1="0" x2="1" y2="0">
         <stop offset="0%" stop-color="#6d28d9"></stop><stop offset="100%" stop-color="#0d7377"></stop>
@@ -653,8 +679,8 @@ function aiTrendChartSVG(points, fullMax) {
       </linearGradient>
     </defs>
     ${grid}
-    <line x1="${L}" y1="${T + phh}" x2="${W - R}" y2="${T + phh}" stroke="#cbd5e1" stroke-width="1"></line>
-    ${area}${line}${dots}
+    <line x1="${L}" y1="${base}" x2="${W - R}" y2="${base}" stroke="#cbd5e1" stroke-width="1"></line>
+    ${area}${segs}${dots}
   </svg>`;
 }
 
@@ -680,11 +706,13 @@ function paintStudentSummary() {
   const fullMax = Number(last.full_max || last.max_score || 60);
 
   // ---- สถิติรวม ----
-  const points = phases.map(ph => ({
+  // แกนของกราฟใช้ "ทุกรอบงาน" เสมอ ส่วนสถิติ (เฉลี่ย/สูงสุด/พัฒนาการ) คิดจากรอบที่ตรวจแล้วเท่านั้น
+  const slots = AI_PHASES.map(ph => ({
     phase: ph,
     label: AI_PHASE_SHORT[ph] || ph,
-    value: aiCombinedOf(aiAllFeedback[ph]),
+    value: aiAllFeedback[ph] ? aiCombinedOf(aiAllFeedback[ph]) : null,
   }));
+  const points = slots.filter(sl => sl.value !== null);
   const values = points.map(p => p.value);
   const avg    = values.reduce((a, b) => a + b, 0) / values.length;
   const best   = points.reduce((a, b) => (b.value > a.value ? b : a), points[0]);
@@ -816,7 +844,11 @@ function paintStudentSummary() {
         <div class="row g-4 mb-2">
           <div class="col-lg-7">
             <h6 class="fw-bold text-dark mb-2"><i class="bi bi-graph-up me-2"></i>พัฒนาการคะแนนรวม (เต็ม ${aiNum(fullMax)})</h6>
-            <div class="ai-chart-box p-2 rounded-4">${aiTrendChartSVG(points, fullMax)}</div>
+            <div class="ai-chart-box p-2 rounded-4">${aiTrendChartSVG(slots, fullMax)}</div>
+            <div class="text-muted mt-1" style="font-size:0.75rem;">
+              <i class="bi bi-info-circle me-1"></i>แกนนอนคือรอบงานทั้งหมด ${AI_PHASES.length} รอบ
+              — รอบที่ยังไม่ได้ตรวจจะเว้นไว้ และช่วงที่ข้ามรอบจะลากเป็นเส้นประ
+            </div>
           </div>
           <div class="col-lg-5">
             <h6 class="fw-bold text-dark mb-2"><i class="bi bi-bar-chart-steps me-2"></i>ความสำเร็จรายเกณฑ์ (เฉลี่ยทุกรอบ)</h6>
