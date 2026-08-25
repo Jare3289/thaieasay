@@ -1023,9 +1023,13 @@ require_once 'header.php';
               <span id="prevScore_${item.id}" class="badge d-none rounded-pill px-3 py-2" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a;">
                 <i class="bi bi-clock-history me-1"></i><span class="prev-score-text"></span>
               </span>
+              <span id="aiScore_${item.id}" class="badge d-none rounded-pill px-3 py-2" style="background:#ede9fe; color:#5b21b6; border:1px solid #ddd6fe;">
+                <i class="bi bi-robot me-1"></i><span class="ai-score-text"></span>
+              </span>
             </div>
           </div>
           <div class="row row-cols-1 row-cols-md-3 row-cols-lg-5 g-3">${levelsHTML}</div>
+          <div id="aiNote_${item.id}" class="ai-eval-note d-none mt-3"></div>
         `;
         cardBody.appendChild(itemDiv);
       });
@@ -1106,6 +1110,8 @@ require_once 'header.php';
     const cmpBox = document.getElementById('comparisonScoreBox');
     if (cmpBox) cmpBox.classList.add('d-none');
     document.querySelectorAll('[id^="compareScore_"]').forEach(el => el.classList.add('d-none'));
+    // ซ่อนป้าย/หมายเหตุจาก AI ของทุกข้อไว้ก่อน (ผลตรวจเป็นของนักเรียนคนเดิม/รอบเดิม)
+    clearAiNotes();
     calculateRealTimeFormScore(); // รีเซ็ต
 
     statusBadge.textContent = "กำลังค้นหาคะแนนเดิม...";
@@ -1193,6 +1199,8 @@ require_once 'header.php';
       fetchStudentEssayForEvaluation(studentId, testPhase);
       // โหลดคะแนนของรอบคู่เทียบ (ก่อนเรียน↔หลังเรียน, หน่วย 1↔หน่วย 2) มาแสดงเทียบพัฒนาการ
       fetchComparisonPhaseScores(studentId, testPhase);
+      // โหลดผลตรวจของ AI มาแปะเป็น "หมายเหตุจาก AI" ในแต่ละข้อย่อย (ไว้ประกอบการตัดสินใจ ไม่ใช่คะแนนจริง)
+      fetchAiNotesForEvaluation(studentId, testPhase);
     } catch (err) {
       console.error(err);
       statusBadge.textContent = "⚠️ ไม่สามารถตรวจสอบประวัติได้";
@@ -1412,6 +1420,123 @@ require_once 'header.php';
     } catch (err) {
       console.error('Error fetching comparison phase evaluation:', err);
     }
+  }
+
+  /* ============================================================
+     หมายเหตุจาก AI รายข้อ (ครู/ผู้เชี่ยวชาญเท่านั้น)
+     ดึงผลตรวจของผู้ช่วย AI ในรอบเดียวกันมาแปะไว้ใต้ข้อย่อยแต่ละข้อ ให้เห็นว่า
+     AI ให้ข้อนี้ไว้กี่คะแนน เพราะอะไร พบข้อบกพร่องอะไร และเสนอให้แก้อย่างไร
+     เป็นเพียงข้อมูลประกอบ ไม่ถูกกรอกลงฟอร์มและไม่นับเป็นคะแนนจริงของผู้ประเมิน
+     ============================================================ */
+
+  // ล้างป้ายและกล่องหมายเหตุจาก AI ของทุกข้อ
+  function clearAiNotes() {
+    document.querySelectorAll('[id^="aiScore_"]').forEach(el => el.classList.add('d-none'));
+    document.querySelectorAll('[id^="aiNote_"]').forEach(el => {
+      el.classList.add('d-none');
+      el.innerHTML = '';
+    });
+  }
+
+  async function fetchAiNotesForEvaluation(studentId, testPhase) {
+    clearAiNotes();
+    // นักเรียน (โหมดตนเอง/เพื่อน) ไม่เห็นหมายเหตุนี้ — API จะบังคับเป็นผลของตัวนักเรียนเองซึ่งไม่ตรงกับผู้ถูกประเมิน
+    if (!studentId || (modeParam !== 'teacher' && modeParam !== 'expert')) return;
+
+    const phase = gradingEssayPhase[testPhase] || testPhase;
+    try {
+      const res = await fetch('api.php?action=get_ai_feedback'
+        + '&student_id=' + encodeURIComponent(studentId)
+        + '&essay_phase=' + encodeURIComponent(phase));
+      const data = await res.json();
+      if (!data.success || !data.feedback) return;   // ยังไม่เคยให้ AI ตรวจรอบนี้ — ไม่ต้องแสดงอะไร
+      renderAiNotes(data.feedback);
+    } catch (err) {
+      console.error('Error fetching AI notes:', err);
+    }
+  }
+
+  function renderAiNotes(fb) {
+    const scores = fb.scores || {};
+
+    // รวมข้อเสนอแนะของ AI ตามรหัสเกณฑ์ เพื่อแปะไว้ใต้ข้อนั้น ๆ
+    const fixesByItem = {};
+    (fb.improvements || []).forEach(it => {
+      const key = (it && it.criterion) ? String(it.criterion).trim() : '';
+      if (!key) return;
+      if (!fixesByItem[key]) fixesByItem[key] = [];
+      fixesByItem[key].push(it);
+    });
+
+    // คะแนนที่คุณครูกรอกเองในหน้าผู้ช่วย AI (ข้อที่ AI ตรวจแทนไม่ได้ เช่น 4.3 ความเรียบร้อย)
+    const teacherScores = fb.teacher_scores || {};
+    const manualIds = (fb.manual_items || []).map(m => m.id);
+
+    rubricData.forEach(section => {
+      section.items.forEach(item => {
+        const badge  = document.getElementById(`aiScore_${item.id}`);
+        const noteEl = document.getElementById(`aiNote_${item.id}`);
+        if (!noteEl) return;
+
+        const sc     = scores[item.id];
+        const manual = teacherScores[item.id];
+        const isManualItem = manualIds.indexOf(item.id) >= 0;
+        const rows = [];
+        let headText = '';
+        let badgeText = '';
+
+        if (sc) {
+          const levelInfo = item.levels.find(l => Number(l.score) === Number(sc.raw));
+          const weighted  = Math.round(parseFloat(sc.weighted) * 100) / 100;
+          badgeText = `AI ให้: ${levelInfo ? levelInfo.label + ' · ' : ''}${weighted} คะแนน`;
+          headText  = `หมายเหตุจาก AI · ข้อ ${item.id} — AI ให้ ${weighted} / ${sc.max} คะแนน`
+                    + (levelInfo ? ` (ระดับ ${levelInfo.label})` : '');
+          if (sc.reason) {
+            rows.push(`<div class="ai-eval-note-row"><span class="ai-eval-note-label text-primary-emphasis">เหตุผลของ AI:</span> ${escapeHTML(sc.reason)}</div>`);
+          }
+        } else if (isManualItem) {
+          // ข้อที่ AI ตรวจแทนไม่ได้ — แสดงคะแนนที่คุณครูกรอกไว้ในหน้าผู้ช่วย AI (ถ้ามี)
+          if (manual) {
+            const levelInfo = item.levels.find(l => Number(l.score) === Number(manual.raw));
+            const weighted  = Math.round(parseFloat(manual.weighted) * 100) / 100;
+            badgeText = `คุณครูให้ไว้ในหน้า AI: ${levelInfo ? levelInfo.label + ' · ' : ''}${weighted} คะแนน`;
+            headText  = `หมายเหตุจากหน้าผู้ช่วย AI · ข้อ ${item.id}`;
+            rows.push(`<div class="ai-eval-note-row">ข้อนี้ AI ประเมินจากไฟล์ที่พิมพ์ไม่ได้ — คะแนนข้างต้นเป็นคะแนนที่คุณครูกรอกไว้เองในหน้าผู้ช่วย AI</div>`);
+          } else {
+            badgeText = 'AI ตรวจข้อนี้แทนไม่ได้';
+            headText  = `หมายเหตุจาก AI · ข้อ ${item.id}`;
+            rows.push(`<div class="ai-eval-note-row">ข้อนี้ต้องดูจากต้นฉบับลายมือ AI จึงไม่ได้ให้คะแนนไว้</div>`);
+          }
+        }
+
+        (fixesByItem[item.id] || []).forEach(fix => {
+          if (fix.issue) {
+            rows.push(`<div class="ai-eval-note-row"><span class="ai-eval-note-label text-danger-emphasis">บกพร่องอะไร:</span> ${escapeHTML(fix.issue)}</div>`);
+          }
+          if (fix.suggestion) {
+            rows.push(`<div class="ai-eval-note-row"><span class="ai-eval-note-label text-success-emphasis">แก้อย่างไร:</span> ${escapeHTML(fix.suggestion)}</div>`);
+          }
+          if (fix.example) {
+            rows.push(`<div class="ai-eval-note-row fst-italic text-muted"><i class="bi bi-quote me-1"></i>ตัวอย่างหลังแก้: ${escapeHTML(fix.example)}</div>`);
+          }
+        });
+
+        if (!headText && !rows.length) return;   // ข้อนี้ AI ไม่ได้พูดถึงเลย
+
+        if (badge && badgeText) {
+          const textEl = badge.querySelector('.ai-score-text');
+          if (textEl) textEl.textContent = badgeText;
+          badge.classList.remove('d-none');
+        }
+        noteEl.innerHTML =
+          `<div class="ai-eval-note-head"><i class="bi bi-robot me-1"></i>${escapeHTML(headText || ('หมายเหตุจาก AI · ข้อ ' + item.id))}</div>`
+          + rows.join('')
+          + `<div class="text-muted mt-2" style="font-size:0.75rem;">
+               <i class="bi bi-info-circle me-1"></i>เป็นข้อมูลจากผู้ช่วย AI เพื่อประกอบการพิจารณาเท่านั้น คะแนนที่บันทึกจริงคือคะแนนที่ท่านเลือกด้านบน
+             </div>`;
+        noteEl.classList.remove('d-none');
+      });
+    });
   }
 
   async function fetchStudentEssayForEvaluation(studentId, testPhase) {

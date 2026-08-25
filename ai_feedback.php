@@ -45,7 +45,8 @@ $aiPhases    = ai_all_phases();
       <i class="bi bi-info-circle me-1"></i>
       ข้อเสนอแนะและคะแนนจาก AI เป็นเพียง<strong>แนวทางเพื่อพัฒนางานเขียน</strong>
       ไม่ถูกนำไปรวมกับคะแนนจริงของครู เพื่อน หรือการประเมินตนเองในระบบประเมิน —
-      ข้อที่ AI ตรวจจากไฟล์พิมพ์แทนไม่ได้ (ความเรียบร้อย/ลายมือ) คุณครูกรอกคะแนนเองได้ในหน้านี้
+      ข้อที่ AI ตรวจจากไฟล์พิมพ์แทนไม่ได้ (ความเรียบร้อย/ลายมือ) คุณครูเลือกระดับคะแนนเองได้ที่
+      <strong>ท้ายตาราง &quot;คะแนนรายเกณฑ์ (ประมาณการ)&quot;</strong> ของผลตรวจแต่ละฉบับ
       เพื่อให้เห็นคะแนนรวม<strong>เต็ม 60 ตามเกณฑ์จริง</strong>
     </div>
   </div>
@@ -255,7 +256,10 @@ $aiPhases    = ai_all_phases();
   <div class="card border-0 shadow-sm rounded-4 mt-4">
     <div class="card-header bg-white border-bottom py-3 px-4 rounded-top-4">
       <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-        <h6 class="fw-bold text-dark mb-0"><i class="bi bi-table text-secondary me-2"></i>ภาพรวมผลตรวจ AI ทั้งชั้น</h6>
+        <div>
+          <h6 class="fw-bold text-dark mb-0"><i class="bi bi-table text-secondary me-2"></i>ภาพรวมผลตรวจ AI ทั้งชั้น</h6>
+          <div class="text-muted small mt-1">คะแนนรวมของนักเรียนแต่ละคนทุกรอบงาน พร้อมค่าเฉลี่ยรายบุคคลและค่าเฉลี่ยทั้งชั้น</div>
+        </div>
         <button class="btn btn-outline-secondary btn-sm rounded-pill" onclick="loadAiOverview()">
           <i class="bi bi-arrow-clockwise me-1"></i>รีเฟรช
         </button>
@@ -267,7 +271,7 @@ $aiPhases    = ai_all_phases();
         </div>
         <div class="col-sm-6 col-lg-4">
           <select id="aiOverviewPhase" class="form-select form-select-sm rounded-3" onchange="paintAiOverview()">
-            <option value="">ทุกรอบงาน</option>
+            <option value="">ทุกรอบงาน (แสดงครบทุกคอลัมน์)</option>
             <?php foreach ($aiPhases as $ph): ?>
             <option value="<?php echo $ph; ?>"><?php echo htmlspecialchars(ai_phase_label($ph)); ?></option>
             <?php endforeach; ?>
@@ -289,6 +293,42 @@ $aiPhases    = ai_all_phases();
   </div>
 <?php endif; ?>
 </div>
+
+<style>
+  /* ตารางภาพรวมผลตรวจ AI — ใช้รูปแบบหัวตารางเดียวกับ "รายงานการส่งงานรายบุคคล" (submission_report.php) */
+  .ai-report-table { min-width: 760px; }
+  .ai-report-table th, .ai-report-table td { white-space: nowrap; text-align: center; font-size: 0.86rem; }
+  .ai-report-table thead th {
+    background: var(--light-slate);
+    color: var(--primary-navy);
+    font-weight: 700;
+    border-bottom: 2px solid var(--border-gray);
+    vertical-align: middle;
+    position: sticky;
+    z-index: 2;
+  }
+  .ai-report-table thead .report-head-group th { top: 0; }
+  .ai-report-table thead .report-head-sub th   { top: 42px; }
+  .ai-report-table thead .grp-unit1 { background: #eff6ff; color: #1d4ed8; }
+  .ai-report-table thead .grp-unit2 { background: #eef2ff; color: #3730a3; }
+  .ai-report-table tbody td { border-bottom: 1px solid var(--border-gray); }
+  .ai-report-table tbody .stu-id { font-family: monospace; color: #64748b; font-weight: 600; text-align: left; }
+  .ai-report-table tbody .stu-name { font-weight: 600; color: var(--primary-navy); text-align: left; white-space: normal; }
+  .ai-report-table tbody tr:hover td { background: var(--light-blue); }
+  .ai-cell-score { cursor: pointer; color: #0f172a; }
+  .ai-cell-score:hover { background: #ede9fe !important; }
+  .ai-cell-empty { color: #cbd5e1; }
+  .ai-cell-avg { background: #f8fafc; }
+  .ai-cell-wait { color: #d97706; font-weight: 700; margin-left: 2px; }
+  .ai-report-avg td {
+    background: #f1f5f9;
+    color: var(--primary-navy);
+    border-top: 2px solid var(--border-gray);
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+  }
+</style>
 
 <script src="ai_review.js"></script>
 <script>
@@ -444,9 +484,10 @@ async function runAiReview() {
 
 // ครูบันทึกคะแนนข้อที่ AI ตรวจแทนไม่ได้ (เช่น 4.3 ความเรียบร้อย/ลายมือ) — รวมกับคะแนน AI ให้ครบเต็ม 60
 async function saveManualScores() {
+  // การ์ดเกณฑ์เป็นปุ่มวิทยุแบบเดียวกับหน้า evaluation.php — เก็บเฉพาะข้อที่คุณครูเลือกไว้จริง
   const scores = {};
-  document.querySelectorAll('.ai-manual-input').forEach(el => {
-    if (el.value !== '') scores[el.dataset.manualId] = Number(el.value);
+  document.querySelectorAll('.ai-manual-input:checked').forEach(el => {
+    scores[el.dataset.manualId] = Number(el.value);
   });
 
   try {
@@ -510,6 +551,41 @@ async function loadAiOverview() {
   }
 }
 
+// คอลัมน์ของตารางภาพรวม — จัดหัวตารางแบบเดียวกับ "รายงานการส่งงานรายบุคคล" ในหน้า submission_report.php
+const AI_OVERVIEW_COLS = [
+  { key: 'pretest',  label: 'ก่อนเรียน',  grp: '' },
+  { key: 'task1_d1', label: 'D1.1',       grp: 'grp-unit1' },
+  { key: 'task1_d2', label: 'D1.2',       grp: 'grp-unit1' },
+  { key: 'task2_d1', label: 'D2.1',       grp: 'grp-unit2' },
+  { key: 'task2_d2', label: 'D2.2',       grp: 'grp-unit2' },
+  { key: 'posttest', label: 'หลังเรียน',  grp: '' },
+];
+
+// ตัดทศนิยมท้ายที่ไม่จำเป็นออก (45.00 → 45, 45.50 → 45.5)
+function aiNum(v) {
+  const n = Math.round(parseFloat(v) * 100) / 100;
+  return isNaN(n) ? '-' : String(n);
+}
+
+// รวมผลตรวจรายฉบับให้เป็นรายบุคคล 1 แถว (คอลัมน์ละ 1 รอบงาน)
+function aiOverviewByStudent() {
+  const map = new Map();
+  aiOverviewList.forEach(r => {
+    let stu = map.get(r.student_id);
+    if (!stu) {
+      stu = {
+        student_id:   r.student_id,
+        student_name: r.student_name,
+        classroom:    r.classroom,
+        cells:        {},
+      };
+      map.set(r.student_id, stu);
+    }
+    stu.cells[r.essay_phase] = r;
+  });
+  return Array.from(map.values());
+}
+
 function paintAiOverview() {
   const box = document.getElementById('aiOverviewBox');
   if (!box) return;
@@ -522,49 +598,111 @@ function paintAiOverview() {
   const phase     = document.getElementById('aiOverviewPhase').value;
   const needScore = document.getElementById('aiOverviewNeedScore').checked;
 
-  const list = aiOverviewList.filter(r => {
-    if (phase && r.essay_phase !== phase) return false;
-    if (needScore && r.manual_done) return false;
+  // เลือกรอบงานไว้ = ดูเฉพาะคอลัมน์นั้น (ค่าเฉลี่ยคิดจากคอลัมน์ที่แสดงอยู่)
+  const cols = phase ? AI_OVERVIEW_COLS.filter(c => c.key === phase) : AI_OVERVIEW_COLS;
+  const fullMax = aiOverviewList[0] ? aiOverviewList[0].full_max : 60;
+
+  const students = aiOverviewByStudent().filter(stu => {
+    const shown = cols.map(c => stu.cells[c.key]).filter(Boolean);
+    if (!shown.length) return false;                                   // ไม่มีผลตรวจในคอลัมน์ที่ดูอยู่
+    if (needScore && !shown.some(r => !r.manual_done)) return false;   // ให้คะแนนครบแล้วทุกฉบับ
     if (!kw) return true;
-    return [r.student_id, r.student_name, r.classroom].join(' ').toLowerCase().indexOf(kw) >= 0;
+    return [stu.student_id, stu.student_name, stu.classroom].join(' ').toLowerCase().indexOf(kw) >= 0;
   });
 
-  if (!list.length) {
+  if (!students.length) {
     box.innerHTML = '<div class="text-center text-muted py-5"><i class="bi bi-search fs-3 d-block mb-2"></i>ไม่พบรายการที่ตรงกับตัวกรอง</div>';
     return;
   }
 
-  const waiting = aiOverviewList.filter(r => !r.manual_done).length;
-  const rows = list.map(r => `
-    <tr style="cursor:pointer;" onclick="jumpTo('${esc(r.student_id)}','${esc(r.essay_phase)}')">
-      <td class="fw-semibold text-nowrap">${esc(r.student_id)}</td>
-      <td>${esc(r.student_name)}${r.classroom ? ` <span class="badge bg-info-subtle text-info-emphasis small">ห้อง ${esc(r.classroom)}</span>` : ''}</td>
-      <td class="small text-nowrap">${esc(r.phase_label)}</td>
-      <td class="text-center fw-bold text-nowrap">${r.total_score} <span class="text-muted fw-normal">/ ${r.max_score}</span></td>
-      <td class="text-center text-nowrap">
-        ${r.manual_done
-          ? `<span class="fw-bold">${r.combined_total}</span> <span class="text-muted fw-normal">/ ${r.full_max}</span>`
-          : `<span class="badge bg-warning text-dark">รอคะแนนครู</span>`}
-      </td>
-      <td class="text-center small text-nowrap">${esc(r.quality_level || '-')}</td>
-      <td class="small text-muted text-nowrap">${esc(String(r.updated_at || '').slice(0, 16))}</td>
-    </tr>`).join('');
+  // ผลรวมรายคอลัมน์ ไว้คิดค่าเฉลี่ยทั้งชั้นในแถวท้ายตาราง
+  const colSum = {}, colCount = {};
+  cols.forEach(c => { colSum[c.key] = 0; colCount[c.key] = 0; });
+  let gradedCells = 0, waiting = 0;
+
+  const rows = students.map(stu => {
+    let sum = 0, cnt = 0;
+    const cells = cols.map(c => {
+      const r = stu.cells[c.key];
+      if (!r) {
+        return '<td class="ai-cell-empty"><i class="bi bi-dash-circle" title="ยังไม่ได้ให้ AI ตรวจรอบนี้"></i></td>';
+      }
+      sum += r.combined_total; cnt++;
+      colSum[c.key] += r.combined_total; colCount[c.key]++;
+      gradedCells++;
+      if (!r.manual_done) waiting++;
+      const tip = `${aiEsc(r.phase_label)} · AI ${aiNum(r.total_score)}/${aiNum(r.max_score)}`
+                + ` · ครู ${r.manual_done ? aiNum(r.teacher_total) : 'ยังไม่ให้'}/${aiNum(r.full_max - r.max_score)}`
+                + ` · รวม ${aiNum(r.combined_total)}/${aiNum(r.full_max)}`
+                + (r.quality_level ? ` · ระดับ ${aiEsc(r.quality_level)}` : '');
+      return `<td class="ai-cell-score" title="${tip}"
+                  onclick="jumpTo('${esc(stu.student_id)}','${esc(c.key)}')">
+        <span class="fw-bold">${aiNum(r.combined_total)}</span>${r.manual_done
+          ? ''
+          : '<span class="ai-cell-wait" title="ยังรอคะแนนข้อที่คุณครูต้องให้เอง">*</span>'}
+      </td>`;
+    }).join('');
+
+    const avg = cnt ? aiNum(sum / cnt) : '-';
+    return `<tr>
+      <td class="stu-id text-start">${esc(stu.student_id)}</td>
+      <td class="stu-name">${esc(stu.student_name || '-')}${stu.classroom
+        ? ` <span class="badge bg-info-subtle text-info-emphasis small">ห้อง ${esc(stu.classroom)}</span>` : ''}</td>
+      ${cells}
+      <td class="ai-cell-avg fw-bold">${avg}<span class="text-muted fw-normal small"> / ${aiNum(fullMax)}</span></td>
+    </tr>`;
+  }).join('');
+
+  // แถวค่าเฉลี่ยทั้งชั้น (เฉลี่ยเฉพาะฉบับที่ตรวจแล้วในแต่ละรอบ)
+  let allSum = 0, allCount = 0;
+  const avgCells = cols.map(c => {
+    if (!colCount[c.key]) return '<td class="ai-cell-empty">-</td>';
+    allSum += colSum[c.key]; allCount += colCount[c.key];
+    return `<td class="fw-bold" title="เฉลี่ยจาก ${colCount[c.key]} ฉบับ">${aiNum(colSum[c.key] / colCount[c.key])}</td>`;
+  }).join('');
+  const allAvg = allCount ? aiNum(allSum / allCount) : '-';
+
+  const headGroups = phase
+    ? `<tr class="report-head-group">
+         <th rowspan="2" class="text-start align-middle">รหัสนักเรียน</th>
+         <th rowspan="2" class="text-start align-middle">ชื่อ-สกุลผู้เรียน</th>
+         <th rowspan="2" class="align-middle">${esc(cols[0].label)}</th>
+         <th rowspan="2" class="align-middle">เฉลี่ย</th>
+       </tr>
+       <tr class="report-head-sub"></tr>`
+    : `<tr class="report-head-group">
+         <th rowspan="2" class="text-start align-middle">รหัสนักเรียน</th>
+         <th rowspan="2" class="text-start align-middle">ชื่อ-สกุลผู้เรียน</th>
+         <th rowspan="2" class="align-middle">ก่อนเรียน</th>
+         <th colspan="2" class="grp-unit1">หน่วยการเรียนที่ 1</th>
+         <th colspan="2" class="grp-unit2">หน่วยการเรียนที่ 2</th>
+         <th rowspan="2" class="align-middle">หลังเรียน</th>
+         <th rowspan="2" class="align-middle">เฉลี่ย</th>
+       </tr>
+       <tr class="report-head-sub">
+         <th class="grp-unit1">D1.1</th>
+         <th class="grp-unit1">D1.2</th>
+         <th class="grp-unit2">D2.1</th>
+         <th class="grp-unit2">D2.2</th>
+       </tr>`;
 
   box.innerHTML = `
-    <table class="table table-hover table-bordered align-middle mb-0">
-      <thead class="table-light" style="position:sticky; top:0; z-index:1;">
-        <tr>
-          <th class="text-nowrap">รหัส</th><th>ชื่อสกุล</th><th class="text-nowrap">รอบงาน</th>
-          <th class="text-center text-nowrap">คะแนน AI</th>
-          <th class="text-center text-nowrap">รวมเต็ม ${aiOverviewList[0] ? aiOverviewList[0].full_max : 60}</th>
-          <th class="text-center text-nowrap">ระดับ</th><th class="text-nowrap">ตรวจเมื่อ</th>
-        </tr>
-      </thead>
+    <table class="table table-hover align-middle mb-0 ai-report-table">
+      <thead>${headGroups}</thead>
       <tbody>${rows}</tbody>
+      <tfoot>
+        <tr class="ai-report-avg">
+          <td colspan="2" class="text-start fw-bold">เฉลี่ยทั้งชั้น (${students.length} คน)</td>
+          ${avgCells}
+          <td class="fw-bold">${allAvg}</td>
+        </tr>
+      </tfoot>
     </table>
     <div class="px-3 py-2 small text-muted border-top bg-light">
-      แสดง ${list.length} จาก ${aiOverviewList.length} รายการ
-      ${waiting > 0 ? ` · <span class="text-warning-emphasis fw-semibold">รอคุณครูให้คะแนนข้อที่ AI ตรวจแทนไม่ได้อีก ${waiting} รายการ</span>` : ''}
+      คะแนนในตารางคือคะแนนรวมเต็ม ${aiNum(fullMax)} (AI ประเมิน + ข้อที่คุณครูให้เอง) · คลิกที่ช่องคะแนนเพื่อเปิดผลตรวจฉบับนั้น
+      · แสดง ${students.length} คน จากผลตรวจ ${gradedCells} ฉบับ
+      ${waiting > 0 ? `<br><span class="text-warning-emphasis fw-semibold">
+          <i class="bi bi-asterisk me-1"></i>ช่องที่มีเครื่องหมาย * ยังรอคุณครูให้คะแนนข้อที่ AI ตรวจแทนไม่ได้ อีก ${waiting} ฉบับ</span>` : ''}
     </div>`;
 }
 

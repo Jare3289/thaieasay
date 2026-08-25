@@ -559,3 +559,43 @@ body {
   display: block; height: 100%; border-radius: 999px;
   background: linear-gradient(90deg, #6d28d9, #0d7377);
 }
+
+/* กล่อง "จุดที่ควรปรับปรุง พร้อมวิธีแก้" — แยกให้เห็นชัดว่าบกพร่องอะไร และแก้อย่างไร */
+.ai-improve-head {
+  background: #fef3c7;
+  border-bottom: 1px solid #fde68a;
+  padding: 10px 14px;
+}
+.ai-fix-block {
+  background: #ffffff;
+  border: 1px solid #f1e7cd;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.ai-fix-issue { border-left: 4px solid #ef4444; }
+.ai-fix-how   { border-left: 4px solid #10b981; }
+.ai-fix-head  { font-weight: 700; font-size: 0.85rem; margin-bottom: 4px; }
+.ai-fix-example {
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: #475569;
+}
+
+/* หมายเหตุจาก AI รายข้อ ในหน้าให้คะแนน (evaluation.php) */
+.ai-eval-note {
+  background: #f5f3ff;
+  border: 1px solid #ddd6fe;
+  border-left: 4px solid #7c3aed;
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.ai-eval-note-head {
+  font-weight: 700;
+  color: #5b21b6;
+  font-size: 0.9rem;
+  margin-bottom: 6px;
+}
+.ai-eval-note-row { font-size: 0.85rem; line-height: 1.65; color: #334155; }
+.ai-eval-note-row + .ai-eval-note-row { margin-top: 4px; }
+.ai-eval-note-label { font-weight: 700; }
