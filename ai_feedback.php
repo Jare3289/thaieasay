@@ -375,6 +375,9 @@ $aiPhases    = ai_all_phases();
     box-shadow: 0 6px 18px rgba(109, 40, 217, 0.15);
   }
   .ai-phase-card-empty { background: #f8fafc; border-style: dashed; }
+  /* การ์ดค่าเฉลี่ยทั้งชั้น (ครู/ผู้เชี่ยวชาญ) — แยกโทนจากการ์ดของนักเรียนให้ไม่สับสน */
+  .ai-phase-card-class { border-color: #99f6e4; background: #ffffff; }
+  .ai-class-avg-wrap { background: #f0fdfa; border: 1px dashed #99f6e4; }
   .ai-phase-card .ai-score-bar { height: 8px; }
 
   /* ตารางภาพรวมผลตรวจ AI — ใช้รูปแบบหัวตารางเดียวกับ "รายงานการส่งงานรายบุคคล" (submission_report.php) */
@@ -516,7 +519,7 @@ async function loadFeedback() {
   if (sumBox) sumBox.innerHTML = '';
 
   if (!sid) {
-    cards.innerHTML = `<div class="col-12">${emptyBox('เลือกนักเรียนด้านบนเพื่อดูผลตรวจของ AI ทุกรอบงาน')}</div>`;
+    paintPhaseCards();   // ยังไม่เลือกนักเรียน แต่ครูยังเห็นการ์ดค่าเฉลี่ยทั้งชั้นได้
     return;
   }
 
@@ -607,11 +610,16 @@ function aiPctColor(pct) {
 }
 
 // กราฟเส้นพัฒนาการคะแนนรวมข้ามรอบงาน (SVG ล้วน ไม่ต้องพึ่งไลบรารีภายนอก)
-function aiTrendChartSVG(points, fullMax) {
-  const W = 560, H = 230, L = 38, R = 14, T = 18, B = 34;
+// กราฟเส้นพัฒนาการคะแนนรวมข้ามรอบงาน (SVG ล้วน ไม่ต้องพึ่งไลบรารีภายนอก)
+// แกนนอนขึ้นครบทุกรอบงานเสมอ (ก่อนเรียน · D1.1 · D1.2 · D2.1 · D2.2 · หลังเรียน)
+// รอบที่ยังไม่ได้ตรวจจะเว้นไว้เป็นจุดจาง ๆ ให้เห็นว่ายังขาดช่วงไหน
+function aiTrendChartSVG(slots, fullMax) {
+  const W = 560, H = 236, L = 38, R = 14, T = 18, B = 40;
   const pw = W - L - R, phh = H - T - B;
+  const n  = slots.length;
   const yOf = v => T + (1 - (v / fullMax)) * phh;
-  const xOf = i => points.length > 1 ? L + (i / (points.length - 1)) * pw : L + pw / 2;
+  const xOf = i => n > 1 ? L + (i / (n - 1)) * pw : L + pw / 2;
+  const base = T + phh;
 
   // เส้นอ้างอิงตามเกณฑ์ระดับคุณภาพ ให้เห็นว่าคะแนนอยู่ช่วงระดับไหน
   const marks = [
@@ -625,24 +633,45 @@ function aiTrendChartSVG(points, fullMax) {
     <text x="${L - 6}" y="${(yOf(m.v) + 3).toFixed(1)}" text-anchor="end"
           font-size="9" fill="#94a3b8">${esc(m.label)}</text>`).join('');
 
-  const line = points.length > 1
-    ? `<polyline fill="none" stroke="url(#aiTrendGrad)" stroke-width="3" stroke-linejoin="round"
-                 stroke-linecap="round" points="${points.map((p, i) => xOf(i).toFixed(1) + ',' + yOf(p.value).toFixed(1)).join(' ')}"></polyline>`
-    : '';
-  const area = points.length > 1
-    ? `<polygon fill="url(#aiTrendFill)" points="${L},${T + phh} ${points.map((p, i) => xOf(i).toFixed(1) + ',' + yOf(p.value).toFixed(1)).join(' ')} ${(W - R)},${T + phh}"></polygon>`
+  // ลำดับของรอบที่มีคะแนนแล้ว (ใช้ลากเส้นเชื่อม)
+  const have = slots.map((sl, i) => (sl.value === null || sl.value === undefined) ? -1 : i).filter(i => i >= 0);
+
+  // เชื่อมทีละช่วง — ถ้าข้ามรอบที่ยังไม่ได้ตรวจ ให้เป็นเส้นประ บอกว่าช่วงนั้นไม่มีข้อมูล
+  const segs = have.slice(1).map((cur, k) => {
+    const prev = have[k];
+    const gap  = (cur - prev) > 1;
+    return `<line x1="${xOf(prev).toFixed(1)}" y1="${yOf(slots[prev].value).toFixed(1)}"
+                  x2="${xOf(cur).toFixed(1)}"  y2="${yOf(slots[cur].value).toFixed(1)}"
+                  stroke="url(#aiTrendGrad)" stroke-width="3" stroke-linecap="round"
+                  ${gap ? 'stroke-dasharray="6 5" stroke-opacity="0.55"' : ''}></line>`;
+  }).join('');
+
+  const area = have.length > 1
+    ? `<polygon fill="url(#aiTrendFill)" points="${xOf(have[0]).toFixed(1)},${base}
+        ${have.map(i => xOf(i).toFixed(1) + ',' + yOf(slots[i].value).toFixed(1)).join(' ')}
+        ${xOf(have[have.length - 1]).toFixed(1)},${base}"></polygon>`
     : '';
 
   // ดึงป้ายของจุดริมซ้าย/ริมขวาเข้ามาเล็กน้อย ไม่ให้ตัวเลขล้นไปทับป้ายระดับหรือขอบกราฟ
   const labelX = i => Math.max(L + 14, Math.min(W - R - 14, xOf(i)));
-  const dots = points.map((p, i) => `
-    <circle cx="${xOf(i).toFixed(1)}" cy="${yOf(p.value).toFixed(1)}" r="5.5" fill="#ffffff" stroke="#6d28d9" stroke-width="3"></circle>
-    <text x="${labelX(i).toFixed(1)}" y="${(yOf(p.value) - 12).toFixed(1)}" text-anchor="middle"
-          font-size="12" font-weight="700" fill="#4c1d95">${aiNum(p.value)}</text>
-    <text x="${labelX(i).toFixed(1)}" y="${H - 12}" text-anchor="middle" font-size="10" fill="#64748b">${esc(p.label)}</text>`).join('');
 
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="230" role="img"
-               aria-label="กราฟพัฒนาการคะแนนรวมของแต่ละรอบงาน">
+  const dots = slots.map((sl, i) => {
+    const x = xOf(i).toFixed(1), lx = labelX(i).toFixed(1);
+    // รอบที่ยังไม่ได้ตรวจ: จุดจาง ๆ บนแกน พร้อมป้าย "ยังไม่ตรวจ"
+    if (sl.value === null || sl.value === undefined) {
+      return `<line x1="${x}" y1="${T}" x2="${x}" y2="${base}" stroke="#f1f5f9" stroke-width="1"></line>
+        <circle cx="${x}" cy="${base}" r="3.5" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"></circle>
+        <text x="${lx}" y="${base - 9}" text-anchor="middle" font-size="9" fill="#cbd5e1">ยังไม่ตรวจ</text>
+        <text x="${lx}" y="${H - 12}" text-anchor="middle" font-size="10" fill="#cbd5e1">${esc(sl.label)}</text>`;
+    }
+    return `<circle cx="${x}" cy="${yOf(sl.value).toFixed(1)}" r="5.5" fill="#ffffff" stroke="#6d28d9" stroke-width="3"></circle>
+      <text x="${lx}" y="${(yOf(sl.value) - 12).toFixed(1)}" text-anchor="middle"
+            font-size="12" font-weight="700" fill="#4c1d95">${aiNum(sl.value)}</text>
+      <text x="${lx}" y="${H - 12}" text-anchor="middle" font-size="10" font-weight="600" fill="#475569">${esc(sl.label)}</text>`;
+  }).join('');
+
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="236" role="img"
+               aria-label="กราฟพัฒนาการคะแนนรวมของทุกรอบงาน">
     <defs>
       <linearGradient id="aiTrendGrad" x1="0" y1="0" x2="1" y2="0">
         <stop offset="0%" stop-color="#6d28d9"></stop><stop offset="100%" stop-color="#0d7377"></stop>
@@ -653,8 +682,8 @@ function aiTrendChartSVG(points, fullMax) {
       </linearGradient>
     </defs>
     ${grid}
-    <line x1="${L}" y1="${T + phh}" x2="${W - R}" y2="${T + phh}" stroke="#cbd5e1" stroke-width="1"></line>
-    ${area}${line}${dots}
+    <line x1="${L}" y1="${base}" x2="${W - R}" y2="${base}" stroke="#cbd5e1" stroke-width="1"></line>
+    ${area}${segs}${dots}
   </svg>`;
 }
 
@@ -680,11 +709,13 @@ function paintStudentSummary() {
   const fullMax = Number(last.full_max || last.max_score || 60);
 
   // ---- สถิติรวม ----
-  const points = phases.map(ph => ({
+  // แกนของกราฟใช้ "ทุกรอบงาน" เสมอ ส่วนสถิติ (เฉลี่ย/สูงสุด/พัฒนาการ) คิดจากรอบที่ตรวจแล้วเท่านั้น
+  const slots = AI_PHASES.map(ph => ({
     phase: ph,
     label: AI_PHASE_SHORT[ph] || ph,
-    value: aiCombinedOf(aiAllFeedback[ph]),
+    value: aiAllFeedback[ph] ? aiCombinedOf(aiAllFeedback[ph]) : null,
   }));
+  const points = slots.filter(sl => sl.value !== null);
   const values = points.map(p => p.value);
   const avg    = values.reduce((a, b) => a + b, 0) / values.length;
   const best   = points.reduce((a, b) => (b.value > a.value ? b : a), points[0]);
@@ -816,7 +847,11 @@ function paintStudentSummary() {
         <div class="row g-4 mb-2">
           <div class="col-lg-7">
             <h6 class="fw-bold text-dark mb-2"><i class="bi bi-graph-up me-2"></i>พัฒนาการคะแนนรวม (เต็ม ${aiNum(fullMax)})</h6>
-            <div class="ai-chart-box p-2 rounded-4">${aiTrendChartSVG(points, fullMax)}</div>
+            <div class="ai-chart-box p-2 rounded-4">${aiTrendChartSVG(slots, fullMax)}</div>
+            <div class="text-muted mt-1" style="font-size:0.75rem;">
+              <i class="bi bi-info-circle me-1"></i>แกนนอนคือรอบงานทั้งหมด ${AI_PHASES.length} รอบ
+              — รอบที่ยังไม่ได้ตรวจจะเว้นไว้ และช่วงที่ข้ามรอบจะลากเป็นเส้นประ
+            </div>
           </div>
           <div class="col-lg-5">
             <h6 class="fw-bold text-dark mb-2"><i class="bi bi-bar-chart-steps me-2"></i>ความสำเร็จรายเกณฑ์ (เฉลี่ยทุกรอบ)</h6>
@@ -873,14 +908,110 @@ function aiCombinedOf(fb) {
   return isNaN(v) ? null : v;
 }
 
+// ทศนิยม 1 ตำแหน่ง — ใช้กับค่าเฉลี่ยบนการ์ด ไม่ให้ตัวเลขยาวจนตกบรรทัด
+function aiNum1(v) {
+  const n = Math.round(parseFloat(v) * 10) / 10;
+  return isNaN(n) ? '-' : String(n);
+}
+
+// ค่าเฉลี่ยของทั้งชั้นรายรอบงาน คิดจากตารางภาพรวมที่โหลดไว้แล้ว (ครู/ผู้เชี่ยวชาญเท่านั้น)
+function aiClassAverages() {
+  const acc = {};
+  (aiOverviewList || []).forEach(r => {
+    if (!acc[r.essay_phase]) acc[r.essay_phase] = { sum: 0, cnt: 0, max: Number(r.full_max) || 60 };
+    acc[r.essay_phase].sum += Number(r.combined_total);
+    acc[r.essay_phase].cnt++;
+  });
+  Object.keys(acc).forEach(ph => { acc[ph].avg = acc[ph].sum / acc[ph].cnt; });
+  return acc;
+}
+
+// การ์ดค่าเฉลี่ยทั้งชั้นของรอบงานหนึ่ง — หน้าตาเดียวกับการ์ดของนักเรียน แต่เป็นสีเขียวอมฟ้าและกดไม่ได้
+function classPhaseCardHTML(ph, stat) {
+  const label = AI_PHASE_LABELS[ph] || ph;
+  if (!stat || !stat.cnt) {
+    return `<div class="col">
+      <div class="ai-phase-card ai-phase-card-empty ai-phase-card-class h-100 p-3 rounded-4">
+        <div class="fw-bold text-dark mb-2">${esc(label)}</div>
+        <div class="text-muted"><i class="bi bi-dash-circle me-1"></i>ยังไม่มีผลตรวจในรอบนี้</div>
+      </div>
+    </div>`;
+  }
+
+  const pct = stat.max > 0 ? Math.round((stat.avg / stat.max) * 100) : 0;
+
+  // ถ้ากำลังเปิดดูนักเรียนอยู่ ให้เทียบคะแนนของคนนี้กับค่าเฉลี่ยไปเลย
+  const mine = (currentStudentId() && aiAllFeedback[ph]) ? aiCombinedOf(aiAllFeedback[ph]) : null;
+  let cmp = '';
+  if (mine !== null) {
+    const d  = Math.round((mine - stat.avg) * 100) / 100;
+    const up = d > 0, same = (d === 0);
+    cmp = `<div class="small mt-2 ${same ? 'text-muted' : (up ? 'text-success-emphasis' : 'text-danger-emphasis')}">
+      <i class="bi ${same ? 'bi-dash-lg' : (up ? 'bi-arrow-up-short' : 'bi-arrow-down-short')} me-1"></i>
+      นักเรียนคนนี้ได้ ${aiNum(mine)} — ${same ? 'เท่ากับค่าเฉลี่ย' : (up ? 'สูงกว่าค่าเฉลี่ย ' : 'ต่ำกว่าค่าเฉลี่ย ') + aiNum1(Math.abs(d)) + ' คะแนน'}
+    </div>`;
+  }
+
+  return `<div class="col">
+    <div class="ai-phase-card ai-phase-card-class h-100 p-3 rounded-4">
+      <div class="d-flex align-items-start justify-content-between gap-2 mb-2 flex-wrap">
+        <span class="fw-bold text-dark">${esc(label)}</span>
+        <span class="badge bg-light text-secondary border">${stat.cnt} ฉบับ</span>
+      </div>
+      <div class="d-flex align-items-end gap-2" title="ค่าเฉลี่ยจริง ${aiNum(stat.avg)} คะแนน">
+        <div class="display-6 fw-bold lh-1" style="color:#0d7377;">${aiNum1(stat.avg)}</div>
+        <div class="text-muted pb-1 text-nowrap">/ ${aiNum(stat.max)} คะแนน</div>
+      </div>
+      <div class="ai-crit-bar mt-2"><span style="width:${pct}%; background:linear-gradient(90deg,#0d7377,#14b8a6);"></span></div>
+      <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-1">
+        <span class="badge bg-info-subtle text-info-emphasis">ระดับเฉลี่ย: ${esc(aiLevelFromScore(stat.avg))}</span>
+        <span class="text-muted small">เฉลี่ยทั้งชั้น</span>
+      </div>
+      ${cmp}
+    </div>
+  </div>`;
+}
+
+// กลุ่มการ์ด "ค่าเฉลี่ยทั้งชั้น" — จัดกลุ่มแบบเดียวกับการ์ดของนักเรียน
+function classAverageGroupsHTML() {
+  if (AI_IS_STUDENT) return '';
+  const stats = aiClassAverages();
+  if (!Object.keys(stats).length) return '';
+
+  const groups = AI_CARD_GROUPS.map(g => {
+    const phases = g.phases.filter(ph => AI_PHASES.indexOf(ph) >= 0);
+    if (!phases.length) return '';
+    return `<div class="mb-4">
+      <div class="fw-bold text-secondary small text-uppercase mb-2">
+        <i class="bi ${g.icon} me-1"></i>${esc(g.title)}
+      </div>
+      <div class="row ${g.cols} g-3">${phases.map(ph => classPhaseCardHTML(ph, stats[ph])).join('')}</div>
+    </div>`;
+  }).join('');
+
+  const total = (aiOverviewList || []).length;
+  return `<div class="ai-class-avg-wrap p-3 p-md-4 rounded-4 mt-2">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+      <div>
+        <h6 class="fw-bold text-dark mb-0"><i class="bi bi-people-fill text-info me-2"></i>ค่าเฉลี่ยทั้งชั้นรายรอบงาน</h6>
+        <div class="text-muted small mt-1">คิดจากผลตรวจของ AI ทั้งหมด ${total} ฉบับที่บันทึกไว้ในระบบ</div>
+      </div>
+    </div>
+    ${groups}
+  </div>`;
+}
+
 // การ์ด 1 ใบต่อ 1 รอบงาน — เห็นคะแนนของตัวเองครบทุกฉบับในหน้าเดียว
 function paintPhaseCards() {
   const box = document.getElementById('aiPhaseCards');
-  if (!box || !aiCardsReady || !currentStudentId()) return;
+  if (!box) return;
+  const sid = currentStudentId();
+  // ยังโหลดผลตรวจของนักเรียนไม่เสร็จ และยังไม่มีค่าเฉลี่ยทั้งชั้นให้แสดง → ปล่อยข้อความ "กำลังโหลด" ไว้
+  if ((!aiCardsReady || !sid) && (AI_IS_STUDENT || !(aiOverviewList || []).length)) return;
 
   const blocked = reviewBlockReason();
 
-  box.innerHTML = AI_CARD_GROUPS.map(g => {
+  const studentCards = (aiCardsReady && sid) ? AI_CARD_GROUPS.map(g => {
     const phases = g.phases.filter(ph => AI_PHASES.indexOf(ph) >= 0);
     if (!phases.length) return '';
 
@@ -909,7 +1040,10 @@ function paintPhaseCards() {
       </div>
       <div class="row ${g.cols} g-3">${cards}</div>
     </div>`;
-  }).join('');
+  }).join('')
+  : `<div class="mb-4">${emptyBox('เลือกนักเรียนด้านบนเพื่อดูผลตรวจของ AI ทุกรอบงาน')}</div>`;
+
+  box.innerHTML = studentCards + classAverageGroupsHTML();
 
   paintStudentSummary();   // สรุปภาพรวมใช้ข้อมูลชุดเดียวกัน วาดพร้อมกันเสมอ
 }
@@ -1200,6 +1334,7 @@ async function loadAiOverview() {
     if (!data.success) { box.innerHTML = `<div class="text-center text-muted py-4">${esc(data.error)}</div>`; return; }
     aiOverviewList = data.list || [];
     paintAiOverview();
+    paintPhaseCards();   // การ์ดค่าเฉลี่ยทั้งชั้นใช้ข้อมูลชุดนี้
   } catch (err) {
     box.innerHTML = '<div class="text-center text-muted py-4">โหลดข้อมูลไม่สำเร็จ</div>';
   }
