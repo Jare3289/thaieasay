@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS evaluations (
     student_id VARCHAR(10) NOT NULL,
     evaluator_type VARCHAR(50) NOT NULL, -- 'ตนเองประเมิน', 'เพื่อนประเมิน', 'ครูประเมิน'
     evaluator_name VARCHAR(150) NOT NULL,
+    -- รอบการประเมิน: pretest / task1 (หน่วยที่ 1) / task2 (หน่วยที่ 2) / posttest
+    test_phase VARCHAR(20) NOT NULL DEFAULT 'posttest',
     -- คะแนนแต่ละมิติก่อนถ่วงน้ำหนัก (ดิบ) หรือ คะแนนหลังถ่วงน้ำหนัก?
     -- ในโค้ดเดิมบันทึกเป็นคะแนนหลังถ่วงน้ำหนัก (คะแนนดิบ * multiplier)
     -- ดังนั้นเราจะเก็บคะแนนหลังคูณแล้วตามแบบเดิมเพื่อไม่ให้ต้องแก้สูตรหน้าบ้าน
@@ -31,7 +33,8 @@ CREATE TABLE IF NOT EXISTS evaluations (
     total_score DECIMAL(5,2) NOT NULL,
     quality_level VARCHAR(50) NOT NULL,
     FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE,
-    UNIQUE KEY unique_eval (student_id, evaluator_type, evaluator_name)
+    -- ต้องมี test_phase ในคีย์ด้วย มิฉะนั้นการประเมินรอบใหม่จะเขียนทับรอบเดิม
+    UNIQUE KEY unique_eval (student_id, evaluator_type, evaluator_name, test_phase)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 3. นำข้อมูลนักเรียน 39 คนเข้าสู่ระบบ

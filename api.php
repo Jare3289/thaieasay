@@ -263,88 +263,141 @@ try {
                 echo json_encode(['success' => false, 'error' => 'ต้องเข้าสู่ระบบก่อนบันทึกข้อมูล']);
                 exit;
             }
-            
+
             $data = isset($request_data['data']) ? $request_data['data'] : null;
             if (!$data) {
                 echo json_encode(['success' => false, 'error' => 'No data provided']);
                 exit;
             }
-            
-            $studentId = $data['studentId'];
-            $studentName = $data['studentName'];
-            $evaluatorType = $data['evaluatorType'];
-            $evaluatorName = $data['evaluatorName'];
-            $testPhase = isset($data['testPhase']) ? $data['testPhase'] : 'posttest';
-            $scores = $data['scores'];
-            $totalScore = $data['totalScore'];
-            $qualityLevel = $data['qualityLevel'];
+
+            $studentId = isset($data['studentId']) ? trim($data['studentId']) : '';
+            $studentName = isset($data['studentName']) ? $data['studentName'] : '';
+            $evaluatorType = isset($data['evaluatorType']) ? trim($data['evaluatorType']) : '';
+            $evaluatorName = isset($data['evaluatorName']) ? trim($data['evaluatorName']) : '';
+            $testPhase = isset($data['testPhase']) ? trim($data['testPhase']) : '';
+            $scores = isset($data['scores']) ? $data['scores'] : [];
+            $totalScore = isset($data['totalScore']) ? $data['totalScore'] : null;
+            $qualityLevel = isset($data['qualityLevel']) ? $data['qualityLevel'] : '';
+
+            if ($studentId === '' || $evaluatorType === '' || $evaluatorName === '') {
+                echo json_encode(['success' => false, 'error' => 'ข้อมูลผู้ประเมิน/ผู้ถูกประเมินไม่ครบ']);
+                exit;
+            }
+            // รอบการประเมินต้องระบุมาเสมอและต้องเป็นค่าที่รู้จัก
+            // (ห้ามใช้ค่า default เงียบ ๆ เพราะจะทำให้คะแนนไปตกอยู่ผิดรอบ = "บันทึกแล้วคะแนนหาย")
+            if (!in_array($testPhase, ['pretest', 'task1', 'task2', 'posttest'], true)) {
+                echo json_encode(['success' => false, 'error' => 'ไม่พบรอบการประเมิน กรุณาเลือกรอบ (ก่อนเรียน/หน่วยที่ 1/หน่วยที่ 2/หลังเรียน) ก่อนบันทึก']);
+                exit;
+            }
+            // ต้องมีคะแนนครบทั้ง 11 ข้อ มิฉะนั้นถือว่าฟอร์มไม่สมบูรณ์
+            $scoreKeys = ['1.1','1.2','1.3','2.1','2.2','3.1','3.2','3.3','4.1','4.2','4.3'];
+            foreach ($scoreKeys as $k) {
+                if (!isset($scores[$k]) || !is_numeric($scores[$k])) {
+                    echo json_encode(['success' => false, 'error' => 'คะแนนไม่ครบทุกข้อเกณฑ์ (ขาดข้อ ' . $k . ')']);
+                    exit;
+                }
+            }
+
             // คำแนะนำเชิงคุณภาพจากเพื่อน (ใช้เฉพาะโหมด 'เพื่อนประเมิน')
-            $peerStrength    = isset($data['peerStrength'])    ? trim($data['peerStrength'])    : null;
-            $peerImprovement = isset($data['peerImprovement']) ? trim($data['peerImprovement']) : null;
+            // ถ้าไม่ได้ส่งมาด้วย = ไม่แตะของเดิม (null) เพื่อไม่ให้การบันทึกโหมดอื่นลบข้อความของเพื่อนทิ้ง
+            $peerStrength      = isset($data['peerStrength'])      ? trim($data['peerStrength'])      : null;
+            $peerImprovement   = isset($data['peerImprovement'])   ? trim($data['peerImprovement'])   : null;
             $peerEncouragement = isset($data['peerEncouragement']) ? trim($data['peerEncouragement']) : null;
-            
-            // เตรียมคิวรีและทำการ Upsert
-            $sql = 'INSERT INTO evaluations (
-                        student_id, evaluator_type, evaluator_name, test_phase,
-                        score_1_1, score_1_2, score_1_3,
-                        score_2_1, score_2_2,
-                        score_3_1, score_3_2, score_3_3,
-                        score_4_1, score_4_2, score_4_3,
-                        total_score, quality_level,
-                        peer_strength, peer_improvement, peer_encouragement
-                    ) VALUES (
-                        :student_id, :evaluator_type, :evaluator_name, :test_phase,
-                        :s1_1, :s1_2, :s1_3,
-                        :s2_1, :s2_2,
-                        :s3_1, :s3_2, :s3_3,
-                        :s4_1, :s4_2, :s4_3,
-                        :total_score, :quality_level,
-                        :peer_strength, :peer_improvement, :peer_encouragement
-                    )
-                    ON DUPLICATE KEY UPDATE
-                        score_1_1 = VALUES(score_1_1),
-                        score_1_2 = VALUES(score_1_2),
-                        score_1_3 = VALUES(score_1_3),
-                        score_2_1 = VALUES(score_2_1),
-                        score_2_2 = VALUES(score_2_2),
-                        score_3_1 = VALUES(score_3_1),
-                        score_3_2 = VALUES(score_3_2),
-                        score_3_3 = VALUES(score_3_3),
-                        score_4_1 = VALUES(score_4_1),
-                        score_4_2 = VALUES(score_4_2),
-                        score_4_3 = VALUES(score_4_3),
-                        total_score = VALUES(total_score),
-                        quality_level = VALUES(quality_level),
-                        peer_strength = VALUES(peer_strength),
-                        peer_improvement = VALUES(peer_improvement),
-                        peer_encouragement = VALUES(peer_encouragement),
-                        timestamp = CURRENT_TIMESTAMP';
-             
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute([
-                ':student_id'          => $studentId,
-                ':evaluator_type'      => $evaluatorType,
-                ':evaluator_name'      => $evaluatorName,
-                ':test_phase'          => $testPhase,
-                ':s1_1'                => $scores['1.1'],
-                ':s1_2'                => $scores['1.2'],
-                ':s1_3'                => $scores['1.3'],
-                ':s2_1'                => $scores['2.1'],
-                ':s2_2'                => $scores['2.2'],
-                ':s3_1'                => $scores['3.1'],
-                ':s3_2'                => $scores['3.2'],
-                ':s3_3'                => $scores['3.3'],
-                ':s4_1'                => $scores['4.1'],
-                ':s4_2'                => $scores['4.2'],
-                ':s4_3'                => $scores['4.3'],
-                ':total_score'         => $totalScore,
-                ':quality_level'       => $qualityLevel,
-                ':peer_strength'       => $peerStrength,
-                ':peer_improvement'    => $peerImprovement,
-                ':peer_encouragement'  => $peerEncouragement
-            ]);
-            
-            echo json_encode(['success' => true]);
+
+            $scoreParams = [
+                ':s1_1' => $scores['1.1'], ':s1_2' => $scores['1.2'], ':s1_3' => $scores['1.3'],
+                ':s2_1' => $scores['2.1'], ':s2_2' => $scores['2.2'],
+                ':s3_1' => $scores['3.1'], ':s3_2' => $scores['3.2'], ':s3_3' => $scores['3.3'],
+                ':s4_1' => $scores['4.1'], ':s4_2' => $scores['4.2'], ':s4_3' => $scores['4.3'],
+                ':total_score' => $totalScore, ':quality_level' => $qualityLevel,
+                ':peer_strength' => $peerStrength, ':peer_improvement' => $peerImprovement,
+                ':peer_encouragement' => $peerEncouragement
+            ];
+            $keyParams = [
+                ':student_id'     => $studentId,
+                ':evaluator_type' => $evaluatorType,
+                ':evaluator_name' => $evaluatorName,
+                ':test_phase'     => $testPhase
+            ];
+
+            try {
+                // ค้นแถวของ "รอบนี้" โดยเฉพาะก่อน แล้วจึงเลือก UPDATE ตาม id หรือ INSERT ใหม่
+                // (ไม่พึ่ง ON DUPLICATE KEY UPDATE เพราะถ้าคีย์ unique ในฐานข้อมูลยังไม่มี test_phase
+                //  การบันทึกรอบใหม่จะไปเขียนทับแถวของรอบเก่าแบบเงียบ ๆ = คะแนนของรอบใหม่หายไป)
+                $find = $pdo->prepare('SELECT id FROM evaluations
+                                       WHERE student_id = :student_id AND evaluator_type = :evaluator_type
+                                         AND evaluator_name = :evaluator_name AND test_phase = :test_phase
+                                       LIMIT 1');
+                $find->execute($keyParams);
+                $existingId = $find->fetchColumn();
+
+                if ($existingId) {
+                    $sql = 'UPDATE evaluations SET
+                                score_1_1 = :s1_1, score_1_2 = :s1_2, score_1_3 = :s1_3,
+                                score_2_1 = :s2_1, score_2_2 = :s2_2,
+                                score_3_1 = :s3_1, score_3_2 = :s3_2, score_3_3 = :s3_3,
+                                score_4_1 = :s4_1, score_4_2 = :s4_2, score_4_3 = :s4_3,
+                                total_score = :total_score, quality_level = :quality_level,
+                                peer_strength      = COALESCE(:peer_strength, peer_strength),
+                                peer_improvement   = COALESCE(:peer_improvement, peer_improvement),
+                                peer_encouragement = COALESCE(:peer_encouragement, peer_encouragement),
+                                timestamp = CURRENT_TIMESTAMP
+                            WHERE id = :id';
+                    $stmt = $pdo->prepare($sql);
+                    $stmt->execute(array_merge($scoreParams, [':id' => $existingId]));
+                    $savedMode = 'update';
+                } else {
+                    $sql = 'INSERT INTO evaluations (
+                                student_id, evaluator_type, evaluator_name, test_phase,
+                                score_1_1, score_1_2, score_1_3,
+                                score_2_1, score_2_2,
+                                score_3_1, score_3_2, score_3_3,
+                                score_4_1, score_4_2, score_4_3,
+                                total_score, quality_level,
+                                peer_strength, peer_improvement, peer_encouragement
+                            ) VALUES (
+                                :student_id, :evaluator_type, :evaluator_name, :test_phase,
+                                :s1_1, :s1_2, :s1_3,
+                                :s2_1, :s2_2,
+                                :s3_1, :s3_2, :s3_3,
+                                :s4_1, :s4_2, :s4_3,
+                                :total_score, :quality_level,
+                                :peer_strength, :peer_improvement, :peer_encouragement
+                            )';
+                    $stmt = $pdo->prepare($sql);
+                    $stmt->execute(array_merge($keyParams, $scoreParams));
+                    $savedMode = 'insert';
+                }
+
+                // ยืนยันซ้ำว่าข้อมูลอยู่ใน "รอบที่ตั้งใจบันทึก" จริง ๆ ก่อนตอบว่าสำเร็จ
+                $verify = $pdo->prepare('SELECT id, total_score FROM evaluations
+                                         WHERE student_id = :student_id AND evaluator_type = :evaluator_type
+                                           AND evaluator_name = :evaluator_name AND test_phase = :test_phase
+                                         LIMIT 1');
+                $verify->execute($keyParams);
+                $saved = $verify->fetch();
+                if (!$saved) {
+                    echo json_encode(['success' => false, 'error' => 'บันทึกไม่สำเร็จ (ตรวจสอบแล้วไม่พบข้อมูลของรอบนี้ในฐานข้อมูล) กรุณาลองใหม่อีกครั้ง']);
+                    exit;
+                }
+
+                echo json_encode([
+                    'success'    => true,
+                    'saveMode'   => $savedMode,
+                    'testPhase'  => $testPhase,
+                    'savedId'    => (int)$saved['id'],
+                    'totalScore' => (float)$saved['total_score']
+                ]);
+            } catch (PDOException $e) {
+                // ชนคีย์ unique = ฐานข้อมูลยังใช้คีย์เก่าที่ไม่มี test_phase (ระบบจะซ่อมให้เองในรอบถัดไป)
+                $isDup = ($e->getCode() === '23000');
+                echo json_encode([
+                    'success' => false,
+                    'error'   => $isDup
+                        ? 'ฐานข้อมูลยังใช้คีย์เดิมที่ไม่แยกรอบการประเมิน กรุณารีเฟรชหน้าเว็บแล้วบันทึกอีกครั้ง (ระบบจะปรับคีย์ให้อัตโนมัติ)'
+                        : ('บันทึกไม่สำเร็จ: ' . $e->getMessage())
+                ]);
+            }
             break;
 
         // 6. ดึงข้อมูลคะแนนสะสม 3 ทิศทางของนักเรียน 1 คน
@@ -399,10 +452,15 @@ try {
             $studentId = isset($request_data['studentId']) ? $request_data['studentId'] : '';
             $evaluatorType = isset($request_data['evaluatorType']) ? $request_data['evaluatorType'] : '';
             $evaluatorName = isset($request_data['evaluatorName']) ? $request_data['evaluatorName'] : '';
-            $testPhase = isset($request_data['testPhase']) ? $request_data['testPhase'] : 'posttest';
+            $testPhase = isset($request_data['testPhase']) ? trim($request_data['testPhase']) : '';
             
             if (empty($studentId) || empty($evaluatorType) || empty($evaluatorName)) {
                 echo json_encode(['success' => false, 'error' => 'Missing parameters']);
+                exit;
+            }
+            // ต้องระบุรอบให้ชัดเจน — ห้าม default เป็น posttest เพราะจะดึงคะแนนข้ามรอบมาแสดงผิดฟอร์ม
+            if (!in_array($testPhase, ['pretest', 'task1', 'task2', 'posttest'], true)) {
+                echo json_encode(['success' => true, 'found' => false, 'note' => 'ยังไม่ได้เลือกรอบการประเมิน']);
                 exit;
             }
             

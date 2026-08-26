@@ -238,6 +238,7 @@ if ($needs_migration) {
             student_id VARCHAR(10) NOT NULL,
             evaluator_type VARCHAR(50) NOT NULL,
             evaluator_name VARCHAR(150) NOT NULL,
+            test_phase VARCHAR(20) NOT NULL DEFAULT 'posttest',
             score_1_1 DECIMAL(5,2) NOT NULL,
             score_1_2 DECIMAL(5,2) NOT NULL,
             score_1_3 DECIMAL(5,2) NOT NULL,
@@ -252,7 +253,7 @@ if ($needs_migration) {
             total_score DECIMAL(5,2) NOT NULL,
             quality_level VARCHAR(50) NOT NULL,
             FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE,
-            UNIQUE KEY unique_eval (student_id, evaluator_type, evaluator_name)
+            UNIQUE KEY unique_eval (student_id, evaluator_type, evaluator_name, test_phase)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     ");
 
@@ -365,9 +366,10 @@ if ($needs_migration) {
     safe_ddl($pdo, "ALTER TABLE evaluations ADD COLUMN peer_encouragement TEXT NULL AFTER peer_improvement");
 
     // 3) เพิ่มคอลัมน์ test_phase และปรับ unique index unique_eval
-    safe_ddl($pdo, "ALTER TABLE evaluations ADD COLUMN test_phase VARCHAR(20) DEFAULT 'posttest' AFTER evaluator_name");
-    safe_ddl($pdo, "ALTER TABLE evaluations DROP INDEX unique_eval");
-    safe_ddl($pdo, "ALTER TABLE evaluations ADD UNIQUE KEY unique_eval (student_id, evaluator_type, evaluator_name, test_phase)");
+    safe_ddl($pdo, "ALTER TABLE evaluations ADD COLUMN test_phase VARCHAR(20) NOT NULL DEFAULT 'posttest' AFTER evaluator_name");
+    // ต้องรวม DROP + ADD ไว้ในคำสั่งเดียว มิฉะนั้น InnoDB จะปฏิเสธ (error 1553)
+    // เพราะ unique_eval เป็นอินเด็กซ์เดียวที่ FOREIGN KEY (student_id) ใช้อยู่
+    safe_ddl($pdo, "ALTER TABLE evaluations DROP INDEX unique_eval, ADD UNIQUE KEY unique_eval (student_id, evaluator_type, evaluator_name, test_phase)");
 
     // 3.5) เพิ่มคอลัมน์ห้องเรียน + กลุ่ม (ทดลอง/ตัวอย่าง) ในตารางนักเรียน
     safe_ddl($pdo, "ALTER TABLE students ADD COLUMN classroom VARCHAR(20) DEFAULT NULL");
@@ -456,6 +458,41 @@ foreach (['writing_problems', 'self_checklists', 'learning_reflections'] as $__r
         }
     } catch (PDOException $e) { /* เงียบไว้ ไม่ให้กระทบการทำงานหลัก */ }
 }
+
+// ---------------------------------------------------------------------
+// ซ่อมคีย์ unique ของตาราง evaluations ให้แยกตาม "รอบการประเมิน" (test_phase)
+// ---------------------------------------------------------------------
+// อาการของบั๊ก: คีย์เดิมคือ (student_id, evaluator_type, evaluator_name) ไม่มี test_phase
+// เมื่อนักเรียน/เพื่อนคนเดิมประเมินคนเดิมในหน่วยที่ 2 คำสั่ง INSERT ... ON DUPLICATE KEY UPDATE
+// จะไปชนแถวของหน่วยที่ 1 แล้วเขียนทับคะแนน โดย test_phase ยังเป็น 'task1' เหมือนเดิม
+// ผลคือ "บันทึกแล้วคะแนนหน่วยที่ 2 หายไป" และรายการสิ่งที่ยังไม่ได้ทำไม่ติ๊กว่าเสร็จ
+//
+// migration เดิมอยู่ในบล็อก $needs_migration (ฐานข้อมูลที่ติดตั้งครบแล้วจะไม่มีวันรัน)
+// และยังสั่ง DROP INDEX แยกจาก ADD UNIQUE ซึ่งล้มเหลวเสมอบน InnoDB
+// เพราะ unique_eval เป็นอินเด็กซ์เดียวที่ขึ้นต้นด้วย student_id ซึ่ง FOREIGN KEY ใช้อยู่
+// (MySQL error 1553) — safe_ddl กลืน error ไว้ ทำให้ไม่มีใครรู้ว่าคีย์ไม่เคยถูกแก้
+// จึงต้องตรวจ + ซ่อมนอกบล็อก migration และรวมเป็นคำสั่ง ALTER เดียว
+try {
+    // คิวรีเดียวต่อ 1 request (metadata อย่างเดียว เบามาก): มี test_phase อยู่ในคีย์ unique_eval แล้วหรือยัง
+    $__idxEval = $pdo->query("SHOW INDEX FROM evaluations WHERE Key_name = 'unique_eval' AND Column_name = 'test_phase'");
+    if ($__idxEval && $__idxEval->rowCount() === 0) {
+        // ยังไม่มี → ตรวจคอลัมน์ test_phase ก่อน (ฐานข้อมูลเก่าบางชุดอาจยังไม่มีคอลัมน์นี้)
+        $__hasPhaseCol = $pdo->query("SHOW COLUMNS FROM evaluations LIKE 'test_phase'")->fetch();
+        if (!$__hasPhaseCol) {
+            safe_ddl($pdo, "ALTER TABLE evaluations ADD COLUMN test_phase VARCHAR(20) NOT NULL DEFAULT 'posttest' AFTER evaluator_name");
+        }
+        // DROP + ADD ในคำสั่งเดียว: ระหว่างทาง MySQL ยังเห็นอินเด็กซ์ที่ขึ้นต้นด้วย student_id
+        // ให้ FOREIGN KEY ใช้ได้ตลอด จึงไม่ติด error 1553 เหมือนการสั่งแยกสองคำสั่ง
+        try {
+            $pdo->exec("ALTER TABLE evaluations
+                DROP INDEX unique_eval,
+                ADD UNIQUE KEY unique_eval (student_id, evaluator_type, evaluator_name, test_phase)");
+        } catch (PDOException $e) {
+            // เผื่อฐานข้อมูลที่ไม่มีอินเด็กซ์ชื่อ unique_eval อยู่แล้ว → สร้างใหม่อย่างเดียว
+            safe_ddl($pdo, "ALTER TABLE evaluations ADD UNIQUE KEY unique_eval (student_id, evaluator_type, evaluator_name, test_phase)");
+        }
+    }
+} catch (PDOException $e) { /* ตารางยังไม่ถูกสร้าง/สิทธิ์ไม่พอ — เงียบไว้ ไม่ให้กระทบการทำงานหลัก */ }
 
 // ตารางจับคู่ประเมินเพื่อน (peer_pairs) — ตรวจแยกจาก migration หลัก
 // เพราะเป็นฟีเจอร์ที่เพิ่มภายหลัง ต้องสร้างให้ระบบที่ migration หลักผ่านไปแล้วด้วย

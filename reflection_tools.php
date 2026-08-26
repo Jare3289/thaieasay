@@ -72,7 +72,10 @@ $role = $sessionUser['role'];
           <!-- 1. แบบบันทึกปัญหาการเขียน -->
           <div class="tab-pane fade show active" id="obstacles" role="tabpanel" aria-labelledby="obstacles-tab">
             <form id="formObstacles">
-              <h5 class="fw-bold text-dark mb-3">แบบบันทึกปัญหาการเขียนจากร่างแรก</h5>
+              <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                <h5 class="fw-bold text-dark mb-0">แบบบันทึกปัญหาการเขียนจากร่างแรก</h5>
+                <span id="statusObstacles" class="badge rounded-pill px-3 py-2 bg-secondary d-none"></span>
+              </div>
               <p class="text-muted small mb-3">คำชี้แจง: ให้ทำเครื่องหมายเลือกเฉพาะด้านที่พบปัญหาจริงจากร่างแรก แล้ววิเคราะห์บันทึกอุปสรรคที่พบพร้อมเสนอแนวทางการแก้ไข ด้านที่ไม่ได้เลือกไม่จำเป็นต้องกรอก</p>
 
               <!-- ตัวนับจำนวนด้านที่เลือก -->
@@ -234,7 +237,10 @@ $role = $sessionUser['role'];
           <!-- 2. แบบรายการตรวจสอบตนเอง -->
           <div class="tab-pane fade" id="checklist" role="tabpanel" aria-labelledby="checklist-tab">
             <form id="formChecklist">
-              <h5 class="fw-bold text-dark mb-3">แบบรายการตรวจสอบตนเอง (Self-Checklist)</h5>
+              <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                <h5 class="fw-bold text-dark mb-0">แบบรายการตรวจสอบตนเอง (Self-Checklist)</h5>
+                <span id="statusChecklist" class="badge rounded-pill px-3 py-2 bg-secondary d-none"></span>
+              </div>
               <p class="text-muted small mb-3">คำชี้แจง: ให้พิจารณาผลงานเขียนร่างสุดท้ายของตนเองอย่างละเอียด แล้วทำเครื่องหมายเลือกในตารางตามความจริง</p>
               
               <div class="table-responsive rounded-3 border mb-4">
@@ -353,7 +359,10 @@ $role = $sessionUser['role'];
           <!-- 3. แบบบันทึกการสะท้อนการเรียนรู้ -->
           <div class="tab-pane fade" id="reflection" role="tabpanel" aria-labelledby="reflection-tab">
             <form id="formReflection">
-              <h5 class="fw-bold text-dark mb-3">แบบบันทึกการสะท้อนการเรียนรู้ (Learning Reflection)</h5>
+              <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                <h5 class="fw-bold text-dark mb-0">แบบบันทึกการสะท้อนการเรียนรู้ (Learning Reflection)</h5>
+                <span id="statusReflection" class="badge rounded-pill px-3 py-2 bg-secondary d-none"></span>
+              </div>
               <p class="text-muted small mb-3">คำชี้แจง: ให้เขียนสะท้อนการเรียนรู้หลังจากปรับปรุงเรียงความฉบับสมบูรณ์เรียบร้อยแล้ว</p>
               
               <div class="row g-4 mb-4">
@@ -1028,6 +1037,15 @@ $role = $sessionUser['role'];
       });
     });
 
+    // ป้ายสถานะ "บันทึกแล้ว / ยังไม่ได้บันทึก" ของแต่ละแบบฟอร์ม แยกตามหน่วยการเรียนที่กำลังเปิดอยู่
+    // (นักเรียนต้องเห็นได้ทันทีว่าหน่วยนี้บันทึกไปแล้วหรือยัง ไม่ต้องเดาจากช่องที่กรอกไว้)
+    function setReflectionSavedBadge(elId, saved) {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      el.className = 'badge rounded-pill px-3 py-2 ' + (saved ? 'bg-success' : 'bg-secondary');
+      el.textContent = (saved ? '✓ บันทึกแล้ว' : '✏️ ยังไม่ได้บันทึก') + ' · หน่วยที่ ' + currentReflectionUnit;
+    }
+
     // 1. โหลดข้อมูลแบบปัญหาการเขียนเดิม
     async function loadStudentWritingProblems() {
       try {
@@ -1053,6 +1071,7 @@ $role = $sessionUser['role'];
           });
           updateProbSelectedCount();
         }
+        setReflectionSavedBadge('statusObstacles', !!(res.success && res.data));
       } catch (err) {
         console.error(err);
       }
@@ -1078,6 +1097,7 @@ $role = $sessionUser['role'];
           const notesText = form.querySelector('[name="notes"]');
           if (notesText && d.notes) notesText.value = d.notes;
         }
+        setReflectionSavedBadge('statusChecklist', !!(res.success && res.data));
       } catch (err) {
         console.error(err);
       }
@@ -1097,6 +1117,7 @@ $role = $sessionUser['role'];
             if (textarea) textarea.value = d[field];
           });
         }
+        setReflectionSavedBadge('statusReflection', !!(res.success && res.data));
       } catch (err) {
         console.error(err);
       }
@@ -1118,6 +1139,10 @@ $role = $sessionUser['role'];
       if (fC) fC.reset();
       const fR = document.getElementById('formReflection');
       if (fR) fR.reset();
+      // สลับหน่วยแล้วต้องตั้งป้ายกลับเป็น "ยังไม่ได้บันทึก" ก่อน แล้วให้ผลการโหลดข้อมูลของหน่วยใหม่เป็นตัวตัดสิน
+      setReflectionSavedBadge('statusObstacles', false);
+      setReflectionSavedBadge('statusChecklist', false);
+      setReflectionSavedBadge('statusReflection', false);
     }
 
     // สลับหน่วยการเรียน แล้วโหลดข้อมูลบันทึกของหน่วยนั้นมาแสดง (ผูกกับปุ่มผ่าน onclick)
@@ -1165,6 +1190,7 @@ $role = $sessionUser['role'];
         });
         const res = await response.json();
         if (res.success) {
+          setReflectionSavedBadge('statusObstacles', true);
           alert('บันทึกอุปสรรคปัญหาการเขียน (หน่วยที่ ' + currentReflectionUnit + ') เสร็จสมบูรณ์!');
         } else {
           alert('เกิดข้อผิดพลาด: ' + res.error);
@@ -1203,6 +1229,7 @@ $role = $sessionUser['role'];
         });
         const res = await response.json();
         if (res.success) {
+          setReflectionSavedBadge('statusChecklist', true);
           alert('บันทึกแบบรายการตรวจสอบตนเอง (หน่วยที่ ' + currentReflectionUnit + ') เรียบร้อย!');
         } else {
           alert('เกิดข้อผิดพลาด: ' + res.error);
@@ -1236,6 +1263,7 @@ $role = $sessionUser['role'];
         });
         const res = await response.json();
         if (res.success) {
+          setReflectionSavedBadge('statusReflection', true);
           alert('บันทึกแบบสะท้อนการเรียนรู้ (หน่วยที่ ' + currentReflectionUnit + ') เรียบร้อย!');
         } else {
           alert('เกิดข้อผิดพลาด: ' + res.error);

@@ -1090,11 +1090,21 @@ require_once 'header.php';
     }
   }
 
+  // ตัวนับลำดับคำขอ — กันกรณีคำตอบของคำขอเก่ากลับมาช้ากว่าคำขอใหม่แล้วเขียนทับสถานะบนหน้าจอ
+  // (เคยทำให้ป้ายสถานะขึ้นว่า "รายการใหม่" ทั้งที่โหลดคะแนนเดิมของรอบที่เลือกมาแล้ว)
+  let evalLoadSeq = 0;
+
   // ดึงข้อมูลการประเมินเก่ามาใส่ในฟอร์ม
   async function checkExistingEvaluation(studentId) {
     const rubricCont = document.getElementById('rubricContainer');
     const statusBadge = document.getElementById('loadOldDataStatus');
     const progressCont = document.getElementById('progressContainer');
+
+    // ยังไม่ได้เลือกรอบ (ก่อนเรียน/หน่วยที่ 1/หน่วยที่ 2/หลังเรียน) → ยังไม่ต้องโหลดอะไร
+    // เพราะการค้นหาโดยไม่มีรอบจะไม่พบข้อมูลเสมอ และทำให้ขึ้นว่า "รายการใหม่" ทั้งที่มีคะแนนเดิมอยู่
+    const selectedPhase = document.getElementById('selectedTestPhase') ? document.getElementById('selectedTestPhase').value : '';
+    if (!selectedPhase) return false;
+    const mySeq = ++evalLoadSeq;
     
     rubricCont.classList.remove('opacity-60', 'pointer-events-none');
     document.getElementById('evalForm').reset();
@@ -1118,7 +1128,7 @@ require_once 'header.php';
     statusBadge.className = "badge bg-info text-white fs-8 px-3 py-2 rounded-pill";
     statusBadge.classList.remove('d-none');
 
-    const testPhase = document.getElementById('selectedTestPhase') ? document.getElementById('selectedTestPhase').value : 'task1';
+    const testPhase = selectedPhase;
 
     try {
       const response = await fetch('api.php?action=get_single_evaluation', {
@@ -1132,9 +1142,10 @@ require_once 'header.php';
         })
       });
       const res = await response.json();
-      
+      if (mySeq !== evalLoadSeq) return false; // มีคำขอใหม่กว่าตามมาแล้ว — ทิ้งผลลัพธ์นี้ไป
+
       if(res.success && res.found) {
-        statusBadge.textContent = "✓ พบข้อมูลประเมินเดิมแล้ว (โหมดแก้ไข)";
+        statusBadge.textContent = `✓ บันทึกแล้ว · ${phaseLabels[testPhase] || testPhase} (เปิดแก้ไขได้)`;
         statusBadge.className = "badge bg-success text-white fs-8 px-3 py-2 rounded-pill";
 
         for (const [itemId, rawValue] of Object.entries(res.scores)) {
@@ -1180,7 +1191,7 @@ require_once 'header.php';
 
         calculateRealTimeFormScore();
       } else {
-        statusBadge.textContent = "✏️ การประเมินผลงานรายการใหม่";
+        statusBadge.textContent = `✏️ ยังไม่ได้บันทึก · ${phaseLabels[testPhase] || testPhase} (รายการใหม่)`;
         statusBadge.className = "badge bg-secondary text-white fs-8 px-3 py-2 rounded-pill";
       }
       // เติมคำแนะนำเชิงคุณภาพจากเพื่อน (ถ้ามี)
@@ -1201,10 +1212,12 @@ require_once 'header.php';
       fetchComparisonPhaseScores(studentId, testPhase);
       // โหลดผลตรวจของ AI มาแปะเป็น "หมายเหตุจาก AI" ในแต่ละข้อย่อย (ไว้ประกอบการตัดสินใจ ไม่ใช่คะแนนจริง)
       fetchAiNotesForEvaluation(studentId, testPhase);
+      return !!(res.success && res.found);
     } catch (err) {
       console.error(err);
       statusBadge.textContent = "⚠️ ไม่สามารถตรวจสอบประวัติได้";
       statusBadge.className = "badge bg-danger text-white fs-8 px-3 py-2 rounded-pill";
+      return false;
     }
   }
 
@@ -1806,9 +1819,15 @@ require_once 'header.php';
         // บันทึกขึ้นเซิร์ฟเวอร์สำเร็จแล้ว ไม่ต้องเก็บร่างสำรองในเครื่องอีกต่อไป
         clearEvalDraftFromLocalStorage(studentId, testPhase);
         // อยู่ที่หน้าประเมินเดิม (ไม่ redirect ไปหน้าอื่น) แล้วโหลดข้อมูลที่บันทึกกลับมาให้เป็นโหมดแก้ไข
-        showToast("บันทึกผลการประเมินเรียบร้อยแล้ว ✓ (คุณยังอยู่ที่หน้าประเมินเดิม)", "success");
+        showToast(`บันทึกผลการประเมิน ${phaseLabels[testPhase] || testPhase} เรียบร้อยแล้ว ✓ (คุณยังอยู่ที่หน้าประเมินเดิม)`, "success");
         btn.innerHTML = originalText;
-        checkExistingEvaluation(studentId);
+        btn.disabled = false; // เปิดปุ่มคืน เผื่อผู้ประเมินต้องการแก้คะแนนแล้วบันทึกซ้ำได้ทันที
+        // อ่านกลับจากฐานข้อมูลเพื่อ "พิสูจน์" ว่าคะแนนของรอบนี้ถูกบันทึกจริง
+        // ถ้าอ่านกลับไม่เจอ ต้องเตือนทันที ห้ามปล่อยให้ฟอร์มว่างเปล่าโดยไม่บอกอะไรเลย
+        const reloaded = await checkExistingEvaluation(studentId);
+        if (!reloaded) {
+          showToast("⚠️ บันทึกแล้วแต่อ่านคะแนนของรอบนี้กลับมาไม่ได้ กรุณารีเฟรชหน้าเว็บแล้วตรวจสอบอีกครั้ง", "error");
+        }
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
         showToast("เกิดข้อผิดพลาดในการบันทึกข้อมูล: " + res.error, "error");
@@ -1842,7 +1861,8 @@ require_once 'header.php';
         resolvedEl.textContent = `✓ ผู้ถูกประเมิน: ${currentUser.id} - ${studentDB[currentUser.id]}`;
         resolvedEl.classList.remove('d-none');
       }
-      checkExistingEvaluation(currentUser.id);
+      // ยังไม่โหลดคะแนนเดิมตรงนี้ — ต้องรู้ "รอบ" ก่อน (selectPhase จะสั่งโหลดให้เอง)
+      // มิฉะนั้นจะยิงคำขอด้วยรอบว่าง ซึ่งไม่มีวันพบข้อมูล และคำตอบที่กลับมาช้าจะไปทับสถานะที่ถูกต้อง
     } else {
       if (tInput) { tInput.value = ''; tInput.disabled = false; }
       dimRubric();
