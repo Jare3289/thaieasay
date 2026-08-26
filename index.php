@@ -29,7 +29,12 @@ require_once 'header.php';
     <div class="card border-0 shadow-sm rounded-4 bg-white mb-4 overflow-hidden text-start">
       <div class="card-header bg-primary bg-opacity-10 text-primary fw-bold py-3 px-4 border-0 d-flex align-items-center justify-content-between">
         <span class="fs-6"><i class="bi bi-list-check me-2"></i>ความคืบหน้า / สิ่งที่ยังไม่ได้ทำ</span>
-        <span id="todoCountBadge" class="badge bg-primary rounded-pill px-3 py-1 font-mono fs-8 d-none">-</span>
+        <span class="d-flex align-items-center gap-2">
+          <button type="button" id="todoRefreshBtn" class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1 fs-8" title="ตรวจสอบความคืบหน้าใหม่อีกครั้ง">
+            <i class="bi bi-arrow-clockwise"></i> รีเฟรช
+          </button>
+          <span id="todoCountBadge" class="badge bg-primary rounded-pill px-3 py-1 font-mono fs-8 d-none">-</span>
+        </span>
       </div>
       <div class="card-body p-4">
         <div id="todoListLoading" class="text-center text-muted py-3">
@@ -544,6 +549,20 @@ require_once 'header.php';
   // เรียกใช้ตรวจสอบความคืบหน้าเมื่อโหลดหน้าสำเร็จ
   document.addEventListener('DOMContentLoaded', () => {
     loadTodoList();
+    const refreshBtn = document.getElementById('todoRefreshBtn');
+    if (refreshBtn) refreshBtn.addEventListener('click', () => {
+      const loadingEl = document.getElementById('todoListLoading');
+      if (loadingEl) loadingEl.classList.remove('d-none');
+      loadTodoList();
+    });
+  });
+
+  // กลับมาที่หน้านี้อีกครั้ง (กดย้อนกลับจากหน้าประเมิน/หน้าเขียนเรียงความ หรือสลับแท็บกลับมา)
+  // ต้องดึงสถานะใหม่เสมอ ไม่ใช้ของเก่าที่ค้างอยู่ในแคชของเบราว์เซอร์
+  // มิฉะนั้นงานที่เพิ่งบันทึกไปจะยังไม่ขึ้นเครื่องหมายถูกจนกว่าจะรีโหลดเอง
+  window.addEventListener('pageshow', (e) => { if (e.persisted) loadTodoList(); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') loadTodoList();
   });
 </script>
 

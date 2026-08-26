@@ -96,7 +96,7 @@ $me = $_SESSION['user'];
             <div class="small text-muted mt-1">คุณจะตรวจงานให้ ${escapeHtml(name)} และ ${escapeHtml(name)} จะตรวจงานให้คุณเช่นกัน (ไป-กลับ)</div>
           </div>
           <div class="d-flex flex-column gap-2">
-            <a href="evaluation.php?mode=peer" class="btn btn-success fw-bold rounded-pill px-4">ไปหน้าประเมินเพื่อน &rarr;</a>
+            <a href="evaluation.php?mode=peer&phase=${encodeURIComponent(currentRound)}" class="btn btn-success fw-bold rounded-pill px-4">ไปหน้าประเมินเพื่อน &rarr;</a>
             <button type="button" id="btnUnpair" class="btn btn-sm btn-outline-danger rounded-pill">ยกเลิกคู่ (ขอใหม่)</button>
           </div>
         </div>`;
