@@ -709,6 +709,10 @@ try {
                 essay_hash      CHAR(40)     DEFAULT NULL,  -- ลายนิ้วมือเนื้อหาเรียงความ ณ ตอนที่ AI ตรวจ
                 recheck_needed  TINYINT(1)   NOT NULL DEFAULT 0,  -- 1 = ต้นฉบับถูกแก้หลังตรวจ รอตรวจใหม่
                 recheck_marked_at DATETIME   DEFAULT NULL,
+                review_round    INT          NOT NULL DEFAULT 1,  -- ตรวจฉบับนี้เป็นครั้งที่เท่าไร (1 = ตรวจครั้งแรก)
+                prev_round      LONGTEXT,      -- JSON ผลตรวจครั้งก่อน (คะแนน/จุดที่ต้องแก้) ไว้เทียบว่าแก้แล้วดีขึ้นตรงไหน
+                progress_comment TEXT,         -- AI สรุปว่าฉบับแก้ไขเปลี่ยนไปจากการตรวจครั้งก่อนอย่างไร
+                resolved_points LONGTEXT,      -- JSON array จุดที่ครั้งก่อนแจ้งไว้ และนักเรียนแก้ได้แล้วในรอบนี้
                 created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE,
@@ -755,6 +759,21 @@ try {
         safe_ddl($pdo, "ALTER TABLE essay_ai_feedback ADD COLUMN essay_hash CHAR(40) DEFAULT NULL AFTER raw_response");
         safe_ddl($pdo, "ALTER TABLE essay_ai_feedback ADD COLUMN recheck_needed TINYINT(1) NOT NULL DEFAULT 0 AFTER essay_hash");
         safe_ddl($pdo, "ALTER TABLE essay_ai_feedback ADD COLUMN recheck_marked_at DATETIME DEFAULT NULL AFTER recheck_needed");
+    }
+} catch (Exception $e) {
+    // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
+}
+
+// เพิ่มคอลัมน์ "เทียบกับการตรวจครั้งก่อน" ให้ตาราง essay_ai_feedback (ฐานข้อมูลที่สร้างไว้ก่อนหน้านี้)
+// เมื่อ AI ตรวจซ้ำฉบับที่นักเรียนแก้มาแล้ว ระบบจะเก็บผลตรวจครั้งก่อนไว้ 1 ชุด
+// เพื่อบอกได้ว่ารอบนี้คะแนนขึ้น/ลงข้อไหน จุดใดแก้แล้ว จุดใดยังต้องแก้ต่อ
+try {
+    $colRr = $pdo->query("SHOW COLUMNS FROM essay_ai_feedback LIKE 'review_round'");
+    if ($colRr && $colRr->rowCount() === 0) {
+        safe_ddl($pdo, "ALTER TABLE essay_ai_feedback ADD COLUMN review_round INT NOT NULL DEFAULT 1 AFTER recheck_marked_at");
+        safe_ddl($pdo, "ALTER TABLE essay_ai_feedback ADD COLUMN prev_round LONGTEXT NULL AFTER review_round");
+        safe_ddl($pdo, "ALTER TABLE essay_ai_feedback ADD COLUMN progress_comment TEXT NULL AFTER prev_round");
+        safe_ddl($pdo, "ALTER TABLE essay_ai_feedback ADD COLUMN resolved_points LONGTEXT NULL AFTER progress_comment");
     }
 } catch (Exception $e) {
     // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ

@@ -407,6 +407,9 @@ $aiPhases    = ai_all_phases();
   .ai-cell-wait { color: #d97706; font-weight: 700; margin-left: 2px; }
   .ai-cell-stale { background: #fffbeb; }
   .ai-cell-stale-icon { color: #d97706; margin-left: 3px; }
+  /* ลูกศรบอกว่าคะแนนของ AI ขยับขึ้น/ลงจากการตรวจครั้งก่อน (ดูรายละเอียดได้ที่ tooltip) */
+  .ai-cell-up   { color: #16a34a; margin-left: 3px; font-size: 0.75rem; }
+  .ai-cell-down { color: #dc2626; margin-left: 3px; font-size: 0.75rem; }
   .ai-recheck-row { cursor: pointer; }
   .ai-recheck-row:hover { background: #fffbeb; }
   .ai-report-avg td {
@@ -1069,6 +1072,10 @@ function phaseCardHTML(ph, blocked) {
       badges += '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning">'
               + '<i class="bi bi-arrow-repeat me-1"></i>รอตรวจใหม่</span>';
     }
+    // ตรวจซ้ำแล้วกี่ครั้ง — คลิกเข้าไปดูรายละเอียดจะเห็นว่ารอบนี้เปลี่ยนจากครั้งก่อนตรงไหน
+    if (Number(fb.review_round || 1) > 1) {
+      badges += `<span class="badge ai-round-badge">ตรวจครั้งที่ ${Number(fb.review_round)}</span>`;
+    }
     body = `<div class="d-flex align-items-end gap-2">
         <div class="display-6 fw-bold text-primary lh-1">${aiNum(combined)}</div>
         <div class="text-muted pb-1">/ ${aiNum(fullMax)} คะแนน</div>
@@ -1078,7 +1085,12 @@ function phaseCardHTML(ph, blocked) {
         <span class="badge bg-primary-subtle text-primary-emphasis">ระดับ${fb.manual_done ? '' : 'โดยประมาณ'}: ${esc(level)}</span>
         <span class="text-muted small">AI ${aiNum(fb.total_score)}/${aiNum(fb.max_score)}
           · ครู ${fb.manual_done ? aiNum(fb.teacher_total) : '—'}/${aiNum(fb.manual_max)}</span>
-      </div>`;
+      </div>
+      ${(fb.progress && fb.progress.has_prev) ? `<div class="small mt-2 d-flex align-items-center gap-2 flex-wrap">
+        <span class="text-muted">เทียบครั้งที่ ${fb.progress.prev_round}:</span>
+        ${aiDeltaBadge(fb.progress.total_delta)}
+        <span class="text-muted">ดีขึ้น ${fb.progress.up} · ลดลง ${fb.progress.down} ข้อ</span>
+      </div>` : ''}`;
     foot = `<span class="fw-semibold text-primary"><i class="bi bi-card-list me-1"></i>${on ? 'กำลังแสดงรายละเอียด' : 'ดูรายละเอียดการให้คะแนน'}</span>`;
   } else if (essay) {
     cls += ' ai-phase-card-empty';
@@ -1453,14 +1465,23 @@ function paintAiOverview() {
                 + (r.teacher_source === 'evaluation' ? ' (จากแบบประเมิน)' : '')
                 + ` · รวม ${aiNum(r.combined_total)}/${aiNum(r.full_max)}`
                 + (r.quality_level ? ` · ระดับ ${aiEsc(r.quality_level)}` : '')
-                + (r.needs_recheck ? ' · ต้นฉบับถูกแก้หลังตรวจ รอตรวจใหม่' : '');
+                + (r.needs_recheck ? ' · ต้นฉบับถูกแก้หลังตรวจ รอตรวจใหม่' : '')
+                + ((Number(r.review_round || 1) > 1)
+                    ? ` · ตรวจครั้งที่ ${Number(r.review_round)}`
+                      + ((r.total_delta === null || r.total_delta === undefined)
+                          ? ''
+                          : ` · คะแนน AI ${r.total_delta > 0 ? 'เพิ่มขึ้น' : (r.total_delta < 0 ? 'ลดลง' : 'เท่าเดิม')}`
+                            + (r.total_delta ? ` ${aiNum(Math.abs(r.total_delta))} คะแนนจากครั้งก่อน` : ''))
+                    : '');
       return `<td class="ai-cell-score${r.needs_recheck ? ' ai-cell-stale' : ''}" title="${tip}"
                   onclick="jumpTo('${esc(stu.student_id)}','${esc(c.key)}')">
         <span class="fw-bold">${aiNum(r.combined_total)}</span>${r.manual_done
           ? ''
           : '<span class="ai-cell-wait" title="ยังรอคะแนนข้อที่คุณครูต้องให้เอง">*</span>'}${r.needs_recheck
           ? '<i class="bi bi-arrow-repeat ai-cell-stale-icon" title="ต้นฉบับถูกแก้หลังตรวจ รอตรวจใหม่"></i>'
-          : ''}
+          : ''}${(r.total_delta === null || r.total_delta === undefined || !r.total_delta)
+          ? ''
+          : `<i class="bi ${r.total_delta > 0 ? 'bi-caret-up-fill ai-cell-up' : 'bi-caret-down-fill ai-cell-down'}"></i>`}
       </td>`;
     }).join('');
 
@@ -1727,8 +1748,15 @@ async function runReviewQueue(items, ui) {
       t.reviewed = true;
       t.needs_recheck = false;
       const fb = data.feedback || {};
+      // ตรวจซ้ำ: บอกในบรรทัดสรุปเลยว่าคะแนนขยับจากครั้งก่อนเท่าไร ไม่ต้องเปิดดูทีละคน
+      const pg   = (fb.progress && fb.progress.has_prev) ? fb.progress : null;
+      const diff = pg
+        ? ` · ครั้งที่ ${pg.round} ${pg.total_delta > 0 ? '▲ +' + aiNum(pg.total_delta)
+            : (pg.total_delta < 0 ? '▼ ' + aiNum(pg.total_delta) : 'เท่าเดิม')}`
+          + ` (เดิม ${aiNum(pg.prev_total)})`
+        : '';
       reviewLogLine(ui, 'bi-check-circle-fill', 'text-success', who,
-        `${fb.total_score}/${fb.max_score} · ${fb.quality_level || '-'}`);
+        `${fb.total_score}/${fb.max_score} · ${fb.quality_level || '-'}${diff}`);
       if (typeof data.quota_left === 'number' && aiStatus) {
         aiStatus.quota_left = data.quota_left;
         aiStatus.quota_used = aiStatus.quota_limit - data.quota_left;

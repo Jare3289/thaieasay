@@ -40,6 +40,13 @@ CREATE TABLE IF NOT EXISTS essay_ai_feedback (
     requested_by    VARCHAR(50)  DEFAULT NULL,
     requested_role  VARCHAR(20)  DEFAULT NULL,
     raw_response    LONGTEXT,
+    essay_hash      CHAR(40)     DEFAULT NULL,
+    recheck_needed  TINYINT(1)   NOT NULL DEFAULT 0,
+    recheck_marked_at DATETIME   DEFAULT NULL,
+    review_round    INT          NOT NULL DEFAULT 1,
+    prev_round      LONGTEXT,
+    progress_comment TEXT,
+    resolved_points LONGTEXT,
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE,
@@ -73,3 +80,12 @@ CREATE TABLE IF NOT EXISTS ai_usage_log (
 -- ALTER TABLE essay_ai_feedback ADD COLUMN essay_hash CHAR(40) DEFAULT NULL AFTER raw_response;
 -- ALTER TABLE essay_ai_feedback ADD COLUMN recheck_needed TINYINT(1) NOT NULL DEFAULT 0 AFTER essay_hash;
 -- ALTER TABLE essay_ai_feedback ADD COLUMN recheck_marked_at DATETIME DEFAULT NULL AFTER recheck_needed;
+
+-- ---------------------------------------------------------------------------
+-- เทียบกับการตรวจครั้งก่อน: เก็บผลตรวจรอบก่อนไว้ 1 ชุด เพื่อบอกว่าฉบับแก้ไข "เปลี่ยนไปอย่างไร"
+-- (db_config.php รันให้อัตโนมัติเมื่อเปิดเว็บ — บรรทัดด้านล่างไว้รันมือกรณีจำเป็น)
+-- ---------------------------------------------------------------------------
+-- ALTER TABLE essay_ai_feedback ADD COLUMN review_round INT NOT NULL DEFAULT 1 AFTER recheck_marked_at;
+-- ALTER TABLE essay_ai_feedback ADD COLUMN prev_round LONGTEXT NULL AFTER review_round;
+-- ALTER TABLE essay_ai_feedback ADD COLUMN progress_comment TEXT NULL AFTER prev_round;
+-- ALTER TABLE essay_ai_feedback ADD COLUMN resolved_points LONGTEXT NULL AFTER progress_comment;
