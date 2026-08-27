@@ -48,12 +48,18 @@ require_once 'header.php';
         <p class="text-muted small mb-0 report-desc">ติดตามสถานะการส่งเรียงความและเครื่องมือสะท้อนคิดของนักเรียนแต่ละคน (ใช้ตัวเลือกกลุ่มการวิจัยที่แถบด้านบน)</p>
         <div class="print-only print-meta" id="printMeta"></div>
       </div>
-      <div class="d-flex gap-2 no-print">
+      <div class="d-flex gap-2 no-print flex-wrap">
         <button class="btn btn-outline-primary btn-sm rounded-pill px-3 fw-bold" onclick="exportSubmissionCSV()">
           <i class="bi bi-filetype-csv me-1"></i> ส่งออก CSV
         </button>
         <button class="btn btn-primary btn-sm rounded-pill px-3 fw-bold shadow-sm" onclick="exportSubmissionPDF()">
           <i class="bi bi-filetype-pdf me-1"></i> ส่งออก PDF (ดูตัวอย่างก่อนพิมพ์)
+        </button>
+        <button class="btn btn-outline-success btn-sm rounded-pill px-3 fw-bold" onclick="openClassReport()">
+          <i class="bi bi-clipboard-data me-1"></i> รายงานภาพรวมชั้นเรียน
+        </button>
+        <button class="btn btn-success btn-sm rounded-pill px-3 fw-bold shadow-sm" onclick="openStudentReport()">
+          <i class="bi bi-person-vcard me-1"></i> รายงานรายบุคคลทั้งห้อง
         </button>
       </div>
     </div>
@@ -216,7 +222,10 @@ require_once 'header.php';
       if (done === REPORT_COLS.length) complete++;
       return '<tr>' +
         '<td class="stu-id text-start">' + s.student_id + '</td>' +
-        '<td class="stu-name">' + (s.student_name || '-') + '</td>' +
+        '<td class="stu-name">' + (s.student_name || '-') +
+          ' <button class="btn btn-link btn-sm p-0 align-baseline no-print" title="พิมพ์รายงานผลการเรียนรู้ของนักเรียนคนนี้"' +
+          ' onclick="openStudentReport(\'' + s.student_id + '\')"><i class="bi bi-printer"></i></button>' +
+        '</td>' +
         cells +
       '</tr>';
     }).join('');
@@ -254,6 +263,32 @@ require_once 'header.php';
     a.download = 'รายงานการส่งงาน.csv';
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  // รายงานผลการเรียนรู้ — เอกสารพร้อมพิมพ์/บันทึกเป็น PDF (ผลสัมฤทธิ์ ผลงาน และสถิติ)
+  // ระบุรหัสนักเรียน = ฉบับของคนนั้นคนเดียว, ไม่ระบุ = ทั้งห้องตามกลุ่มที่เลือกอยู่ (ขึ้นหน้าใหม่ทุกคน)
+  function reportQuery(extra) {
+    const g = (window.TEG ? TEG.filterValue() : '');
+    const qs = new URLSearchParams();
+    if (g) qs.set('group', g);
+    if (extra) qs.set('student_id', extra);
+    const str = qs.toString();
+    return str ? ('?' + str) : '';
+  }
+
+  function openReportWindow(url) {
+    const win = window.open(url, '_blank');
+    if (!win) showToast('เบราว์เซอร์บล็อกป๊อปอัป — โปรดอนุญาตป๊อปอัปเพื่อเปิดหน้ารายงาน', 'error');
+  }
+
+  function openStudentReport(studentId) {
+    if (!studentId && !submissionData.length) { showToast('ยังไม่มีข้อมูลให้ออกรายงาน', 'error'); return; }
+    openReportWindow('student_report_print.php' + reportQuery(studentId));
+  }
+
+  function openClassReport() {
+    if (!submissionData.length) { showToast('ยังไม่มีข้อมูลให้ออกรายงาน', 'error'); return; }
+    openReportWindow('class_report_print.php' + reportQuery());
   }
 
   // ส่งออก PDF — เปิดหน้าตัวอย่างพร้อมพิมพ์ (submission_print.php) ให้ดูก่อน

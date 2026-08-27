@@ -1143,7 +1143,7 @@ function ai_log_usage(PDO $pdo, $userId, $role, $studentId, $phase, $ok, $errorM
 }
 
 /** แปลงแถวในตาราง essay_ai_feedback ให้เป็นโครงสร้างที่หน้าเว็บใช้ได้ทันที */
-function ai_feedback_row_to_array(array $row, array $evalManual = null) {
+function ai_feedback_row_to_array(array $row, ?array $evalManual = null) {
     $decode = function ($v) {
         $d = json_decode((string)$v, true);
         return is_array($d) ? $d : [];

@@ -162,13 +162,18 @@ require_once 'header.php';
       <div class="col-12">
         <div class="card border-0 shadow-sm rounded-4 p-4 bg-white text-start">
           <div class="row align-items-center">
-            <div class="col-md-9 col-sm-12">
+            <div class="col-md-8 col-sm-12">
               <h5 class="fw-bold text-dark mb-1"><i class="bi bi-pie-chart text-primary me-2"></i>รายงานผลการประเมินสะสมรอบทิศ (360° Student Report)</h5>
               <p class="text-muted small mb-0 font-light" style="font-size: 0.85rem;">คลิกเพื่อดูสรุปคะแนนประเมินร่วมกันระหว่างนักเรียน เพื่อนร่วมชั้น และคุณครูผู้สอน พร้อมวิเคราะห์พัฒนาการรายบุคคล</p>
             </div>
-            <div class="col-md-3 col-sm-12 text-end mt-3 mt-md-0">
+            <div class="col-md-4 col-sm-12 text-end mt-3 mt-md-0 d-grid gap-2">
               <a href="dashboard.php" id="btnOpenReport" class="btn btn-primary btn-lg rounded-pill px-4 fw-bold w-100 shadow text-decoration-none">
                 เปิดรายงานของฉัน
+              </a>
+              <!-- เอกสารประจำตัว: ผลสัมฤทธิ์ ผลงาน และสถิติของตนเอง พิมพ์หรือบันทึกเป็น PDF เก็บไว้ได้ -->
+              <a href="student_report_print.php" target="_blank" rel="noopener"
+                 class="btn btn-outline-primary rounded-pill px-4 fw-bold w-100 text-decoration-none">
+                <i class="bi bi-printer me-1"></i>พิมพ์รายงานผลการเรียนรู้ของฉัน
               </a>
             </div>
           </div>
@@ -283,6 +288,8 @@ require_once 'header.php';
                 ['essay_viewer.php',            '📝', 'เรียงความนักเรียน', 'อ่านงานเขียนทุกคนทุกรอบ'],
                 ['ai_feedback.php',             '🤖', 'ผู้ช่วย AI ตรวจเรียงความ', 'ให้ข้อเสนอแนะอัตโนมัติ + ตั้งค่า AI'],
                 ['research_analysis.php',       '🔬', 'วิเคราะห์สถิติวิจัย', 'ICC, Paired t-test, เชิงคุณภาพ'],
+                ['class_report_print.php',      '📋', 'รายงานภาพรวมชั้นเรียน', 'สรุปผลสัมฤทธิ์ทั้งห้อง พร้อมพิมพ์เป็น PDF'],
+                ['student_report_print.php',    '🧑‍🎓', 'รายงานรายบุคคล', 'ผลสัมฤทธิ์ ผลงาน และสถิติของนักเรียนแต่ละคน'],
               ];
               foreach ($quick as $q):
             ?>
