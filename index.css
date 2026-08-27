@@ -606,3 +606,79 @@ body {
   border: 1px solid #fde68a;
   border-left: 4px solid #f59e0b;
 }
+
+/* ============================================================
+   เทียบกับการตรวจครั้งก่อน (ตรวจครั้งที่ 2 ขึ้นไป)
+   ============================================================ */
+.ai-progress-box {
+  background: #f5f3ff;
+  border: 1px solid #ddd6fe;
+  border-left: 4px solid #7c3aed;
+}
+.ai-round-badge {
+  background: #ede9fe;
+  color: #5b21b6;
+  border: 1px solid #ddd6fe;
+  font-weight: 600;
+}
+.ai-progress-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  background: #ffffff;
+  border: 1px solid #e9d5ff;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+}
+.ai-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.ai-delta-up   { background: #dcfce7; color: #166534; }
+.ai-delta-down { background: #fee2e2; color: #991b1b; }
+.ai-delta-same { background: #e5e7eb; color: #4b5563; }
+.ai-progress-comment {
+  background: #ffffff;
+  border: 1px solid #e9d5ff;
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: #334155;
+  line-height: 1.8;
+}
+.ai-progress-note {
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.9rem;
+}
+.ai-progress-note-good { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; }
+.ai-progress-note-warn { background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; }
+.ai-progress-col {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.ai-progress-col-head { font-weight: 700; font-size: 0.88rem; margin-bottom: 6px; }
+.ai-progress-fixed { border-top: 3px solid #10b981; }
+.ai-progress-fixed .ai-progress-col-head { color: #047857; }
+.ai-progress-still { border-top: 3px solid #f59e0b; }
+.ai-progress-still .ai-progress-col-head { color: #b45309; }
+.ai-progress-new   { border-top: 3px solid #7c3aed; }
+.ai-progress-new .ai-progress-col-head { color: #6d28d9; }
+.ai-progress-item {
+  font-size: 0.85rem;
+  padding: 6px 0;
+  border-top: 1px dashed #e5e7eb;
+}
+.ai-progress-item:first-of-type { border-top: 0; }
+.ai-tag-open    { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; font-weight: 600; }
+.ai-tag-partial { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; font-weight: 600; }
+.ai-tag-new     { background: #ede9fe; color: #5b21b6; border: 1px solid #ddd6fe; font-weight: 600; }
