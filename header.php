@@ -27,6 +27,7 @@ function teg_menu_for_role($role) {
       ],
       'general' => [
         ['รายงานของฉัน',      'dashboard.php',             'bi-pie-chart-fill',     'dashboard'],
+        ['รายงานผลการเรียนรู้','student_report.php',        'bi-person-vcard',       'student_report'],
       ],
     ];
   }
@@ -37,6 +38,7 @@ function teg_menu_for_role($role) {
         ['ประเมินผลงาน',       'evaluation.php?mode=expert',  'bi-clipboard-check', 'evaluation:expert'],
         ['เรียงความนักเรียน',   'essay_viewer.php',            'bi-journal-text',    'essay_viewer'],
         ['ผลตรวจจาก AI',       'ai_feedback.php',             'bi-robot',           'ai_feedback'],
+        ['รายงานรายบุคคล',     'student_report.php',          'bi-person-vcard',    'student_report'],
       ],
       'general' => [],
     ];
@@ -52,6 +54,7 @@ function teg_menu_for_role($role) {
       ['ผู้ช่วย AI ตรวจงาน',  'ai_feedback.php',              'bi-robot',              'ai_feedback'],
     ],
     'general' => [
+      ['รายงานรายบุคคล',       'student_report.php',           'bi-person-vcard',       'student_report'],
       ['รายงานสะท้อนคิด',      'reflection_tools.php',         'bi-lightbulb-fill',     'reflection_tools'],
       ['นักเรียน & จับคู่',    'manage_students.php',          'bi-person-lines-fill',  'manage_students'],
       ['วิเคราะห์สถิติวิจัย',  'research_analysis.php',        'bi-graph-up-arrow',     'research_analysis'],

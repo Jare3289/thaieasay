@@ -223,6 +223,8 @@ require_once 'header.php';
       return '<tr>' +
         '<td class="stu-id text-start">' + s.student_id + '</td>' +
         '<td class="stu-name">' + (s.student_name || '-') +
+          ' <a class="btn btn-link btn-sm p-0 align-baseline no-print" title="เปิดรายงานฉบับเต็มของนักเรียนคนนี้"' +
+          ' href="student_report.php?student_id=' + encodeURIComponent(s.student_id) + '"><i class="bi bi-person-vcard"></i></a>' +
           ' <button class="btn btn-link btn-sm p-0 align-baseline no-print" title="พิมพ์รายงานผลการเรียนรู้ของนักเรียนคนนี้"' +
           ' onclick="openStudentReport(\'' + s.student_id + '\')"><i class="bi bi-printer"></i></button>' +
         '</td>' +

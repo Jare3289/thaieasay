@@ -579,6 +579,24 @@ function report_student_summary(array $data, $sid) {
     }
     $done = report_done_count($data, $sid);
 
+    // ---- ลำดับในชั้นเรียน (คะแนนหลังเรียน และพัฒนาการ) ----
+    // เรียงจากมากไปน้อย คนที่คะแนนเท่ากันได้ลำดับเดียวกัน
+    $rankOf = function ($values, $mine) {
+        if ($mine === null) return null;
+        $vals = array_values(array_filter($values, function ($v) { return $v !== null; }));
+        if (!$vals) return null;
+        $better = 0;
+        foreach ($vals as $v) { if ($v > $mine) $better++; }
+        return ['rank' => $better + 1, 'of' => count($vals)];
+    };
+    $allPost = $allGrowth = [];
+    foreach (array_keys($data['students']) as $other) {
+        $p = $data['evals'][$other]['pretest']['teacher']['total']  ?? null;
+        $q = $data['evals'][$other]['posttest']['teacher']['total'] ?? null;
+        $allPost[]   = ($q === null) ? null : (float)$q;
+        $allGrowth[] = ($p === null || $q === null) ? null : (float)$q - (float)$p;
+    }
+
     // ---- ผลตรวจของ AI ฉบับล่าสุดที่มี (ใช้เป็นข้อเสนอแนะปิดท้ายรายงาน) ----
     $latestAi = null;
     foreach (array_reverse(array_keys(report_essay_phases())) as $ph) {
@@ -598,6 +616,241 @@ function report_student_summary(array $data, $sid) {
         'done_total'  => count(report_work_items()),
         'peer'        => $data['peer'][$sid] ?? ['received' => [], 'given' => 0],
         'latest_ai'   => $latestAi,
+        'rank_post'   => $rankOf($allPost, $post),
+        'rank_growth' => $rankOf($allGrowth, $growth['diff']),
         'class'       => $class,
     ];
+}
+
+/* ==========================================================================
+ * ข้อมูล "ทั้งหมด" ของนักเรียนรายบุคคล — ใช้ทำรายงานฉบับเต็มและหน้าเว็บรายบุคคล
+ * ทุกอย่างที่นักเรียนทำไว้ในระบบ: เรียงความฉบับเต็มทุกรอบ คะแนนรายเกณฑ์จากผู้ประเมินทุกฝ่าย
+ * ผลตรวจของ AI ทุกรอบ เครื่องมือสะท้อนคิดทุกหน่วย และข้อคิดเห็นจากเพื่อน
+ * ========================================================================== */
+
+/** ป้ายชื่อเกณฑ์ 11 ข้อ แบบคีย์ขีดล่าง (ตรงกับชื่อคอลัมน์ในตารางเครื่องมือสะท้อนคิด) */
+function report_criteria_underscore() {
+    $out = [];
+    foreach (report_criteria() as $c) {
+        $out[str_replace('.', '_', $c['id'])] = $c['id'] . ' ' . $c['name'];
+    }
+    return $out;
+}
+
+/** ป้ายชื่อเกณฑ์ของ "แบบประเมินเพื่อน" (มีข้อย่อยเพิ่มอีก 2 ข้อ รวม 13 ข้อ) */
+function report_peer_criteria() {
+    return [
+        '1_1' => '1.1 ความตรงประเด็น',
+        '1_2' => '1.2 แก่นเรื่องชัดเจน',
+        '1_3' => '1.3 การขยายความและเหตุผล',
+        '1_4' => '1.4 เอกภาพของเนื้อหา',
+        '2_1' => '2.1 ความครบถ้วนขององค์ประกอบ',
+        '2_2' => '2.2 การลำดับประเด็นเป็นระบบ',
+        '3_1' => '3.1 การใช้ประโยคถูกต้อง',
+        '3_2' => '3.2 การเลือกใช้คำ',
+        '3_3' => '3.3 ระดับภาษาเหมาะสม',
+        '3_4' => '3.4 การใช้คำเชื่อม',
+        '4_1' => '4.1 การสะกดคำถูกต้อง',
+        '4_2' => '4.2 การเว้นวรรค',
+        '4_3' => '4.3 ความเรียบร้อย',
+    ];
+}
+
+/** หัวข้อของบันทึกสะท้อนการเรียนรู้ */
+function report_reflect_fields() {
+    return [
+        'content_structure'  => 'ด้านเนื้อหาสาระและองค์ประกอบ',
+        'language_mechanics' => 'ด้านการใช้สำนวนภาษาและอักขรวิธี',
+        'feedback_applied'   => 'การนำข้อเสนอแนะไปปรับปรุงงาน',
+        'future_goals'       => 'การประยุกต์ใช้และเป้าหมายในอนาคต',
+    ];
+}
+
+/** เกณฑ์ความยาวเรียงความที่ครูกำหนด */
+function report_word_target() {
+    return ['min' => 250, 'max' => 300];
+}
+
+/**
+ * ดึงข้อมูลดิบทั้งหมดของนักเรียนหลายคนพร้อมกัน (query ละครั้งต่อประเภทข้อมูล)
+ * คืนค่า [student_id => dossier] — ใช้กับรายงานทั้งห้องได้โดยไม่ยิง query ซ้ำต่อคน
+ */
+function report_full_data(PDO $pdo, array $sids) {
+    $out = [];
+    if (!$sids) return $out;
+    $in     = implode(',', array_fill(0, count($sids), '?'));
+    $blank  = [
+        'essays' => [], 'evals' => [], 'ai' => [], 'problems' => [], 'checklists' => [],
+        'reflections' => [], 'peer_received' => [], 'peer_given' => [],
+    ];
+    foreach ($sids as $sid) $out[$sid] = $blank;
+
+    // หัวข้อที่ครูกำหนดแต่ละรอบ (ตัวช่วยอยู่ใน db_config.php ซึ่งหน้าเว็บโหลดผ่าน auth_helper.php อยู่แล้ว)
+    $topics = function_exists('essay_topics_map') ? essay_topics_map($pdo) : [];
+
+    // ---- เรียงความฉบับเต็มทุกรอบ ----
+    try {
+        $st = $pdo->prepare("SELECT student_id, essay_phase, intro_content, body_content, conclusion_content,
+                                    word_count, created_at, updated_at
+                               FROM student_essays WHERE student_id IN ($in)");
+        $st->execute($sids);
+        while ($r = $st->fetch()) {
+            $body = json_decode((string)$r['body_content'], true);
+            if (!is_array($body)) {
+                $body = (trim((string)$r['body_content']) !== '') ? [(string)$r['body_content']] : [];
+            }
+            $body = array_values(array_filter(array_map('strval', $body), function ($p) { return trim($p) !== ''; }));
+            $intro = (string)($r['intro_content'] ?? '');
+            $concl = (string)($r['conclusion_content'] ?? '');
+            $out[$r['student_id']]['essays'][$r['essay_phase']] = [
+                'intro'      => $intro,
+                'body'       => $body,
+                'conclusion' => $concl,
+                'word_count' => (int)$r['word_count'],
+                'created_at' => (string)$r['created_at'],
+                'updated_at' => (string)$r['updated_at'],
+                'topic'      => (string)($topics[function_exists('essay_topic_phase')
+                                    ? essay_topic_phase($r['essay_phase']) : $r['essay_phase']] ?? ''),
+                'has_text'   => (trim($intro) !== '' || $body || trim($concl) !== ''),
+            ];
+        }
+    } catch (Exception $e) { /* ยังไม่มีตารางเรียงความ */ }
+
+    // ---- คะแนนรายเกณฑ์จากผู้ประเมินทุกฝ่าย ทุกรอบ ----
+    $crit    = report_criteria();
+    $evalMap = report_evaluator_map();
+    try {
+        $cols = [];
+        foreach ($crit as $c) $cols[] = 'e.' . $c['col'];
+        $base = "SELECT e.student_id, e.test_phase, e.evaluator_type, e.evaluator_name,
+                        e.total_score, e.quality_level, e.timestamp, ";
+        $tail = " FROM evaluations e WHERE e.student_id IN ($in)";
+        try {
+            $st = $pdo->prepare($base . 'e.peer_strength, e.peer_improvement, e.peer_encouragement, '
+                                . implode(', ', $cols) . $tail);
+            $st->execute($sids);
+        } catch (Exception $e) {
+            $st = $pdo->prepare($base . implode(', ', $cols) . $tail);
+            $st->execute($sids);
+        }
+        while ($r = $st->fetch()) {
+            $key = $evalMap[$r['evaluator_type']] ?? '';
+            if ($key === '') continue;
+            $scores = [];
+            foreach ($crit as $c) $scores[$c['id']] = (float)$r[$c['col']];
+            $row = [
+                'type'           => $key,
+                'type_label'     => (string)$r['evaluator_type'],
+                'evaluator_name' => formatNamePrefix((string)$r['evaluator_name']),
+                'total'          => (float)$r['total_score'],
+                'level'          => (string)$r['quality_level'],
+                'scores'         => $scores,
+                'timestamp'      => (string)$r['timestamp'],
+                'strength'       => (string)($r['peer_strength'] ?? ''),
+                'improvement'    => (string)($r['peer_improvement'] ?? ''),
+                'encouragement'  => (string)($r['peer_encouragement'] ?? ''),
+            ];
+            $out[$r['student_id']]['evals'][$r['test_phase']][] = $row;
+        }
+    } catch (Exception $e) { /* ยังไม่มีผลประเมิน */ }
+
+    // ---- ผลตรวจของ AI ทุกรอบงาน ----
+    try {
+        $st = $pdo->prepare("SELECT f.*, s.student_name, s.classroom
+                               FROM essay_ai_feedback f
+                               LEFT JOIN students s ON s.student_id = f.student_id
+                              WHERE f.student_id IN ($in)");
+        $st->execute($sids);
+        while ($r = $st->fetch()) {
+            $out[$r['student_id']]['ai'][$r['essay_phase']] = ai_feedback_row_to_array($r);
+        }
+    } catch (Exception $e) { /* ยังไม่ได้ใช้ระบบ AI */ }
+
+    // ---- บันทึกปัญหาการเขียนและแนวทางแก้ (แยกตามหน่วย) ----
+    $critU = report_criteria_underscore();
+    try {
+        $st = $pdo->prepare("SELECT * FROM writing_problems WHERE student_id IN ($in)");
+        $st->execute($sids);
+        while ($r = $st->fetch()) {
+            $u = ((int)$r['task_unit'] === 2) ? 2 : 1;
+            $items = [];
+            foreach ($critU as $k => $label) {
+                $prob = trim((string)($r['prob_' . $k] ?? ''));
+                $sol  = trim((string)($r['sol_' . $k] ?? ''));
+                if ($prob === '' && $sol === '') continue;
+                $items[$k] = ['label' => $label, 'problem' => $prob, 'solution' => $sol];
+            }
+            $out[$r['student_id']]['problems'][$u] = [
+                'items'      => $items,
+                'created_at' => (string)($r['created_at'] ?? ''),
+            ];
+        }
+    } catch (Exception $e) { /* ตารางอาจยังไม่ถูกสร้าง */ }
+
+    // ---- รายการตรวจสอบตนเอง (แยกตามหน่วย) ----
+    try {
+        $st = $pdo->prepare("SELECT * FROM self_checklists WHERE student_id IN ($in)");
+        $st->execute($sids);
+        while ($r = $st->fetch()) {
+            $u = ((int)$r['task_unit'] === 2) ? 2 : 1;
+            $items = [];
+            foreach ($critU as $k => $label) {
+                $items[$k] = ['label' => $label, 'value' => trim((string)($r['check_' . $k] ?? ''))];
+            }
+            $out[$r['student_id']]['checklists'][$u] = [
+                'items'      => $items,
+                'notes'      => trim((string)($r['notes'] ?? '')),
+                'created_at' => (string)($r['created_at'] ?? ''),
+            ];
+        }
+    } catch (Exception $e) { /* ตารางอาจยังไม่ถูกสร้าง */ }
+
+    // ---- บันทึกสะท้อนการเรียนรู้ (แยกตามหน่วย) ----
+    try {
+        $st = $pdo->prepare("SELECT * FROM learning_reflections WHERE student_id IN ($in)");
+        $st->execute($sids);
+        while ($r = $st->fetch()) {
+            $u = ((int)$r['task_unit'] === 2) ? 2 : 1;
+            $fields = [];
+            foreach (report_reflect_fields() as $f => $label) {
+                $fields[$f] = ['label' => $label, 'text' => trim((string)($r[$f] ?? ''))];
+            }
+            $out[$r['student_id']]['reflections'][$u] = [
+                'fields'     => $fields,
+                'created_at' => (string)($r['created_at'] ?? ''),
+            ];
+        }
+    } catch (Exception $e) { /* ตารางอาจยังไม่ถูกสร้าง */ }
+
+    // ---- แบบประเมินเพื่อนเชิงคุณภาพ (ทั้งที่ได้รับและที่ไปประเมินให้เพื่อน) ----
+    $peerCrit = report_peer_criteria();
+    try {
+        $st = $pdo->prepare("SELECT pr.*, own.student_name AS owner_name, rev.student_name AS reviewer_name
+                               FROM peer_reviews pr
+                               LEFT JOIN students own ON own.student_id = pr.student_id
+                               LEFT JOIN students rev ON rev.student_id = pr.reviewer_id
+                              WHERE pr.student_id IN ($in) OR pr.reviewer_id IN ($in)");
+        $st->execute(array_merge($sids, $sids));
+        while ($r = $st->fetch()) {
+            $scores = [];
+            foreach ($peerCrit as $k => $label) {
+                $scores[$k] = ['label' => $label, 'value' => trim((string)($r['score_' . $k] ?? ''))];
+            }
+            $item = [
+                'owner_id'      => (string)$r['student_id'],
+                'owner_name'    => formatNamePrefix((string)($r['owner_name'] ?? '')),
+                'reviewer_id'   => (string)$r['reviewer_id'],
+                'reviewer_name' => formatNamePrefix((string)($r['reviewer_name'] ?? '')),
+                'scores'        => $scores,
+                'strength'      => trim((string)($r['strength'] ?? '')),
+                'improvement'   => trim((string)($r['improvement'] ?? '')),
+                'encouragement' => trim((string)($r['encouragement'] ?? '')),
+                'created_at'    => (string)($r['created_at'] ?? ''),
+            ];
+            if (isset($out[$r['student_id']]))  $out[$r['student_id']]['peer_received'][] = $item;
+            if (isset($out[$r['reviewer_id']])) $out[$r['reviewer_id']]['peer_given'][]   = $item;
+        }
+    } catch (Exception $e) { /* ยังไม่มีการประเมินเพื่อน */ }
+
+    return $out;
 }
