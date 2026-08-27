@@ -170,10 +170,10 @@ require_once 'header.php';
               <a href="dashboard.php" id="btnOpenReport" class="btn btn-primary btn-lg rounded-pill px-4 fw-bold w-100 shadow text-decoration-none">
                 เปิดรายงานของฉัน
               </a>
-              <!-- เอกสารประจำตัว: ผลสัมฤทธิ์ ผลงาน และสถิติของตนเอง พิมพ์หรือบันทึกเป็น PDF เก็บไว้ได้ -->
-              <a href="student_report_print.php" target="_blank" rel="noopener"
+              <!-- เอกสารประจำตัว: ข้อมูลทั้งหมดของตนเองพร้อมบทวิเคราะห์ (ในหน้านั้นมีปุ่มพิมพ์เป็น PDF ด้วย) -->
+              <a href="student_report.php"
                  class="btn btn-outline-primary rounded-pill px-4 fw-bold w-100 text-decoration-none">
-                <i class="bi bi-printer me-1"></i>พิมพ์รายงานผลการเรียนรู้ของฉัน
+                <i class="bi bi-person-vcard me-1"></i>รายงานผลการเรียนรู้ของฉัน (ฉบับเต็ม)
               </a>
             </div>
           </div>
@@ -289,7 +289,7 @@ require_once 'header.php';
                 ['ai_feedback.php',             '🤖', 'ผู้ช่วย AI ตรวจเรียงความ', 'ให้ข้อเสนอแนะอัตโนมัติ + ตั้งค่า AI'],
                 ['research_analysis.php',       '🔬', 'วิเคราะห์สถิติวิจัย', 'ICC, Paired t-test, เชิงคุณภาพ'],
                 ['class_report_print.php',      '📋', 'รายงานภาพรวมชั้นเรียน', 'สรุปผลสัมฤทธิ์ทั้งห้อง พร้อมพิมพ์เป็น PDF'],
-                ['student_report_print.php',    '🧑‍🎓', 'รายงานรายบุคคล', 'ผลสัมฤทธิ์ ผลงาน และสถิติของนักเรียนแต่ละคน'],
+                ['student_report.php',          '🧑‍🎓', 'รายงานรายบุคคล', 'ข้อมูลทั้งหมดของนักเรียนรายคน พร้อมบทวิเคราะห์'],
               ];
               foreach ($quick as $q):
             ?>
