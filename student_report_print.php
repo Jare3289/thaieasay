@@ -248,7 +248,7 @@ foreach ($targets as $sid):
         <th style="width:28%">รอบงาน</th>
         <th class="num" style="width:11%">สถานะ</th>
         <th class="num" style="width:11%">จำนวนคำ</th>
-        <th class="num" style="width:16%">บันทึกล่าสุด</th>
+        <th class="wrap" style="width:16%">บันทึกล่าสุด</th>
         <th class="num" style="width:12%">คะแนน AI</th>
         <th class="num" style="width:10%">ครั้งที่ตรวจ</th>
         <th class="num" style="width:12%">เทียบครั้งก่อน</th>
@@ -262,7 +262,7 @@ foreach ($targets as $sid):
             ? '<span class="pill lv-3">ส่งแล้ว</span>'
             : '<span class="pill lv-0">ยังไม่ส่ง</span>'; ?></td>
         <td class="num"><?php echo $w['submitted'] ? number_format($w['word_count']) : '—'; ?></td>
-        <td class="num"><?php echo rp_esc($w['submitted'] ? rp_when($w['updated_at']) : '—'); ?></td>
+        <td class="wrap"><?php echo rp_esc($w['submitted'] ? rp_when($w['updated_at']) : '—'); ?></td>
         <td class="num"><?php echo ($w['ai_total'] === null)
             ? '<span class="muted">ยังไม่ตรวจ</span>'
             : rp_num($w['ai_total'], 1) . ' <span class="muted">/ ' . rp_num($w['ai_max'], 0) . '</span>'; ?></td>
