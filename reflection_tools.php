@@ -618,7 +618,11 @@ $role = $sessionUser['role'];
 
           <!-- 2. ตรวจสอบรายบุคคล -->
           <div class="tab-pane fade" id="inspector" role="tabpanel" aria-labelledby="inspector-tab">
-            <h5 class="fw-bold text-dark mb-3">ตรวจสอบแฟ้มผลงานสะท้อนการประเมินรายนักเรียน</h5>
+            <h5 class="fw-bold text-dark mb-3">
+              ตรวจสอบแฟ้มผลงานสะท้อนการประเมินรายนักเรียน
+              <!-- บอกให้ชัดว่ากำลังดูข้อมูลของหน่วยการเรียนใด (ตามปุ่มเลือกหน่วยในแท็บภาพรวม) -->
+              <span class="badge bg-primary align-middle ms-2">หน่วยที่ <span id="inspectorUnitLabel">1</span></span>
+            </h5>
             
             <div class="card border-0 bg-light p-3 mb-4 rounded-3">
               <div class="row align-items-center">
@@ -734,6 +738,9 @@ $role = $sessionUser['role'];
   let currentMonitorUnit = 1;    // หน่วยการเรียนที่ครูเลือกดูในแดชบอร์ดภาพรวม (1 หรือ 2)
   let loadTeacherDashboardSummary = function() {}; // Global placeholder to prevent ReferenceError
 
+  // โหลดแฟ้มรายบุคคลของนักเรียนที่ครูกำลังส่องอยู่ใหม่ (ใช้ตอนสลับหน่วยการเรียน) — กำหนดจริงในบล็อกของครู
+  let reloadInspectedStudent = function() {};
+
   // ครูสลับหน่วยการเรียนของแดชบอร์ดภาพรวม — ข้อมูลทุกแท็บจะโหลดใหม่ตามหน่วยที่เลือก
   window.setMonitorUnit = function(u) {
     currentMonitorUnit = (parseInt(u, 10) === 2) ? 2 : 1;
@@ -743,8 +750,13 @@ $role = $sessionUser['role'];
     });
     const lbl = document.getElementById('monitorUnitLabel');
     if (lbl) lbl.textContent = currentMonitorUnit;
+    const insLbl = document.getElementById('inspectorUnitLabel');
+    if (insLbl) insLbl.textContent = currentMonitorUnit;
     if (typeof loadTeacherDashboardSummary === 'function') loadTeacherDashboardSummary();
+    // แท็บตรวจสอบรายบุคคลต้องเปลี่ยนตามหน่วยที่เลือกด้วย ไม่อย่างนั้นจะค้างอยู่ที่ข้อมูลของหน่วยเดิม
+    if (typeof reloadInspectedStudent === 'function') reloadInspectedStudent();
   };
+
 
   // ส่งออกรายงานสะท้อนคิดของหน่วยที่เลือกเป็นหน้าพิมพ์ PDF (แบบเดียวกับรายงานการส่งงาน)
   window.exportReflectionPdf = function() {
@@ -1071,7 +1083,13 @@ $role = $sessionUser['role'];
           });
           updateProbSelectedCount();
         }
-        setReflectionSavedBadge('statusObstacles', !!(res.success && res.data));
+        // "บันทึกแล้ว" ต้องหมายถึงมีข้อมูลจริงอย่างน้อย 1 ด้าน ไม่ใช่แค่มีแถวในฐานข้อมูล
+        // (ให้ตรงกับกติกาที่หน้าแรกใช้นับความคืบหน้า)
+        const hasProblemData = !!(res.success && res.data) && PROB_ROW_KEYS.some(rowKey => {
+          const d = res.data;
+          return (d['prob_' + rowKey] || '').trim() !== '' || (d['sol_' + rowKey] || '').trim() !== '';
+        });
+        setReflectionSavedBadge('statusObstacles', hasProblemData);
       } catch (err) {
         console.error(err);
       }
@@ -1176,6 +1194,13 @@ $role = $sessionUser['role'];
           }
         }
       });
+
+      // ต้องมีอย่างน้อย 1 แถวที่กรอกจริง มิฉะนั้นจะได้บันทึกเปล่า ๆ ที่ขึ้นว่า "บันทึกแล้ว"
+      // แต่เปิดกลับเข้ามาดูแล้วไม่มีข้อมูล และความคืบหน้าในหน้าแรกก็ไม่ตรงกับสิ่งที่บันทึก
+      if (Object.keys(problems).length === 0) {
+        alert('กรุณาเลือกและกรอกอย่างน้อย 1 ด้านเกณฑ์ก่อนบันทึก (ยังไม่มีข้อมูลให้บันทึก)');
+        return;
+      }
 
       try {
         const response = await fetch('api.php', {
@@ -1614,6 +1639,9 @@ $role = $sessionUser['role'];
     };
 
     // 2. โหลดข้อมูลรายบุคคลของนักเรียนที่ครูเลือกส่อง
+    //    ต้องดึงตามหน่วยการเรียนที่ครูเลือกไว้ (currentMonitorUnit) เหมือนแดชบอร์ดภาพรวม
+    //    ก่อนหน้านี้ไม่ได้ส่ง unit ไป ฝั่ง API จึงตกไปใช้หน่วยที่ 1 เสมอ ทำให้ครูเลือกดูหน่วยที่ 2
+    //    แล้วเห็นข้อมูลของหน่วยที่ 1 หรือขึ้นว่าไม่มีข้อมูล ทั้งที่นักเรียนบันทึกหน่วยที่ 2 ไว้แล้ว
     async function loadIndividualReflectionReport(studentId) {
       const inspectProbsTbody = document.getElementById('inspectProblemsTbody');
       const inspectChecklistList = document.getElementById('inspectChecklistList');
@@ -1638,7 +1666,7 @@ $role = $sessionUser['role'];
 
       try {
         // ดึงปัญหารอบแรก
-        const resProblems = await (await fetch(`api.php?action=get_writing_problems&studentId=${studentId}&_t=${new Date().getTime()}`)).json();
+        const resProblems = await (await fetch(`api.php?action=get_writing_problems&studentId=${studentId}&unit=${currentMonitorUnit}&_t=${new Date().getTime()}`)).json();
         if (resProblems.success && resProblems.data) {
           const d = resProblems.data;
           const criteriaLabelMap = {
@@ -1687,7 +1715,7 @@ $role = $sessionUser['role'];
         }
 
         // ดึงเช็คลิสต์ตนเอง
-        const resChecklist = await (await fetch(`api.php?action=get_self_checklist&studentId=${studentId}&_t=${new Date().getTime()}`)).json();
+        const resChecklist = await (await fetch(`api.php?action=get_self_checklist&studentId=${studentId}&unit=${currentMonitorUnit}&_t=${new Date().getTime()}`)).json();
         if (resChecklist.success && resChecklist.data) {
           const d = resChecklist.data;
           const chkLabelMap = {
@@ -1770,7 +1798,7 @@ $role = $sessionUser['role'];
         }
 
         // ดึงสะท้อนคิดการเรียนรู้
-        const resRef = await (await fetch(`api.php?action=get_learning_reflection&studentId=${studentId}&_t=${new Date().getTime()}`)).json();
+        const resRef = await (await fetch(`api.php?action=get_learning_reflection&studentId=${studentId}&unit=${currentMonitorUnit}&_t=${new Date().getTime()}`)).json();
         if (resRef.success && resRef.data) {
           const d = resRef.data;
           inspectRefContent.textContent = d.content_structure || '-';
@@ -1792,6 +1820,13 @@ $role = $sessionUser['role'];
         loadIndividualReflectionReport(studentId);
       }
     });
+
+    // สลับหน่วยการเรียนแล้วให้แฟ้มรายบุคคลที่เปิดค้างอยู่โหลดข้อมูลของหน่วยใหม่ตามไปด้วย
+    reloadInspectedStudent = function() {
+      const select = document.getElementById('inspectorStudentSelect');
+      const studentId = select ? select.value : '';
+      if (studentId) loadIndividualReflectionReport(studentId);
+    };
 
     // ปุ่มเลือกกลุ่มบน navbar เปลี่ยน → โหลดภาพรวมของกลุ่มใหม่ (ไม่ต้องรีเฟรชหน้า)
     window.onTEGChange = function() {

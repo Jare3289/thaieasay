@@ -729,7 +729,12 @@ async function loadEssayForPhase(phase, opts) {
     const container = document.getElementById('bodyParagraphsContainer');
     container.innerHTML = '';
 
-    if (data.success && data.found) {
+    // "มีข้อมูลบันทึกไว้แล้ว" ต้องดูจากเนื้อหาจริง (has_content) ไม่ใช่แค่มีแถวในฐานข้อมูล
+    // มิฉะนั้นการกดบันทึกฟอร์มเปล่าจะทำให้หน้านี้ขึ้นว่าบันทึกแล้ว แต่หน้าแรกยังขึ้นว่ายังไม่ได้ทำ
+    const hasSavedContent = data.success && data.found
+      && (data.has_content !== undefined ? data.has_content : true);
+
+    if (hasSavedContent) {
       const contentStr = data.data.essay_content || '';
       
       try {
@@ -1095,7 +1100,13 @@ async function loadSavedList() {
     phases.map(ph => fetch(`api.php?action=get_essay&essay_phase=${ph}`).then(r => r.json()).catch(() => ({ success: false })))
   );
 
-  const found = results.map((r, i) => r.success && r.found ? { phase: phases[i], data: r.data } : null).filter(Boolean);
+  // แสดงเฉพาะรอบที่มีเนื้อหาจริง — แถวเปล่าที่เกิดจากการกดบันทึกฟอร์มว่างไม่ควรนับเป็นเรียงความที่บันทึกไว้
+  const found = results
+    .map((r, i) => {
+      const hasContent = r.success && r.found && (r.has_content !== undefined ? r.has_content : true);
+      return hasContent ? { phase: phases[i], data: r.data } : null;
+    })
+    .filter(Boolean);
 
   if (found.length === 0) {
     container.innerHTML = '<div class="text-center text-muted py-4"><i class="bi bi-inbox fs-3 d-block mb-2"></i>ยังไม่มีเรียงความที่บันทึกไว้</div>';
