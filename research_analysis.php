@@ -692,8 +692,8 @@ require_once 'header.php';
     problems.forEach(p => QUAL_SUB_CRITERIA.forEach(sc => { if (p['prob_' + sc.replace('.', '_')]) critCounts[sc]++; }));
     const peerSum = {}, peerCnt = {}; QUAL_SUB_CRITERIA.forEach(sc => { peerSum[sc] = 0; peerCnt[sc] = 0; });
     peerReviews.forEach(pr => QUAL_SUB_CRITERIA.forEach(sc => {
-      const lv = pr['score_' + sc.replace('.', '_')];
-      if (lv && PEER_LEVEL_SCORE[lv] !== undefined) { peerSum[sc] += PEER_LEVEL_SCORE[lv]; peerCnt[sc]++; }
+      const lv = peerLevelValue(pr['score_' + sc.replace('.', '_')]);
+      if (lv !== null) { peerSum[sc] += lv; peerCnt[sc]++; }
     }));
     const sortedCrit = QUAL_SUB_CRITERIA.map(sc => [sc, critCounts[sc]]).sort((a, b) => b[1] - a[1]);
 
@@ -1621,6 +1621,18 @@ require_once 'header.php';
 
   // แปลงระดับคุณภาพที่เพื่อนให้ (ดีมาก/ดี/ปานกลาง/พอใช้/ปรับปรุง) เป็นตัวเลข 0-4 เพื่อหาค่าเฉลี่ยรายด้าน
   const PEER_LEVEL_SCORE = { 'ดีมาก': 4, 'ดี': 3, 'ปานกลาง': 2, 'พอใช้': 1, 'ปรับปรุง': 0 };
+
+  // แปลงคะแนนรายเกณฑ์ของการประเมินเพื่อนให้เป็นระดับ 0-4 เสมอ
+  // ข้อมูลปัจจุบันมาจากตาราง evaluations (API หารด้วย multiplier ให้เป็น 0-4 มาแล้ว = ตัวเลข)
+  // ส่วนข้อมูลรูปแบบเดิมในตาราง peer_reviews เก็บเป็นคำ ('ดีมาก'/'ดี'/…) จึงต้องรองรับทั้งสองแบบ
+  // คืนค่า null เมื่อไม่มีข้อมูล เพื่อให้ผู้เรียกข้ามไม่นำไปเฉลี่ย
+  function peerLevelValue(v) {
+    if (v === null || v === undefined || v === '') return null;
+    if (typeof v === 'number') return isFinite(v) ? v : null;
+    if (PEER_LEVEL_SCORE[v] !== undefined) return PEER_LEVEL_SCORE[v];
+    const n = parseFloat(v);
+    return isFinite(n) ? n : null;
+  }
   const QUAL_SUB_CRITERIA = ['1.1', '1.2', '1.3', '2.1', '2.2', '3.1', '3.2', '3.3', '4.1', '4.2', '4.3'];
 
   let qualProblemChartInstance = null;
@@ -1658,10 +1670,9 @@ require_once 'header.php';
     QUAL_SUB_CRITERIA.forEach(sc => { peerSums[sc] = 0; peerCounts[sc] = 0; });
     peerReviews.forEach(pr => {
       QUAL_SUB_CRITERIA.forEach(sc => {
-        const key = 'score_' + sc.replace('.', '_');
-        const level = pr[key];
-        if (level && PEER_LEVEL_SCORE[level] !== undefined) {
-          peerSums[sc] += PEER_LEVEL_SCORE[level];
+        const val = peerLevelValue(pr['score_' + sc.replace('.', '_')]);
+        if (val !== null) {
+          peerSums[sc] += val;
           peerCounts[sc]++;
         }
       });
@@ -1838,7 +1849,8 @@ require_once 'header.php';
 
     peerReviews.forEach(pr => {
       const studentName = studentDB[pr.student_id] || pr.student_id;
-      const reviewerName = studentDB[pr.reviewer_id] || pr.reviewer_id;
+      // เผื่อเทียบชื่อผู้ประเมินกลับเป็นรหัสไม่ได้ ให้ใช้ชื่อที่บันทึกไว้ตรง ๆ แทนการโชว์ค่าว่าง
+      const reviewerName = studentDB[pr.reviewer_id] || pr.reviewer_name || pr.reviewer_id || 'เพื่อน';
 
       if (filterCriteria !== 'all') return;
 

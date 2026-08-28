@@ -994,7 +994,12 @@ try {
                 isset($p['prob_4_2']) ? $p['prob_4_2'] : null, isset($p['sol_4_2']) ? $p['sol_4_2'] : null,
                 isset($p['prob_4_3']) ? $p['prob_4_3'] : null, isset($p['sol_4_3']) ? $p['sol_4_3'] : null
             ]);
-            echo json_encode(['success' => true]);
+            // ยืนยันว่าบันทึกลงหน่วยที่ตั้งใจจริง ก่อนตอบว่าสำเร็จ
+            if (!reflection_saved_in_unit($pdo, 'writing_problems', $studentId, $unit)) {
+                echo json_encode(['success' => false, 'error' => reflection_unit_save_error($unit)]);
+                exit;
+            }
+            echo json_encode(['success' => true, 'unit' => $unit]);
             break;
 
         case 'get_writing_problems':
@@ -1051,7 +1056,12 @@ try {
                 isset($c['4.3']) ? $c['4.3'] : 'ต้องปรับปรุง',
                 $notes
             ]);
-            echo json_encode(['success' => true]);
+            // ยืนยันว่าบันทึกลงหน่วยที่ตั้งใจจริง ก่อนตอบว่าสำเร็จ
+            if (!reflection_saved_in_unit($pdo, 'self_checklists', $studentId, $unit)) {
+                echo json_encode(['success' => false, 'error' => reflection_unit_save_error($unit)]);
+                exit;
+            }
+            echo json_encode(['success' => true, 'unit' => $unit]);
             break;
 
         case 'get_self_checklist':
@@ -1115,21 +1125,97 @@ try {
             echo json_encode(['success' => true]);
             break;
 
+        // ความเห็น/คะแนนที่เพื่อนประเมินให้นักเรียนคนนี้
+        //
+        // แหล่งข้อมูลจริงคือตาราง evaluations (evaluator_type = 'เพื่อนประเมิน') ที่หน้า evaluation.php
+        // บันทึกไว้ พร้อมข้อความ 3 ช่อง (peer_strength / peer_improvement / peer_encouragement)
+        // เดิมคิวรีนี้อ่านจากตาราง peer_reviews ซึ่งไม่มีหน้าไหนในระบบเขียนลงไปแล้ว (เหลือไว้เป็นข้อมูลเก่า)
+        // ครูจึงเปิดดูแล้วขึ้นว่าไม่มีความเห็นเพื่อน ทั้งที่นักเรียนประเมินและบันทึกไปเรียบร้อยแล้ว
+        // — อ่านจาก evaluations เป็นหลัก แล้วต่อท้ายด้วยข้อมูลเก่าใน peer_reviews (ถ้ายังมี) เพื่อไม่ให้ตกหล่น
         case 'get_peer_reviews':
-            $studentId = isset($_GET['studentId']) ? $_GET['studentId'] : '';
+            $studentId = isset($_GET['studentId']) ? trim($_GET['studentId']) : '';
             if (empty($studentId)) {
                 echo json_encode(['success' => false, 'error' => 'Student ID is required']);
                 exit;
             }
-            $stmt = $pdo->prepare('
-                SELECT pr.*, s.student_name AS reviewer_name 
-                FROM peer_reviews pr
-                JOIN students s ON pr.reviewer_id = s.student_id
-                WHERE pr.student_id = ?
-            ');
-            $stmt->execute([$studentId]);
-            $rows = $stmt->fetchAll();
-            echo json_encode(['success' => true, 'data' => $rows]);
+            // กรองตามหน่วยการเรียนที่ครูเลือก (หน่วยที่ 1 = รอบ task1, หน่วยที่ 2 = รอบ task2)
+            // ไม่ส่ง unit มา = เอาทุกรอบ
+            $prUnit  = isset($_GET['unit']) ? intval($_GET['unit']) : 0;
+            $prPhase = ($prUnit === 1) ? 'task1' : (($prUnit === 2) ? 'task2' : null);
+
+            $prSql = "SELECT test_phase, evaluator_name, total_score, quality_level,
+                             score_1_1, score_1_2, score_1_3,
+                             score_2_1, score_2_2,
+                             score_3_1, score_3_2, score_3_3,
+                             score_4_1, score_4_2, score_4_3,
+                             peer_strength, peer_improvement, peer_encouragement, timestamp
+                      FROM evaluations
+                      WHERE student_id = ? AND evaluator_type = 'เพื่อนประเมิน'";
+            $prParams = [$studentId];
+            if ($prPhase !== null) { $prSql .= ' AND test_phase = ?'; $prParams[] = $prPhase; }
+            $prSql .= ' ORDER BY test_phase ASC, timestamp DESC';
+
+            $stmt = $pdo->prepare($prSql);
+            $stmt->execute($prParams);
+
+            $peerRows = [];
+            $scoreKeyMap = [
+                '1.1' => 'score_1_1', '1.2' => 'score_1_2', '1.3' => 'score_1_3',
+                '2.1' => 'score_2_1', '2.2' => 'score_2_2',
+                '3.1' => 'score_3_1', '3.2' => 'score_3_2', '3.3' => 'score_3_3',
+                '4.1' => 'score_4_1', '4.2' => 'score_4_2', '4.3' => 'score_4_3',
+            ];
+            while ($r = $stmt->fetch()) {
+                $sc = [];
+                foreach ($scoreKeyMap as $label => $col) { $sc[$label] = (float)$r[$col]; }
+                $peerRows[] = [
+                    'reviewer_name' => $r['evaluator_name'],
+                    'phase'         => $r['test_phase'],
+                    'scores'        => $sc,
+                    'numeric'       => true,
+                    'total'         => (float)$r['total_score'],
+                    'quality'       => $r['quality_level'],
+                    'strength'      => $r['peer_strength'] ?? '',
+                    'improvement'   => $r['peer_improvement'] ?? '',
+                    'encouragement' => $r['peer_encouragement'] ?? '',
+                    'source'        => 'evaluations',
+                ];
+            }
+
+            // ข้อมูลเก่าในตาราง peer_reviews (ถ้ายังมีเหลืออยู่) — เก็บคะแนนเป็นคำ ไม่ใช่ตัวเลข
+            // ไม่ได้แยกรอบ จึงแสดงเฉพาะตอนที่ครูดูรวมทุกรอบ เพื่อไม่ให้ปนกับหน่วยที่เลือก
+            if ($prPhase === null) {
+                try {
+                    $legacy = $pdo->prepare('
+                        SELECT pr.*, s.student_name AS reviewer_name
+                        FROM peer_reviews pr
+                        JOIN students s ON pr.reviewer_id = s.student_id
+                        WHERE pr.student_id = ?
+                    ');
+                    $legacy->execute([$studentId]);
+                    while ($r = $legacy->fetch()) {
+                        $sc = [];
+                        foreach ($scoreKeyMap as $label => $col) { $sc[$label] = $r[$col] ?? '-'; }
+                        // เกณฑ์ 1.4 / 3.4 มีเฉพาะในแบบเก่า
+                        if (isset($r['score_1_4'])) $sc['1.4'] = $r['score_1_4'];
+                        if (isset($r['score_3_4'])) $sc['3.4'] = $r['score_3_4'];
+                        $peerRows[] = [
+                            'reviewer_name' => formatNamePrefix($r['reviewer_name']),
+                            'phase'         => null,
+                            'scores'        => $sc,
+                            'numeric'       => false,
+                            'total'         => null,
+                            'quality'       => null,
+                            'strength'      => $r['strength'] ?? '',
+                            'improvement'   => $r['improvement'] ?? '',
+                            'encouragement' => $r['encouragement'] ?? '',
+                            'source'        => 'legacy',
+                        ];
+                    }
+                } catch (PDOException $e) { /* ตารางเก่าอาจถูกลบไปแล้ว — ข้ามได้ */ }
+            }
+
+            echo json_encode(['success' => true, 'unit' => $prUnit ?: null, 'data' => $peerRows]);
             break;
 
         // ============================================================
@@ -1594,7 +1680,12 @@ try {
                     future_goals = VALUES(future_goals)
             ');
             $stmt->execute([$studentId, $unit, $cs, $lm, $fa, $fg]);
-            echo json_encode(['success' => true]);
+            // ยืนยันว่าบันทึกลงหน่วยที่ตั้งใจจริง ก่อนตอบว่าสำเร็จ
+            if (!reflection_saved_in_unit($pdo, 'learning_reflections', $studentId, $unit)) {
+                echo json_encode(['success' => false, 'error' => reflection_unit_save_error($unit)]);
+                exit;
+            }
+            echo json_encode(['success' => true, 'unit' => $unit]);
             break;
 
         case 'get_learning_reflection':
@@ -1648,9 +1739,17 @@ try {
             $stmt->execute($unitGrpParam);
             $chk_count = $stmt->fetchColumn();
 
-            // การประเมินเพื่อน (peer_reviews) ไม่ได้แยกตามหน่วยการเรียน — นับรวมทุกหน่วยตามเดิม
-            $stmt = $pdo->prepare('SELECT COUNT(DISTINCT pr.student_id) FROM peer_reviews pr JOIN students s ON pr.student_id = s.student_id' . $grpWhere('s'));
-            $stmt->execute($grpParam);
+            // การประเมินเพื่อน — นับจาก evaluations (evaluator_type = 'เพื่อนประเมิน') ของรอบที่ตรงกับหน่วยที่เลือก
+            // ไม่ใช่จากตาราง peer_reviews ซึ่งไม่มีหน้าไหนเขียนลงไปแล้ว (ตัวเลขจะขึ้น 0 เสมอ
+            // ทั้งที่นักเรียนประเมินเพื่อนและบันทึกไปแล้ว = ความคืบหน้าไม่ตรงกับข้อมูล)
+            // นับ "จำนวนนักเรียนที่ถูกเพื่อนประเมินแล้ว" ให้ความหมายเหมือนตัวเลขเดิม
+            $peerPhase = ($refUnit === 2) ? 'task2' : 'task1';
+            $peerParams = array_merge([$peerPhase], $grpParam);
+            $stmt = $pdo->prepare("SELECT COUNT(DISTINCT e.student_id)
+                                   FROM evaluations e JOIN students s ON e.student_id = s.student_id
+                                   WHERE e.evaluator_type = 'เพื่อนประเมิน' AND e.test_phase = ?"
+                                   . ($hasRefGroup ? ' AND s.student_group = ?' : ''));
+            $stmt->execute($peerParams);
             $peer_count = $stmt->fetchColumn();
 
             $stmt = $pdo->prepare('SELECT COUNT(DISTINCT lr.student_id) FROM learning_reflections lr JOIN students s ON lr.student_id = s.student_id' . $unitGrpWhere('lr.task_unit'));
@@ -1668,15 +1767,20 @@ try {
             $stmt_probs->execute($unitGrpParam);
             $recent_problems = $stmt_probs->fetchAll();
 
-            // รีวิวล่าสุด
-            $stmt_peers = $pdo->prepare('
-                SELECT pr.*, s.student_name, r.student_name AS reviewer_name
-                FROM peer_reviews pr
-                JOIN students s ON pr.student_id = s.student_id
-                JOIN students r ON pr.reviewer_id = r.student_id' . $grpWhere('s') . '
-                ORDER BY pr.created_at DESC LIMIT 5
-            ');
-            $stmt_peers->execute($grpParam);
+            // รีวิวล่าสุด — อ่านจาก evaluations (แหล่งข้อมูลจริง) ไม่ใช่ตาราง peer_reviews ที่ไม่มีใครเขียนแล้ว
+            // และกรองตามรอบที่ตรงกับหน่วยการเรียนที่ครูเลือก ให้สอดคล้องกับตัวเลขสรุปด้านบน
+            $stmt_peers = $pdo->prepare("
+                SELECT e.student_id, e.evaluator_name AS reviewer_name, e.test_phase,
+                       e.peer_strength AS strength, e.peer_improvement AS improvement,
+                       e.peer_encouragement AS encouragement, e.timestamp AS created_at,
+                       s.student_name
+                FROM evaluations e
+                JOIN students s ON e.student_id = s.student_id
+                WHERE e.evaluator_type = 'เพื่อนประเมิน' AND e.test_phase = ?"
+                . ($hasRefGroup ? ' AND s.student_group = ?' : '') . "
+                ORDER BY e.timestamp DESC LIMIT 5
+            ");
+            $stmt_peers->execute($peerParams);
             $recent_peers = $stmt_peers->fetchAll();
 
             // ข้อมูลของนักเรียนทุกคนสำหรับภาพรวมชั้นเรียน
@@ -1853,9 +1957,61 @@ try {
             $stmt_chk = $pdo->query('SELECT * FROM self_checklists');
             $checklists = $stmt_chk->fetchAll();
             
-            // 5. ดึงข้อมูล peer_reviews
-            $stmt_peer = $pdo->query('SELECT * FROM peer_reviews');
-            $peer_reviews = $stmt_peer->fetchAll();
+            // 5. ดึงข้อมูลการประเมินโดยเพื่อน
+            //
+            // แหล่งข้อมูลจริงคือ evaluations (evaluator_type = 'เพื่อนประเมิน') — ตาราง peer_reviews
+            // ไม่มีหน้าไหนเขียนลงไปแล้ว ถ้าอ่านจากตารางนั้นอย่างเดียว บทวิเคราะห์เชิงคุณภาพ
+            // ในรายงานวิจัยจะว่างเปล่า ทั้งที่นักเรียนประเมินเพื่อนกันไปแล้ว
+            //
+            // evaluations เก็บคะแนน "หลังถ่วงน้ำหนัก" (ระดับ 0-4 × multiplier ของแต่ละเกณฑ์)
+            // จึงหารกลับด้วย multiplier จาก ai_rubric() ให้เป็นระดับ 0-4 ตามเกณฑ์เดิม
+            // ซึ่งเป็นสเกลเดียวกับที่ฝั่งรายงานใช้ (PEER_LEVEL_SCORE: ปรับปรุง=0 … ดีมาก=4)
+            $peerMultipliers = [];
+            foreach (ai_rubric() as $rubricItem) {
+                $peerMultipliers[$rubricItem['id']] = (float)$rubricItem['multiplier'];
+            }
+            // evaluations เก็บ "ชื่อ" ผู้ประเมิน ไม่ใช่รหัส — ทำดัชนีชื่อ→รหัสไว้เติม reviewer_id
+            // (หน้ารายงานวิจัยใช้ reviewer_id หาชื่อผู้ประเมินจาก studentDB)
+            // $students ถูกตัดคำนำหน้าออกแล้วด้านบน จึงตรงกับรูปแบบที่บันทึกใน evaluator_name
+            $peerIdByName = [];
+            foreach ($students as $stRow) {
+                $nm = trim((string)$stRow['student_name']);
+                if ($nm !== '') $peerIdByName[$nm] = (string)$stRow['student_id'];
+            }
+            $stmt_peer = $pdo->prepare("SELECT student_id, evaluator_name, test_phase, total_score, quality_level,
+                                               score_1_1, score_1_2, score_1_3,
+                                               score_2_1, score_2_2,
+                                               score_3_1, score_3_2, score_3_3,
+                                               score_4_1, score_4_2, score_4_3,
+                                               peer_strength, peer_improvement, peer_encouragement
+                                        FROM evaluations WHERE evaluator_type = 'เพื่อนประเมิน'");
+            $stmt_peer->execute();
+            $peer_reviews = [];
+            while ($pr = $stmt_peer->fetch()) {
+                $reviewerName = trim((string)$pr['evaluator_name']);
+                $row = [
+                    'student_id'    => $pr['student_id'],
+                    'reviewer_id'   => $peerIdByName[$reviewerName] ?? '',
+                    'reviewer_name' => $reviewerName,
+                    'test_phase'    => $pr['test_phase'],
+                    'total_score'   => (float)$pr['total_score'],
+                    'quality_level' => $pr['quality_level'],
+                    'strength'      => $pr['peer_strength'] ?? '',
+                    'improvement'   => $pr['peer_improvement'] ?? '',
+                    'encouragement' => $pr['peer_encouragement'] ?? '',
+                ];
+                foreach ($peerMultipliers as $critId => $mult) {
+                    $col = 'score_' . str_replace('.', '_', $critId);
+                    if (!array_key_exists($col, $pr)) continue;
+                    $row[$col] = ($mult > 0) ? round((float)$pr[$col] / $mult, 2) : (float)$pr[$col];
+                }
+                $peer_reviews[] = $row;
+            }
+            // ข้อมูลเก่าในตาราง peer_reviews (คะแนนเป็นคำ) — ต่อท้ายไว้ไม่ให้ตกหล่น
+            try {
+                $legacyPeer = $pdo->query('SELECT * FROM peer_reviews')->fetchAll();
+                foreach ($legacyPeer as $lp) { $peer_reviews[] = $lp; }
+            } catch (PDOException $e) { /* ตารางเก่าอาจถูกลบไปแล้ว */ }
             
             // 6. ดึงข้อมูล learning_reflections
             $stmt_ref = $pdo->query('SELECT * FROM learning_reflections');

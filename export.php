@@ -15,6 +15,8 @@
  */
 
 require_once 'auth_helper.php';
+// ใช้ ai_rubric() เป็นแหล่งเดียวของค่าถ่วงน้ำหนักรายเกณฑ์ (ใช้แปลงคะแนนประเมินเพื่อนกลับเป็นระดับ 0-4)
+require_once 'ai_config.php';
 
 // ---------------------------------------------------------------------------
 // 0) ตรวจสิทธิ์ — เฉพาะคุณครูเท่านั้น (เป็นผู้ดูแลข้อมูลวิจัยทั้งชั้น)
@@ -276,30 +278,76 @@ function build_self_checklists($pdo, $students, $STD_HEADERS, $CRITERIA) {
     return ['name'=>'ตรวจสอบตนเอง', 'title'=>'รายการตรวจสอบตนเองของนักเรียน (รายเกณฑ์)', 'rows'=>$rows];
 }
 
-/* 3.6 [รายละเอียด] การประเมินเพื่อนเชิงคุณภาพ (wide + ข้อความเชิงบรรยาย) */
+/* 3.6 [รายละเอียด] การประเมินเพื่อนเชิงคุณภาพ (wide + ข้อความเชิงบรรยาย)
+ *
+ * แหล่งข้อมูลจริงคือตาราง evaluations (evaluator_type = 'เพื่อนประเมิน') ที่หน้า evaluation.php บันทึกไว้
+ * ตาราง peer_reviews ไม่มีหน้าไหนเขียนลงไปแล้ว ถ้าดึงจากตารางนั้นอย่างเดียว ไฟล์ส่งออกจะว่าง
+ * ทั้งที่นักเรียนประเมินเพื่อนกันไปแล้ว — จึงดึงจาก evaluations เป็นหลัก แล้วต่อท้ายด้วยข้อมูลเก่า
+ *
+ * evaluations เก็บคะแนน "หลังถ่วงน้ำหนัก" จึงหารกลับด้วย multiplier ให้เป็นระดับ 0-4 ตามเกณฑ์
+ * ส่วนเกณฑ์ 1.4 / 3.4 มีเฉพาะแบบประเมินเพื่อนรูปแบบเดิม จึงเว้นว่างสำหรับข้อมูลปัจจุบัน
+ */
 function build_peer_reviews($pdo, $students, $STD_HEADERS, $PEER_CRITERIA) {
-    $stmt = $pdo->query('SELECT * FROM peer_reviews');
     $rows = [];
     $critHeaders = array_values($PEER_CRITERIA);
     $rows[] = array_merge(
-        ['รหัสเจ้าของผลงาน', 'ชื่อเจ้าของผลงาน', 'ห้องเรียน', 'กลุ่ม', 'รหัสเพื่อนผู้ประเมิน', 'ชื่อเพื่อนผู้ประเมิน'],
+        ['รหัสเจ้าของผลงาน', 'ชื่อเจ้าของผลงาน', 'ห้องเรียน', 'กลุ่ม', 'รหัสเพื่อนผู้ประเมิน', 'ชื่อเพื่อนผู้ประเมิน', 'รอบการประเมิน'],
         $critHeaders,
         ['จุดแข็ง/สิ่งที่ประทับใจ', 'จุดที่ควรปรับปรุง', 'ข้อความให้กำลังใจ', 'บันทึกเมื่อ']
     );
+
+    // multiplier ของแต่ละเกณฑ์ (ใช้ชุดเดียวกับทั้งระบบจาก ai_rubric())
+    $mult = [];
+    if (function_exists('ai_rubric')) {
+        foreach (ai_rubric() as $ri) { $mult[str_replace('.', '_', $ri['id'])] = (float)$ri['multiplier']; }
+    }
+    // ชื่อ (ตัดคำนำหน้า) → รหัสนักเรียน สำหรับหาว่าใครเป็นผู้ประเมิน (evaluations เก็บเป็นชื่อ ไม่ใช่รหัส)
+    $idByName = [];
+    foreach ($students as $sid => $st) {
+        $idByName[trim(formatNamePrefix($st['student_name']))] = $sid;
+        $idByName[trim($st['student_name'])] = $sid;
+    }
+    $phaseLabels = ['pretest' => 'ก่อนเรียน', 'task1' => 'หน่วยที่ 1', 'task2' => 'หน่วยที่ 2', 'posttest' => 'หลังเรียน'];
+
+    $stmt = $pdo->query("SELECT * FROM evaluations WHERE evaluator_type = 'เพื่อนประเมิน' ORDER BY test_phase ASC, student_id ASC");
     while ($r = $stmt->fetch()) {
         if (!isset($students[$r['student_id']])) continue;
-        $owner = stdCols($students, $r['student_id']);
-        $rvId = $r['reviewer_id'];
-        $rvName = isset($students[$rvId]) ? $students[$rvId]['student_name']
-                  : (($n = getStudentName($students, $rvId)) ? $n : $rvId);
-        $line = array_merge($owner, [$rvId, $rvName]);
-        foreach (array_keys($PEER_CRITERIA) as $k) $line[] = (string)($r['score_' . $k] ?? '');
-        $line[] = trim((string)($r['strength'] ?? ''));
-        $line[] = trim((string)($r['improvement'] ?? ''));
-        $line[] = trim((string)($r['encouragement'] ?? ''));
-        $line[] = $r['created_at'] ?? '';
+        $owner   = stdCols($students, $r['student_id']);
+        $rvName  = trim((string)$r['evaluator_name']);
+        $rvId    = $idByName[$rvName] ?? '';
+        $line    = array_merge($owner, [$rvId, $rvName, $phaseLabels[$r['test_phase']] ?? $r['test_phase']]);
+        foreach (array_keys($PEER_CRITERIA) as $k) {
+            $col = 'score_' . $k;
+            if (!array_key_exists($col, $r) || $r[$col] === null) { $line[] = ''; continue; }
+            $m = $mult[$k] ?? 0;
+            $line[] = (string)($m > 0 ? round((float)$r[$col] / $m, 2) : (float)$r[$col]);
+        }
+        $line[] = trim((string)($r['peer_strength'] ?? ''));
+        $line[] = trim((string)($r['peer_improvement'] ?? ''));
+        $line[] = trim((string)($r['peer_encouragement'] ?? ''));
+        $line[] = $r['timestamp'] ?? '';
         $rows[] = $line;
     }
+
+    // ข้อมูลรูปแบบเดิมในตาราง peer_reviews (คะแนนเป็นคำ) — ต่อท้ายไว้ไม่ให้ตกหล่น
+    try {
+        $legacy = $pdo->query('SELECT * FROM peer_reviews');
+        while ($r = $legacy->fetch()) {
+            if (!isset($students[$r['student_id']])) continue;
+            $owner = stdCols($students, $r['student_id']);
+            $rvId = $r['reviewer_id'];
+            $rvName = isset($students[$rvId]) ? $students[$rvId]['student_name']
+                      : (($n = getStudentName($students, $rvId)) ? $n : $rvId);
+            $line = array_merge($owner, [$rvId, $rvName, '(รูปแบบเดิม)']);
+            foreach (array_keys($PEER_CRITERIA) as $k) $line[] = (string)($r['score_' . $k] ?? '');
+            $line[] = trim((string)($r['strength'] ?? ''));
+            $line[] = trim((string)($r['improvement'] ?? ''));
+            $line[] = trim((string)($r['encouragement'] ?? ''));
+            $line[] = $r['created_at'] ?? '';
+            $rows[] = $line;
+        }
+    } catch (PDOException $e) { /* ตารางเก่าอาจถูกลบไปแล้ว */ }
+
     if (count($rows) === 1) $rows[] = array_fill(0, count($rows[0]), '');
     return ['name'=>'ประเมินเพื่อน', 'title'=>'การประเมินผลงานเพื่อนเชิงคุณภาพ พร้อมข้อเสนอแนะเชิงบรรยาย', 'rows'=>$rows];
 }

@@ -143,14 +143,22 @@ function essay_has_content($intro, $bodyJson, $conclusion) {
 
     $bodyJson = (string)($bodyJson ?? '');
     if (trim($bodyJson) === '') return false;
+
     $decoded = json_decode($bodyJson, true);
-    if (is_array($decoded)) {
-        foreach ($decoded as $para) {
-            if (trim((string)$para) !== '') return true;
+    if (json_last_error() === JSON_ERROR_NONE) {
+        // ค่า JSON null (สตริง 'null') = ไม่มีเนื้อหา ไม่ใช่ข้อความที่สะกดว่า null
+        if ($decoded === null) return false;
+        if (is_array($decoded)) {
+            foreach ($decoded as $para) {
+                if (trim((string)$para) !== '') return true;
+            }
+            return false;
         }
-        return false;
+        // JSON ที่เป็นสตริง/ตัวเลขเดี่ยว ๆ
+        return trim((string)$decoded) !== '';
     }
-    // ข้อมูลรุ่นเก่าที่ไม่ได้เก็บเป็น JSON — ถือเป็นข้อความล้วน
+
+    // ไม่ใช่ JSON — ข้อมูลรุ่นเก่าที่เก็บเป็นข้อความล้วน
     return trim($bodyJson) !== '';
 }
 
@@ -171,6 +179,31 @@ function reflection_problems_has_content($row) {
         if (isset($row[$col]) && trim((string)$row[$col]) !== '') return true;
     }
     return false;
+}
+
+// ยืนยันว่าบันทึกของเครื่องมือสะท้อนคิดลงไปอยู่ใน "หน่วยการเรียนที่ตั้งใจบันทึก" จริงหรือไม่
+//
+// ใช้เรียกหลัง INSERT ... ON DUPLICATE KEY UPDATE เสมอ เพราะถ้าคีย์หลักของตารางยังเป็น
+// student_id เดี่ยว ๆ (ดูคำอธิบายการซ่อมคีย์ท้ายไฟล์นี้) การบันทึกหน่วยที่ 2 จะไปเขียนทับ
+// แถวของหน่วยที่ 1 โดยไม่มี error ใด ๆ — นักเรียนเห็นข้อความว่าบันทึกสำเร็จ แต่ข้อมูลหายไป
+// ตอบเป็นข้อผิดพลาดดีกว่าปล่อยให้เข้าใจผิดว่าบันทึกแล้ว
+function reflection_saved_in_unit(PDO $pdo, $table, $studentId, $unit) {
+    $allowed = ['writing_problems', 'self_checklists', 'learning_reflections'];
+    if (!in_array($table, $allowed, true)) return false;
+    try {
+        $stmt = $pdo->prepare("SELECT 1 FROM `$table` WHERE student_id = ? AND task_unit = ? LIMIT 1");
+        $stmt->execute([$studentId, $unit]);
+        return (bool)$stmt->fetchColumn();
+    } catch (PDOException $e) {
+        return false;
+    }
+}
+
+// ข้อความแจ้งเมื่อบันทึกไม่ลงหน่วยที่ตั้งใจ (โครงสร้างฐานข้อมูลยังไม่แยกหน่วยการเรียน)
+function reflection_unit_save_error($unit) {
+    return 'บันทึกไม่สำเร็จ: ตรวจสอบแล้วไม่พบข้อมูลของหน่วยที่ ' . $unit . ' ในฐานข้อมูล '
+         . '(โครงสร้างฐานข้อมูลยังไม่แยกหน่วยการเรียน) กรุณารีเฟรชหน้าเว็บแล้วบันทึกอีกครั้ง '
+         . 'ระบบจะปรับโครงสร้างให้อัตโนมัติ';
 }
 
 // ดึงหัวข้อที่ครูกำหนดทุกรอบเป็น map [phase => topic] (มี cache ต่อ 1 request)
@@ -485,17 +518,44 @@ safe_ddl($pdo, "
 
 // เพิ่มมิติ "หน่วยการเรียน" (task_unit) ให้เครื่องมือสะท้อนคิด — ตรวจแยกจาก migration หลัก
 // (สำคัญมาก: ต้องรันแม้ระบบเดิมที่ migration หลักผ่านไปแล้ว มิฉะนั้นคิวรีที่อ้าง task_unit จะพัง)
-// ทำ DDL จริงเพียงครั้งเดียว โดยเช็ค SHOW COLUMNS ก่อน แล้วเปลี่ยนคีย์หลักเป็น (student_id, task_unit)
+//
+// ต้องตรวจ "คอลัมน์" กับ "คีย์หลัก" แยกกัน ห้ามผูกการซ่อมคีย์ไว้กับเงื่อนไข "ยังไม่มีคอลัมน์"
+// เพราะมีทางที่คอลัมน์ถูกเพิ่มสำเร็จแต่คีย์หลักไม่ถูกเปลี่ยน แล้วไม่มีวันถูกซ่อมอีกเลย:
+//   - migration_reflection_units.sql (ที่ MIGRATION.md บอกให้ import เอง) สั่ง DROP PRIMARY KEY
+//     แยกจาก ADD PRIMARY KEY ซึ่งล้มเหลวเสมอบน InnoDB (error 1553) เพราะ PRIMARY เป็นอินเด็กซ์เดียว
+//     ที่ขึ้นต้นด้วย student_id ซึ่ง FOREIGN KEY ใช้อยู่ — และเอกสารยังบอกว่า error ตอน import เป็นเรื่องปกติ
+//   - safe_ddl() กลืน error ทุกชนิด ถ้า ALTER รวมคำสั่งเดียวล้มเหลวก็จะเงียบเช่นกัน
+//
+// อาการเมื่อคีย์หลักยังเป็น student_id เดี่ยว ๆ: INSERT ... ON DUPLICATE KEY UPDATE ของการบันทึก
+// หน่วยที่ 2 จะไปชนแถวของหน่วยที่ 1 แล้วเขียนทับเนื้อหา โดย task_unit ยังเป็น 1 เหมือนเดิม
+// (คำสั่ง UPDATE ไม่ได้แก้ task_unit) ผลคือ
+//   - บันทึกหน่วยที่ 2 แล้วเปิดกลับเข้าไปดูหน่วยที่ 2 ไม่เจอข้อมูล
+//   - ข้อมูลหน่วยที่ 1 กลายเป็นเนื้อหาของหน่วยที่ 2
+//   - หน้าแรกขึ้นว่าหน่วยที่ 2 ยังไม่ได้ทำ ทั้งที่เพิ่งกดบันทึกไป
 foreach (['writing_problems', 'self_checklists', 'learning_reflections'] as $__reflTbl) {
     try {
         $__tblExists = $pdo->query("SHOW TABLES LIKE '" . $__reflTbl . "'");
         if (!$__tblExists || $__tblExists->rowCount() === 0) continue; // ตารางยังไม่ถูกสร้าง — ข้ามไปก่อน
-        $__hasUnit = $pdo->query("SHOW COLUMNS FROM `$__reflTbl` LIKE 'task_unit'")->fetch();
+
+        $__hasUnit = (bool)$pdo->query("SHOW COLUMNS FROM `$__reflTbl` LIKE 'task_unit'")->fetch();
         if (!$__hasUnit) {
             safe_ddl($pdo, "ALTER TABLE `$__reflTbl` ADD COLUMN task_unit TINYINT NOT NULL DEFAULT 1 AFTER student_id");
-            // เปลี่ยนคีย์หลักจาก student_id เดี่ยว ๆ เป็นคีย์ผสม (student_id, task_unit) ในคำสั่งเดียวเพื่อความปลอดภัย
-            // (ข้อมูลเดิมทั้งหมดถูกตั้งเป็นหน่วยที่ 1 โดยอัตโนมัติจากค่า DEFAULT 1)
-            safe_ddl($pdo, "ALTER TABLE `$__reflTbl` DROP PRIMARY KEY, ADD PRIMARY KEY (student_id, task_unit)");
+            // ยืนยันผลจริง ไม่เชื่อว่าคำสั่งสำเร็จ (safe_ddl กลืน error)
+            $__hasUnit = (bool)$pdo->query("SHOW COLUMNS FROM `$__reflTbl` LIKE 'task_unit'")->fetch();
+        }
+        if (!$__hasUnit) continue; // เพิ่มคอลัมน์ไม่สำเร็จ — ยังเปลี่ยนคีย์ไม่ได้
+
+        // ตรวจคีย์หลักทุก request (คิวรี metadata อย่างเดียว เบามาก) แล้วซ่อมถ้ายังไม่มี task_unit อยู่ในคีย์
+        $__pkHasUnit = $pdo->query("SHOW KEYS FROM `$__reflTbl` WHERE Key_name = 'PRIMARY' AND Column_name = 'task_unit'");
+        if ($__pkHasUnit && $__pkHasUnit->rowCount() === 0) {
+            try {
+                // DROP + ADD ในคำสั่งเดียว: ระหว่างทาง MySQL ยังเห็นอินเด็กซ์ที่ขึ้นต้นด้วย student_id
+                // ให้ FOREIGN KEY ใช้ได้ตลอด จึงไม่ติด error 1553 เหมือนการสั่งแยกสองคำสั่ง
+                $pdo->exec("ALTER TABLE `$__reflTbl` DROP PRIMARY KEY, ADD PRIMARY KEY (student_id, task_unit)");
+            } catch (PDOException $e) {
+                // เผื่อตารางที่ไม่มีคีย์หลักอยู่แล้ว → สร้างใหม่อย่างเดียว
+                safe_ddl($pdo, "ALTER TABLE `$__reflTbl` ADD PRIMARY KEY (student_id, task_unit)");
+            }
         }
     } catch (PDOException $e) { /* เงียบไว้ ไม่ให้กระทบการทำงานหลัก */ }
 }

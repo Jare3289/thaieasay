@@ -272,24 +272,32 @@ function report_dataset(PDO $pdo, array $opt = []) {
     }
 
     // ---- 6) ข้อคิดเห็นเชิงคุณภาพจากเพื่อน ----
+    // อ่านจากตาราง evaluations (evaluator_type = 'เพื่อนประเมิน') ซึ่งเป็นที่ที่หน้า evaluation.php
+    // บันทึกจริง — ตาราง peer_reviews ไม่มีหน้าไหนเขียนลงไปแล้ว ถ้าอ่านจากตารางนั้น รายงานจะไม่มี
+    // ข้อคิดเห็นจากเพื่อนเลย ทั้งที่นักเรียนเขียนและบันทึกไปแล้ว
+    // (evaluations เก็บ "ชื่อ" ผู้ประเมิน ไม่ใช่รหัส จึงต้องเทียบกลับเป็นรหัสด้วยชื่อในทะเบียน)
     $peer = [];
+    $peerIdByName = report_student_id_by_name($pdo);
     try {
-        $q = $pdo->query('SELECT pr.student_id, pr.reviewer_id, pr.strength, pr.improvement,
-                                 pr.encouragement, pr.created_at, s.student_name AS reviewer_name
-                            FROM peer_reviews pr
-                            LEFT JOIN students s ON s.student_id = pr.reviewer_id');
+        $q = $pdo->query("SELECT student_id, evaluator_name, test_phase,
+                                 peer_strength, peer_improvement, peer_encouragement, timestamp
+                            FROM evaluations
+                           WHERE evaluator_type = 'เพื่อนประเมิน'");
         while ($r = $q->fetch()) {
+            $reviewerName = trim((string)$r['evaluator_name']);
+            $reviewerId   = $peerIdByName[$reviewerName] ?? '';
             if (isset($students[$r['student_id']])) {
                 $peer[$r['student_id']]['received'][] = [
-                    'reviewer'      => formatNamePrefix((string)$r['reviewer_name']),
-                    'strength'      => (string)$r['strength'],
-                    'improvement'   => (string)$r['improvement'],
-                    'encouragement' => (string)$r['encouragement'],
-                    'created_at'    => (string)$r['created_at'],
+                    'reviewer'      => formatNamePrefix($reviewerName),
+                    'phase'         => (string)$r['test_phase'],
+                    'strength'      => (string)($r['peer_strength'] ?? ''),
+                    'improvement'   => (string)($r['peer_improvement'] ?? ''),
+                    'encouragement' => (string)($r['peer_encouragement'] ?? ''),
+                    'created_at'    => (string)$r['timestamp'],
                 ];
             }
-            if (isset($students[$r['reviewer_id']])) {
-                $peer[$r['reviewer_id']]['given'] = (int)($peer[$r['reviewer_id']]['given'] ?? 0) + 1;
+            if ($reviewerId !== '' && isset($students[$reviewerId])) {
+                $peer[$reviewerId]['given'] = (int)($peer[$reviewerId]['given'] ?? 0) + 1;
             }
         }
     } catch (Exception $e) { /* ยังไม่มีการประเมินเพื่อน */ }
@@ -656,6 +664,41 @@ function report_peer_criteria() {
     ];
 }
 
+/** ทำดัชนี "ชื่อนักเรียน → รหัส" (ทั้งชื่อเต็มและชื่อที่ตัดคำนำหน้าออก)
+ *  ใช้หาว่าใครเป็นผู้ประเมิน เพราะตาราง evaluations เก็บชื่อผู้ประเมิน ไม่ได้เก็บรหัส
+ *  ดึงจากทะเบียนเองและแคชไว้ต่อ 1 request เพื่อให้เรียกใช้ได้จากทุกฟังก์ชันในไฟล์นี้ */
+function report_student_id_by_name(PDO $pdo) {
+    static $idByName = null;
+    if ($idByName !== null) return $idByName;
+    $idByName = [];
+    try {
+        $rows = $pdo->query('SELECT student_id, student_name FROM students')->fetchAll();
+        foreach ($rows as $r) {
+            $sid  = (string)$r['student_id'];
+            $full = (string)($r['student_name'] ?? '');
+            if (trim($full) !== '')                   $idByName[trim($full)] = $sid;
+            $short = trim(formatNamePrefix($full));
+            if ($short !== '')                        $idByName[$short] = $sid;
+        }
+    } catch (PDOException $e) { /* ทะเบียนยังไม่ถูกสร้าง — คืนดัชนีว่าง */ }
+    return $idByName;
+}
+
+/** แปลงคะแนนรายเกณฑ์ที่ถ่วงน้ำหนักแล้วใน evaluations กลับเป็นระดับ 0-4 ตามเกณฑ์เดิม
+ *  (ใช้ multiplier ชุดเดียวกับทั้งระบบจาก ai_rubric()) */
+function report_peer_level_from_weighted($critKey, $weighted) {
+    static $mult = null;
+    if ($mult === null) {
+        $mult = [];
+        if (function_exists('ai_rubric')) {
+            foreach (ai_rubric() as $ri) { $mult[str_replace('.', '_', $ri['id'])] = (float)$ri['multiplier']; }
+        }
+    }
+    if ($weighted === null || $weighted === '') return '';
+    $m = $mult[$critKey] ?? 0;
+    return (string)($m > 0 ? round((float)$weighted / $m, 2) : (float)$weighted);
+}
+
 /** หัวข้อของบันทึกสะท้อนการเรียนรู้ */
 function report_reflect_fields() {
     return [
@@ -823,32 +866,46 @@ function report_full_data(PDO $pdo, array $sids) {
     } catch (Exception $e) { /* ตารางอาจยังไม่ถูกสร้าง */ }
 
     // ---- แบบประเมินเพื่อนเชิงคุณภาพ (ทั้งที่ได้รับและที่ไปประเมินให้เพื่อน) ----
+    // อ่านจาก evaluations (evaluator_type = 'เพื่อนประเมิน') ซึ่งเป็นแหล่งข้อมูลจริง
+    // ไม่ใช่ตาราง peer_reviews ที่ไม่มีหน้าไหนเขียนลงไปแล้ว (รายงานจะไม่มีข้อมูลประเมินเพื่อนเลย)
+    // คะแนนใน evaluations เป็นค่าหลังถ่วงน้ำหนัก จึงหารกลับเป็นระดับ 0-4 ตามเกณฑ์เดิม
+    // ส่วนเกณฑ์ 1.4 / 3.4 มีเฉพาะแบบประเมินเพื่อนรูปแบบเดิม จึงเว้นว่างไว้
     $peerCrit = report_peer_criteria();
+    $peerIdByName2 = report_student_id_by_name($pdo);
     try {
-        $st = $pdo->prepare("SELECT pr.*, own.student_name AS owner_name, rev.student_name AS reviewer_name
-                               FROM peer_reviews pr
-                               LEFT JOIN students own ON own.student_id = pr.student_id
-                               LEFT JOIN students rev ON rev.student_id = pr.reviewer_id
-                              WHERE pr.student_id IN ($in) OR pr.reviewer_id IN ($in)");
-        $st->execute(array_merge($sids, $sids));
+        $st = $pdo->prepare("SELECT e.*, own.student_name AS owner_name
+                               FROM evaluations e
+                               LEFT JOIN students own ON own.student_id = e.student_id
+                              WHERE e.evaluator_type = 'เพื่อนประเมิน'");
+        $st->execute();
         while ($r = $st->fetch()) {
+            $reviewerName = trim((string)$r['evaluator_name']);
+            $reviewerId   = $peerIdByName2[$reviewerName] ?? '';
+            // เอาเฉพาะที่เกี่ยวข้องกับนักเรียนในรายงานชุดนี้ (เจ้าของผลงาน หรือผู้ประเมิน)
+            if (!isset($out[$r['student_id']]) && !($reviewerId !== '' && isset($out[$reviewerId]))) continue;
+
             $scores = [];
             foreach ($peerCrit as $k => $label) {
-                $scores[$k] = ['label' => $label, 'value' => trim((string)($r['score_' . $k] ?? ''))];
+                $col = 'score_' . $k;
+                $scores[$k] = [
+                    'label' => $label,
+                    'value' => array_key_exists($col, $r) ? report_peer_level_from_weighted($k, $r[$col]) : '',
+                ];
             }
             $item = [
                 'owner_id'      => (string)$r['student_id'],
                 'owner_name'    => formatNamePrefix((string)($r['owner_name'] ?? '')),
-                'reviewer_id'   => (string)$r['reviewer_id'],
-                'reviewer_name' => formatNamePrefix((string)($r['reviewer_name'] ?? '')),
+                'reviewer_id'   => $reviewerId,
+                'reviewer_name' => formatNamePrefix($reviewerName),
+                'phase'         => (string)($r['test_phase'] ?? ''),
                 'scores'        => $scores,
-                'strength'      => trim((string)($r['strength'] ?? '')),
-                'improvement'   => trim((string)($r['improvement'] ?? '')),
-                'encouragement' => trim((string)($r['encouragement'] ?? '')),
-                'created_at'    => (string)($r['created_at'] ?? ''),
+                'strength'      => trim((string)($r['peer_strength'] ?? '')),
+                'improvement'   => trim((string)($r['peer_improvement'] ?? '')),
+                'encouragement' => trim((string)($r['peer_encouragement'] ?? '')),
+                'created_at'    => (string)($r['timestamp'] ?? ''),
             ];
-            if (isset($out[$r['student_id']]))  $out[$r['student_id']]['peer_received'][] = $item;
-            if (isset($out[$r['reviewer_id']])) $out[$r['reviewer_id']]['peer_given'][]   = $item;
+            if (isset($out[$r['student_id']]))                    $out[$r['student_id']]['peer_received'][] = $item;
+            if ($reviewerId !== '' && isset($out[$reviewerId]))   $out[$reviewerId]['peer_given'][]         = $item;
         }
     } catch (Exception $e) { /* ยังไม่มีการประเมินเพื่อน */ }
 

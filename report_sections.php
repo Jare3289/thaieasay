@@ -531,11 +531,24 @@ function rs_peer($full, $no = '9') {
         <table>
           <thead>
             <tr><th style="width:34%">เกณฑ์</th>
-              <?php foreach ($show as $r): ?><th class="wrap"><?php echo rp_esc($r['reviewer_name'] ?: 'เพื่อน'); ?></th><?php endforeach; ?>
+              <?php foreach ($show as $r): ?><th class="wrap"><?php
+                  // ระบุรอบการประเมินกำกับชื่อเพื่อนด้วย เพราะเพื่อนคนเดียวกันประเมินได้หลายรอบ
+                  $rsPhaseLabels = ['pretest' => 'ก่อนเรียน', 'task1' => 'หน่วยที่ 1', 'task2' => 'หน่วยที่ 2', 'posttest' => 'หลังเรียน'];
+                  $rsPhase = $r['phase'] ?? '';
+                  echo rp_esc($r['reviewer_name'] ?: 'เพื่อน');
+                  if ($rsPhase !== '') echo '<br><span class="muted">' . rp_esc($rsPhaseLabels[$rsPhase] ?? $rsPhase) . '</span>';
+              ?></th><?php endforeach; ?>
             </tr>
           </thead>
           <tbody>
             <?php foreach (report_peer_criteria() as $k => $label): ?>
+            <?php
+              // ข้ามเกณฑ์ที่ไม่มีคะแนนเลยสักคน (เช่น 1.4 / 3.4 ซึ่งมีเฉพาะแบบประเมินรูปแบบเดิม)
+              // เพื่อไม่ให้รายงานมีแถวว่างติดมาทุกฉบับ
+              $rsHasAny = false;
+              foreach ($show as $r) { if (($r['scores'][$k]['value'] ?? '') !== '') { $rsHasAny = true; break; } }
+              if (!$rsHasAny) continue;
+            ?>
             <tr>
               <td><?php echo rp_esc($label); ?></td>
               <?php foreach ($show as $r): ?>

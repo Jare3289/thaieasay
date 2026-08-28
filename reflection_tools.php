@@ -1754,38 +1754,50 @@ $role = $sessionUser['role'];
           inspectChecklistNotes.textContent = '';
         }
 
-        // ดึงประเมินเพื่อน
-        const resPeer = await (await fetch(`api.php?action=get_peer_reviews&studentId=${studentId}&_t=${new Date().getTime()}`)).json();
+        // ดึงความเห็น/คะแนนที่เพื่อนประเมินให้ (อ่านจากผลประเมินจริงในตาราง evaluations)
+        // ส่ง unit ไปด้วย เพื่อให้ตรงกับหน่วยการเรียนที่ครูเลือกดูอยู่เหมือนส่วนอื่นของแฟ้ม
+        const resPeer = await (await fetch(`api.php?action=get_peer_reviews&studentId=${studentId}&unit=${currentMonitorUnit}&_t=${new Date().getTime()}`)).json();
         if (resPeer.success && resPeer.data && resPeer.data.length > 0) {
+          const peerCriteriaLabels = {
+            '1.1': '1.1 ตรงประเด็น',       '1.2': '1.2 แก่นเรื่อง',      '1.3': '1.3 ขยายความ',
+            '1.4': '1.4 เอกภาพของเนื้อหา',
+            '2.1': '2.1 องค์ประกอบครบ',    '2.2': '2.2 ลำดับเป็นระบบ',
+            '3.1': '3.1 ประโยคถูกต้อง',    '3.2': '3.2 เลือกใช้คำ',      '3.3': '3.3 ระดับภาษา',
+            '3.4': '3.4 การใช้คำเชื่อม',
+            '4.1': '4.1 สะกดคำ',           '4.2': '4.2 เว้นวรรค',        '4.3': '4.3 เรียบร้อย'
+          };
+          const peerPhaseLabels = { pretest: 'ก่อนเรียน', task1: 'หน่วยที่ 1', task2: 'หน่วยที่ 2', posttest: 'หลังเรียน' };
+          const esc = (v) => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          const fmtScore = (v, numeric) => {
+            if (v === null || v === undefined || v === '') return '-';
+            return numeric ? Number(v).toLocaleString('th-TH', { maximumFractionDigits: 2 }) : esc(v);
+          };
+
           let html = '<div class="accordion" id="peerReviewsInspectAccordion">';
           resPeer.data.forEach((row, index) => {
+            const scoreCells = Object.keys(peerCriteriaLabels)
+              .filter(k => row.scores && row.scores[k] !== undefined)
+              .map(k => `<div class="col-6 small"><strong>${esc(peerCriteriaLabels[k])}:</strong> ${fmtScore(row.scores[k], row.numeric)}</div>`)
+              .join('');
+            const phaseTag = row.phase
+              ? `<span class="badge bg-primary ms-2">${esc(peerPhaseLabels[row.phase] || row.phase)}</span>` : '';
+            const legacyTag = (row.source === 'legacy')
+              ? '<span class="badge bg-secondary ms-2">ข้อมูลรูปแบบเดิม</span>' : '';
+            const totalTag = (row.total !== null && row.total !== undefined)
+              ? `<span class="badge bg-success ms-2">รวม ${fmtScore(row.total, true)}${row.quality ? ' · ' + esc(row.quality) : ''}</span>` : '';
             html += `
               <div class="accordion-item mb-2 border rounded-3 overflow-hidden">
                 <h2 class="accordion-header" id="headingPeer${index}">
                   <button class="accordion-button collapsed py-2 px-3 fw-bold small bg-light text-dark shadow-none" type="button" data-bs-toggle="collapse" data-bs-target="#collapsePeer${index}" aria-expanded="false" aria-controls="collapsePeer${index}">
-                    👩‍🎓 ผู้ประเมิน: ${row.reviewer_name}
+                    👩‍🎓 ผู้ประเมิน: ${esc(row.reviewer_name)}${phaseTag}${totalTag}${legacyTag}
                   </button>
                 </h2>
                 <div id="collapsePeer${index}" class="accordion-collapse collapse" aria-labelledby="headingPeer${index}" data-bs-parent="#peerReviewsInspectAccordion">
                   <div class="accordion-body p-3 bg-white">
-                    <div class="row g-2 mb-3">
-                      <div class="col-6 small"><strong>1.1 ตรงประเด็น:</strong> ${row.score_1_1}</div>
-                      <div class="col-6 small"><strong>1.2 แก่นเรื่อง:</strong> ${row.score_1_2}</div>
-                      <div class="col-6 small"><strong>1.3 ขยายความ:</strong> ${row.score_1_3}</div>
-                      <div class="col-6 small text-primary"><strong>1.4 เอกภาพของเนื้อหา:</strong> ${row.score_1_4}</div>
-                      <div class="col-6 small"><strong>2.1 องค์ประกอบครบ:</strong> ${row.score_2_1}</div>
-                      <div class="col-6 small"><strong>2.2 ลำดับเป็นระบบ:</strong> ${row.score_2_2}</div>
-                      <div class="col-6 small"><strong>3.1 ประโยคถูกต้อง:</strong> ${row.score_3_1}</div>
-                      <div class="col-6 small"><strong>3.2 เลือกใช้คำ:</strong> ${row.score_3_2}</div>
-                      <div class="col-6 small"><strong>3.3 ระดับภาษา:</strong> ${row.score_3_3}</div>
-                      <div class="col-6 small text-primary"><strong>3.4 การใช้คำเชื่อม:</strong> ${row.score_3_4}</div>
-                      <div class="col-6 small"><strong>4.1 สะกดคำ:</strong> ${row.score_4_1}</div>
-                      <div class="col-6 small"><strong>4.2 เว้นวรรค:</strong> ${row.score_4_2}</div>
-                      <div class="col-6 small"><strong>4.3 เรียบร้อย:</strong> ${row.score_4_3}</div>
-                    </div>
-                    <div class="p-2 bg-light rounded text-muted small mb-1"><strong>จุดแข็ง:</strong> ${row.strength || '-'}</div>
-                    <div class="p-2 bg-light rounded text-muted small mb-1"><strong>จุดปรับปรุง:</strong> ${row.improvement || '-'}</div>
-                    <div class="p-2 bg-light rounded text-muted small"><strong>กำลังใจ:</strong> "${row.encouragement || '-'}"</div>
+                    <div class="row g-2 mb-3">${scoreCells}</div>
+                    <div class="p-2 bg-light rounded text-muted small mb-1"><strong>จุดแข็ง:</strong> ${esc(row.strength) || '-'}</div>
+                    <div class="p-2 bg-light rounded text-muted small mb-1"><strong>จุดปรับปรุง:</strong> ${esc(row.improvement) || '-'}</div>
+                    <div class="p-2 bg-light rounded text-muted small"><strong>กำลังใจ:</strong> ${esc(row.encouragement) || '-'}</div>
                   </div>
                 </div>
               </div>
@@ -1794,7 +1806,7 @@ $role = $sessionUser['role'];
           html += '</div>';
           inspectPeerContainer.innerHTML = html;
         } else {
-          inspectPeerContainer.innerHTML = '<p class="text-center text-muted py-4">นักเรียนรายนี้ยังไม่มีการประเมินสะท้อนข้อมูลเชิงรับจากเพื่อนร่วมห้อง</p>';
+          inspectPeerContainer.innerHTML = `<p class="text-center text-muted py-4">ยังไม่มีความเห็นจากเพื่อนของหน่วยที่ ${currentMonitorUnit} สำหรับนักเรียนรายนี้</p>`;
         }
 
         // ดึงสะท้อนคิดการเรียนรู้
