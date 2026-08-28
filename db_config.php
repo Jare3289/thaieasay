@@ -132,6 +132,47 @@ function essay_compose_content($intro, $bodyJson, $conclusion) {
     ], JSON_UNESCAPED_UNICODE);
 }
 
+// ตรวจว่าเรียงความแถวนี้ "มีเนื้อหาจริง" หรือไม่ — ใช้เป็นกติกาเดียวกันทุกที่ที่นับว่าส่งงานแล้ว
+//
+// สำคัญ: body_content เก็บทุกย่อหน้าเป็น JSON array ค่าว่างจึงถูกบันทึกเป็นสตริง '[]' ไม่ใช่สตริงว่าง
+// การเช็คด้วย SQL แบบ body_content <> '' จึงเป็นจริงเสมอ ทำให้ "แถวเปล่า" ถูกนับว่าส่งงานแล้ว
+// (หน้ารายงานของครูขึ้นว่าส่งแล้ว แต่หน้าแรกของนักเรียนขึ้นว่ายังไม่ได้ทำ = ความคืบหน้าไม่ตรงกับข้อมูล)
+function essay_has_content($intro, $bodyJson, $conclusion) {
+    if (trim((string)($intro ?? '')) !== '')      return true;
+    if (trim((string)($conclusion ?? '')) !== '') return true;
+
+    $bodyJson = (string)($bodyJson ?? '');
+    if (trim($bodyJson) === '') return false;
+    $decoded = json_decode($bodyJson, true);
+    if (is_array($decoded)) {
+        foreach ($decoded as $para) {
+            if (trim((string)$para) !== '') return true;
+        }
+        return false;
+    }
+    // ข้อมูลรุ่นเก่าที่ไม่ได้เก็บเป็น JSON — ถือเป็นข้อความล้วน
+    return trim($bodyJson) !== '';
+}
+
+// รายชื่อคอลัมน์ปัญหา/แนวทางแก้ของตาราง writing_problems (11 เกณฑ์ย่อย)
+function reflection_problem_columns() {
+    $keys = ['1_1', '1_2', '1_3', '2_1', '2_2', '3_1', '3_2', '3_3', '4_1', '4_2', '4_3'];
+    $cols = [];
+    foreach ($keys as $k) { $cols[] = 'prob_' . $k; $cols[] = 'sol_' . $k; }
+    return $cols;
+}
+
+// ตรวจว่าแถวบันทึกอุปสรรคปัญหาการเขียน "มีเนื้อหาจริง" หรือไม่
+// (ฟอร์มเดิมกดบันทึกได้ทั้งที่ไม่ได้ติ๊กแถวใดเลย → ได้แถวที่ทุกช่องเป็น NULL
+//  ถ้านับแค่ "มีแถว" ความคืบหน้าจะขึ้นว่าทำแล้วทั้งที่เปิดเข้าไปดูแล้วไม่มีข้อมูล)
+function reflection_problems_has_content($row) {
+    if (!is_array($row)) return false;
+    foreach (reflection_problem_columns() as $col) {
+        if (isset($row[$col]) && trim((string)$row[$col]) !== '') return true;
+    }
+    return false;
+}
+
 // ดึงหัวข้อที่ครูกำหนดทุกรอบเป็น map [phase => topic] (มี cache ต่อ 1 request)
 function essay_topics_map(PDO $pdo) {
     static $cache = null;

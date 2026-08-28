@@ -516,18 +516,24 @@ try {
                 'posttest' => ['plain' => 'posttest']
             ];
 
-            // 1) เรียงความที่เขียนแล้ว (มีคำอย่างน้อย 1 คำ) ของแต่ละร่าง/รอบ
+            // 1) เรียงความที่เขียนแล้วของแต่ละร่าง/รอบ
+            //    ใช้กติกาเดียวกับรายงานการส่งงานของครู (essay_has_content) คือ "มีข้อความจริงอย่างน้อย 1 ส่วน"
+            //    ไม่ใช้ word_count > 0 อย่างเดียว เพราะเรียงความที่บันทึกไว้ก่อนมีการนับคำแบบตัดคำไทย
+            //    อาจมี word_count เป็น 0 ทั้งที่มีเนื้อหา → หน้าแรกจะขึ้นว่ายังไม่ได้ทำทั้งที่บันทึกไปแล้ว
             $essayStatusByPhase = [];
-            $stmtEssay = $pdo->prepare('SELECT word_count FROM student_essays WHERE student_id = ? AND essay_phase = ?');
+            $stmtEssay = $pdo->prepare('SELECT intro_content, body_content, conclusion_content, word_count
+                                        FROM student_essays WHERE student_id = ? AND essay_phase = ?');
             foreach ($essayChecks as $phase => $draftMap) {
                 $essayStatusByPhase[$phase] = [];
                 foreach ($draftMap as $draftKey => $essayPhaseKey) {
                     $stmtEssay->execute([$myId, $essayPhaseKey]);
-                    $wc = $stmtEssay->fetchColumn();
-                    $wc = ($wc !== false) ? (int)$wc : 0;
+                    $erow = $stmtEssay->fetch();
+                    $hasContent = $erow
+                        ? essay_has_content($erow['intro_content'], $erow['body_content'], $erow['conclusion_content'])
+                        : false;
                     $essayStatusByPhase[$phase][$draftKey] = [
-                        'done'      => $wc > 0,
-                        'wordCount' => $wc,
+                        'done'      => $hasContent,
+                        'wordCount' => $erow ? (int)$erow['word_count'] : 0,
                         'phaseKey'  => $essayPhaseKey
                     ];
                 }
@@ -545,17 +551,41 @@ try {
                 if ($erow['evaluator_type'] === 'ครูประเมิน')   $evalByPhase[$ph]['teacher'] = true;
             }
 
-            // 3) คู่ประเมินเพื่อนของแต่ละรอบ + สถานะว่าประเมินคู่ตนเองไปแล้วหรือยัง
+            // 3) คู่ประเมินเพื่อนของแต่ละรอบ + สถานะว่าประเมินเพื่อนของรอบนั้นไปแล้วหรือยัง
+            //
+            // สถานะ "ประเมินแล้ว" ต้องดูจากผลประเมินที่บันทึกไว้จริง ไม่ผูกกับตารางจับคู่ (peer_pairs)
+            // เพราะนักเรียนประเมินเพื่อนได้โดยไม่ผ่านการจับคู่ (หน้าประเมินเปิดให้ระบุรหัสเองเมื่อยังไม่มีคู่)
+            // และคู่ที่จับไว้ถูกยกเลิก/เปลี่ยนภายหลังได้ ถ้าอิงคู่อย่างเดียว หน้าแรกจะขึ้นว่า "ไปจับคู่/ไปประเมิน"
+            // ทั้งที่บันทึกผลประเมินเพื่อนของรอบนั้นไปเรียบร้อยแล้ว
+            //
+            // ชื่อผู้ประเมินถูกบันทึกเป็นชื่อที่ตัดคำนำหน้าออกแล้ว (formatNamePrefix) แต่ข้อมูลเก่าหรือข้อมูล
+            // ที่บันทึกก่อนครูแก้ชื่อในทะเบียนอาจเก็บอีกแบบ จึงเทียบทั้งชื่อในเซสชันและชื่อเต็มในทะเบียน
+            $stmtMyName = $pdo->prepare('SELECT student_name FROM students WHERE student_id = ?');
+            $stmtMyName->execute([$myId]);
+            $myFullName = (string)$stmtMyName->fetchColumn();
+            $myNameVariants = array_values(array_unique(array_filter([
+                trim((string)$myName),
+                trim($myFullName),
+                trim(formatNamePrefix($myFullName)),
+            ], function ($n) { return $n !== ''; })));
+
+            $namePlaceholders = implode(',', array_fill(0, max(1, count($myNameVariants)), '?'));
             $stmtPartner  = $pdo->prepare('SELECT partner_code FROM peer_pairs WHERE round = ? AND student_code = ?');
-            $stmtPeerDone = $pdo->prepare("SELECT 1 FROM evaluations WHERE student_id = ? AND evaluator_type = 'เพื่อนประเมิน' AND evaluator_name = ? AND test_phase = ?");
+            $stmtPeerDone = $pdo->prepare("SELECT 1 FROM evaluations
+                                           WHERE evaluator_type = 'เพื่อนประเมิน'
+                                             AND test_phase = ?
+                                             AND TRIM(evaluator_name) IN ($namePlaceholders)
+                                             AND student_id <> ?
+                                           LIMIT 1");
             $peerByPhase = [];
             foreach ($phases as $phase) {
                 $stmtPartner->execute([$phase, $myId]);
                 $partnerId = $stmtPartner->fetchColumn();
                 $partnerId = ($partnerId !== false && $partnerId !== null && $partnerId !== '') ? $partnerId : null;
+
                 $peerDone = false;
-                if ($partnerId) {
-                    $stmtPeerDone->execute([$partnerId, $myName, $phase]);
+                if ($myNameVariants) {
+                    $stmtPeerDone->execute(array_merge([$phase], $myNameVariants, [$myId]));
                     $peerDone = (bool)$stmtPeerDone->fetchColumn();
                 }
                 $peerByPhase[$phase] = ['partnerId' => $partnerId, 'peerDone' => $peerDone];
@@ -571,16 +601,21 @@ try {
             }
 
             // 4) เครื่องมือสะท้อนคิด (เฉพาะหน่วย 1/2 — ไม่มีในรอบก่อน/หลังเรียน) มี 3 หัวข้อย่อยที่ต้องทำให้ครบ
-            $stmtProblems  = $pdo->prepare('SELECT 1 FROM writing_problems WHERE student_id = ? AND task_unit = ?');
+            //    บันทึกอุปสรรคปัญหาการเขียนต้องดู "เนื้อหาจริง" ไม่ใช่แค่มีแถวในตาราง เพราะกดบันทึกฟอร์มเปล่า
+            //    จะได้แถวที่ทุกช่องว่าง ทำให้ความคืบหน้าขึ้นว่าทำแล้วทั้งที่เปิดเข้าไปดูแล้วไม่มีข้อมูล
+            //    ส่วนเช็คลิสต์และแบบสะท้อนการเรียนรู้บังคับกรอกครบทุกช่องอยู่แล้ว จึงถือว่ามีแถว = ทำแล้ว
+            $probCols      = implode(', ', reflection_problem_columns());
+            $stmtProblems  = $pdo->prepare("SELECT $probCols FROM writing_problems WHERE student_id = ? AND task_unit = ?");
             $stmtChecklist = $pdo->prepare('SELECT 1 FROM self_checklists WHERE student_id = ? AND task_unit = ?');
             $stmtRefl      = $pdo->prepare('SELECT 1 FROM learning_reflections WHERE student_id = ? AND task_unit = ?');
             $reflectionByUnit = [];
             foreach ([1, 2] as $unit) {
                 $stmtProblems->execute([$myId, $unit]);
+                $probRow = $stmtProblems->fetch();
                 $stmtChecklist->execute([$myId, $unit]);
                 $stmtRefl->execute([$myId, $unit]);
                 $reflectionByUnit[$unit] = [
-                    'problemsDone'  => (bool)$stmtProblems->fetchColumn(),
+                    'problemsDone'  => reflection_problems_has_content($probRow),
                     'checklistDone' => (bool)$stmtChecklist->fetchColumn(),
                     'reflectionDone'=> (bool)$stmtRefl->fetchColumn()
                 ];
@@ -1600,7 +1635,12 @@ try {
             };
             $unitGrpParam = array_merge([$refUnit], $grpParam);
 
-            $stmt = $pdo->prepare('SELECT COUNT(DISTINCT wp.student_id) FROM writing_problems wp JOIN students s ON wp.student_id = s.student_id' . $unitGrpWhere('wp.task_unit'));
+            // นับเฉพาะนักเรียนที่ "มีเนื้อหาจริง" ไม่ใช่แค่มีแถว (แถวเปล่าจากการกดบันทึกฟอร์มว่าง
+            // จะทำให้จำนวนที่ทำแล้วในแดชบอร์ดไม่ตรงกับข้อมูลที่เปิดเข้าไปดูจริง)
+            $probNotEmpty = ' AND (' . implode(' OR ', array_map(function ($c) {
+                return "TRIM(COALESCE(wp.$c,'')) <> ''";
+            }, reflection_problem_columns())) . ')';
+            $stmt = $pdo->prepare('SELECT COUNT(DISTINCT wp.student_id) FROM writing_problems wp JOIN students s ON wp.student_id = s.student_id' . $unitGrpWhere('wp.task_unit') . $probNotEmpty);
             $stmt->execute($unitGrpParam);
             $prob_count = $stmt->fetchColumn();
 
@@ -1617,14 +1657,15 @@ try {
             $stmt->execute($unitGrpParam);
             $ref_count = $stmt->fetchColumn();
 
-            // ปัญหาล่าสุด
+            // ปัญหาล่าสุด — ต้องกรองตามหน่วยการเรียนที่ครูเลือกด้วย มิฉะนั้นจะเห็นบันทึกของอีกหน่วยปนมา
+            // ทั้งที่ตัวเลขสรุปด้านบนนับเฉพาะหน่วยที่เลือก (ตัวเลขกับรายการที่แสดงไม่ตรงกัน)
             $stmt_probs = $pdo->prepare('
                 SELECT wp.*, s.student_name
                 FROM writing_problems wp
-                JOIN students s ON wp.student_id = s.student_id' . $grpWhere('s') . '
+                JOIN students s ON wp.student_id = s.student_id' . $unitGrpWhere('wp.task_unit') . $probNotEmpty . '
                 ORDER BY wp.created_at DESC LIMIT 5
             ');
-            $stmt_probs->execute($grpParam);
+            $stmt_probs->execute($unitGrpParam);
             $recent_problems = $stmt_probs->fetchAll();
 
             // รีวิวล่าสุด
@@ -1965,14 +2006,23 @@ try {
             ');
             $stmt->execute([$studentId, $essayPhase]);
             $row = $stmt->fetch();
+            $hasContent = false;
             if ($row) {
                 if (isset($row['student_name'])) { $row['student_name'] = formatNamePrefix($row['student_name']); }
                 // ประกอบ essay_content (JSON) จากคอลัมน์แยกส่วน + เติมหัวข้อที่ครูกำหนดเป็น essay_title
                 $row['essay_content'] = essay_compose_content($row['intro_content'] ?? null, $row['body_content'] ?? null, $row['conclusion_content'] ?? null);
                 $topics = essay_topics_map($pdo);
                 $row['essay_title'] = $topics[essay_topic_phase($row['essay_phase'])] ?? '';
+                // มีแถวในตารางไม่ได้แปลว่ามีเนื้อหา (กดบันทึกฟอร์มเปล่าก็ได้แถวว่าง)
+                // ส่ง has_content ไปด้วย เพื่อให้หน้าเว็บบอกสถานะตรงกับความคืบหน้าในหน้าแรก
+                $hasContent = essay_has_content($row['intro_content'] ?? null, $row['body_content'] ?? null, $row['conclusion_content'] ?? null);
             }
-            echo json_encode(['success' => true, 'found' => (bool)$row, 'data' => $row ?: null]);
+            echo json_encode([
+                'success'     => true,
+                'found'       => (bool)$row,
+                'has_content' => $hasContent,
+                'data'        => $row ?: null
+            ]);
             break;
 
         // ตรวจคำที่อาจสะกดผิด + คำที่เขียนด้วยภาษาอื่นปนอยู่ + การเว้นวรรครอบ "ๆ" ของข้อความเรียงความ (ดู thai_text_utils.php)
@@ -2146,21 +2196,29 @@ try {
             $stuRows = $stuStmt->fetchAll();
 
             // ชุดรหัสนักเรียนที่ "ส่งแล้ว" ของแต่ละชิ้นงาน (ดึงทีเดียวแล้วแมปในหน่วยความจำ ประหยัด query)
-            // เรียงความ: นับว่าส่งแล้วเมื่อมีเนื้อหาอย่างน้อยหนึ่งส่วน หรือ word_count > 0
+            // เรียงความ: นับว่าส่งแล้วเมื่อมีข้อความจริงอย่างน้อยหนึ่งส่วน — ใช้ essay_has_content()
+            // ซึ่งเป็นกติกาเดียวกับหน้าแรกของนักเรียน (get_my_todo_status) เพื่อไม่ให้สองหน้ารายงานไม่ตรงกัน
+            // (เช็คด้วย SQL ตรง ๆ ไม่ได้ เพราะ body_content เก็บเป็น JSON array ค่าว่างคือ '[]' ซึ่งไม่ใช่สตริงว่าง
+            //  แถวเปล่าจึงถูกนับว่าส่งแล้วเสมอ)
             $essaySet = [
                 'pretest' => [], 'task1_d1' => [], 'task1_d2' => [],
                 'task2_d1' => [], 'task2_d2' => [], 'posttest' => [],
             ];
+            // กรองแถวที่ว่างแน่ ๆ ออกตั้งแต่ใน SQL ก่อน (ลดการดึงคอลัมน์ LONGTEXT ที่ไม่จำเป็น)
+            // เงื่อนไขนี้กว้างกว่า essay_has_content เสมอ จึงยังต้องยืนยันซ้ำด้วย PHP อีกชั้นให้ตรงกติกาเดียวกัน
             $esStmt = $pdo->query("
-                SELECT student_id, essay_phase FROM student_essays
-                WHERE COALESCE(word_count,0) > 0
-                   OR COALESCE(intro_content,'') <> ''
-                   OR COALESCE(body_content,'') <> ''
-                   OR COALESCE(conclusion_content,'') <> ''
+                SELECT student_id, essay_phase, intro_content, body_content, conclusion_content
+                FROM student_essays
+                WHERE TRIM(COALESCE(intro_content,'')) <> ''
+                   OR TRIM(COALESCE(conclusion_content,'')) <> ''
+                   OR TRIM(COALESCE(body_content,'')) NOT IN ('', '[]', 'null')
             ");
             while ($r = $esStmt->fetch()) {
                 $ph = $r['essay_phase'];
-                if (isset($essaySet[$ph])) $essaySet[$ph][$r['student_id']] = true;
+                if (!isset($essaySet[$ph])) continue;
+                if (essay_has_content($r['intro_content'], $r['body_content'], $r['conclusion_content'])) {
+                    $essaySet[$ph][$r['student_id']] = true;
+                }
             }
 
             // เครื่องมือสะท้อนคิด — แยกตามหน่วยการเรียน (หน่วยที่ 1 / หน่วยที่ 2)
@@ -2170,7 +2228,6 @@ try {
                 'reflection' => [1 => [], 2 => []],
             ];
             foreach ([
-                'problems'   => 'writing_problems',
                 'checklist'  => 'self_checklists',
                 'reflection' => 'learning_reflections',
             ] as $key => $tbl) {
@@ -2183,6 +2240,16 @@ try {
                     }
                 } catch (Exception $e) { /* ตารางอาจยังไม่ถูกสร้าง — ปล่อยว่าง */ }
             }
+            // อุปสรรคปัญหาการเขียน: นับเฉพาะแถวที่มีเนื้อหาจริง (กติกาเดียวกับหน้าแรกของนักเรียน)
+            try {
+                $probColsRep = implode(', ', reflection_problem_columns());
+                $q = $pdo->query("SELECT student_id, task_unit, $probColsRep FROM writing_problems");
+                while ($r = $q->fetch()) {
+                    if (!reflection_problems_has_content($r)) continue;
+                    $u = ((int)$r['task_unit'] === 2) ? 2 : 1;
+                    $flagSet['problems'][$u][$r['student_id']] = true;
+                }
+            } catch (Exception $e) { /* ตารางอาจยังไม่ถูกสร้าง — ปล่อยว่าง */ }
 
             $report = [];
             foreach ($stuRows as $s) {
