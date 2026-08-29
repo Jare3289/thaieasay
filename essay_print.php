@@ -542,7 +542,7 @@ $genAt = date('d/m/Y H:i');
         <div class="topic">
           <span class="lead">หัวข้อ :</span><span class="fill"><?php echo $h($e['essay_title']); ?></span>
         </div>
-        <div class="meta">รอบการประเมิน: <?php echo $h($phaseText); ?><?php if ($grp !== ''): ?> · กลุ่ม: <?php echo $h($grp); ?><?php endif; ?> · <?php echo $eWordCount; ?> คำ</div>
+        <div class="meta">รอบการประเมิน: <?php echo $h($phaseText); ?><?php if ($grp !== ''): ?> · กลุ่ม: <?php echo $h($grp); ?><?php endif; ?> · <span id="wc_<?php echo $fi; ?>"><?php echo $eWordCount; ?></span> คำ</div>
         <div class="content" id="content_<?php echo $fi; ?>"><?php echo essayParagraphs($e['essay_content'] ?? ''); ?></div>
         <?php if ($isTeacher): ?>
         <div class="editpanel" id="panel_<?php echo $fi; ?>" style="display:none;">
@@ -590,6 +590,36 @@ $genAt = date('d/m/Y H:i');
     function addLineNumbers() {
       var boxes = document.querySelectorAll('.content');
       for (var b = 0; b < boxes.length; b++) addLineNumbersFor(boxes[b]);
+    }
+
+    // อัปเดตเนื้อหาเรียงความชิ้นที่ i บนหน้าจอทันทีหลังบันทึกสำเร็จ (ไม่โหลดหน้าใหม่)
+    // สำคัญ: การ location.reload() จะเด้งกลับไปรายการแรกและปิดแผงแก้ไขเสมอ ครูที่กำลังตรวจ
+    // รายการที่ 15 จึงเห็นรายการที่ 1 ซึ่งเป็นเนื้อหาเดิม แล้วเข้าใจว่าการแก้ไข "ไม่ถูกบันทึก"
+    function applySavedEssay(i, intro, body, conc, wordCount) {
+      var d = ESSAY_EDIT[i];
+      if (!d) return;
+      d.intro = intro;
+      d.body  = (body || []).slice();
+      d.conc  = conc;
+
+      var box = document.getElementById('content_' + i);
+      if (box) {
+        var paras = [];
+        if ((intro || '').trim() !== '') paras.push(intro);
+        d.body.forEach(function (p) { if ((p || '').trim() !== '') paras.push(p); });
+        if ((conc || '').trim() !== '') paras.push(conc);
+        box.removeAttribute('data-numbered');   // เนื้อหาเปลี่ยน จำนวนบรรทัดย่อมเปลี่ยนตาม
+        if (paras.length === 0) {
+          box.innerHTML = '<div class="no-content">— ยังไม่มีเนื้อหาเรียงความ —</div>';
+        } else {
+          box.innerHTML = paras.map(function (p) {
+            return '<p class="para">' + ThaiReview.renderStaticHTML(p, {}) + '</p>';
+          }).join('');
+          addLineNumbersFor(box);
+        }
+      }
+      var wc = document.getElementById('wc_' + i);
+      if (wc && wordCount !== undefined && wordCount !== null) wc.textContent = wordCount;
     }
 
     // ===== โหมดตรวจทีละรายการ =====
@@ -722,8 +752,8 @@ $genAt = date('d/m/Y H:i');
               body: JSON.stringify({ student_id: d.sid, essay_phase: d.phase, introduction: intro, body: body, conclusion: conc })
             }).then(function (r) { return r.json(); }).then(function (res) {
               if (!res.success) throw new Error(res.error || 'บันทึกไม่สำเร็จ');
-              // บันทึกสำเร็จ — โหลดหน้าใหม่เพื่อแสดงเนื้อหาที่แก้ไขแล้ว (เหมือนแผงแก้ไขเดิม)
-              location.reload();
+              // บันทึกสำเร็จ — อัปเดตเนื้อหาบนหน้าเอกสารตรงจุดเดิม (คงรายการที่กำลังตรวจอยู่)
+              applySavedEssay(i, intro, body, conc, res.word_count);
             });
           }
         });
@@ -785,7 +815,11 @@ $genAt = date('d/m/Y H:i');
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ student_id: d.sid, essay_phase: d.phase, introduction: intro, body: body, conclusion: conc })
       }).then(function (r) { return r.json(); }).then(function (res) {
-        if (res.success) { alert('บันทึกเรียงความเรียบร้อยแล้ว'); location.reload(); }
+        if (res.success) {
+          applySavedEssay(i, intro, body, conc, res.word_count);
+          toggleEdit(i);   // ปิดแผงแก้ไข แล้วแสดงเนื้อหาที่บันทึกแล้วในรายการเดิม
+          alert('บันทึกเรียงความเรียบร้อยแล้ว');
+        }
         else { alert('บันทึกไม่สำเร็จ: ' + (res.error || '')); }
       }).catch(function () { alert('บันทึกไม่สำเร็จ'); });
     }
