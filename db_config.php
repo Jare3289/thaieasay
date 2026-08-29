@@ -819,3 +819,47 @@ try {
 } catch (Exception $e) {
     // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
 }
+
+// ---------------------------------------------------------------------------
+// ตารางของระบบ "วิเคราะห์บทที่ 4 และบทที่ 5"
+// ---------------------------------------------------------------------------
+// 1) ch45_analysis      : ผลวิเคราะห์ของ AI แยกตามหัวข้อ (job) หัวข้อละ 1 แถว ทำซ้ำจะทับของเดิม
+// 2) ch45_teaching_logs : บันทึกหลังสอนของผู้วิจัย — ใช้เขียน "ข้อเสนอแนะสำหรับการนำผลวิจัยไปใช้"
+//                         ซึ่งโครงบทที่ 5 กำหนดว่าต้องเขียนจากปัญหาที่พบจริง ไม่ใช่จากตัวเลข
+//
+// ทั้งสองตารางแยกจากข้อมูลวิจัยเดิมทั้งหมด การวิเคราะห์จึงไม่แตะคะแนนหรือผลงานของนักเรียน
+try {
+    $tCh45 = $pdo->query("SHOW TABLES LIKE 'ch45_teaching_logs'");
+    if (!$tCh45 || $tCh45->rowCount() === 0) {
+        safe_ddl($pdo, "
+            CREATE TABLE IF NOT EXISTS ch45_analysis (
+                job_key      VARCHAR(40) PRIMARY KEY,   -- เช่น quant_narrative, ind_1_1, domain_d1, ch5_summary
+                payload      LONGTEXT,                  -- JSON ผลวิเคราะห์ที่ผ่านการตรวจแล้ว
+                raw_response LONGTEXT,                  -- คำตอบดิบของ AI ไว้ตรวจย้อนหลัง
+                provider     VARCHAR(30)  DEFAULT NULL,
+                model        VARCHAR(100) DEFAULT NULL,
+                requested_by VARCHAR(50)  DEFAULT NULL,
+                input_hash   CHAR(40)     DEFAULT NULL, -- ลายนิ้วมือข้อมูลนำเข้า ใช้เตือนเมื่อผลล้าสมัย
+                warnings     TEXT,                      -- JSON array ข้อควรตรวจสอบก่อนนำไปใช้
+                created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+        safe_ddl($pdo, "
+            CREATE TABLE IF NOT EXISTS ch45_teaching_logs (
+                id         INT AUTO_INCREMENT PRIMARY KEY,
+                poa_stage  VARCHAR(20) NOT NULL DEFAULT 'general', -- motivating / enabling / assessing / general
+                task_unit  TINYINT     NOT NULL DEFAULT 0,         -- 0 = ไม่ระบุหน่วย
+                problem    TEXT        NOT NULL,                   -- ปัญหาที่พบจริงระหว่างจัดการเรียนการสอน
+                solution   TEXT,                                   -- แนวทางแก้ไขที่ใช้แล้วได้ผล
+                evidence   TEXT,                                   -- ข้อสังเกต/หลักฐานประกอบ
+                created_by VARCHAR(50) DEFAULT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_ch45_log_stage (poa_stage, task_unit)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+    }
+} catch (Exception $e) {
+    // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
+}
