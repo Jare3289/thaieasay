@@ -3,6 +3,7 @@
 require_once 'auth_helper.php';
 require_once 'thai_text_utils.php';
 require_once 'ai_config.php';
+require_once 'chapter45_ai.php';
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Cache-Control: post-check=0, pre-check=0', false);
@@ -2935,6 +2936,202 @@ try {
             $stmt = $pdo->prepare('DELETE FROM essay_ai_feedback WHERE student_id = ? AND essay_phase = ?');
             $stmt->execute([$aiSid, $aiPhase]);
             echo json_encode(['success' => true, 'deleted' => $stmt->rowCount()]);
+            break;
+
+        // ===================================================================
+        // ระบบวิเคราะห์บทที่ 4 และบทที่ 5
+        // ===================================================================
+
+        // ดึงข้อมูล ตัวเลขสถิติ ความพร้อมของข้อมูล และผลวิเคราะห์ที่ทำไว้แล้วทั้งหมด
+        case 'ch45_get_data':
+            if (!isset($_SESSION['user']) || !in_array($_SESSION['user']['role'], ['teacher', 'expert'], true)) {
+                echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูและผู้เชี่ยวชาญเท่านั้น']);
+                exit;
+            }
+            $c45Opt = [
+                'group'     => isset($request_data['group'])     ? trim((string)$request_data['group'])     : '',
+                'classroom' => isset($request_data['classroom']) ? trim((string)$request_data['classroom']) : '',
+            ];
+            $c45 = ch45_build_context($pdo, $c45Opt);
+
+            // ตัดข้อมูลส่วนที่หน้าจอไม่ได้ใช้ออกก่อนส่ง เพื่อไม่ให้คำตอบใหญ่เกินจำเป็น
+            $c45Pairs = [];
+            foreach ($c45['quant']['pairs'] as $pr) {
+                $c45Pairs[] = ['no' => $pr['no'], 'pre' => $pr['pre']['total'], 'post' => $pr['post']['total']];
+            }
+            $c45Quant = $c45['quant'];
+            $c45Quant['pairs'] = $c45Pairs;
+
+            $c45Defects = $c45['defects'];
+            foreach ($c45Defects['rows'] as $k => $r) {
+                // ส่งไปเฉพาะ "จำนวน" ไม่ส่งรหัสนักเรียนรายคน เพื่อไม่ให้ข้อมูลระบุตัวตนหลุดออกหน้าจอโดยไม่จำเป็น
+                $c45Defects['rows'][$k]['students1'] = count($r['students1']);
+                $c45Defects['rows'][$k]['students2'] = count($r['students2']);
+                $c45Defects['rows'][$k]['resolved']  = count($r['resolved']);
+                $c45Defects['rows'][$k]['persist']   = count($r['persist']);
+                $c45Defects['rows'][$k]['emerged']   = count($r['emerged']);
+            }
+            $c45Defects['ranked'] = array_map(function ($r) {
+                return ['id' => $r['id'], 'name' => $r['name'], 'pct1' => $r['pct1'], 'pct2' => $r['pct2'],
+                        'diff_pct' => $r['diff_pct']];
+            }, $c45Defects['ranked']);
+
+            $c45Hash = ch45_input_hash($c45['ds'], $c45['quant'], $c45['defects']);
+            $c45Res  = [];
+            foreach ($c45['results'] as $k => $r) {
+                $c45Res[$k] = [
+                    'payload'    => $r['payload'],
+                    'warnings'   => $r['warnings'],
+                    'model'      => $r['model'],
+                    'updated_at' => $r['updated_at'],
+                    'stale'      => ($r['input_hash'] !== '' && $r['input_hash'] !== $c45Hash),
+                ];
+            }
+
+            echo json_encode([
+                'success'    => true,
+                'meta'       => $c45['ds']['meta'],
+                'meta_fields'=> ch45_meta_fields(),
+                'phases'     => array_map('ai_phase_label', array_combine(ai_all_phases(), ai_all_phases())),
+                'topics'     => $c45['ds']['topics'],
+                'students'   => count($c45['ds']['sids']),
+                'domains'    => ch45_domains(),
+                'indicators' => ch45_indicators(),
+                'quant'      => $c45Quant,
+                'defects'    => $c45Defects,
+                'mechanics'  => $c45['mech'],
+                'readiness'  => $c45['readiness'],
+                'jobs'       => ch45_ai_jobs(),
+                'job_groups' => ch45_ai_job_groups(),
+                'results'    => $c45Res,
+                'logs'       => $c45['ds']['logs'],
+                'poa_stages' => ch45_poa_stages(),
+                'input_hash' => $c45Hash,
+            ], JSON_UNESCAPED_UNICODE);
+            break;
+
+        // สั่งให้ AI วิเคราะห์หัวข้อหนึ่งของบทที่ 4/5
+        case 'ch45_run_job':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้นที่สั่งวิเคราะห์ได้']);
+                exit;
+            }
+            $c45Job = isset($request_data['job']) ? trim((string)$request_data['job']) : '';
+            if (!isset(ch45_ai_jobs()[$c45Job])) {
+                echo json_encode(['success' => false, 'error' => 'ไม่รู้จักหัวข้อที่สั่งวิเคราะห์']);
+                exit;
+            }
+            $c45Used = ai_usage_today($pdo, $_SESSION['user']['id']);
+            if ($c45Used >= CH45_DAILY_LIMIT) {
+                echo json_encode(['success' => false,
+                    'error' => 'วันนี้ใช้ AI ครบ ' . CH45_DAILY_LIMIT . ' ครั้งแล้ว กรุณาลองใหม่ในวันพรุ่งนี้']);
+                exit;
+            }
+            $c45Ctx = ch45_build_context($pdo, [
+                'group'     => isset($request_data['group'])     ? trim((string)$request_data['group'])     : '',
+                'classroom' => isset($request_data['classroom']) ? trim((string)$request_data['classroom']) : '',
+            ]);
+
+            // เตือน (ไม่บล็อก) เมื่อสั่งข้ามลำดับ — หัวข้อสรุปจะได้เนื้อหาไม่ครบถ้าหัวข้อย่อยยังไม่เสร็จ
+            $c45Missing = [];
+            foreach (ch45_ai_jobs()[$c45Job]['deps'] as $dep) {
+                if (empty($c45Ctx['results'][$dep])) $c45Missing[] = ch45_ai_jobs()[$dep]['label'];
+            }
+
+            $c45Run = ch45_ai_run($pdo, $c45Job, $c45Ctx, $_SESSION['user']);
+            if (!$c45Run['ok']) {
+                echo json_encode(['success' => false, 'error' => $c45Run['error']], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            echo json_encode([
+                'success'  => true,
+                'job'      => $c45Job,
+                'payload'  => $c45Run['payload'],
+                'warnings' => $c45Run['warnings'],
+                'pending_deps' => $c45Missing,
+                'model'    => $c45Run['model'],
+            ], JSON_UNESCAPED_UNICODE);
+            break;
+
+        // ลบผลวิเคราะห์ของหัวข้อหนึ่ง (สั่งใหม่ได้เสมอ ผลเดิมจะถูกทับอยู่แล้ว)
+        case 'ch45_delete_result':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้น']);
+                exit;
+            }
+            $c45Job = isset($request_data['job']) ? trim((string)$request_data['job']) : '';
+            if ($c45Job === '__all__') {
+                $pdo->exec('DELETE FROM ch45_analysis');
+                echo json_encode(['success' => true, 'deleted' => 'all']);
+                break;
+            }
+            if (!isset(ch45_ai_jobs()[$c45Job])) {
+                echo json_encode(['success' => false, 'error' => 'ไม่รู้จักหัวข้อที่สั่งลบ']);
+                exit;
+            }
+            echo json_encode(['success' => true, 'deleted' => ch45_delete_result($pdo, $c45Job)]);
+            break;
+
+        // บันทึกข้อมูลประจำงานวิจัย (ปีการศึกษา ประชากร รอบงานที่ใช้ ฯลฯ)
+        case 'ch45_save_meta':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้น']);
+                exit;
+            }
+            $c45In = isset($request_data['meta']) && is_array($request_data['meta']) ? $request_data['meta'] : [];
+            if (!$c45In) {
+                echo json_encode(['success' => false, 'error' => 'ไม่มีข้อมูลที่จะบันทึก']);
+                exit;
+            }
+            $c45Saved = ch45_save_meta($pdo, $c45In);
+            echo json_encode(['success' => true, 'saved' => $c45Saved], JSON_UNESCAPED_UNICODE);
+            break;
+
+        // บันทึก/แก้ไขบันทึกหลังสอน (ใช้เขียนข้อเสนอแนะในบทที่ 5)
+        case 'ch45_save_log':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้น']);
+                exit;
+            }
+            $c45Log = isset($request_data['log']) && is_array($request_data['log']) ? $request_data['log'] : [];
+            $c45R = ch45_save_teaching_log($pdo, $c45Log, (string)$_SESSION['user']['id']);
+            if (!$c45R['ok']) {
+                echo json_encode(['success' => false, 'error' => $c45R['error']], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            echo json_encode(['success' => true, 'id' => $c45R['id'], 'logs' => ch45_teaching_logs($pdo)],
+                             JSON_UNESCAPED_UNICODE);
+            break;
+
+        // ลบบันทึกหลังสอนหนึ่งรายการ
+        case 'ch45_delete_log':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้น']);
+                exit;
+            }
+            $c45Id = isset($request_data['id']) ? (int)$request_data['id'] : 0;
+            $c45Ok = ($c45Id > 0) ? ch45_delete_teaching_log($pdo, $c45Id) : false;
+            echo json_encode(['success' => $c45Ok, 'logs' => ch45_teaching_logs($pdo)], JSON_UNESCAPED_UNICODE);
+            break;
+
+        // ดูคลังผลงานจริงที่ระบบคัดไว้ให้ AI ยกเป็นตัวอย่างของตัวบ่งชี้หนึ่ง (ไว้ตรวจสอบย้อนหลัง)
+        case 'ch45_get_evidence':
+            if (!isset($_SESSION['user']) || !in_array($_SESSION['user']['role'], ['teacher', 'expert'], true)) {
+                echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูและผู้เชี่ยวชาญเท่านั้น']);
+                exit;
+            }
+            $c45Ind = isset($request_data['indicator']) ? trim((string)$request_data['indicator']) : '';
+            if (!isset(ch45_indicators()[$c45Ind])) {
+                echo json_encode(['success' => false, 'error' => 'ไม่รู้จักตัวบ่งชี้ที่ระบุ']);
+                exit;
+            }
+            $c45Ds  = ch45_dataset($pdo, [
+                'group'     => isset($request_data['group'])     ? trim((string)$request_data['group'])     : '',
+                'classroom' => isset($request_data['classroom']) ? trim((string)$request_data['classroom']) : '',
+            ]);
+            $c45Def = ch45_defects($c45Ds);
+            $c45Ev  = ch45_evidence($c45Ds, $c45Ind, $c45Def, 3);
+            echo json_encode(['success' => true, 'evidence' => $c45Ev], JSON_UNESCAPED_UNICODE);
             break;
 
         default:

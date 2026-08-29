@@ -1,0 +1,43 @@
+-- =============================================================================
+-- Migration: ระบบวิเคราะห์บทที่ 4 และบทที่ 5
+--
+-- หมายเหตุ: ระบบมี auto-migration ใน db_config.php อยู่แล้ว (รันอัตโนมัติเมื่อเปิดเว็บ)
+-- ไฟล์นี้มีไว้สำหรับรันมือผ่าน phpMyAdmin / mysql client หากต้องการควบคุมเอง
+-- รันซ้ำได้อย่างปลอดภัย (ใช้ IF NOT EXISTS ทั้งหมด)
+-- =============================================================================
+
+-- 1) ผลวิเคราะห์ของ AI แยกตามหัวข้อของบทที่ 4-5 (หัวข้อละ 1 แถว วิเคราะห์ใหม่จะทับของเดิม)
+CREATE TABLE IF NOT EXISTS ch45_analysis (
+    job_key      VARCHAR(40) PRIMARY KEY,   -- quant_narrative, ind_1_1 … ind_4_3, domain_d1 … domain_d4,
+                                            -- overview, defect_narrative, ch5_summary, ch5_discussion, ch5_recommend
+    payload      LONGTEXT,                  -- JSON ผลวิเคราะห์ที่ผ่านการตรวจแล้ว
+    raw_response LONGTEXT,                  -- คำตอบดิบของ AI ไว้ตรวจย้อนหลัง
+    provider     VARCHAR(30)  DEFAULT NULL,
+    model        VARCHAR(100) DEFAULT NULL,
+    requested_by VARCHAR(50)  DEFAULT NULL,
+    input_hash   CHAR(40)     DEFAULT NULL, -- ลายนิ้วมือข้อมูลนำเข้า ใช้เตือนเมื่อผลวิเคราะห์ล้าสมัย
+    warnings     TEXT,                      -- JSON array จุดที่ต้องตรวจสอบก่อนนำไปใช้
+    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 2) บันทึกหลังสอนของผู้วิจัย — แหล่งข้อมูลของ "ข้อเสนอแนะสำหรับการนำผลวิจัยไปใช้" ในบทที่ 5
+CREATE TABLE IF NOT EXISTS ch45_teaching_logs (
+    id         INT AUTO_INCREMENT PRIMARY KEY,
+    poa_stage  VARCHAR(20) NOT NULL DEFAULT 'general', -- motivating / enabling / assessing / general
+    task_unit  TINYINT     NOT NULL DEFAULT 0,         -- 0 = ไม่ระบุหน่วย
+    problem    TEXT        NOT NULL,                   -- ปัญหาที่พบจริงระหว่างจัดการเรียนการสอน
+    solution   TEXT,                                   -- แนวทางแก้ไขที่ใช้แล้วได้ผล
+    evidence   TEXT,                                   -- ข้อสังเกต/หลักฐานประกอบ
+    created_by VARCHAR(50) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_ch45_log_stage (poa_stage, task_unit)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 3) ข้อมูลประจำงานวิจัยเก็บในตาราง app_settings เดิม (คีย์ขึ้นต้นด้วย ch45_)
+--    ไม่ต้องสร้างตารางเพิ่ม — ตัวอย่างการตั้งค่าด้วยมือ:
+-- INSERT INTO app_settings (skey, svalue) VALUES
+--   ('ch45_academic_year', '2568'), ('ch45_classroom', '5/6'),
+--   ('ch45_population_n', '280'),   ('ch45_sample_n', '40')
+-- ON DUPLICATE KEY UPDATE svalue = VALUES(svalue);
