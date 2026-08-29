@@ -309,6 +309,24 @@ function essayParagraphs($contentStr) {
     return $out;
 }
 
+// ป้ายรอบการประเมินแบบเต็ม (รวมร่าง D1/D2)
+$phaseTextFull = [
+  'pretest'  => 'ก่อนเรียน (Pretest)',
+  'task1_d1' => 'ภาระงาน หน่วยที่ 1 · ร่างที่ 1 (D1)',
+  'task1_d2' => 'ภาระงาน หน่วยที่ 1 · ร่างที่ 2 (D2)',
+  'task2_d1' => 'ภาระงาน หน่วยที่ 2 · ร่างที่ 1 (D1)',
+  'task2_d2' => 'ภาระงาน หน่วยที่ 2 · ร่างที่ 2 (D2)',
+  'posttest' => 'หลังเรียน (Posttest)',
+];
+
+// รายการสำหรับแถบเลื่อนดูทีละรายการ (ลำดับตรงกับ .form ที่พิมพ์ออกมา)
+$formCount = count($rows);
+$navItems  = [];
+foreach ($rows as $e) {
+    $navItems[] = trim((string)($e['student_name'] ?? '')) . ' (' . (string)($e['student_id'] ?? '') . ')'
+                . ' — ' . ($phaseTextFull[$e['essay_phase']] ?? ($phaseLabels[$e['essay_phase']] ?? $e['essay_phase']));
+}
+
 $genAt = date('d/m/Y H:i');
 ?>
 <!DOCTYPE html>
@@ -339,6 +357,33 @@ $genAt = date('d/m/Y H:i');
   .sheet { max-width: 800px; margin: 0 auto; padding: 20px 24px; }
   .form { page-break-after: always; }
   .form:last-child { page-break-after: auto; }
+
+  /* แถบเลื่อนดูทีละรายการ (บนจอเท่านั้น) */
+  .pager {
+    position: sticky; top: 0; z-index: 30;
+    background: #eef3f9; border-bottom: 1px solid #cfd9e6;
+    padding: 8px 16px; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center;
+    font-family: "Tahoma", sans-serif; font-size: 14px;
+  }
+  .pager button {
+    border: 1px solid #0d3b66; background: #fff; color: #0d3b66; border-radius: 999px;
+    padding: 5px 16px; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit;
+  }
+  .pager button:disabled { border-color: #c3ccd8; color: #9aa4b2; cursor: default; }
+  .pager button:not(:disabled):hover { filter: brightness(0.96); }
+  .pager select {
+    max-width: 340px; padding: 5px 8px; border: 1px solid #cfd9e6; border-radius: 8px;
+    font-family: inherit; font-size: 14px; background: #fff;
+  }
+  .pager .count { font-weight: 700; color: #0d3b66; white-space: nowrap; }
+  .pager .toggle { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; color: #0d3b66; font-weight: 700; }
+  .pager .hint { color: #5b6b7f; }
+
+  /* โหมดตรวจทีละรายการ: บนจอแสดงเฉพาะรายการปัจจุบัน (เวลาพิมพ์ยังได้ครบทุกรายการ) */
+  @media screen {
+    body.one-by-one .form { display: none; }
+    body.one-by-one .form.is-current { display: block; }
+  }
 
   .form-title { text-align: center; font-size: 28px; font-weight: 700; margin: 0 0 12px; }
   .info { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: 19px; margin-bottom: 6px; }
@@ -418,31 +463,42 @@ $genAt = date('d/m/Y H:i');
   @media print {
     .toolbar { display: none !important; }
     .editbar, .editpanel, .reviewbar { display: none !important; }
+    .pager { display: none !important; }
+    /* พิมพ์ออกมาต้องได้ครบทุกรายการต่อกันเสมอ แม้บนจอจะดูทีละรายการ */
+    .form { display: block !important; }
     .sheet { max-width: none; padding: 0; }
   }
 </style>
 </head>
 <body>
   <div class="toolbar">
-    <span>เอกสารพร้อมพิมพ์ — กล่องพิมพ์จะเปิดอัตโนมัติ หากไม่เปิด กดปุ่ม "พิมพ์ / บันทึก PDF" (แนะนำให้เครื่องมีฟอนต์ TH Sarabun PSK)</span>
+    <span><?php if ($formCount > 1): ?>ตรวจได้ทีละรายการจากแถบด้านล่าง — เมื่อกด "พิมพ์ / บันทึก PDF" จะได้ครบทุกรายการต่อกันทั้งหมด (แนะนำให้เครื่องมีฟอนต์ TH Sarabun PSK)<?php else: ?>เอกสารพร้อมพิมพ์ — กล่องพิมพ์จะเปิดอัตโนมัติ หากไม่เปิด กดปุ่ม "พิมพ์ / บันทึก PDF" (แนะนำให้เครื่องมีฟอนต์ TH Sarabun PSK)<?php endif; ?></span>
     <div>
       <button onclick="window.print()">🖨️ พิมพ์ / บันทึก PDF</button>
       <a href="essay_viewer.php">ปิด</a>
     </div>
   </div>
 
+  <?php if ($formCount > 1): ?>
+  <div class="pager" id="pager">
+    <button type="button" id="pagerPrev" onclick="gotoForm(CUR_FORM - 1)">◀ ก่อนหน้า</button>
+    <span class="count" id="pagerCount">1 / <?php echo $formCount; ?></span>
+    <button type="button" id="pagerNext" onclick="gotoForm(CUR_FORM + 1)">ถัดไป ▶</button>
+    <select id="pagerSelect" onchange="gotoForm(this.selectedIndex)" title="เลือกรายการที่ต้องการตรวจ">
+      <?php foreach ($navItems as $ni => $label): ?>
+        <option value="<?php echo $ni; ?>"><?php echo ($ni + 1) . '. ' . $h($label); ?></option>
+      <?php endforeach; ?>
+    </select>
+    <label class="toggle"><input type="checkbox" id="pagerShowAll" onchange="setShowAll(this.checked)"> แสดงทั้งหมดต่อกัน</label>
+    <span class="hint">ใช้ปุ่มลูกศร ← → เลื่อนรายการได้</span>
+  </div>
+  <?php endif; ?>
+
   <div class="sheet">
     <?php if (empty($rows)): ?>
       <div class="empty"><div style="font-size:40px">📭</div>ไม่พบเรียงความที่ตรงกับเงื่อนไข</div>
     <?php else: ?>
       <?php
-        // ป้ายรอบการประเมินแบบเต็ม (รวมร่าง D1/D2)
-        $phaseTextFull = [
-          'pretest'  => 'ก่อนเรียน (Pretest)',
-          'task1_d1' => 'ภาระงาน หน่วยที่ 1 · ร่างที่ 1 (D1)',
-          'task1_d2' => 'ภาระงาน หน่วยที่ 1 · ร่างที่ 2 (D2)',
-          'posttest' => 'หลังเรียน (Posttest)',
-        ];
         $editData = []; // ข้อมูลสำหรับให้ครูแก้ไข (ต่อเรียงความหนึ่งชิ้น)
         $fi = 0;
         foreach ($rows as $e):
@@ -516,27 +572,103 @@ $genAt = date('d/m/Y H:i');
 
     // สร้างเลขบรรทัดทุก 5 บรรทัด (5, 10, 15, ...) ที่ขอบซ้ายของเนื้อความ
     // คำนวณจำนวนบรรทัดจริงหลังจัดหน้าเสร็จ แล้ววางตัวเลขตามระยะบรรทัด (LH)
-    function addLineNumbers() {
+    // หมายเหตุ: กล่องที่ถูกซ่อนอยู่ (โหมดทีละรายการ) วัดความสูงไม่ได้ จึงค่อยคำนวณตอนแสดง/ตอนพิมพ์
+    function addLineNumbersFor(box) {
+      if (!box || box.getAttribute('data-numbered') === '1') return;
       var LH = 30; // ต้องตรงกับ line-height ของ .content ใน CSS
-      var boxes = document.querySelectorAll('.content');
-      for (var b = 0; b < boxes.length; b++) {
-        var box = boxes[b];
-        var lines = Math.round(box.clientHeight / LH);
-        for (var i = 5; i <= lines; i += 5) {
-          var s = document.createElement('span');
-          s.className = 'lnum';
-          s.textContent = i;
-          s.style.top = ((i - 1) * LH) + 'px';
-          box.appendChild(s);
-        }
+      var lines = Math.round(box.clientHeight / LH);
+      if (lines <= 0) return; // ยังไม่ถูกแสดงผล — ไว้คำนวณใหม่ตอนเปิดดู
+      for (var i = 5; i <= lines; i += 5) {
+        var s = document.createElement('span');
+        s.className = 'lnum';
+        s.textContent = i;
+        s.style.top = ((i - 1) * LH) + 'px';
+        box.appendChild(s);
       }
+      box.setAttribute('data-numbered', '1');
     }
+    function addLineNumbers() {
+      var boxes = document.querySelectorAll('.content');
+      for (var b = 0; b < boxes.length; b++) addLineNumbersFor(boxes[b]);
+    }
+
+    // ===== โหมดตรวจทีละรายการ =====
+    // บนจอ: แสดงเรียงความทีละชิ้น (เลื่อนด้วยปุ่ม/ลูกศร/ช่องเลือก)
+    // เวลาพิมพ์: คลายโหมดนี้ชั่วคราว เพื่อให้ได้ทุกรายการต่อกันครบเหมือนเดิม
+    var FORM_COUNT  = <?php echo (int)$formCount; ?>;
+    var CUR_FORM    = 0;
+    var ONE_BY_ONE  = false;
+    var STORE_KEY   = 'essayPrintShowAll';
+
+    function formEls() { return document.querySelectorAll('.sheet .form'); }
+
+    function gotoForm(i) {
+      if (FORM_COUNT <= 1) return;
+      if (i < 0) i = 0;
+      if (i > FORM_COUNT - 1) i = FORM_COUNT - 1;
+      CUR_FORM = i;
+      var forms = formEls();
+      for (var k = 0; k < forms.length; k++) {
+        if (k === i) forms[k].classList.add('is-current');
+        else forms[k].classList.remove('is-current');
+      }
+      var sel = document.getElementById('pagerSelect');
+      if (sel) sel.selectedIndex = i;
+      var cnt = document.getElementById('pagerCount');
+      if (cnt) cnt.textContent = (i + 1) + ' / ' + FORM_COUNT;
+      var prev = document.getElementById('pagerPrev');
+      var next = document.getElementById('pagerNext');
+      if (prev) prev.disabled = ONE_BY_ONE && (i === 0);
+      if (next) next.disabled = ONE_BY_ONE && (i === FORM_COUNT - 1);
+      if (forms[i]) addLineNumbersFor(forms[i].querySelector('.content'));
+      if (ONE_BY_ONE) window.scrollTo(0, 0);
+      else if (forms[i]) forms[i].scrollIntoView({ block: 'start' }); // โหมดทั้งหมดต่อกัน: เลื่อนไปหารายการนั้น
+    }
+
+    // สลับระหว่าง "ทีละรายการ" กับ "ทั้งหมดต่อกัน" (จำค่าไว้ในเครื่องผู้ใช้)
+    function setShowAll(showAll) {
+      ONE_BY_ONE = !showAll;
+      document.body.classList.toggle('one-by-one', ONE_BY_ONE);
+      var chk = document.getElementById('pagerShowAll');
+      if (chk) chk.checked = !!showAll;
+      try { localStorage.setItem(STORE_KEY, showAll ? '1' : '0'); } catch (err) {}
+      if (showAll) addLineNumbers();
+      gotoForm(CUR_FORM);
+    }
+
     // เอกสารนี้ไม่มีทรัพยากรภายนอก จึงพร้อมพิมพ์ได้ทันที
     // ครูที่เปิดเรียงความชิ้นเดียวเพื่อจัดการ (แก้ไข/ลบ) จะไม่เปิดกล่องพิมพ์อัตโนมัติ
-    var AUTO_PRINT = <?php echo (!($isTeacher && $isSingle)) ? 'true' : 'false'; ?>;
+    // เอกสารหลายรายการก็ไม่เปิดเอง เพราะเปิดไว้ให้ตรวจทีละรายการก่อน (กดปุ่มพิมพ์เมื่อพร้อม)
+    var AUTO_PRINT = <?php echo (!($isTeacher && $isSingle) && $formCount <= 1) ? 'true' : 'false'; ?>;
     window.addEventListener('load', function () {
-      addLineNumbers();
+      if (FORM_COUNT > 1) {
+        var showAll = false;
+        try { showAll = (localStorage.getItem(STORE_KEY) === '1'); } catch (err) {}
+        setShowAll(showAll);
+      } else {
+        addLineNumbers();
+      }
       if (AUTO_PRINT) setTimeout(function () { window.print(); }, 200);
+    });
+
+    // ก่อนพิมพ์: แสดงทุกรายการและใส่เลขบรรทัดให้ครบ แล้วค่อยกลับสู่โหมดเดิมหลังพิมพ์เสร็จ
+    window.addEventListener('beforeprint', function () {
+      if (!ONE_BY_ONE) return;
+      document.body.classList.remove('one-by-one');
+      addLineNumbers();
+    });
+    window.addEventListener('afterprint', function () {
+      if (ONE_BY_ONE) document.body.classList.add('one-by-one');
+    });
+
+    // ลูกศรซ้าย/ขวา (และ PageUp/PageDown) เลื่อนรายการ — ยกเว้นตอนพิมพ์ข้อความอยู่
+    document.addEventListener('keydown', function (ev) {
+      if (!ONE_BY_ONE || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+      var t = ev.target || {};
+      var tag = (t.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || t.isContentEditable) return;
+      if (ev.key === 'ArrowLeft' || ev.key === 'PageUp') { gotoForm(CUR_FORM - 1); ev.preventDefault(); }
+      else if (ev.key === 'ArrowRight' || ev.key === 'PageDown') { gotoForm(CUR_FORM + 1); ev.preventDefault(); }
     });
 
     // สร้างรายการย่อหน้าทั้งฉบับของเรียงความชิ้นที่ i (สำหรับหน้าต่างตรวจสอบการสะกดคำ)
