@@ -9,8 +9,14 @@
 -- =============================================================================
 
 -- 1) ภาระงานรุ่นเก่า (ร่างเดียว) → ร่างที่ 1 (D1)
+--    หมายเหตุ: UPDATE IGNORE จะ "ข้าม" แถวที่ชนกับแถว _d1 ที่มีอยู่แล้ว (unique student_id+essay_phase)
+--    แถวเหล่านั้นจะค้างเป็น 'task1'/'task2' ต่อไป ให้ตรวจด้วยคำสั่งท้ายไฟล์นี้
+--    (auto-migration ใน db_config.php จะจัดการให้อัตโนมัติ: ถ้าแถว _d1 ยังไม่มีเนื้อหาจะลบทิ้งแล้วย้ายของเดิมเข้าไปแทน)
 UPDATE IGNORE student_essays SET essay_phase = 'task1_d1' WHERE essay_phase = 'task1';
 UPDATE IGNORE student_essays SET essay_phase = 'task2_d1' WHERE essay_phase = 'task2';
+
+-- ตรวจว่ายังมีแถวรุ่นเก่าค้างอยู่หรือไม่ (ควรได้ 0 แถว)
+-- SELECT student_id, essay_phase FROM student_essays WHERE essay_phase IN ('task1','task2');
 
 -- 2) เพิ่มคอลัมน์แยกส่วนเนื้อหา
 --    intro_content = ส่วนนำ, body_content = ส่วนเนื้อหา (หลายย่อหน้าเก็บเป็น JSON array), conclusion_content = ส่วนสรุป

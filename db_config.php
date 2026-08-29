@@ -112,6 +112,21 @@ function essay_topic_phase($phase) {
     return $phase; // pretest / posttest
 }
 
+// รอบการประเมินทั้งหมดที่ระบบใช้จริง (ภาระงานแยกเป็นร่างที่ 1 / ร่างที่ 2)
+function essay_all_phases() {
+    return ['pretest', 'task1_d1', 'task1_d2', 'task2_d1', 'task2_d2', 'posttest'];
+}
+
+// รอบรุ่นเก่า (ภาระงานมีร่างเดียว: 'task1'/'task2') → ร่างที่ 1 ของหน่วยนั้น
+// ยังจำเป็นอยู่ เพราะข้อมูลเก่าบางแถวย้ายอัตโนมัติไม่สำเร็จ (ชนกับแถว _d1 ที่มีอยู่ก่อนแล้ว)
+// และแท็บเก่าที่ค้างไว้ก็ยังส่งค่ารุ่นเก่านี้เข้ามาได้
+function essay_normalize_phase($phase) {
+    $phase = trim((string)$phase);
+    if ($phase === 'task1') return 'task1_d1';
+    if ($phase === 'task2') return 'task2_d1';
+    return $phase;
+}
+
 // ประกอบเนื้อหาเรียงความจากคอลัมน์แยกส่วน (ส่วนนำ/เนื้อหา(หลายย่อหน้า)/สรุป) กลับเป็น JSON รูปแบบเดิม
 // เพื่อความเข้ากันได้กับส่วนแสดงผล/ค้นหา/ส่งออกที่ยังอ่าน essay_content แบบ JSON
 function essay_compose_content($intro, $bodyJson, $conclusion) {
@@ -588,12 +603,35 @@ try {
 // ภาระงานรุ่นเก่าถูกเก็บเป็น 'task1'/'task2' (มีร่างเดียว) จึงย้ายให้เป็น "ร่างที่ 1 (D1)" = task1_d1 / task2_d1
 // เพื่อให้เข้ากับคอลัมน์ D1/D2 ใหม่ในหน้า Essay Viewer และตัวเขียนเรียงความ
 // ใช้ SELECT ... LIMIT 1 ตรวจก่อน จึงเบามาก — เมื่อย้ายครบแล้วจะไม่ทำงานอีก
+// เดิมใช้ UPDATE IGNORE ทีเดียวทั้งตาราง ซึ่ง "เงียบ" เกินไป: แถวที่ชนกับแถว _d1 ที่มีอยู่แล้ว
+// (unique student_id+essay_phase) จะถูกข้ามไปโดยไม่มีใครรู้ แล้วค้างเป็น 'task1'/'task2' ตลอดไป
+// กลายเป็นเรียงความที่หน้า Essay Viewer มองไม่เห็น และครูกดบันทึกแก้ไขไม่ได้ (API ตอบว่า "รอบการประเมินไม่ถูกต้อง")
+// จึงเปลี่ยนมาไล่ทีละแถว: ถ้าช่องร่างที่ 1 ว่างอยู่ (ไม่มีแถว หรือมีแถวแต่ยังไม่มีเนื้อหา) ให้ย้ายเข้าไปเลย
 try {
-    $legacyEssay = $pdo->query("SELECT 1 FROM student_essays WHERE essay_phase IN ('task1','task2') LIMIT 1");
-    if ($legacyEssay && $legacyEssay->fetch()) {
-        // UPDATE IGNORE กันชนกับแถว _d1 ที่อาจมีอยู่แล้ว (unique student_id+essay_phase)
-        safe_ddl($pdo, "UPDATE IGNORE student_essays SET essay_phase = 'task1_d1' WHERE essay_phase = 'task1'");
-        safe_ddl($pdo, "UPDATE IGNORE student_essays SET essay_phase = 'task2_d1' WHERE essay_phase = 'task2'");
+    $legacyEssay = $pdo->query("SELECT id, student_id, essay_phase FROM student_essays WHERE essay_phase IN ('task1','task2')");
+    $legacyRows  = $legacyEssay ? $legacyEssay->fetchAll() : [];
+    if ($legacyRows) {
+        $findTarget = $pdo->prepare("SELECT id, intro_content, body_content, conclusion_content
+                                     FROM student_essays WHERE student_id = ? AND essay_phase = ?");
+        $renameRow  = $pdo->prepare("UPDATE student_essays SET essay_phase = ? WHERE id = ?");
+        $deleteRow  = $pdo->prepare("DELETE FROM student_essays WHERE id = ?");
+        foreach ($legacyRows as $lr) {
+            $target = essay_normalize_phase($lr['essay_phase']);   // task1 → task1_d1, task2 → task2_d1
+            $findTarget->execute([$lr['student_id'], $target]);
+            $existing = $findTarget->fetch();
+
+            // แถวร่างที่ 1 ที่มีอยู่แล้วแต่ยังไม่มีเนื้อหาใด ๆ = แถวเปล่า ลบทิ้งได้ ไม่มีข้อมูลนักเรียนสูญหาย
+            if ($existing && !essay_has_content($existing['intro_content'] ?? null, $existing['body_content'] ?? null, $existing['conclusion_content'] ?? null)) {
+                $deleteRow->execute([$existing['id']]);
+                $existing = false;
+            }
+
+            // ถ้าช่องร่างที่ 1 มีเรียงความจริงอยู่แล้ว ปล่อยแถวรุ่นเก่าไว้ตามเดิม (ห้ามเขียนทับงานนักเรียน)
+            // ครูยังเปิด/แก้ไข/ลบแถวนั้นได้จากหน้าเอกสาร เพราะ api.php ยอมรับรอบรุ่นเก่าที่มีแถวอยู่จริง
+            if (!$existing) {
+                $renameRow->execute([$target, $lr['id']]);
+            }
+        }
     }
 } catch (Exception $e) {
     // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ

@@ -1882,6 +1882,14 @@ try {
             $studentId    = $_SESSION['user']['id'];
             $essayPhase   = isset($request_data['essay_phase'])   ? trim($request_data['essay_phase'])   : 'task1_d1';
 
+            // รอบรุ่นเก่า ('task1'/'task2' จากแท็บที่เปิดค้างไว้) → ร่างที่ 1 และต้องเป็นรอบที่ระบบรู้จักเท่านั้น
+            // มิฉะนั้นจะเกิดแถวที่หน้าอื่น ๆ มองไม่เห็น (คอลัมน์ในรายงานอ้างอิงรอบมาตรฐาน 6 รอบนี้)
+            $essayPhase = essay_normalize_phase($essayPhase);
+            if (!in_array($essayPhase, essay_all_phases(), true)) {
+                echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
+                exit;
+            }
+
             // ครูต้อง "เปิดรับ" รอบนั้นก่อน นักเรียนจึงจะส่งได้ (กันการส่งผิดรอบ)
             // essay_phase เช่น task1_d2 จับคู่กับรอบหัวข้อ task1 เพื่อตรวจสถานะเปิด/ปิดรับ
             $openMap = essay_open_map($pdo);
@@ -2120,9 +2128,20 @@ try {
                 echo json_encode(['success' => false, 'error' => 'กรุณาระบุนักเรียน']);
                 exit;
             }
-            if (!in_array($aPhase, ['pretest', 'task1_d1', 'task1_d2', 'task2_d1', 'task2_d2', 'posttest'], true)) {
-                echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
-                exit;
+            // รอบมาตรฐาน 6 รอบ + รอบรุ่นเก่า ('task1'/'task2') เฉพาะกรณีที่ยังมีแถวนั้นอยู่จริง
+            // (ข้อมูลเก่าบางแถวย้ายเป็น _d1 ไม่ได้เพราะชนกับแถวที่มีอยู่แล้ว ครูต้องแก้ไขแถวนั้นได้ตามปกติ)
+            // ห้ามแปลง 'task1' เป็น 'task1_d1' ตรงนี้ เพราะจะกลายเป็นเขียนทับเรียงความคนละชิ้น
+            if (!in_array($aPhase, essay_all_phases(), true)) {
+                $aLegacyOk = false;
+                if (in_array($aPhase, ['task1', 'task2'], true)) {
+                    $aLegacyChk = $pdo->prepare('SELECT 1 FROM student_essays WHERE student_id = ? AND essay_phase = ?');
+                    $aLegacyChk->execute([$aStudentId, $aPhase]);
+                    $aLegacyOk = (bool)$aLegacyChk->fetch();
+                }
+                if (!$aLegacyOk) {
+                    echo json_encode(['success' => false, 'error' => 'รอบการประเมินไม่ถูกต้อง']);
+                    exit;
+                }
             }
             // ต้องมีนักเรียนคนนี้อยู่จริงในระบบก่อน จึงจะบันทึกเรียงความให้ได้
             $chk = $pdo->prepare('SELECT student_id FROM students WHERE student_id = ?');
@@ -2164,7 +2183,8 @@ try {
             }
             $dStudentId = isset($request_data['student_id'])  ? trim((string)$request_data['student_id'])  : '';
             $dPhase     = isset($request_data['essay_phase']) ? trim((string)$request_data['essay_phase']) : '';
-            if ($dStudentId === '' || !in_array($dPhase, ['pretest', 'task1_d1', 'task1_d2', 'task2_d1', 'task2_d2', 'posttest'], true)) {
+            // ลบด้วยคู่ (นักเรียน + รอบ) แบบตรงตัว จึงรับรอบรุ่นเก่าได้ด้วย ไม่ไปโดนแถวอื่น
+            if ($dStudentId === '' || !in_array($dPhase, array_merge(essay_all_phases(), ['task1', 'task2']), true)) {
                 echo json_encode(['success' => false, 'error' => 'ข้อมูลไม่ถูกต้อง']);
                 exit;
             }
