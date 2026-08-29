@@ -68,6 +68,7 @@ jobs:
             migration_essay_split.sql
             migration_reflection_units.sql
             migration_ai_feedback.sql
+            migration_chapter45.sql
             research_queries.sql
             test_db.php
             clean_temp.php
