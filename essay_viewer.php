@@ -207,6 +207,8 @@ require_once 'header.php';
               <option value="pretest">ก่อนเรียน (Pretest)</option>
               <option value="task1_d1">ภาระงาน หน่วยที่ 1 · ร่างที่ 1 (D1)</option>
               <option value="task1_d2">ภาระงาน หน่วยที่ 1 · ร่างที่ 2 (D2)</option>
+              <option value="task2_d1">ภาระงาน หน่วยที่ 2 · ร่างที่ 1 (D1)</option>
+              <option value="task2_d2">ภาระงาน หน่วยที่ 2 · ร่างที่ 2 (D2)</option>
               <option value="posttest">หลังเรียน (Posttest)</option>
             </select>
           </div>
@@ -635,6 +637,17 @@ require_once 'header.php';
     return allEssaysCache.find(e => (e.student_id || '').trim() === String(sid).trim() && e.essay_phase === phase) || null;
   }
 
+  // หา "เนื้อหาเต็ม" ของชิ้นงาน — แคชของตาราง (light=1) มีแต่สถานะการส่ง ไม่มี essay_content
+  // ถ้าดึงเนื้อหาจากแคชนั้นมาเติมฟอร์มแก้ไข ช่องข้อความจะว่างเปล่าทั้งที่นักเรียนส่งงานแล้ว
+  async function findFullEssayFor(sid, phase) {
+    try {
+      const full = await ensureFullEssays();
+      return full.find(e => (e.student_id || '').trim() === String(sid).trim() && e.essay_phase === phase) || null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   // เพิ่มช่องย่อหน้าเนื้อเรื่องหนึ่งช่อง
   function addBodyParagraph(text) {
     const list = document.getElementById('editBodyList');
@@ -694,7 +707,7 @@ require_once 'header.php';
     phaseSel.onchange = updateOverwriteWarn;
 
     // เติมเนื้อหาเดิมถ้าเป็นการแก้ไข
-    const parts = parseEssayParts(isEdit ? findEssayInCache(sid, phase) : null);
+    const parts = parseEssayParts(isEdit ? await findFullEssayFor(sid, phase) : null);
     document.getElementById('editIntro').value = parts.intro;
     document.getElementById('editConclusion').value = parts.conclusion;
     const list = document.getElementById('editBodyList');
