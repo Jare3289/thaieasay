@@ -265,6 +265,68 @@ function aiAttachDraftCompare(all) {
   return all;
 }
 
+// ป้ายบอกสถานะของแต่ละส่วนในเรียงความเมื่อเทียบกับฉบับตั้งต้น
+const AI_EDIT_STATUS = {
+  edited:  { label: 'แก้ไข',       icon: 'bi-pencil-fill',      cls: 'ai-edit-edited'  },
+  added:   { label: 'เพิ่มใหม่',    icon: 'bi-plus-circle-fill', cls: 'ai-edit-added'   },
+  removed: { label: 'ตัดออก',      icon: 'bi-dash-circle-fill', cls: 'ai-edit-removed' },
+  same:    { label: 'ไม่ได้แก้',    icon: 'bi-dash',             cls: 'ai-edit-same'    }
+};
+
+/**
+ * รายการ "สิ่งที่เปลี่ยนไปจากฉบับตั้งต้น" ทีละส่วนของเรียงความ
+ * มาจากการเทียบข้อความที่ระบบทำเอง จึงบอกได้แน่นอนว่าส่วนไหนถูกแก้ ส่วนไหนไม่ได้แตะเลย
+ */
+function aiEditListHTML(d) {
+  const edits = d.edits || [];
+  if (!edits.length) return '';
+
+  const sum = d.edit_summary || {};
+  const head = (sum.touched === 0)
+    ? '<span class="text-danger-emphasis fw-semibold">ไม่มีส่วนไหนถูกแก้เลย — ทุกส่วนเหมือนฉบับตั้งต้นทุกตัวอักษร</span>'
+    : `แก้ไข ${sum.edited || 0} ส่วน · เพิ่มใหม่ ${sum.added || 0} ส่วน · ตัดออก ${sum.removed || 0} ส่วน `
+      + `<span class="text-muted">· ไม่ได้แก้ ${sum.same || 0} ส่วน</span>`;
+
+  const rows = edits.map(e => {
+    const st = AI_EDIT_STATUS[e.status] || AI_EDIT_STATUS.same;
+    const words = (e.status === 'edited')
+      ? `<span class="text-muted small text-nowrap">${e.base_words} → ${e.words} คำ</span>`
+      : (e.status === 'added'   ? `<span class="text-muted small text-nowrap">${e.words} คำ</span>`
+      : (e.status === 'removed' ? `<span class="text-muted small text-nowrap">เดิม ${e.base_words} คำ</span>` : ''));
+
+    const quote = (list, tag, cls) => (list && list.length)
+      ? `<div class="ai-edit-quote ${cls}">
+           <span class="ai-draft-tag ${cls === 'ai-edit-in' ? 'ai-draft-tag-after' : 'ai-draft-tag-before'}">${tag}</span>
+           ${list.map(t => aiEsc(t)).join(' <span class="text-muted">/</span> ')}
+         </div>`
+      : '';
+
+    return `<div class="ai-edit-row ${st.cls}">
+      <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
+        <span class="fw-semibold small">
+          <i class="bi ${st.icon} me-1"></i>${aiEsc(e.label)}
+          <span class="badge ai-edit-badge ms-1">${st.label}</span>
+        </span>
+        ${words}
+      </div>
+      ${quote(e.added, 'เพิ่มเข้ามา', 'ai-edit-in')}
+      ${quote(e.removed, 'ถูกตัดออก', 'ai-edit-out')}
+    </div>`;
+  }).join('');
+
+  return `<div class="ai-edit-box mt-3">
+    <div class="fw-bold text-dark mb-1">
+      <i class="bi bi-pencil-square text-primary me-2"></i>สิ่งที่เปลี่ยนไปจาก ${aiEsc(d.short)}
+    </div>
+    <div class="small mb-2">${head}</div>
+    ${rows}
+    <div class="text-muted mt-2" style="font-size:0.75rem;">
+      <i class="bi bi-info-circle me-1"></i>ส่วนนี้ระบบเทียบข้อความของสองฉบับเอง ไม่ได้ถาม AI
+      จึงยืนยันได้ว่าส่วนที่ขึ้นว่า &quot;ไม่ได้แก้&quot; คือเหมือนเดิมทุกตัวอักษรจริง
+    </div>
+  </div>`;
+}
+
 /**
  * กล่อง "ฉบับนี้ต่างจากฉบับตั้งต้นอย่างไร"
  * เทียบ "คนละฉบับ" ตามคู่ที่ครูกำหนด เพื่อตอบคำถามเดียวว่า "คะแนนดีขึ้นจริงไหม และต่างกันตรงไหน"
@@ -351,10 +413,19 @@ function aiDraftCompareHTML(fb, opts) {
              ${c.after  ? `<div class="mt-1"><span class="ai-draft-tag ai-draft-tag-after">ฉบับนี้</span>${aiEsc(c.after)}</div>` : ''}
            </div>`
         : '';
+      // AI อธิบายว่าข้อนี้ถูกแก้อะไรไปบ้างและแก้อย่างไร — ข้อที่ไม่มีอะไรเปลี่ยนก็บอกให้รู้
+      const changeLine = c.change
+        ? `<div class="ai-draft-change mt-1">
+             <i class="bi ${c.changed === false ? 'bi-dash-circle' : 'bi-pencil-fill'} me-1"></i>
+             <span class="fw-semibold">${c.changed === false ? 'ยังไม่ได้แก้:' : 'แก้อะไรไป:'}</span>
+             ${aiEsc(c.change)}
+           </div>`
+        : '';
       return `<tr class="${rowCls}">
         <td class="text-nowrap fw-semibold align-top">${aiEsc(c.id)}</td>
         <td class="align-top">
           <span class="fw-semibold">${aiEsc(c.name || '')}</span> ${aiVerdictBadge(c.verdict)}
+          ${changeLine}
           ${words}
           ${c.note ? `<div class="ai-draft-note mt-1"><i class="bi bi-lightbulb me-1"></i>${aiEsc(c.note)}</div>` : ''}
         </td>
@@ -367,7 +438,7 @@ function aiDraftCompareHTML(fb, opts) {
     table = `<div class="table-responsive mt-2">
       <table class="table table-sm table-bordered align-middle mb-0 bg-white">
         <thead class="table-light">
-          <tr><th style="width:58px;">ข้อ</th><th>เกณฑ์ · ต่างกันตรงไหน</th>
+          <tr><th style="width:58px;">ข้อ</th><th>เกณฑ์ · แก้อะไรไป และต่างกันตรงไหน</th>
               <th class="text-center" style="width:90px;">${aiEsc(d.short)}</th>
               <th class="text-center" style="width:110px;">ฉบับนี้</th>
               <th class="text-center" style="width:105px;">เปลี่ยนแปลง</th></tr>
@@ -390,6 +461,7 @@ function aiDraftCompareHTML(fb, opts) {
     ${flags.join('')}
     <div class="d-flex flex-wrap gap-2 mt-2">${chips}</div>
     ${d.comment ? `<div class="ai-progress-comment mt-2">${aiEsc(d.comment)}</div>` : ''}
+    ${opts.compact ? '' : aiEditListHTML(d)}
     ${table}
     <div class="text-muted mt-2" style="font-size:0.75rem;">
       <i class="bi bi-info-circle me-1"></i>ส่วนต่างคำนวณจากคะแนนที่ AI ให้จริงทั้งสองฉบับ

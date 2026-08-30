@@ -2514,7 +2514,8 @@ try {
                             'max_score'     => $rowB['max_score'],
                             'quality_level' => $rowB['quality_level'],
                         ], (string)($rowB['updated_at'] ?? ''), (int)($rowB['word_count'] ?? 0),
-                           (string)($rowB['essay_hash'] ?? ai_essay_hash($bIntro, $bBody, $bConcl)));
+                           (string)($rowB['essay_hash'] ?? ai_essay_hash($bIntro, $bBody, $bConcl)),
+                           ai_essay_parts($bIntro, $bBody, $bConcl));
                         $aiBaseSnap['text'] = $aiBaseText;
                     }
                 } catch (Exception $e) {
@@ -2550,13 +2551,21 @@ try {
             // เทียบกับฉบับตั้งต้นตามคู่ที่ครูกำหนด — คิดจากคะแนนที่เก็บไว้จริง ไม่ได้เชื่อคำบรรยายของ AI อย่างเดียว
             $aiEssayHash = ai_essay_hash($aiIntro, $aiBody, $aiConcl);
             $aiBaseStore = $aiBaseSnap;
-            unset($aiBaseStore['text']);   // ตัวเรียงความอ่านจาก student_essays ได้อยู่แล้ว ไม่ต้องเก็บซ้ำ
+            // ตัวเรียงความอ่านจาก student_essays ได้อยู่แล้ว ไม่ต้องเก็บซ้ำลงฐานข้อมูล
+            unset($aiBaseStore['text'], $aiBaseStore['parts']);
+            // ส่วนของเรียงความที่ถูกแก้จริงเมื่อเทียบกับฉบับตั้งต้น — ระบบเทียบข้อความเอง เชื่อถือได้กว่าคำบรรยายของ AI
+            $aiEdits = (!empty($aiBaseSnap['parts']) && is_array($aiBaseSnap['parts']))
+                ? ai_diff_essay_parts($aiBaseSnap['parts'], ai_essay_parts($aiIntro, $aiBody, $aiConcl))
+                : [];
             $aiDraftCompare = ai_draft_progress(
                 array_merge($aiData, ['essay_phase' => $aiPhase]),
-                $aiBaseStore, $aiEssayHash, $aiWords
+                $aiBaseStore, $aiEssayHash, $aiWords, $aiEdits
             );
             $aiBaseJson   = $aiBaseStore ? json_encode($aiBaseStore, $jsonOpt) : null;
-            $aiChangeJson = json_encode($aiData['draft_changes'] ?? [], $jsonOpt);
+            $aiChangeJson = json_encode([
+                'criteria' => $aiData['draft_changes'] ?? [],
+                'edits'    => $aiEdits,
+            ], $jsonOpt);
 
             // ฐานข้อมูลเก่าที่ยังไม่มีคอลัมน์เทียบรอบ ให้บันทึกแบบเดิมไปก่อน (auto-migration จะเติมให้ในรอบถัดไป)
             $aiRoundCols = ai_feedback_has_round_columns($pdo);

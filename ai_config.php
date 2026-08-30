@@ -30,6 +30,10 @@ if (!defined('AI_FEEDBACK_LOADED')) {
     define('AI_MAX_CHARS', 12000);
 }
 
+// ตัวนับคำภาษาไทย (ใช้ตอนเทียบว่าฉบับใหม่ยาวขึ้น/สั้นลงจากฉบับตั้งต้นเท่าไร)
+// ไฟล์นี้ไม่พึ่งฐานข้อมูล จึงโหลดได้ทุกที่ที่เรียก ai_config.php
+require_once __DIR__ . '/thai_text_utils.php';
+
 /**
  * รายชื่อผู้ให้บริการ AI ที่รองรับ พร้อมค่าเริ่มต้นที่ "มีโควตาให้ใช้ฟรี"
  * - gemini    : Google AI Studio — มีชั้นใช้งานฟรี เหมาะกับโรงเรียนมากที่สุด
@@ -481,7 +485,16 @@ function ai_build_prompt($topic, $phase, $intro, array $bodyArr, $conclusion, $w
     $baseBlock  = '';
     $hasBase    = !empty($baseline) && trim((string)($baseline['text'] ?? '')) !== '';
     $baseLabel  = $hasBase ? ai_phase_label((string)($baseline['phase'] ?? '')) : '';
+    $editLines  = [];
     if ($hasBase) {
+        // ระบบเทียบข้อความทีละส่วนเองก่อน แล้วบอก AI ไปเลยว่าส่วนไหนถูกแก้ ส่วนไหนไม่ได้แตะ
+        // กันไม่ให้ AI เดาว่านักเรียน "แก้แล้ว" ทั้งที่ข้อความยังเหมือนเดิมทุกตัวอักษร
+        if (!empty($baseline['parts']) && is_array($baseline['parts'])) {
+            $editLines = ai_edit_lines(ai_diff_essay_parts(
+                $baseline['parts'],
+                ai_essay_parts($intro, $bodyArr, $conclusion)
+            ));
+        }
         $baseScoreLine = [];
         $baseScores = is_array($baseline['scores'] ?? null) ? $baseline['scores'] : [];
         foreach (ai_rubric() as $it) {
@@ -515,16 +528,26 @@ function ai_build_prompt($topic, $phase, $intro, array $bodyArr, $conclusion, $w
                         ? ' (ระดับ ' . $baseline['quality_level'] . ')' : '')
                 : ''),
             ($baseImpLine ? "จุดที่เคยแจ้งให้แก้ในฉบับตั้งต้น:\n" . implode("\n", $baseImpLine) : ''),
+            ($editLines
+                ? "\n--- ระบบเทียบข้อความของสองฉบับให้แล้ว (ข้อมูลนี้ถูกต้องเสมอ ให้ยึดตามนี้) ---\n"
+                  . implode("\n", $editLines)
+                : ''),
             '',
             'สิ่งที่ต้องทำเพิ่มในการตรวจครั้งนี้ (บังคับ):',
             '1. ให้คะแนนฉบับใหม่ตามเกณฑ์อย่างตรงไปตรงมาก่อน โดยตัดสินจากตัวงานเอง',
             '   ห้ามลอกคะแนนของฉบับตั้งต้นมาใส่ และห้ามบวกคะแนนให้เพราะเห็นว่านักเรียนตั้งใจแก้',
             '2. เทียบรายข้อว่าฉบับใหม่ต่างจากฉบับตั้งต้นตรงไหน โดยยก "ข้อความจริง" ของทั้งสองฉบับมาวางคู่กันให้เห็น',
             '   (before = ข้อความ/ลักษณะเดิมในฉบับตั้งต้น, after = ข้อความ/ลักษณะใหม่ในฉบับนี้)',
-            '3. ข้อใดที่คะแนนเท่าเดิม ต้องบอกให้ชัดว่าเป็นเพราะข้อความส่วนนั้นยังไม่ถูกแก้',
+            '3. ทุกข้อต้องเขียน change ว่า "นักเรียนแก้อะไรในข้อนี้ และแก้อย่างไร" ให้เป็นรูปธรรม',
+            '   เช่น ตัดย่อหน้าที่ 3 ที่พูดถึงเรื่องอื่นออก / เพิ่มตัวอย่างสองเรื่องในย่อหน้าที่ 2 /',
+            '   เปลี่ยนคำเชื่อม "แล้วก็" เป็น "นอกจากนี้" — ต้องระบุว่าอยู่ส่วนไหนของเรียงความด้วย',
+            '   และต้องบอกต่อว่าการแก้นั้นทำให้ข้อนี้ดีขึ้น/แย่ลง/ไม่ต่างอย่างไร',
+            '   ถ้าข้อไหนไม่มีอะไรเปลี่ยนเลย ให้ใส่ changed = "no" และเขียน change ว่าส่วนที่เกี่ยวข้องยังไม่ถูกแก้',
+            '4. ข้อใดที่คะแนนเท่าเดิม ต้องบอกให้ชัดว่าเป็นเพราะข้อความส่วนนั้นยังไม่ถูกแก้',
             '   หรือแก้แล้วแต่ยังไม่ถึงระดับถัดไป และต้องระบุว่าต้องทำอะไรจึงจะขยับขึ้นได้',
-            '4. ห้ามสรุปว่า "ดีขึ้น" ลอย ๆ โดยไม่มีข้อความจากฉบับใหม่มายืนยัน',
-            '5. ถ้าฉบับใหม่แทบไม่ต่างจากฉบับตั้งต้น ให้พูดตรง ๆ ว่าไม่ต่าง และคะแนนต้องสะท้อนความจริงข้อนั้น',
+            '5. ห้ามสรุปว่า "ดีขึ้น" ลอย ๆ โดยไม่มีข้อความจากฉบับใหม่มายืนยัน',
+            '6. ถ้าฉบับใหม่แทบไม่ต่างจากฉบับตั้งต้น ให้พูดตรง ๆ ว่าไม่ต่าง และคะแนนต้องสะท้อนความจริงข้อนั้น',
+            '7. ห้ามบอกว่านักเรียนแก้ส่วนที่ระบบระบุไว้ข้างบนว่า "เหมือนฉบับตั้งต้นทุกตัวอักษร" เด็ดขาด',
         ], function ($v) { return $v !== ''; }));
     }
 
@@ -571,7 +594,10 @@ function ai_build_prompt($topic, $phase, $intro, array $bodyArr, $conclusion, $w
         ($hasBase ? '  "draft_comment": "สรุป 3-5 ประโยคว่าฉบับนี้ต่างจาก ' . $baseLabel
             . ' อย่างไร ดีขึ้นตรงไหน ยังเหมือนเดิมตรงไหน โดยอ้างข้อความจริงของทั้งสองฉบับ",' : null),
         ($hasBase ? '  "draft_changes": [' : null),
-        ($hasBase ? '    { "criterion": "1.1", "before": "ข้อความ/ลักษณะเดิมในฉบับตั้งต้น",'
+        ($hasBase ? '    { "criterion": "1.1", "changed": "yes หรือ no",' : null),
+        ($hasBase ? '      "change": "นักเรียนแก้อะไรในข้อนี้ แก้อย่างไร อยู่ส่วนไหนของเรียงความ'
+            . ' และการแก้นั้นทำให้ข้อนี้เปลี่ยนไปอย่างไร",' : null),
+        ($hasBase ? '      "before": "ข้อความ/ลักษณะเดิมในฉบับตั้งต้น",'
             . ' "after": "ข้อความ/ลักษณะใหม่ในฉบับนี้", "verdict": "ดีขึ้น หรือ เท่าเดิม หรือ แย่ลง",'
             . ' "note": "ถ้าเท่าเดิมให้บอกว่าต้องแก้อะไรจึงจะขยับขึ้น" }' : null),
         ($hasBase ? '  ]' : null),
@@ -581,7 +607,8 @@ function ai_build_prompt($topic, $phase, $intro, array $bodyArr, $conclusion, $w
         'next_steps ให้ 2-4 ข้อ, ต้องให้คะแนนครบทั้ง 10 ข้อ และ score_reasons ต้องมีครบทุกข้อเช่นกัน',
         ($hasBase
             ? 'สำคัญ: ต้องมี draft_comment เสมอ และ draft_changes ต้องมีครบทุกข้อที่ให้คะแนน (10 ข้อ) '
-              . 'โดยเรียงตามรหัสข้อ — ข้อที่ไม่เปลี่ยนก็ต้องมี พร้อมระบุ verdict ว่า "เท่าเดิม" และบอกวิธีทำให้ขยับขึ้นใน note'
+              . 'โดยเรียงตามรหัสข้อ — ข้อที่ไม่เปลี่ยนก็ต้องมี พร้อมระบุ changed = "no", verdict = "เท่าเดิม" '
+              . 'และบอกวิธีทำให้ขยับขึ้นใน note ส่วนข้อที่เปลี่ยน ต้องเขียน change ให้เห็นภาพว่าแก้ตรงไหน แก้อย่างไร'
             : null),
     ], function ($v) { return $v !== null; }));
 }
@@ -886,14 +913,21 @@ function ai_parse_feedback($rawText) {
     if (isset($obj['draft_changes']) && is_array($obj['draft_changes'])) {
         foreach ($obj['draft_changes'] as $v) {
             if (!is_array($v)) continue;
+            $changedRaw = mb_strtolower(trim((string)($v['changed'] ?? '')), 'UTF-8');
             $item = [
                 'criterion' => ai_clean_text($v['criterion'] ?? '', 20),
+                // AI บอกว่าข้อนี้มีอะไรเปลี่ยนไหม และเปลี่ยนอะไรไปอย่างไร
+                'changed'   => ($changedRaw === '' ? null
+                                 : !in_array($changedRaw, ['no', 'false', 'ไม่', 'ไม่เปลี่ยน', 'ไม่ได้แก้'], true)),
+                'change'    => ai_clean_text($v['change'] ?? '', 800),
                 'before'    => ai_clean_text($v['before'] ?? '', 600),
                 'after'     => ai_clean_text($v['after'] ?? '', 600),
                 'verdict'   => ai_verdict_code($v['verdict'] ?? ''),
                 'note'      => ai_clean_text($v['note'] ?? '', 400),
             ];
-            if ($item['before'] !== '' || $item['after'] !== '' || $item['note'] !== '') $draftChanges[] = $item;
+            if ($item['change'] !== '' || $item['before'] !== '' || $item['after'] !== '' || $item['note'] !== '') {
+                $draftChanges[] = $item;
+            }
         }
     }
 
@@ -992,7 +1026,7 @@ function ai_feedback_has_baseline_columns(PDO $pdo) {
  * เก็บคะแนนรายข้อ จุดที่เคยแจ้งให้แก้ และลายนิ้วมือของข้อความ (ไว้ดูว่านักเรียนเขียนใหม่จริงหรือลอกฉบับเดิมมา)
  * ไม่เก็บตัวเรียงความทั้งก้อน เพราะอ่านจากตาราง student_essays ได้อยู่แล้ว
  */
-function ai_baseline_snapshot($phase, array $data, $reviewedAt, $wordCount = 0, $textHash = '') {
+function ai_baseline_snapshot($phase, array $data, $reviewedAt, $wordCount = 0, $textHash = '', array $parts = []) {
     $scores = [];
     $rawScores = (isset($data['scores']) && is_array($data['scores'])) ? $data['scores'] : [];
     foreach ($rawScores as $id => $sc) {
@@ -1021,6 +1055,8 @@ function ai_baseline_snapshot($phase, array $data, $reviewedAt, $wordCount = 0, 
         'reviewed_at'   => (string)$reviewedAt,
         'word_count'    => (int)$wordCount,
         'text_hash'     => (string)$textHash,
+        // ข้อความรายส่วนของฉบับตั้งต้น (คำนำ/ย่อหน้า/สรุป) ไว้เทียบว่าฉบับใหม่แก้ตรงไหนไปบ้าง
+        'parts'         => $parts,
         'scores'        => $scores,
         'improvements'  => $imps,
         'total_score'   => (float)($data['total_score'] ?? 0),
@@ -1039,7 +1075,7 @@ function ai_baseline_snapshot($phase, array $data, $reviewedAt, $wordCount = 0, 
  *   identical  = คะแนนรวมและคะแนนรายข้อเท่ากันหมด (น่าสงสัยว่า AI ไม่ได้เทียบจริง หรือนักเรียนไม่ได้แก้)
  *   same_text  = ข้อความทั้งฉบับเหมือนฉบับตั้งต้นทุกตัวอักษร (นักเรียนคัดลอกมา ยังไม่ได้เขียนใหม่)
  */
-function ai_draft_progress(array $curr, $baseline, $currentHash = '', $currentWords = 0) {
+function ai_draft_progress(array $curr, $baseline, $currentHash = '', $currentWords = 0, array $edits = []) {
     $phase   = (string)($curr['essay_phase'] ?? '');
     $basePh  = ai_baseline_phase($phase);
     $comment = (string)($curr['draft_comment'] ?? '');
@@ -1092,6 +1128,9 @@ function ai_draft_progress(array $curr, $baseline, $currentHash = '', $currentWo
             'after'         => (string)($ch['after'] ?? ''),
             'verdict'       => (string)($ch['verdict'] ?? ''),
             'note'          => (string)($ch['note'] ?? ''),
+            // AI อธิบายว่าข้อนี้ถูกแก้อะไรไปบ้าง และแก้อย่างไร
+            'change'        => (string)($ch['change'] ?? ''),
+            'changed'       => array_key_exists('changed', $ch) ? $ch['changed'] : null,
         ];
     }
 
@@ -1129,7 +1168,152 @@ function ai_draft_progress(array $curr, $baseline, $currentHash = '', $currentWo
         'criteria'        => $criteria,
         'comment'         => $comment,
         'changes'         => $changes,
+        // ส่วนของเรียงความที่ถูกแก้จริง — ระบบเทียบข้อความเอง ไม่ได้ถาม AI
+        'edits'           => array_values($edits),
+        'edit_summary'    => ai_edit_summary($edits),
     ];
+}
+
+/* ============================================================
+   เทียบ "ตัวข้อความ" ของสองฉบับให้เห็นว่าแก้อะไรไปบ้าง
+   ระบบทำเองแบบตรงไปตรงมา (ไม่ต้องพึ่ง AI) จึงเชื่อถือได้ว่าส่วนไหน "ไม่ได้แตะเลย" จริง ๆ
+   ผลที่ได้ใช้ 2 ทาง: แนบไปในคำสั่งให้ AI อธิบายได้ตรงจุด และแสดงให้ครู/นักเรียนเห็นในผลตรวจ
+   ============================================================ */
+
+/** แยกเรียงความเป็นส่วน ๆ ตามโครงที่ครูกำหนด (คำนำ · เนื้อเรื่องทีละย่อหน้า · สรุป) */
+function ai_essay_parts($intro, array $bodyArr, $conclusion) {
+    $parts = [['key' => 'intro', 'label' => 'คำนำ', 'text' => trim((string)$intro)]];
+    foreach ($bodyArr as $i => $p) {
+        $parts[] = [
+            'key'   => 'body' . ($i + 1),
+            'label' => 'เนื้อเรื่อง ย่อหน้าที่ ' . ($i + 1),
+            'text'  => trim((string)$p),
+        ];
+    }
+    $parts[] = ['key' => 'concl', 'label' => 'สรุป', 'text' => trim((string)$conclusion)];
+    return $parts;
+}
+
+/**
+ * ซอยข้อความเป็น "วรรค" ตามการเว้นวรรค
+ * ภาษาไทยไม่เว้นวรรคระหว่างคำ แต่เว้นวรรคเพื่อจบความ วรรคจึงเป็นหน่วยที่ใกล้เคียงประโยคที่สุด
+ * และเป็นหน่วยที่ยกมาให้ครูอ่านแล้วเข้าใจได้ทันทีว่าข้อความไหนเพิ่มเข้ามาหรือถูกตัดออก
+ */
+function ai_text_chunks($text) {
+    $t = trim(preg_replace('/\s+/u', ' ', (string)$text));
+    if ($t === '') return [];
+    $out = [];
+    foreach (explode(' ', $t) as $c) {
+        $c = trim($c);
+        if ($c !== '') $out[] = $c;
+    }
+    return $out;
+}
+
+/** นับความยาวของข้อความเป็นคำ (ใช้ตัวตัดคำภาษาไทยของระบบ ไม่ใช่การนับช่องว่าง) */
+function ai_count_words($text) {
+    if (function_exists('count_thai_words')) return (int)count_thai_words((string)$text);
+    return count(ai_text_chunks($text));   // เผื่อกรณีโหลด thai_text_utils.php ไม่สำเร็จ
+}
+
+/**
+ * เทียบเรียงความสองฉบับทีละส่วน แล้วบอกว่าแต่ละส่วน "เหมือนเดิม / แก้ไข / เพิ่มใหม่ / ถูกตัดออก"
+ * ส่วนที่แก้ไขจะบอกด้วยว่ามีข้อความใดเพิ่มเข้ามาและข้อความใดหายไป
+ * คืนค่า: [['key','label','status','base_words','words','added'=>[],'removed'=>[]], ...]
+ */
+function ai_diff_essay_parts(array $baseParts, array $currParts) {
+    $index = function (array $parts) {
+        $m = [];
+        foreach ($parts as $p) $m[$p['key']] = $p;
+        return $m;
+    };
+    $baseMap = $index($baseParts);
+    $currMap = $index($currParts);
+
+    // เรียงตามลำดับของฉบับใหม่ก่อน แล้วต่อท้ายด้วยส่วนที่มีเฉพาะในฉบับตั้งต้น (= ถูกตัดออก)
+    $order = [];
+    foreach ($currParts as $p) $order[] = $p['key'];
+    foreach ($baseParts as $p) if (!in_array($p['key'], $order, true)) $order[] = $p['key'];
+
+    $trim = function (array $list) {
+        $out = [];
+        foreach (array_slice($list, 0, 6) as $c) $out[] = ai_clean_text($c, 160);
+        return $out;
+    };
+
+    $edits = [];
+    foreach ($order as $key) {
+        $b = isset($baseMap[$key]) ? (string)$baseMap[$key]['text'] : null;
+        $c = isset($currMap[$key]) ? (string)$currMap[$key]['text'] : null;
+        $label = isset($currMap[$key]) ? $currMap[$key]['label'] : $baseMap[$key]['label'];
+
+        // ส่วนที่ว่างทั้งสองฝั่ง ไม่ต้องรายงาน (เช่นย่อหน้าที่นักเรียนไม่ได้เขียนทั้งสองฉบับ)
+        if (($b === null || $b === '') && ($c === null || $c === '')) continue;
+
+        if ($b === null || $b === '') {
+            $edits[] = ['key' => $key, 'label' => $label, 'status' => 'added',
+                        'base_words' => 0, 'words' => ai_count_words($c),
+                        'added' => $trim(ai_text_chunks($c)), 'removed' => []];
+            continue;
+        }
+        if ($c === null || $c === '') {
+            $edits[] = ['key' => $key, 'label' => $label, 'status' => 'removed',
+                        'base_words' => ai_count_words($b), 'words' => 0,
+                        'added' => [], 'removed' => $trim(ai_text_chunks($b))];
+            continue;
+        }
+        if ($b === $c) {
+            $edits[] = ['key' => $key, 'label' => $label, 'status' => 'same',
+                        'base_words' => ai_count_words($b), 'words' => ai_count_words($c),
+                        'added' => [], 'removed' => []];
+            continue;
+        }
+
+        $bc = ai_text_chunks($b);
+        $cc = ai_text_chunks($c);
+        $edits[] = [
+            'key' => $key, 'label' => $label, 'status' => 'edited',
+            'base_words' => ai_count_words($b), 'words' => ai_count_words($c),
+            'added'   => $trim(array_values(array_diff($cc, $bc))),
+            'removed' => $trim(array_values(array_diff($bc, $cc))),
+        ];
+    }
+    return $edits;
+}
+
+/** นับว่าฉบับนี้แก้ไปกี่ส่วน เพิ่มกี่ส่วน ตัดออกกี่ส่วน และไม่ได้แตะกี่ส่วน */
+function ai_edit_summary(array $edits) {
+    $sum = ['edited' => 0, 'added' => 0, 'removed' => 0, 'same' => 0, 'total' => count($edits)];
+    foreach ($edits as $e) {
+        $st = (string)($e['status'] ?? '');
+        if (isset($sum[$st])) $sum[$st]++;
+    }
+    $sum['touched'] = $sum['edited'] + $sum['added'] + $sum['removed'];
+    return $sum;
+}
+
+/** สรุปผลเทียบข้อความเป็นบรรทัดภาษาไทย สำหรับแนบไปในคำสั่งที่ส่งให้ AI */
+function ai_edit_lines(array $edits) {
+    $lines = [];
+    foreach ($edits as $e) {
+        if ($e['status'] === 'same') {
+            $lines[] = '- ' . $e['label'] . ': เหมือนฉบับตั้งต้นทุกตัวอักษร (ไม่ได้แก้เลย)';
+            continue;
+        }
+        if ($e['status'] === 'added') {
+            $lines[] = '- ' . $e['label'] . ': เพิ่มเข้ามาใหม่ในฉบับนี้ (' . (int)$e['words'] . ' คำ)';
+            continue;
+        }
+        if ($e['status'] === 'removed') {
+            $lines[] = '- ' . $e['label'] . ': มีในฉบับตั้งต้นแต่ถูกตัดออกจากฉบับนี้ (เดิม ' . (int)$e['base_words'] . ' คำ)';
+            continue;
+        }
+        $l = '- ' . $e['label'] . ': แก้ไข (จาก ' . (int)$e['base_words'] . ' คำ เป็น ' . (int)$e['words'] . ' คำ)';
+        if ($e['added'])   $l .= "\n    ข้อความที่เพิ่มเข้ามา: " . implode(' / ', $e['added']);
+        if ($e['removed']) $l .= "\n    ข้อความที่ถูกตัดออก: " . implode(' / ', $e['removed']);
+        $lines[] = $l;
+    }
+    return $lines;
 }
 
 /**
@@ -1239,12 +1423,17 @@ function ai_feedback_row_to_array(array $row, ?array $evalManual = null) {
     ];
 
     // เทียบกับ "ฉบับตั้งต้น" คนละฉบับ (ร่างที่ 1 ของหน่วยเดียวกัน หรือฉบับก่อนเรียน)
-    $out['draft_changes'] = $decode($row['draft_changes'] ?? '');
+    // คอลัมน์ draft_changes เก็บเป็น {criteria, edits} — ข้อมูลเก่าที่เก็บเป็นอาเรย์ล้วนก็ยังอ่านได้
+    $dcRaw  = $decode($row['draft_changes'] ?? '');
+    $dcCrit = (isset($dcRaw['criteria']) && is_array($dcRaw['criteria'])) ? $dcRaw['criteria'] : $dcRaw;
+    $dcEdit = (isset($dcRaw['edits']) && is_array($dcRaw['edits'])) ? $dcRaw['edits'] : [];
+    $out['draft_changes'] = $dcCrit;
     $out['draft_compare'] = ai_draft_progress(
         $out,
         $decode($row['baseline_snapshot'] ?? ''),
         (string)($row['essay_hash'] ?? ''),
-        (int)($row['word_count'] ?? 0)
+        (int)($row['word_count'] ?? 0),
+        $dcEdit
     );
 
     $tScores = $decode($row['teacher_scores'] ?? '');

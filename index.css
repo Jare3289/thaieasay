@@ -679,6 +679,35 @@ body {
   background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px;
   padding: 6px 10px; font-size: 0.82rem; color: #92400e;
 }
+/* บรรทัด "แก้อะไรไป" ในตารางเทียบรายเกณฑ์ */
+.ai-draft-change {
+  background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 8px;
+  padding: 6px 10px; font-size: 0.82rem; color: #4c1d95; line-height: 1.7;
+}
+/* รายการ "สิ่งที่เปลี่ยนไปจากฉบับตั้งต้น" — ระบบเทียบข้อความเอง */
+.ai-edit-box {
+  background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 14px;
+}
+.ai-edit-row {
+  border-top: 1px dashed #e5e7eb; padding: 8px 0 8px 10px; border-left: 3px solid transparent;
+}
+.ai-edit-row:first-of-type { border-top: 0; }
+.ai-edit-edited  { border-left-color: #6d28d9; }
+.ai-edit-added   { border-left-color: #0d9488; }
+.ai-edit-removed { border-left-color: #dc2626; }
+.ai-edit-same    { border-left-color: #e2e8f0; color: #94a3b8; }
+.ai-edit-badge {
+  background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; font-weight: 600; font-size: 0.7rem;
+}
+.ai-edit-edited  .ai-edit-badge { background: #ede9fe; color: #5b21b6; border-color: #ddd6fe; }
+.ai-edit-added   .ai-edit-badge { background: #ccfbf1; color: #0f766e; border-color: #99f6e4; }
+.ai-edit-removed .ai-edit-badge { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
+.ai-edit-quote {
+  margin-top: 4px; font-size: 0.8rem; line-height: 1.7; color: #334155;
+  border-radius: 8px; padding: 5px 9px;
+}
+.ai-edit-in  { background: #f0fdf4; border: 1px solid #bbf7d0; }
+.ai-edit-out { background: #fef2f2; border: 1px solid #fecaca; }
 .ai-draft-row-up   td { background: #f6fff9; }
 .ai-draft-row-down td { background: #fff7f7; }
 .ai-tag-better { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; font-weight: 600; }
