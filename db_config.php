@@ -754,6 +754,10 @@ try {
                 prev_round      LONGTEXT,      -- JSON ผลตรวจครั้งก่อน (คะแนน/จุดที่ต้องแก้) ไว้เทียบว่าแก้แล้วดีขึ้นตรงไหน
                 progress_comment TEXT,         -- AI สรุปว่าฉบับแก้ไขเปลี่ยนไปจากการตรวจครั้งก่อนอย่างไร
                 resolved_points LONGTEXT,      -- JSON array จุดที่ครั้งก่อนแจ้งไว้ และนักเรียนแก้ได้แล้วในรอบนี้
+                baseline_phase  VARCHAR(20)  DEFAULT NULL,  -- รอบงานฉบับตั้งต้นที่ใช้เทียบ (D1.2→D1.1, D2.2→D2.1, หลังเรียน→ก่อนเรียน)
+                baseline_snapshot LONGTEXT,    -- JSON คะแนน/จุดที่ต้องแก้ของฉบับตั้งต้น ไว้เทียบว่าคะแนนดีขึ้นจริงไหม
+                draft_comment   TEXT,          -- AI สรุปว่าฉบับนี้ต่างจากฉบับตั้งต้นอย่างไร
+                draft_changes   LONGTEXT,      -- JSON array ของ {criterion, before, after, verdict, note}
                 created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE,
@@ -815,6 +819,21 @@ try {
         safe_ddl($pdo, "ALTER TABLE essay_ai_feedback ADD COLUMN prev_round LONGTEXT NULL AFTER review_round");
         safe_ddl($pdo, "ALTER TABLE essay_ai_feedback ADD COLUMN progress_comment TEXT NULL AFTER prev_round");
         safe_ddl($pdo, "ALTER TABLE essay_ai_feedback ADD COLUMN resolved_points LONGTEXT NULL AFTER progress_comment");
+    }
+} catch (Exception $e) {
+    // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
+}
+
+// เพิ่มคอลัมน์ "เทียบกับฉบับตั้งต้น" ให้ตาราง essay_ai_feedback (ฐานข้อมูลที่สร้างไว้ก่อนหน้านี้)
+// คู่ที่ต้องเทียบกันเสมอตามที่คุณครูกำหนด: ร่างที่ 2 เทียบร่างที่ 1 ของหน่วยเดียวกัน และหลังเรียนเทียบก่อนเรียน
+// เก็บผลตรวจของฉบับตั้งต้นไว้ 1 ชุด เพื่อบอกได้ว่าคะแนน "ดีขึ้นจริงไหม" และต่างกันตรงไหน
+try {
+    $colBp = $pdo->query("SHOW COLUMNS FROM essay_ai_feedback LIKE 'baseline_phase'");
+    if ($colBp && $colBp->rowCount() === 0) {
+        safe_ddl($pdo, "ALTER TABLE essay_ai_feedback ADD COLUMN baseline_phase VARCHAR(20) DEFAULT NULL AFTER resolved_points");
+        safe_ddl($pdo, "ALTER TABLE essay_ai_feedback ADD COLUMN baseline_snapshot LONGTEXT NULL AFTER baseline_phase");
+        safe_ddl($pdo, "ALTER TABLE essay_ai_feedback ADD COLUMN draft_comment TEXT NULL AFTER baseline_snapshot");
+        safe_ddl($pdo, "ALTER TABLE essay_ai_feedback ADD COLUMN draft_changes LONGTEXT NULL AFTER draft_comment");
     }
 } catch (Exception $e) {
     // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
