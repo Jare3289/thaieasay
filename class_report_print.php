@@ -281,7 +281,7 @@ if (!$class['count']) {
         <th class="num" style="width:12%">ตรวจแล้ว</th>
         <th class="num" style="width:16%">คะแนนเฉลี่ย</th>
         <th class="num" style="width:14%">ตรวจซ้ำ</th>
-        <th class="num" style="width:28%">คะแนนที่เปลี่ยนเฉลี่ย<br>(เทียบการตรวจครั้งก่อน)</th>
+        <th class="num" style="width:28%">ส่วนต่างเฉลี่ย<br>(เทียบฉบับตั้งต้นตามคู่)</th>
       </tr>
     </thead>
     <tbody>
@@ -294,14 +294,18 @@ if (!$class['count']) {
             : rp_num($st['mean'], 2) . ' <span class="muted">/ ' . rp_num($st['max_score'], 0) . '</span>'; ?></td>
         <td class="num"><?php echo (int)$st['rechecked']; ?> ฉบับ</td>
         <td class="num"><?php echo ($st['mean_delta'] === null)
-            ? '<span class="muted">—</span>' : rp_diff($st['mean_delta'], 2); ?></td>
+            ? '<span class="muted">ไม่มีคู่เทียบ</span>'
+            : rp_diff($st['mean_delta'], 2)
+              . ' <span class="muted">(ดีขึ้น ' . (int)$st['improved'] . '/' . (int)$st['paired'] . ')</span>'; ?></td>
       </tr>
       <?php endforeach; ?>
     </tbody>
   </table>
   <div class="note">
     ช่อง "ตรวจซ้ำ" คือจำนวนฉบับที่นักเรียนแก้ไขแล้วให้ AI ตรวจอีกครั้ง
-    ส่วนคะแนนที่เปลี่ยนเฉลี่ยบอกว่าการแก้ไขทำให้คะแนนขยับขึ้นหรือลงโดยรวมเท่าใด
+    ส่วน "ส่วนต่างเฉลี่ย" คือคะแนนที่ต่างจากฉบับตั้งต้นตามคู่ที่ครูกำหนด
+    (D1.2 เทียบ D1.1 · D2.2 เทียบ D2.1 · หลังเรียน เทียบ ก่อนเรียน) พร้อมจำนวนฉบับที่ได้คะแนนสูงกว่าฉบับตั้งต้นจริง
+    — รอบที่เป็นฉบับตั้งต้นเอง (ก่อนเรียน · ร่างที่ 1) จึงไม่มีคู่เทียบ
   </div>
 
   <?php if (!empty($class['watchlist'])): ?>

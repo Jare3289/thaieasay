@@ -286,7 +286,7 @@ function rs_works($sum, $no = '5') {
           <th class="wrap" style="width:16%">บันทึกล่าสุด</th>
           <th class="num" style="width:12%">คะแนน AI</th>
           <th class="num" style="width:10%">ครั้งที่ตรวจ</th>
-          <th class="num" style="width:12%">เทียบครั้งก่อน</th>
+          <th class="num" style="width:12%">เทียบฉบับตั้งต้น</th>
         </tr>
       </thead>
       <tbody>
@@ -299,14 +299,18 @@ function rs_works($sum, $no = '5') {
           <td class="num"><?php echo ($w['ai_total'] === null) ? '<span class="muted">ยังไม่ตรวจ</span>'
               : rp_num($w['ai_total'], 1) . ' <span class="muted">/ ' . rp_num($w['ai_max'], 0) . '</span>'; ?></td>
           <td class="num"><?php echo $w['ai_round'] > 0 ? (int)$w['ai_round'] : '—'; ?></td>
-          <td class="num"><?php echo ($w['ai_delta'] === null) ? '<span class="muted">—</span>' : rp_diff($w['ai_delta'], 2); ?></td>
+          <td class="num"><?php echo ($w['ai_delta'] === null)
+              ? '<span class="muted">—</span>'
+              : rp_diff($w['ai_delta'], 2)
+                . ($w['ai_base'] !== '' ? ' <span class="muted">(' . rp_esc($w['ai_base']) . ')</span>' : ''); ?></td>
         </tr>
         <?php endforeach; ?>
       </tbody>
     </table>
     <div class="note">
       คะแนนของ AI เป็นเพียงข้อมูลประกอบการพัฒนางานเขียน (เต็ม <?php echo rp_num(ai_rubric_max(), 0); ?> คะแนนเฉพาะข้อที่ AI ตรวจได้)
-      ไม่ถูกนำไปรวมกับคะแนนจริงของครู · ช่อง "เทียบครั้งก่อน" คือคะแนนที่เปลี่ยนไปหลังนักเรียนแก้ไขงานแล้วให้ AI ตรวจซ้ำ
+      ไม่ถูกนำไปรวมกับคะแนนจริงของครู · ช่อง "เทียบฉบับตั้งต้น" คือส่วนต่างจากฉบับที่ต้องนำมาเทียบตามคู่ที่ครูกำหนด
+      (D1.2 เทียบ D1.1 · D2.2 เทียบ D2.1 · หลังเรียน เทียบ ก่อนเรียน) — รอบที่ไม่มีคู่เทียบจะขึ้นเป็น —
     </div>
 
     <h3 class="sub-title">ใบตรวจสอบความครบถ้วนของชิ้นงาน (<?php echo (int)$sum['done']; ?>/<?php echo (int)$sum['done_total']; ?> ชิ้น)</h3>
@@ -387,27 +391,30 @@ function rs_ai($full, $no = '7') {
         <div class="kv" style="margin-bottom:5px;"><?php echo rp_esc($fb['overall']); ?></div>
         <?php endif; ?>
 
-        <?php if (!empty($fb['progress']['has_prev'])): $pg = $fb['progress']; ?>
-        <div class="box info" style="margin-bottom:6px;">
-          <h4>เทียบกับการตรวจครั้งที่ <?php echo (int)$pg['prev_round']; ?></h4>
-          <div class="kv">คะแนน <?php echo rp_num($pg['prev_total'], 2); ?> → <?php echo rp_num($pg['total'], 2); ?>
-            <?php echo rp_diff($pg['total_delta'], 2); ?>
-            · ดีขึ้น <?php echo (int)$pg['up']; ?> ข้อ · ลดลง <?php echo (int)$pg['down']; ?> ข้อ
-            · เท่าเดิม <?php echo (int)$pg['same']; ?> ข้อ</div>
-          <?php if (!empty($pg['comment'])): ?><div class="kv"><?php echo rp_esc($pg['comment']); ?></div><?php endif; ?>
+        <?php if (!empty($fb['draft_compare']['has_baseline'])): $dc = $fb['draft_compare']; ?>
+        <div class="box <?php echo ($dc['delta'] > 0) ? 'good' : (($dc['delta'] < 0) ? 'watch' : 'info'); ?>" style="margin-bottom:6px;">
+          <h4>เทียบกับ <?php echo rp_esc($dc['label']); ?></h4>
+          <div class="kv">คะแนน <?php echo rp_num($dc['base_total'], 2); ?> → <?php echo rp_num($dc['total'], 2); ?>
+            <?php echo rp_diff($dc['delta'], 2); ?>
+            · <?php echo ($dc['delta'] > 0) ? 'ดีขึ้นตามที่ควรเป็น'
+                 : (($dc['delta'] < 0) ? 'คะแนนถอยลง' : 'คะแนนเท่าเดิม ยังไม่ดีขึ้น'); ?>
+            · ดีขึ้น <?php echo (int)$dc['up']; ?> ข้อ · ลดลง <?php echo (int)$dc['down']; ?> ข้อ
+            · เท่าเดิม <?php echo (int)$dc['same']; ?> ข้อ</div>
+          <?php if (!empty($dc['same_text'])): ?>
+          <div class="kv"><b>ข้อความเหมือนฉบับตั้งต้นทุกตัวอักษร</b> — นักเรียนยังไม่ได้แก้ไขงาน</div>
+          <?php elseif (!empty($dc['identical'])): ?>
+          <div class="kv"><b>คะแนนรายข้อเท่ากันทุกข้อ</b> — งานเปลี่ยนแล้วแต่ยังไม่ถึงระดับถัดไปสักข้อ</div>
+          <?php endif; ?>
+          <?php if (!empty($dc['comment'])): ?><div class="kv"><?php echo rp_esc($dc['comment']); ?></div><?php endif; ?>
           <?php
-          $lists = [
-              'แก้ได้แล้วจากครั้งก่อน' => $pg['fixed'] ?? [],
-              'ยังต้องแก้ต่อ'          => $pg['still'] ?? [],
-              'จุดใหม่ในฉบับแก้ไข'     => $pg['new']   ?? [],
-          ];
-          foreach ($lists as $head => $rows) {
-              if (!$rows) continue;
-              $names = [];
-              foreach ($rows as $r) {
-                  $names[] = trim((($r['criterion'] !== '') ? 'ข้อ ' . $r['criterion'] . ' ' : '') . $r['name']);
-              }
-              echo '<div class="kv"><b>' . rp_esc($head) . ':</b> ' . rp_esc(implode(', ', array_filter($names))) . '</div>';
+          // ข้อที่คะแนนขยับ พร้อมข้อความที่ AI ยกมาเทียบให้เห็นว่าต่างกันตรงไหน
+          foreach (($dc['criteria'] ?? []) as $c) {
+              if ($c['dir'] === 'same' && trim((string)$c['note']) === '') continue;
+              $head = 'ข้อ ' . $c['id'] . ' ' . $c['name'];
+              $body = ($c['dir'] === 'up') ? 'ดีขึ้น ' : (($c['dir'] === 'down') ? 'ลดลง ' : 'เท่าเดิม ');
+              $body .= rp_num($c['base_weighted'], 2) . ' → ' . rp_num($c['weighted'], 2);
+              if (trim((string)$c['note']) !== '') $body .= ' · ' . $c['note'];
+              echo '<div class="kv"><b>' . rp_esc($head) . ':</b> ' . rp_esc($body) . '</div>';
           }
           ?>
         </div>

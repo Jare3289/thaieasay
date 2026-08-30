@@ -162,7 +162,7 @@ function aiClearManualInput(itemId) {
     .forEach(el => { el.checked = false; });
 }
 
-/* ---- เทียบกับการตรวจครั้งก่อน (ตรวจครั้งที่ 2 ขึ้นไป) ---- */
+/* ---- ตัวช่วยแสดงส่วนต่างของคะแนน ---- */
 
 // ตัดทศนิยมที่ไม่จำเป็นออก (40.00 → 40, 40.50 → 40.5)
 function aiFmt(n) {
@@ -179,129 +179,6 @@ function aiDeltaBadge(delta, opts) {
   const text = d > 0 ? '+' + aiFmt(d) : (d < 0 ? aiFmt(d) : 'เท่าเดิม');
   return `<span class="ai-delta ${cls}"><i class="bi ${icon}"></i>${aiEsc(text)}${
     (d !== 0 && opts.unit !== false) ? ' คะแนน' : ''}</span>`;
-}
-
-// ป้ายสถานะของจุดที่ควรปรับปรุง เมื่อเทียบกับครั้งก่อน
-function aiStatusBadge(status) {
-  if (status === 'open')    return '<span class="badge ai-tag-open"><i class="bi bi-arrow-repeat me-1"></i>จุดเดิม · ยังต้องแก้</span>';
-  if (status === 'partial') return '<span class="badge ai-tag-partial"><i class="bi bi-hourglass-split me-1"></i>แก้แล้วบางส่วน</span>';
-  if (status === 'new')     return '<span class="badge ai-tag-new"><i class="bi bi-plus-circle me-1"></i>จุดใหม่ในฉบับแก้ไข</span>';
-  return '';
-}
-
-/**
- * กล่อง "ฉบับแก้ไขนี้เปลี่ยนไปจากการตรวจครั้งก่อนอย่างไร"
- * แสดงเฉพาะเมื่อฉบับนี้ถูกตรวจมาแล้วอย่างน้อย 2 ครั้ง (fb.progress.has_prev = true)
- */
-function aiProgressHTML(fb, opts) {
-  opts = opts || {};
-  const p = fb.progress;
-  if (!p || !p.has_prev) return '';
-
-  const prevAt = p.prev_at ? String(p.prev_at).replace('T', ' ').slice(0, 16) : '';
-
-  // แถบสรุปตัวเลข: คะแนนรวมของ AI ขยับเท่าไร ระดับคุณภาพเปลี่ยนไหม ข้อไหนขึ้น/ลง/เท่าเดิม
-  const chips = [
-    `<span class="ai-progress-chip">
-       <span class="text-muted">คะแนน AI</span>
-       <span class="fw-bold">${aiFmt(p.prev_total)} → ${aiFmt(p.total)}</span>
-       <span class="text-muted">/ ${aiFmt(p.max_score)}</span>
-       ${aiDeltaBadge(p.total_delta)}
-     </span>`,
-    (p.prev_quality || p.quality)
-      ? `<span class="ai-progress-chip">
-           <span class="text-muted">ระดับคุณภาพ</span>
-           <span class="fw-bold">${aiEsc(p.prev_quality || '-')} → ${aiEsc(p.quality || '-')}</span>
-           ${p.quality_changed ? '<span class="badge bg-primary-subtle text-primary-emphasis">เปลี่ยนระดับ</span>' : ''}
-         </span>`
-      : '',
-    `<span class="ai-progress-chip">
-       <span class="ai-delta ai-delta-up"><i class="bi bi-arrow-up-short"></i>ดีขึ้น ${p.up} ข้อ</span>
-       <span class="ai-delta ai-delta-down"><i class="bi bi-arrow-down-short"></i>ลดลง ${p.down} ข้อ</span>
-       <span class="ai-delta ai-delta-same"><i class="bi bi-dash"></i>เท่าเดิม ${p.same} ข้อ</span>
-     </span>`
-  ].filter(Boolean).join('');
-
-  // 3 คอลัมน์: แก้ได้แล้ว / ยังต้องแก้ต่อ / จุดใหม่
-  const listCol = (title, icon, cls, items, emptyMsg) => {
-    const rows = items.map(it => {
-      const head = it.criterion ? `ข้อ ${aiEsc(it.criterion)}${it.name ? ' ' + aiEsc(it.name) : ''}` : 'ภาพรวมของงานเขียน';
-      const dl   = (it.delta === null || it.delta === undefined) ? '' : aiDeltaBadge(it.delta, { unit: false });
-      return `<div class="ai-progress-item">
-        <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
-          <span class="fw-semibold">${head}</span>${dl}
-        </div>
-        ${it.issue ? `<div class="text-muted small mt-1">${aiEsc(it.issue)}</div>` : ''}
-      </div>`;
-    }).join('');
-    return `<div class="col-lg-4">
-      <div class="ai-progress-col ${cls} h-100">
-        <div class="ai-progress-col-head"><i class="bi ${icon} me-1"></i>${aiEsc(title)}
-          <span class="badge bg-white text-secondary border ms-1">${items.length}</span></div>
-        ${rows || `<div class="text-muted small">${aiEsc(emptyMsg)}</div>`}
-      </div>
-    </div>`;
-  };
-
-  const cols = `<div class="row g-2 mt-1">
-    ${listCol('แก้ได้แล้วจากครั้งก่อน', 'bi-check2-circle', 'ai-progress-fixed', p.fixed || [],
-              'ครั้งนี้ยังไม่มีจุดใดที่ครั้งก่อนแจ้งไว้แล้วแก้ได้ครบ')}
-    ${listCol('ยังต้องแก้ต่อ', 'bi-arrow-repeat', 'ai-progress-still', p.still || [],
-              'ไม่มีจุดเดิมค้างอยู่แล้ว')}
-    ${listCol('จุดใหม่ในฉบับแก้ไข', 'bi-plus-circle', 'ai-progress-new', p.new || [],
-              'ไม่มีจุดใหม่เพิ่มขึ้นมา')}
-  </div>`;
-
-  // สิ่งที่ AI เขียนบรรยายเอง (มีเมื่อโมเดลตอบกลับมาครบ)
-  const resolved = (p.ai_resolved || []).map(t =>
-    `<li>${aiEsc(t)}</li>`).join('');
-  const regress  = (p.ai_regressions || []).map(t =>
-    `<li>${aiEsc(t)}</li>`).join('');
-  const notes = `
-    ${resolved ? `<div class="ai-progress-note ai-progress-note-good mt-2">
-      <div class="fw-semibold"><i class="bi bi-stars me-1"></i>AI เห็นว่านักเรียนแก้จุดเหล่านี้ได้แล้ว</div>
-      <ul class="mb-0 mt-1 small">${resolved}</ul></div>` : ''}
-    ${regress ? `<div class="ai-progress-note ai-progress-note-warn mt-2">
-      <div class="fw-semibold"><i class="bi bi-exclamation-triangle me-1"></i>จุดที่เคยทำได้ดี แต่ฉบับนี้กลับถอยลง</div>
-      <ul class="mb-0 mt-1 small">${regress}</ul></div>` : ''}`;
-
-  // ตารางคะแนนรายข้อ ครั้งก่อน → ครั้งนี้ (เฉพาะข้อที่เปลี่ยน) — ไม่แสดงในโหมดย่อ
-  let changeTable = '';
-  const changed = (p.criteria || []).filter(c => c.dir !== 'same');
-  if (!opts.compact && changed.length) {
-    const rows = changed.map(c => `<tr>
-      <td class="text-nowrap fw-semibold">${aiEsc(c.id)}</td>
-      <td>${aiEsc(c.name || '')}</td>
-      <td class="text-center text-nowrap text-muted">${aiFmt(c.prev_weighted)}</td>
-      <td class="text-center text-nowrap fw-bold">${aiFmt(c.weighted)} <span class="text-muted fw-normal">/ ${aiFmt(c.max)}</span></td>
-      <td class="text-center text-nowrap">${aiDeltaBadge(c.delta, { unit: false })}</td>
-    </tr>`).join('');
-    changeTable = `<div class="table-responsive mt-2">
-      <table class="table table-sm table-bordered align-middle mb-0 bg-white">
-        <thead class="table-light">
-          <tr><th style="width:60px;">ข้อ</th><th>เกณฑ์ที่คะแนนเปลี่ยน</th>
-              <th class="text-center" style="width:90px;">ครั้งก่อน</th>
-              <th class="text-center" style="width:110px;">ครั้งนี้</th>
-              <th class="text-center" style="width:110px;">เปลี่ยนแปลง</th></tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>`;
-  }
-
-  return `<div class="ai-progress-box rounded-3 p-3 mb-3">
-    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
-      <span class="fw-bold text-dark">
-        <i class="bi bi-clock-history text-primary me-2"></i>ผลการตรวจครั้งที่ ${p.round} — เทียบกับครั้งที่ ${p.prev_round}
-      </span>
-      ${prevAt ? `<span class="text-muted small">ครั้งก่อนตรวจเมื่อ ${aiEsc(prevAt)}</span>` : ''}
-    </div>
-    <div class="d-flex flex-wrap gap-2">${chips}</div>
-    ${p.comment ? `<div class="ai-progress-comment mt-2">${aiEsc(p.comment)}</div>` : ''}
-    ${notes}
-    ${cols}
-    ${changeTable}
-  </div>`;
 }
 
 /* ---- เทียบกับ "ฉบับตั้งต้น" ตามคู่ที่ครูกำหนด (D1.2↔D1.1 · D2.2↔D2.1 · หลังเรียน↔ก่อนเรียน) ---- */
@@ -390,8 +267,7 @@ function aiAttachDraftCompare(all) {
 
 /**
  * กล่อง "ฉบับนี้ต่างจากฉบับตั้งต้นอย่างไร"
- * ต่างจาก aiProgressHTML ตรงที่เทียบ "คนละฉบับ" (ร่างที่ 2 กับร่างที่ 1 / หลังเรียนกับก่อนเรียน)
- * ไม่ใช่การตรวจซ้ำฉบับเดิม — จึงเน้นตอบคำถามเดียวว่า "คะแนนดีขึ้นจริงไหม และต่างกันตรงไหน"
+ * เทียบ "คนละฉบับ" ตามคู่ที่ครูกำหนด เพื่อตอบคำถามเดียวว่า "คะแนนดีขึ้นจริงไหม และต่างกันตรงไหน"
  */
 function aiDraftCompareHTML(fb, opts) {
   opts = opts || {};
@@ -550,13 +426,6 @@ function aiFeedbackHTML(fb, opts) {
     : '';
   const pct           = fullMax > 0 ? Math.round((combined / fullMax) * 100) : 0;
 
-  // ตรวจซ้ำหรือไม่ — ใช้ตัดสินว่าจะแสดงกล่องเทียบกับครั้งก่อน และป้ายสถานะรายจุดหรือเปล่า
-  const prog     = (fb.progress && fb.progress.has_prev) ? fb.progress : null;
-  const stillSet = prog ? new Set((prog.still || []).map(x => x.criterion || '')) : null;
-  const newSet   = prog ? new Set((prog.new   || []).map(x => x.criterion || '')) : null;
-  const prevOf   = {};
-  if (prog) (prog.criteria || []).forEach(c => { prevOf[c.id] = c; });
-
   const strengths = (fb.strengths || []).map(s =>
     `<div class="p-3 rounded-3 mb-2 ai-strength-card"><i class="bi bi-check-circle-fill text-success me-2"></i>${aiEsc(s)}</div>`
   ).join('') || '<div class="text-muted small mb-2">— ไม่มีข้อมูล —</div>';
@@ -570,18 +439,11 @@ function aiFeedbackHTML(fb, opts) {
     const scoreTag = c
       ? `AI ให้ ${c.weighted} / ${c.max} คะแนน${lost > 0 ? ' · เสียไป ' + lost + ' คะแนน' : ''}`
       : '';
-    // ตรวจซ้ำ: จุดนี้เป็นจุดเดิมที่ยังแก้ไม่ตก หรือเป็นจุดที่เพิ่งพบในฉบับแก้ไข
-    const key    = it.criterion || '';
-    const status = prog
-      ? (it.status || (stillSet.has(key) ? 'open' : (newSet.has(key) ? 'new' : '')))
-      : '';
-    const critDelta = (prog && prevOf[key]) ? aiDeltaBadge(prevOf[key].delta, { unit: false }) : '';
     return `<div class="ai-improve-card rounded-3 mb-3 overflow-hidden">
       <div class="ai-improve-head d-flex align-items-center justify-content-between flex-wrap gap-2">
         <span class="fw-bold text-dark">
           <span class="badge bg-warning text-dark me-1">จุดที่ ${i + 1}</span>
           ${it.criterion ? `ข้อ ${aiEsc(it.criterion)} ${aiEsc(critName)}` : 'ภาพรวมของงานเขียน'}
-          ${aiStatusBadge(status)}${critDelta ? ' ' + critDelta : ''}
         </span>
         ${scoreTag ? `<span class="badge bg-white border text-secondary fw-semibold">${aiEsc(scoreTag)}</span>` : ''}
       </div>
@@ -645,7 +507,6 @@ function aiFeedbackHTML(fb, opts) {
         ${has ? `${cur.weighted} <span class="text-muted fw-normal">/ ${it.max}</span>`
               : `<span class="text-warning-emphasis small">รอครูให้คะแนน</span>`}
       </td>
-      ${prog ? '<td class="text-center text-muted small" title="ข้อนี้คุณครูให้คะแนนเอง ไม่ได้เปลี่ยนตามรอบที่ AI ตรวจ">—</td>' : ''}
       <td style="min-width:110px;"><div class="ai-score-bar"><span style="width:${cpct}%"></span></div></td>
     </tr>`;
   }).join('');
@@ -742,14 +603,10 @@ function aiFeedbackHTML(fb, opts) {
     const critRows = Object.keys(fb.scores || {}).sort().map(k => {
       const c = fb.scores[k];
       const cpct = c.max > 0 ? Math.round((c.weighted / c.max) * 100) : 0;
-      const pc   = prog ? prevOf[k] : null;
       return `<tr class="ai-crit-row">
         <td class="text-nowrap fw-semibold">${aiEsc(k)}</td>
         <td>${aiEsc(c.name || '')}${c.reason ? `<div class="text-muted small mt-1">${aiEsc(c.reason)}</div>` : ''}</td>
         <td class="text-center text-nowrap fw-bold">${c.weighted} <span class="text-muted fw-normal">/ ${c.max}</span></td>
-        ${prog ? `<td class="text-center text-nowrap small">${pc
-          ? `<span class="text-muted">${aiFmt(pc.prev_weighted)}</span> ${aiDeltaBadge(pc.delta, { unit: false })}`
-          : '<span class="text-muted">—</span>'}</td>` : ''}
         <td style="min-width:110px;"><div class="ai-score-bar"><span style="width:${cpct}%"></span></div></td>
       </tr>`;
     }).join('');
@@ -760,16 +617,13 @@ function aiFeedbackHTML(fb, opts) {
           <thead class="table-light">
             <tr><th style="width:60px;">ข้อ</th><th>เกณฑ์ / เหตุผล</th>
                 <th class="text-center" style="width:110px;">คะแนน</th>
-                ${prog ? '<th class="text-center" style="width:130px;">เทียบครั้งก่อน</th>' : ''}
                 <th style="width:130px;">สัดส่วน</th></tr>
           </thead>
-          <tbody>${critRows || `<tr><td colspan="${prog ? 5 : 4}" class="text-muted text-center">— ไม่มีข้อมูลคะแนน —</td></tr>`}${manualRows}</tbody>
+          <tbody>${critRows || '<tr><td colspan="4" class="text-muted text-center">— ไม่มีข้อมูลคะแนน —</td></tr>'}${manualRows}</tbody>
           <tfoot class="table-light">
             <tr class="fw-bold">
               <td colspan="2" class="text-end">คะแนนรวมตามเกณฑ์ของครู</td>
               <td class="text-center text-nowrap">${combined} <span class="text-muted fw-normal">/ ${fullMax}</span></td>
-              ${prog ? `<td class="text-center text-nowrap" title="ส่วนต่างเฉพาะคะแนนที่ AI ประเมิน (${aiFmt(prog.prev_total)} → ${aiFmt(prog.total)})">
-                ${aiDeltaBadge(prog.total_delta, { unit: false })}</td>` : ''}
               <td><div class="ai-score-bar"><span style="width:${pct}%"></span></div></td>
             </tr>
           </tfoot>
@@ -800,8 +654,6 @@ function aiFeedbackHTML(fb, opts) {
     ${recheckBox}
 
     ${aiDraftCompareHTML(fb, opts)}
-
-    ${aiProgressHTML(fb, opts)}
 
     <div class="row g-3 mb-4">
       <div class="col-lg-5">

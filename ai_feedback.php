@@ -451,9 +451,6 @@ $aiPhases    = ai_all_phases();
   .ai-cell-wait { color: #d97706; font-weight: 700; margin-left: 2px; }
   .ai-cell-stale { background: #fffbeb; }
   .ai-cell-stale-icon { color: #d97706; margin-left: 3px; }
-  /* ลูกศรบอกว่าคะแนนของ AI ขยับขึ้น/ลงจากการตรวจครั้งก่อน (ดูรายละเอียดได้ที่ tooltip) */
-  .ai-cell-up   { color: #16a34a; margin-left: 3px; font-size: 0.75rem; }
-  .ai-cell-down { color: #dc2626; margin-left: 3px; font-size: 0.75rem; }
   .ai-stu-link { color: var(--primary-navy); text-decoration: none; }
   .ai-stu-link:hover { text-decoration: underline; color: #6d28d9; }
   /* สัญลักษณ์คู่เทียบตามที่ครูกำหนด (ร่างหลังต้องดีกว่าร่างก่อน) */
@@ -954,11 +951,6 @@ function phaseCardHTML(ph, blocked) {
         <span class="text-muted small">AI ${aiNum(fb.total_score)}/${aiNum(fb.max_score)}
           · ครู ${fb.manual_done ? aiNum(fb.teacher_total) : '—'}/${aiNum(fb.manual_max)}</span>
       </div>
-      ${(fb.progress && fb.progress.has_prev) ? `<div class="small mt-2 d-flex align-items-center gap-2 flex-wrap">
-        <span class="text-muted">เทียบครั้งที่ ${fb.progress.prev_round}:</span>
-        ${aiDeltaBadge(fb.progress.total_delta)}
-        <span class="text-muted">ดีขึ้น ${fb.progress.up} · ลดลง ${fb.progress.down} ข้อ</span>
-      </div>` : ''}
       ${draftLine}`;
     foot = `<span class="fw-semibold text-primary"><i class="bi bi-card-list me-1"></i>${on ? 'กำลังแสดงรายละเอียด' : 'ดูรายละเอียดการให้คะแนน'}</span>`;
   } else if (essay) {
@@ -1326,13 +1318,7 @@ function paintAiOverview() {
                     ? ''
                     : ` · เทียบ ${aiEsc(r.baseline_label)} ${r.draft_delta > 0 ? 'ดีขึ้น' : (r.draft_delta < 0 ? 'ต่ำกว่า' : 'เท่ากัน')}`
                       + (r.draft_delta ? ` ${aiNum(Math.abs(r.draft_delta))} คะแนน` : ''))
-                + ((Number(r.review_round || 1) > 1)
-                    ? ` · ตรวจครั้งที่ ${Number(r.review_round)}`
-                      + ((r.total_delta === null || r.total_delta === undefined)
-                          ? ''
-                          : ` · คะแนน AI ${r.total_delta > 0 ? 'เพิ่มขึ้น' : (r.total_delta < 0 ? 'ลดลง' : 'เท่าเดิม')}`
-                            + (r.total_delta ? ` ${aiNum(Math.abs(r.total_delta))} คะแนนจากครั้งก่อน` : ''))
-                    : '');
+                + ((Number(r.review_round || 1) > 1) ? ` · ตรวจครั้งที่ ${Number(r.review_round)}` : '');
       const draftMark = (r.draft_delta === null || r.draft_delta === undefined)
         ? ''
         : (r.draft_delta > 0
@@ -1344,9 +1330,7 @@ function paintAiOverview() {
           ? ''
           : '<span class="ai-cell-wait" title="ยังรอคะแนนข้อที่คุณครูต้องให้เอง">*</span>'}${r.needs_recheck
           ? '<i class="bi bi-arrow-repeat ai-cell-stale-icon" title="ต้นฉบับถูกแก้หลังตรวจ รอตรวจใหม่"></i>'
-          : ''}${(r.total_delta === null || r.total_delta === undefined || !r.total_delta)
-          ? ''
-          : `<i class="bi ${r.total_delta > 0 ? 'bi-caret-up-fill ai-cell-up' : 'bi-caret-down-fill ai-cell-down'}"></i>`}${draftMark}
+          : ''}${draftMark}
       </td>`;
     }).join('');
 
@@ -1624,12 +1608,12 @@ async function runReviewQueue(items, ui) {
       t.reviewed = true;
       t.needs_recheck = false;
       const fb = data.feedback || {};
-      // ตรวจซ้ำ: บอกในบรรทัดสรุปเลยว่าคะแนนขยับจากครั้งก่อนเท่าไร ไม่ต้องเปิดดูทีละคน
-      const pg   = (fb.progress && fb.progress.has_prev) ? fb.progress : null;
-      const diff = pg
-        ? ` · ครั้งที่ ${pg.round} ${pg.total_delta > 0 ? '▲ +' + aiNum(pg.total_delta)
-            : (pg.total_delta < 0 ? '▼ ' + aiNum(pg.total_delta) : 'เท่าเดิม')}`
-          + ` (เดิม ${aiNum(pg.prev_total)})`
+      // รอบที่มีคู่เทียบ: บอกในบรรทัดสรุปเลยว่าดีขึ้นจากฉบับตั้งต้นเท่าไร ไม่ต้องเปิดดูทีละคน
+      const dc   = (fb.draft_compare && fb.draft_compare.has_baseline) ? fb.draft_compare : null;
+      const diff = dc
+        ? ` · เทียบ ${dc.short} ${dc.delta > 0 ? '▲ +' + aiNum(dc.delta)
+            : (dc.delta < 0 ? '▼ ' + aiNum(dc.delta) : 'เท่าเดิม')}`
+          + ` (${aiNum(dc.base_total)} → ${aiNum(dc.total)})`
         : '';
       reviewLogLine(ui, 'bi-check-circle-fill', 'text-success', who,
         `${fb.total_score}/${fb.max_score} · ${fb.quality_level || '-'}${diff}`);

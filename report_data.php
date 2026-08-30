@@ -242,7 +242,7 @@ function report_dataset(PDO $pdo, array $opt = []) {
         }
     } catch (Exception $e) { /* ยังไม่มีตารางเรียงความ */ }
 
-    // ---- 4) ผลตรวจของ AI (รวมข้อมูลเทียบกับการตรวจครั้งก่อน) ----
+    // ---- 4) ผลตรวจของ AI (รวมข้อมูลเทียบกับฉบับตั้งต้นตามคู่ที่ครูกำหนด) ----
     $ai = [];
     try {
         $q = $pdo->query('SELECT f.*, s.student_name, s.classroom
@@ -430,14 +430,17 @@ function report_class_stats(array $data) {
     foreach (report_essay_phases() as $ph => $label) {
         $totals = [];
         $rounds = 0;
-        $deltas = [];
+        $deltas = [];   // ส่วนต่างจากฉบับตั้งต้นตามคู่ที่ครูกำหนด (D1.2↔D1.1 · D2.2↔D2.1 · หลังเรียน↔ก่อนเรียน)
+        $better = 0;
         foreach ($sids as $sid) {
             $fb = $data['ai'][$sid][$ph] ?? null;
             if (!$fb) continue;
             $totals[] = (float)$fb['total_score'];
-            if ((int)($fb['review_round'] ?? 1) > 1) {
-                $rounds++;
-                if (!empty($fb['progress']['has_prev'])) $deltas[] = (float)$fb['progress']['total_delta'];
+            if ((int)($fb['review_round'] ?? 1) > 1) $rounds++;
+            $dc = $fb['draft_compare'] ?? null;
+            if (is_array($dc) && !empty($dc['has_baseline'])) {
+                $deltas[] = (float)$dc['delta'];
+                if ((float)$dc['delta'] > 0) $better++;
             }
         }
         $out['ai'][$ph] = [
@@ -446,6 +449,9 @@ function report_class_stats(array $data) {
             'mean'        => report_mean($totals),
             'max_score'   => ai_rubric_max(),
             'rechecked'   => $rounds,
+            // เทียบกับฉบับตั้งต้น: เทียบได้กี่ฉบับ ดีขึ้นกี่ฉบับ และส่วนต่างเฉลี่ย
+            'paired'      => count($deltas),
+            'improved'    => $better,
             'mean_delta'  => report_mean($deltas),
         ];
     }
@@ -563,7 +569,11 @@ function report_student_summary(array $data, $sid) {
             'ai_max'      => $fb ? (float)$fb['max_score'] : null,
             'ai_level'    => $fb ? (string)$fb['quality_level'] : '',
             'ai_round'    => $fb ? (int)($fb['review_round'] ?? 1) : 0,
-            'ai_delta'    => ($fb && !empty($fb['progress']['has_prev'])) ? (float)$fb['progress']['total_delta'] : null,
+            // ส่วนต่างจากฉบับตั้งต้นตามคู่ที่ครูกำหนด (null = รอบนี้ไม่มีคู่เทียบ หรือฉบับตั้งต้นยังไม่ถูกตรวจ)
+            'ai_delta'    => ($fb && !empty($fb['draft_compare']['has_baseline']))
+                                ? (float)$fb['draft_compare']['delta'] : null,
+            'ai_base'     => ($fb && !empty($fb['draft_compare']['has_baseline']))
+                                ? (string)$fb['draft_compare']['short'] : '',
             'ai_pending'  => $fb ? !empty($fb['needs_recheck']) : false,
         ];
     }

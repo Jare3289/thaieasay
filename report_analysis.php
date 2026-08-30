@@ -198,47 +198,51 @@ function report_student_insights(array $sum, array $full) {
         ];
     }
 
-    // ------------------------------------------------ 7) การนำข้อเสนอแนะของ AI ไปแก้จริง
-    $rechecked = [];
-    $repeat    = [];
+    // ------------------------------------------------ 7) ร่างหลังดีขึ้นกว่าร่างก่อนจริงไหม
+    // เทียบตามคู่ที่ครูกำหนดเท่านั้น: D1.2 กับ D1.1 · D2.2 กับ D2.1 · หลังเรียน กับ ก่อนเรียน
+    $paired = [];
+    $repeat = [];
     foreach (($full['ai'] ?? []) as $ph => $fb) {
         foreach (($fb['improvements'] ?? []) as $im) {
             $cid = trim((string)($im['criterion'] ?? ''));
             if ($cid !== '') $repeat[$cid] = (int)($repeat[$cid] ?? 0) + 1;
         }
-        if (!empty($fb['progress']['has_prev'])) {
-            $pg = $fb['progress'];
-            $rechecked[] = [
+        $dc = $fb['draft_compare'] ?? null;
+        if (is_array($dc) && !empty($dc['has_baseline'])) {
+            $paired[] = [
                 'label' => $fb['phase_label'],
-                'delta' => (float)$pg['total_delta'],
-                'fixed' => count($pg['fixed'] ?? []),
-                'still' => count($pg['still'] ?? []),
-                'round' => (int)$pg['round'],
+                'base'  => (string)$dc['short'],
+                'delta' => (float)$dc['delta'],
+                'up'    => (int)$dc['up'],
+                'down'  => (int)$dc['down'],
             ];
         }
     }
-    if ($rechecked) {
+    if ($paired) {
         $items = [];
         $sumD  = 0;
-        foreach ($rechecked as $r) {
+        $okN   = 0;
+        foreach ($paired as $r) {
             $sumD += $r['delta'];
-            $items[] = $r['label'] . ' (ตรวจครั้งที่ ' . $r['round'] . '): คะแนน '
-                     . (($r['delta'] > 0) ? 'เพิ่มขึ้น ' . ra_n($r['delta'], 2)
-                     : (($r['delta'] < 0) ? 'ลดลง ' . ra_n(abs($r['delta']), 2) : 'เท่าเดิม'))
-                     . ' · แก้จุดเดิมได้ ' . $r['fixed'] . ' จุด · ยังเหลือ ' . $r['still'] . ' จุด';
+            if ($r['delta'] > 0) $okN++;
+            $items[] = $r['label'] . ' เทียบกับ ' . $r['base'] . ': คะแนน '
+                     . (($r['delta'] > 0) ? 'ดีขึ้น ' . ra_n($r['delta'], 2)
+                     : (($r['delta'] < 0) ? 'ต่ำกว่า ' . ra_n(abs($r['delta']), 2) : 'เท่ากัน'))
+                     . ' · ดีขึ้น ' . $r['up'] . ' ข้อ · ลดลง ' . $r['down'] . ' ข้อ';
         }
-        $avgD = $sumD / count($rechecked);
+        $avgD = $sumD / count($paired);
         $out[] = [
-            'key' => 'ai_response', 'title' => 'การนำข้อเสนอแนะไปแก้ไขจริง (จากการให้ AI ตรวจซ้ำ)',
-            'tone' => ($avgD > 0) ? 'good' : (($avgD < 0) ? 'warn' : 'info'),
-            'text' => 'มีการแก้งานแล้วส่งตรวจซ้ำ ' . count($rechecked) . ' ฉบับ คะแนนเปลี่ยนเฉลี่ย '
-                    . (($avgD >= 0) ? '+' : '') . ra_n($avgD, 2) . ' คะแนนต่อฉบับ',
+            'key' => 'ai_response', 'title' => 'ร่างหลังดีขึ้นกว่าร่างก่อนจริงหรือไม่ (เทียบตามคู่ที่ครูกำหนด)',
+            'tone' => ($okN === count($paired)) ? 'good' : (($okN === 0) ? 'warn' : 'info'),
+            'text' => 'เทียบได้ ' . count($paired) . ' คู่ · ร่างหลังได้คะแนนสูงกว่า ' . $okN . ' คู่ '
+                    . '· ส่วนต่างเฉลี่ย ' . (($avgD >= 0) ? '+' : '') . ra_n($avgD, 2) . ' คะแนนต่อคู่',
             'items' => $items,
         ];
     } elseif (!empty($full['ai'])) {
         $out[] = [
-            'key' => 'ai_response', 'title' => 'การนำข้อเสนอแนะไปแก้ไขจริง', 'tone' => 'info',
-            'text' => 'ยังไม่เคยแก้งานแล้วให้ AI ตรวจซ้ำ จึงยังไม่มีข้อมูลว่าการแก้ไขทำให้คะแนนดีขึ้นหรือไม่',
+            'key' => 'ai_response', 'title' => 'ร่างหลังดีขึ้นกว่าร่างก่อนจริงหรือไม่', 'tone' => 'info',
+            'text' => 'ยังไม่มีคู่ไหนที่ AI ตรวจครบทั้งสองฉบับ (ร่างที่ 1 คู่ร่างที่ 2 หรือก่อนเรียนคู่หลังเรียน) '
+                    . 'จึงยังบอกไม่ได้ว่าร่างหลังดีขึ้นจริงหรือไม่',
         ];
     }
     if ($repeat) {
