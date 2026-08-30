@@ -17,8 +17,76 @@ function aiEsc(s) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+// ชื่อสั้น ใช้บนป้าย/แกนกราฟที่พื้นที่จำกัด
+const AI_PHASE_SHORT_MAP = {
+  pretest:  'ก่อนเรียน',
+  task1_d1: 'D1.1',
+  task1_d2: 'D1.2',
+  task2_d1: 'D2.1',
+  task2_d2: 'D2.2',
+  posttest: 'หลังเรียน'
+};
+
+// คู่รอบงานที่ต้องเทียบกันเสมอตามที่คุณครูกำหนด (ตรงกับ ai_baseline_pairs() ฝั่งเซิร์ฟเวอร์)
+const AI_BASELINE_PAIRS = {
+  task1_d2: 'task1_d1',
+  task2_d2: 'task2_d1',
+  posttest: 'pretest'
+};
+
 function aiPhaseLabel(phase) {
   return AI_PHASE_LABEL_MAP[phase] || phase;
+}
+
+function aiPhaseShort(phase) {
+  return AI_PHASE_SHORT_MAP[phase] || phase;
+}
+
+/* ---- ตัวเลข/ระดับคุณภาพ (ใช้ร่วมกันทุกหน้าของระบบผู้ช่วย AI) ---- */
+
+// ตัดทศนิยมท้ายที่ไม่จำเป็นออก (45.00 → 45, 45.50 → 45.5)
+function aiNum(v) {
+  const n = Math.round(parseFloat(v) * 100) / 100;
+  return isNaN(n) ? '-' : String(n);
+}
+
+// ทศนิยม 1 ตำแหน่ง — ใช้กับค่าเฉลี่ยบนการ์ด ไม่ให้ตัวเลขยาวจนตกบรรทัด
+function aiNum1(v) {
+  const n = Math.round(parseFloat(v) * 10) / 10;
+  return isNaN(n) ? '-' : String(n);
+}
+
+// แปลงคะแนนรวม (เต็ม 60) เป็นระดับคุณภาพ — เกณฑ์เดียวกับหน้า evaluation.php และ ai_config.php
+function aiLevelFromScore(total60) {
+  const n = parseFloat(total60);
+  if (isNaN(n)) return '';
+  if (n >= 49) return 'ดีมาก';
+  if (n >= 37) return 'ดี';
+  if (n >= 25) return 'ปานกลาง';
+  if (n >= 13) return 'พอใช้';
+  return 'ต้องปรับปรุง';
+}
+
+// ป้ายระดับคุณภาพ ใช้สีเดียวกับการ์ดเกณฑ์ในหน้าประเมิน (ดีมาก=เขียวอมฟ้า ... ต้องปรับปรุง=แดง)
+const AI_LEVEL_STYLE = {
+  'ดีมาก':       'background:#ccfbf1; color:#0f766e; border:1px solid #99f6e4;',
+  'ดี':          'background:#dbeafe; color:#1e40af; border:1px solid #bfdbfe;',
+  'ปานกลาง':     'background:#f1f5f9; color:#475569; border:1px solid #e2e8f0;',
+  'พอใช้':       'background:#fffbeb; color:#b45309; border:1px solid #fde68a;',
+  'ต้องปรับปรุง': 'background:#fef2f2; color:#b91c1c; border:1px solid #fecaca;'
+};
+
+function aiLevelBadge(level) {
+  if (!level) return '<span class="text-muted">-</span>';
+  const style = AI_LEVEL_STYLE[level] || 'background:#f1f5f9; color:#475569; border:1px solid #e2e8f0;';
+  return `<span class="badge rounded-pill px-3 py-2 fw-semibold" style="${style}">${aiEsc(level)}</span>`;
+}
+
+// คะแนนรวม (เต็ม 60) ของผลตรวจ 1 ฉบับ — ยังไม่มีผลตรวจคืน null
+function aiCombinedOf(fb) {
+  if (!fb) return null;
+  const v = Number(fb.combined_total != null ? fb.combined_total : fb.total_score);
+  return isNaN(v) ? null : v;
 }
 
 /* ---- เรียก API ---- */
@@ -233,6 +301,226 @@ function aiProgressHTML(fb, opts) {
     ${notes}
     ${cols}
     ${changeTable}
+  </div>`;
+}
+
+/* ---- เทียบกับ "ฉบับตั้งต้น" ตามคู่ที่ครูกำหนด (D1.2↔D1.1 · D2.2↔D2.1 · หลังเรียน↔ก่อนเรียน) ---- */
+
+// ป้ายคำตัดสินรายข้อที่ AI ให้มา (ดีขึ้น / เท่าเดิม / แย่ลง)
+function aiVerdictBadge(v) {
+  if (v === 'better') return '<span class="badge ai-tag-better"><i class="bi bi-arrow-up-circle me-1"></i>ดีขึ้น</span>';
+  if (v === 'worse')  return '<span class="badge ai-tag-worse"><i class="bi bi-arrow-down-circle me-1"></i>แย่ลง</span>';
+  if (v === 'same')   return '<span class="badge ai-tag-same"><i class="bi bi-dash-circle me-1"></i>เท่าเดิม</span>';
+  return '';
+}
+
+/**
+ * คำนวณผลเทียบกับฉบับตั้งต้นจาก "ผลตรวจสองฉบับที่บันทึกไว้แล้ว"
+ * ใช้เป็นตัวสำรองเมื่อฐานข้อมูลยังไม่มีคอลัมน์เทียบ หรือผลตรวจถูกบันทึกไว้ก่อนมีฟีเจอร์นี้
+ * ได้โครงสร้างเดียวกับ ai_draft_progress() ฝั่งเซิร์ฟเวอร์ แต่ไม่มีข้อความ before/after ที่ AI ยกมา
+ */
+function aiComputeDraftCompare(fb, baseFb) {
+  const phase  = fb.essay_phase || '';
+  const basePh = AI_BASELINE_PAIRS[phase] || '';
+  if (!basePh) return { has_baseline: false, pairable: false };
+
+  const info = { pairable: true, phase: basePh, label: aiPhaseLabel(basePh), short: aiPhaseShort(basePh) };
+  if (!baseFb || !baseFb.scores) return Object.assign({ has_baseline: false }, info);
+
+  const criteria = [];
+  let up = 0, down = 0, same = 0;
+  Object.keys(fb.scores || {}).sort().forEach(id => {
+    const c = fb.scores[id], b = baseFb.scores[id];
+    if (!c || !b) return;
+    const bw = Math.round(Number(b.weighted) * 100) / 100;
+    const cw = Math.round(Number(c.weighted) * 100) / 100;
+    const delta = Math.round((cw - bw) * 100) / 100;
+    const dir = delta > 0 ? 'up' : (delta < 0 ? 'down' : 'same');
+    if (dir === 'up') up++; else if (dir === 'down') down++; else same++;
+    criteria.push({
+      id, name: c.name || b.name || '', max: Number(c.max) || 0,
+      base_raw: Number(b.raw) || 0, raw: Number(c.raw) || 0,
+      base_weighted: bw, weighted: cw, delta, dir,
+      before: '', after: '', verdict: '', note: ''
+    });
+  });
+
+  const baseTotal = Math.round(Number(baseFb.total_score) * 100) / 100;
+  const total     = Math.round(Number(fb.total_score) * 100) / 100;
+  return Object.assign({
+    has_baseline:    true,
+    estimated:       true,          // คำนวณจากคะแนนที่บันทึกไว้ ไม่ได้มาจากการเทียบข้อความของ AI
+    this_short:      aiPhaseShort(phase),
+    reviewed_at:     baseFb.updated_at || baseFb.created_at || '',
+    base_total:      baseTotal,
+    total:           total,
+    delta:           Math.round((total - baseTotal) * 100) / 100,
+    max_score:       Number(fb.max_score) || 0,
+    base_quality:    baseFb.quality_level || '',
+    quality:         fb.quality_level || '',
+    quality_changed: !!(baseFb.quality_level && fb.quality_level && baseFb.quality_level !== fb.quality_level),
+    base_words:      0,
+    words:           0,
+    up, down, same,
+    improved:        (total - baseTotal) > 0,
+    identical:       (total === baseTotal && up === 0 && down === 0 && same > 0),
+    same_text:       false,
+    criteria,
+    comment:         '',
+    changes:         []
+  }, info);
+}
+
+/**
+ * เติมผลเทียบ "ฉบับตั้งต้น" ให้ผลตรวจทุกฉบับที่โหลดมา
+ * ฉบับที่เซิร์ฟเวอร์เทียบมาให้แล้วจะคงของเดิมไว้ ส่วนฉบับเก่าที่ยังไม่มีจะคำนวณจากคะแนนที่บันทึกไว้แทน
+ * all = { รหัสรอบงาน => ผลตรวจ }
+ */
+function aiAttachDraftCompare(all) {
+  Object.keys(all || {}).forEach(ph => {
+    const fb = all[ph];
+    if (!fb) return;
+    if (fb.draft_compare && fb.draft_compare.has_baseline) return;
+    const basePh = AI_BASELINE_PAIRS[ph];
+    if (!basePh) { fb.draft_compare = { has_baseline: false, pairable: false }; return; }
+    fb.draft_compare = aiComputeDraftCompare(fb, all[basePh]);
+  });
+  return all;
+}
+
+/**
+ * กล่อง "ฉบับนี้ต่างจากฉบับตั้งต้นอย่างไร"
+ * ต่างจาก aiProgressHTML ตรงที่เทียบ "คนละฉบับ" (ร่างที่ 2 กับร่างที่ 1 / หลังเรียนกับก่อนเรียน)
+ * ไม่ใช่การตรวจซ้ำฉบับเดิม — จึงเน้นตอบคำถามเดียวว่า "คะแนนดีขึ้นจริงไหม และต่างกันตรงไหน"
+ */
+function aiDraftCompareHTML(fb, opts) {
+  opts = opts || {};
+  const d = fb.draft_compare;
+  if (!d || !d.pairable) return '';
+
+  // มีคู่ให้เทียบ แต่ฉบับตั้งต้นยังไม่ถูก AI ตรวจ → บอกครูว่าต้องตรวจฉบับนั้นก่อนจึงจะเทียบได้
+  // (โหมดย่อในหน้าเขียนเรียงความไม่ต้องขึ้น เพราะนักเรียนสั่งตรวจเองไม่ได้อยู่แล้ว)
+  if (!d.has_baseline) {
+    if (opts.compact) return '';
+    return `<div class="ai-draft-box ai-draft-box-wait rounded-3 p-3 mb-3">
+      <div class="fw-bold text-dark"><i class="bi bi-arrow-left-right text-secondary me-2"></i>ยังเทียบกับ ${aiEsc(d.label || '')} ไม่ได้</div>
+      <div class="small text-muted mt-1">
+        รอบนี้ต้องเทียบกับ <strong>${aiEsc(d.label || '')}</strong> เสมอ
+        แต่ฉบับนั้นยังไม่มีผลตรวจของ AI — ให้ AI ตรวจฉบับตั้งต้นก่อน แล้วสั่งตรวจรอบนี้ใหม่อีกครั้ง
+        ระบบจะเทียบคะแนนรายข้อให้เอง
+      </div>
+      ${fb.draft_comment ? `<div class="ai-progress-comment mt-2">
+        <span class="fw-semibold">AI เทียบจากตัวข้อความไว้ว่า:</span> ${aiEsc(fb.draft_comment)}</div>` : ''}
+    </div>`;
+  }
+
+  const up = d.delta > 0, flat = (d.delta === 0);
+  const headCls = up ? 'ai-draft-box-up' : (flat ? 'ai-draft-box-flat' : 'ai-draft-box-down');
+
+  // คำตัดสินบรรทัดเดียวที่ครูอ่านแล้วรู้ทันทีว่า "ผ่าน" เกณฑ์ที่ตั้งไว้ไหม (ร่างหลังต้องดีขึ้นและต้องต่าง)
+  const verdict = up
+    ? `<span class="ai-draft-verdict ai-draft-verdict-ok"><i class="bi bi-check-circle-fill me-1"></i>คะแนนดีขึ้นจาก ${aiEsc(d.short)} อยู่ ${aiFmt(Math.abs(d.delta))} คะแนน</span>`
+    : (flat
+        ? `<span class="ai-draft-verdict ai-draft-verdict-warn"><i class="bi bi-exclamation-triangle-fill me-1"></i>คะแนนเท่ากับ ${aiEsc(d.short)} — ยังไม่ดีขึ้น</span>`
+        : `<span class="ai-draft-verdict ai-draft-verdict-bad"><i class="bi bi-arrow-down-circle-fill me-1"></i>คะแนนต่ำกว่า ${aiEsc(d.short)} อยู่ ${aiFmt(Math.abs(d.delta))} คะแนน</span>`);
+
+  // ธงเตือนเมื่อผลออกมา "ผิดจากที่ควรเป็น" — ครูจะได้รู้ว่าควรกลับไปดูงานจริง
+  const flags = [];
+  if (d.same_text) {
+    flags.push(`<div class="ai-draft-flag ai-draft-flag-bad"><i class="bi bi-files me-1"></i>
+      <strong>ข้อความเหมือนฉบับ ${aiEsc(d.short)} ทุกตัวอักษร</strong> — นักเรียนยังไม่ได้แก้ไขงานเลย คะแนนจึงไม่ควรต่างกัน</div>`);
+  } else if (d.identical) {
+    flags.push(`<div class="ai-draft-flag ai-draft-flag-warn"><i class="bi bi-exclamation-triangle me-1"></i>
+      <strong>คะแนนรายข้อเท่ากันทุกข้อ</strong> — งานเปลี่ยนไปแล้วแต่ยังไม่ถึงระดับถัดไปสักข้อ
+      ลองอ่านคอลัมน์ &quot;ต้องแก้อะไรจึงจะขยับขึ้น&quot; ด้านล่างประกอบ</div>`);
+  }
+  if (!up && !d.same_text && !d.identical) {
+    flags.push(`<div class="ai-draft-flag ai-draft-flag-warn"><i class="bi bi-graph-down me-1"></i>
+      คะแนนรวมยัง<strong>ไม่ดีขึ้น</strong>จาก ${aiEsc(d.short)} — มีข้อที่ดีขึ้น ${d.up} ข้อ แต่ถอยลง ${d.down} ข้อ</div>`);
+  }
+
+  const chips = [
+    `<span class="ai-progress-chip">
+       <span class="text-muted">คะแนน AI</span>
+       <span class="fw-bold">${aiFmt(d.base_total)} → ${aiFmt(d.total)}</span>
+       <span class="text-muted">/ ${aiFmt(d.max_score)}</span>
+       ${aiDeltaBadge(d.delta)}
+     </span>`,
+    (d.base_quality || d.quality)
+      ? `<span class="ai-progress-chip">
+           <span class="text-muted">ระดับคุณภาพ</span>
+           <span class="fw-bold">${aiEsc(d.base_quality || '-')} → ${aiEsc(d.quality || '-')}</span>
+           ${d.quality_changed ? '<span class="badge bg-primary-subtle text-primary-emphasis">เปลี่ยนระดับ</span>' : ''}
+         </span>`
+      : '',
+    `<span class="ai-progress-chip">
+       <span class="ai-delta ai-delta-up"><i class="bi bi-arrow-up-short"></i>ดีขึ้น ${d.up} ข้อ</span>
+       <span class="ai-delta ai-delta-down"><i class="bi bi-arrow-down-short"></i>ลดลง ${d.down} ข้อ</span>
+       <span class="ai-delta ai-delta-same"><i class="bi bi-dash"></i>เท่าเดิม ${d.same} ข้อ</span>
+     </span>`,
+    (d.base_words || d.words)
+      ? `<span class="ai-progress-chip"><span class="text-muted">จำนวนคำ</span>
+           <span class="fw-bold">${d.base_words || '-'} → ${d.words || '-'}</span></span>`
+      : ''
+  ].filter(Boolean).join('');
+
+  // ตารางเทียบรายข้อ: คะแนนก่อน → หลัง พร้อมข้อความจริงที่ AI ยกมาให้เห็นว่าต่างกันตรงไหน
+  let table = '';
+  if (!opts.compact && (d.criteria || []).length) {
+    const rows = d.criteria.map(c => {
+      const rowCls = c.dir === 'up' ? 'ai-draft-row-up' : (c.dir === 'down' ? 'ai-draft-row-down' : '');
+      const words = (c.before || c.after)
+        ? `<div class="ai-draft-words mt-1">
+             ${c.before ? `<div><span class="ai-draft-tag ai-draft-tag-before">${aiEsc(d.short)}</span>${aiEsc(c.before)}</div>` : ''}
+             ${c.after  ? `<div class="mt-1"><span class="ai-draft-tag ai-draft-tag-after">ฉบับนี้</span>${aiEsc(c.after)}</div>` : ''}
+           </div>`
+        : '';
+      return `<tr class="${rowCls}">
+        <td class="text-nowrap fw-semibold align-top">${aiEsc(c.id)}</td>
+        <td class="align-top">
+          <span class="fw-semibold">${aiEsc(c.name || '')}</span> ${aiVerdictBadge(c.verdict)}
+          ${words}
+          ${c.note ? `<div class="ai-draft-note mt-1"><i class="bi bi-lightbulb me-1"></i>${aiEsc(c.note)}</div>` : ''}
+        </td>
+        <td class="text-center text-nowrap text-muted align-top">${aiFmt(c.base_weighted)}</td>
+        <td class="text-center text-nowrap fw-bold align-top">${aiFmt(c.weighted)}
+          <span class="text-muted fw-normal">/ ${aiFmt(c.max)}</span></td>
+        <td class="text-center text-nowrap align-top">${aiDeltaBadge(c.delta, { unit: false })}</td>
+      </tr>`;
+    }).join('');
+    table = `<div class="table-responsive mt-2">
+      <table class="table table-sm table-bordered align-middle mb-0 bg-white">
+        <thead class="table-light">
+          <tr><th style="width:58px;">ข้อ</th><th>เกณฑ์ · ต่างกันตรงไหน</th>
+              <th class="text-center" style="width:90px;">${aiEsc(d.short)}</th>
+              <th class="text-center" style="width:110px;">ฉบับนี้</th>
+              <th class="text-center" style="width:105px;">เปลี่ยนแปลง</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+  }
+
+  const when = d.reviewed_at ? String(d.reviewed_at).replace('T', ' ').slice(0, 16) : '';
+
+  return `<div class="ai-draft-box ${headCls} rounded-3 p-3 mb-3">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+      <span class="fw-bold text-dark">
+        <i class="bi bi-arrow-left-right text-primary me-2"></i>เทียบกับ ${aiEsc(d.label || '')}
+      </span>
+      ${when ? `<span class="text-muted small">ฉบับตั้งต้นตรวจเมื่อ ${aiEsc(when)}</span>` : ''}
+    </div>
+    <div class="mb-2">${verdict}</div>
+    ${flags.join('')}
+    <div class="d-flex flex-wrap gap-2 mt-2">${chips}</div>
+    ${d.comment ? `<div class="ai-progress-comment mt-2">${aiEsc(d.comment)}</div>` : ''}
+    ${table}
+    <div class="text-muted mt-2" style="font-size:0.75rem;">
+      <i class="bi bi-info-circle me-1"></i>ส่วนต่างคำนวณจากคะแนนที่ AI ให้จริงทั้งสองฉบับ
+      ไม่ได้เชื่อคำบรรยายของ AI อย่างเดียว
+      ${d.estimated ? '<br><i class="bi bi-lightbulb me-1"></i>ผลตรวจฉบับนี้บันทึกไว้ก่อนระบบจะเทียบร่างให้อัตโนมัติ '
+        + 'จึงเทียบได้เฉพาะคะแนน — สั่งให้ AI ตรวจรอบนี้ใหม่ เพื่อให้ AI ยกข้อความของทั้งสองฉบับมาวางคู่กันให้เห็น' : ''}
+    </div>
   </div>`;
 }
 
@@ -510,6 +798,8 @@ function aiFeedbackHTML(fb, opts) {
     </div>
 
     ${recheckBox}
+
+    ${aiDraftCompareHTML(fb, opts)}
 
     ${aiProgressHTML(fb, opts)}
 

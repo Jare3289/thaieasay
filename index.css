@@ -680,5 +680,83 @@ body {
 }
 .ai-progress-item:first-of-type { border-top: 0; }
 .ai-tag-open    { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; font-weight: 600; }
+/* ============================================================
+   เทียบกับ "ฉบับตั้งต้น" คนละฉบับ (D1.2↔D1.1 · D2.2↔D2.1 · หลังเรียน↔ก่อนเรียน)
+   ============================================================ */
+.ai-draft-box { background: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #64748b; }
+.ai-draft-box-up   { background: #f0fdf4; border-color: #bbf7d0; border-left-color: #16a34a; }
+.ai-draft-box-flat { background: #fffbeb; border-color: #fde68a; border-left-color: #f59e0b; }
+.ai-draft-box-down { background: #fef2f2; border-color: #fecaca; border-left-color: #dc2626; }
+.ai-draft-box-wait { background: #f8fafc; border-color: #e2e8f0; border-left-color: #94a3b8; }
+.ai-draft-verdict {
+  display: inline-flex; align-items: center; gap: 4px;
+  border-radius: 999px; padding: 6px 14px; font-weight: 700; font-size: 0.92rem;
+}
+.ai-draft-verdict-ok   { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+.ai-draft-verdict-warn { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+.ai-draft-verdict-bad  { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+.ai-draft-flag {
+  border-radius: 10px; padding: 8px 12px; font-size: 0.86rem; margin-top: 8px; line-height: 1.7;
+}
+.ai-draft-flag-warn { background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; }
+.ai-draft-flag-bad  { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+.ai-draft-words { font-size: 0.82rem; color: #475569; line-height: 1.7; }
+.ai-draft-tag {
+  display: inline-block; border-radius: 6px; padding: 0 6px; margin-right: 6px;
+  font-size: 0.72rem; font-weight: 700;
+}
+.ai-draft-tag-before { background: #e2e8f0; color: #475569; }
+.ai-draft-tag-after  { background: #ede9fe; color: #5b21b6; }
+.ai-draft-note {
+  background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px;
+  padding: 6px 10px; font-size: 0.82rem; color: #92400e;
+}
+.ai-draft-row-up   td { background: #f6fff9; }
+.ai-draft-row-down td { background: #fff7f7; }
+.ai-tag-better { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; font-weight: 600; }
+.ai-tag-worse  { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; font-weight: 600; }
+.ai-tag-same   { background: #e5e7eb; color: #4b5563; border: 1px solid #d1d5db; font-weight: 600; }
 .ai-tag-partial { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; font-weight: 600; }
 .ai-tag-new     { background: #ede9fe; color: #5b21b6; border: 1px solid #ddd6fe; font-weight: 600; }
+
+/* ============================================================
+   สรุปภาพรวมผลงานเขียนรายบุคคล (ai_student_summary.php)
+   การ์ดตัวเลข กราฟ กล่องข้อเสนอแนะ และการ์ดคู่เทียบร่าง
+   ============================================================ */
+.ai-stat-tile {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border: 1px solid var(--border-gray);
+}
+.ai-chart-box { background: #fbfbfe; border: 1px solid var(--border-gray); }
+.ai-crit-bar { height: 8px; border-radius: 999px; background: #e9ecef; overflow: hidden; }
+.ai-crit-bar > span { display: block; height: 100%; border-radius: 999px; }
+.ai-summary-quote {
+  background: #ecfdf5; border-left: 3px solid #10b981;
+  border-radius: 8px; padding: 8px 10px; color: #334155;
+}
+.ai-summary-todo { background: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #f59e0b; }
+.ai-summary-step { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a; }
+
+/* การ์ดคู่เทียบร่าง: D1.1→D1.2 · D2.1→D2.2 · ก่อนเรียน→หลังเรียน */
+.ai-pair-card { background: #ffffff; border: 2px solid var(--border-gray); }
+.ai-pair-up   { border-color: #bbf7d0; background: #f6fff9; }
+.ai-pair-flat { border-color: #fde68a; background: #fffdf5; }
+.ai-pair-down { border-color: #fecaca; background: #fffafa; }
+.ai-pair-wait { border-style: dashed; background: #f8fafc; }
+.ai-pair-head { font-weight: 700; color: var(--primary-navy); }
+.ai-pair-from { color: #64748b; }
+.ai-pair-to   { color: #4c1d95; }
+.ai-pair-verdict { font-weight: 700; font-size: 0.88rem; }
+.ai-pair-up   .ai-pair-verdict { color: #166534; }
+.ai-pair-flat .ai-pair-verdict { color: #92400e; }
+.ai-pair-down .ai-pair-verdict { color: #991b1b; }
+.ai-pair-warn {
+  background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412;
+  border-radius: 8px; padding: 6px 10px; font-size: 0.8rem; line-height: 1.6;
+}
+.ai-pair-summary {
+  border-radius: 10px; padding: 10px 14px; font-weight: 600; font-size: 0.9rem;
+}
+.ai-pair-summary-ok   { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+.ai-pair-summary-warn { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+.ai-pair-summary-wait { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }

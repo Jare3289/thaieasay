@@ -2489,10 +2489,61 @@ try {
                 $aiRound    = 1;
             }
 
+            // ---- ฉบับตั้งต้นที่ต้องเทียบทุกครั้งตามคู่ที่คุณครูกำหนด ----
+            // D1.2 เทียบกับ D1.1 · D2.2 เทียบกับ D2.1 · หลังเรียน เทียบกับก่อนเรียน (คู่อื่นไม่เทียบข้ามกัน)
+            // แนบทั้งตัวเรียงความและคะแนนของฉบับตั้งต้นไปให้ AI เพื่อให้ยกข้อความจริงมาเทียบได้ ไม่ใช่เดาจากคะแนน
+            $aiBasePhase = ai_baseline_phase($aiPhase);
+            $aiBaseSnap  = [];
+            $aiBaseText  = '';
+            if ($aiBasePhase !== '') {
+                try {
+                    $stmtB = $pdo->prepare('
+                        SELECT se.intro_content, se.body_content, se.conclusion_content, se.word_count,
+                               f.scores, f.improvements, f.total_score, f.max_score, f.quality_level,
+                               f.essay_hash, f.updated_at
+                          FROM student_essays se
+                          LEFT JOIN essay_ai_feedback f
+                                 ON f.student_id = se.student_id AND f.essay_phase = se.essay_phase
+                         WHERE se.student_id = ? AND se.essay_phase = ?
+                    ');
+                    $stmtB->execute([$aiSid, $aiBasePhase]);
+                    $rowB = $stmtB->fetch();
+                    if ($rowB) {
+                        $bIntro = (string)($rowB['intro_content'] ?? '');
+                        $bBody  = json_decode((string)($rowB['body_content'] ?? ''), true);
+                        if (!is_array($bBody)) $bBody = ($rowB['body_content'] ?? '') !== '' ? [(string)$rowB['body_content']] : [];
+                        $bConcl = (string)($rowB['conclusion_content'] ?? '');
+                        $aiBaseText = trim($bIntro . "\n" . implode("\n", $bBody) . "\n" . $bConcl);
+                        // กันคำสั่งยาวเกินข้อจำกัดของโมเดล เมื่อรวมกับเรียงความฉบับที่กำลังตรวจ
+                        if (mb_strlen($aiBaseText, 'UTF-8') > AI_MAX_CHARS) {
+                            $aiBaseText = mb_substr($aiBaseText, 0, AI_MAX_CHARS, 'UTF-8') . '…';
+                        }
+
+                        $bScores = json_decode((string)($rowB['scores'] ?? ''), true);
+                        $bImps   = json_decode((string)($rowB['improvements'] ?? ''), true);
+                        $aiBaseSnap = ai_baseline_snapshot($aiBasePhase, [
+                            'scores'        => is_array($bScores) ? $bScores : [],
+                            'improvements'  => is_array($bImps) ? $bImps : [],
+                            'total_score'   => $rowB['total_score'],
+                            'max_score'     => $rowB['max_score'],
+                            'quality_level' => $rowB['quality_level'],
+                        ], (string)($rowB['updated_at'] ?? ''), (int)($rowB['word_count'] ?? 0),
+                           (string)($rowB['essay_hash'] ?? ai_essay_hash($bIntro, $bBody, $bConcl)));
+                        $aiBaseSnap['text'] = $aiBaseText;
+                    }
+                } catch (Exception $e) {
+                    // ยังไม่มีฉบับตั้งต้น หรืออ่านไม่ได้ — ตรวจต่อได้ตามปกติ แค่ไม่มีผลเทียบให้ดู
+                    $aiBaseSnap = [];
+                }
+            }
+            // ไม่มีตัวเรียงความของฉบับตั้งต้น = เทียบไม่ได้ ไม่ต้องส่งบล็อกเทียบไปให้ AI
+            if ($aiBaseText === '') $aiBaseSnap = [];
+
             // การเรียก API ภายนอกอาจใช้เวลาหลายสิบวินาที — ขยายเวลาทำงานของสคริปต์
             @set_time_limit(150);
 
-            $aiPrompt = ai_build_prompt($aiTopic, $aiPhase, $aiIntro, $aiBody, $aiConcl, $aiWords, $aiHints, $aiPrevSnap);
+            $aiPrompt = ai_build_prompt($aiTopic, $aiPhase, $aiIntro, $aiBody, $aiConcl, $aiWords, $aiHints,
+                                        $aiPrevSnap, $aiBaseSnap);
             $aiCall   = ai_call_model($aiSet, ai_system_prompt(), $aiPrompt);
             if (!$aiCall['ok']) {
                 ai_log_usage($pdo, $aiUser['id'], $aiRole, $aiSid, $aiPhase, false, $aiCall['error']);
@@ -2517,17 +2568,31 @@ try {
                 'regressions' => $aiData['regressions'] ?? [],
             ], $jsonOpt);
 
+            // เทียบกับฉบับตั้งต้นตามคู่ที่ครูกำหนด — คิดจากคะแนนที่เก็บไว้จริง ไม่ได้เชื่อคำบรรยายของ AI อย่างเดียว
+            $aiEssayHash = ai_essay_hash($aiIntro, $aiBody, $aiConcl);
+            $aiBaseStore = $aiBaseSnap;
+            unset($aiBaseStore['text']);   // ตัวเรียงความอ่านจาก student_essays ได้อยู่แล้ว ไม่ต้องเก็บซ้ำ
+            $aiDraftCompare = ai_draft_progress(
+                array_merge($aiData, ['essay_phase' => $aiPhase]),
+                $aiBaseStore, $aiEssayHash, $aiWords
+            );
+            $aiBaseJson   = $aiBaseStore ? json_encode($aiBaseStore, $jsonOpt) : null;
+            $aiChangeJson = json_encode($aiData['draft_changes'] ?? [], $jsonOpt);
+
             // ฐานข้อมูลเก่าที่ยังไม่มีคอลัมน์เทียบรอบ ให้บันทึกแบบเดิมไปก่อน (auto-migration จะเติมให้ในรอบถัดไป)
             $aiRoundCols = ai_feedback_has_round_columns($pdo);
+            $aiBaseCols  = ai_feedback_has_baseline_columns($pdo);
             $stmt = $pdo->prepare('
                 INSERT INTO essay_ai_feedback
                     (student_id, essay_phase, overall_comment, strengths, improvements, next_steps,
                      encouragement, scores, total_score, max_score, quality_level,
                      provider, model, requested_by, requested_role, raw_response,
                      essay_hash, recheck_needed, recheck_marked_at'
-                     . ($aiRoundCols ? ', review_round, prev_round, progress_comment, resolved_points' : '') . ')
+                     . ($aiRoundCols ? ', review_round, prev_round, progress_comment, resolved_points' : '')
+                     . ($aiBaseCols  ? ', baseline_phase, baseline_snapshot, draft_comment, draft_changes' : '') . ')
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL'
-                     . ($aiRoundCols ? ', ?, ?, ?, ?' : '') . ')
+                     . ($aiRoundCols ? ', ?, ?, ?, ?' : '')
+                     . ($aiBaseCols  ? ', ?, ?, ?, ?' : '') . ')
                 ON DUPLICATE KEY UPDATE
                     overall_comment = VALUES(overall_comment),
                     strengths       = VALUES(strengths),
@@ -2550,7 +2615,12 @@ try {
                     review_round     = VALUES(review_round),
                     prev_round       = VALUES(prev_round),
                     progress_comment = VALUES(progress_comment),
-                    resolved_points  = VALUES(resolved_points),' : '') . '
+                    resolved_points  = VALUES(resolved_points),' : '')
+                    . ($aiBaseCols ? '
+                    baseline_phase    = VALUES(baseline_phase),
+                    baseline_snapshot = VALUES(baseline_snapshot),
+                    draft_comment     = VALUES(draft_comment),
+                    draft_changes     = VALUES(draft_changes),' : '') . '
                     updated_at      = CURRENT_TIMESTAMP
             ');
             $aiParams = [
@@ -2564,10 +2634,14 @@ try {
                 $aiSet['provider'], $aiSet['model'], $aiUser['id'], $aiRole,
                 mb_substr($aiCall['text'], 0, 60000, 'UTF-8'),
                 // ลายนิ้วมือของต้นฉบับที่เพิ่งตรวจ ไว้เทียบว่านักเรียนแก้ไขต่อหรือไม่
-                ai_essay_hash($aiIntro, $aiBody, $aiConcl),
+                $aiEssayHash,
             ];
             if ($aiRoundCols) {
                 array_push($aiParams, $aiRound, $aiPrevJson, (string)($aiData['progress_comment'] ?? ''), $aiResJson);
+            }
+            if ($aiBaseCols) {
+                array_push($aiParams, ($aiBaseJson ? $aiBasePhase : null), $aiBaseJson,
+                                      (string)($aiData['draft_comment'] ?? ''), $aiChangeJson);
             }
             $stmt->execute($aiParams);
 
@@ -2616,6 +2690,8 @@ try {
             $aiData['recheck_marked_at'] = '';
             $aiData['review_round']      = $aiRound;
             $aiData['progress']          = $aiProgress;
+            $aiData['baseline_phase']    = $aiBaseJson ? $aiBasePhase : '';
+            $aiData['draft_compare']     = $aiDraftCompare;
 
             echo json_encode([
                 'success'    => true,
@@ -2773,11 +2849,13 @@ try {
                 exit;
             }
             $aiRoundCols = ai_feedback_has_round_columns($pdo);
+            $aiBaseCols  = ai_feedback_has_baseline_columns($pdo);
             $stmt = $pdo->query('
                 SELECT f.student_id, f.essay_phase, f.total_score, f.max_score, f.quality_level,
                        f.teacher_total, f.teacher_scores,
                        f.recheck_needed, f.recheck_marked_at,'
-                     . ($aiRoundCols ? ' f.review_round, f.prev_round,' : '') . '
+                     . ($aiRoundCols ? ' f.review_round, f.prev_round,' : '')
+                     . ($aiBaseCols  ? ' f.baseline_phase, f.baseline_snapshot,' : '') . '
                        f.model, f.provider, f.requested_role, f.updated_at,
                        s.student_name, s.classroom, s.student_group
                 FROM essay_ai_feedback f
@@ -2806,6 +2884,10 @@ try {
                 $aiPrevSnapRow = json_decode((string)($r['prev_round'] ?? ''), true);
                 $aiPrevTotal   = (is_array($aiPrevSnapRow) && isset($aiPrevSnapRow['total_score']))
                     ? round((float)$aiPrevSnapRow['total_score'], 2) : null;
+                // เทียบกับฉบับตั้งต้นตามคู่ที่ครูกำหนด (D1.2↔D1.1, D2.2↔D2.1, หลังเรียน↔ก่อนเรียน)
+                $aiBaseSnapRow = json_decode((string)($r['baseline_snapshot'] ?? ''), true);
+                $aiBaseTotal   = (is_array($aiBaseSnapRow) && isset($aiBaseSnapRow['total_score']))
+                    ? round((float)$aiBaseSnapRow['total_score'], 2) : null;
                 $aiList[] = [
                     'student_id'    => $r['student_id'],
                     'student_name'  => formatNamePrefix((string)$r['student_name']),
@@ -2831,6 +2913,12 @@ try {
                     'review_round'      => max(1, (int)($r['review_round'] ?? 1)),
                     'prev_total'        => $aiPrevTotal,
                     'total_delta'       => ($aiPrevTotal === null) ? null : round((float)$r['total_score'] - $aiPrevTotal, 2),
+                    // คู่เทียบตามที่ครูกำหนด: ฉบับตั้งต้นคือรอบไหน คะแนนของฉบับนั้นเท่าไร และรอบนี้ขยับขึ้นเท่าไร
+                    'baseline_phase'    => ai_baseline_phase($r['essay_phase']),
+                    'baseline_label'    => (ai_baseline_phase($r['essay_phase']) !== '')
+                                             ? ai_phase_short(ai_baseline_phase($r['essay_phase'])) : '',
+                    'baseline_total'    => $aiBaseTotal,
+                    'draft_delta'       => ($aiBaseTotal === null) ? null : round((float)$r['total_score'] - $aiBaseTotal, 2),
                 ];
             }
             echo json_encode(['success' => true, 'list' => $aiList]);

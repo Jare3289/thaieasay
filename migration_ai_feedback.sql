@@ -47,6 +47,10 @@ CREATE TABLE IF NOT EXISTS essay_ai_feedback (
     prev_round      LONGTEXT,
     progress_comment TEXT,
     resolved_points LONGTEXT,
+    baseline_phase  VARCHAR(20)  DEFAULT NULL,
+    baseline_snapshot LONGTEXT,
+    draft_comment   TEXT,
+    draft_changes   LONGTEXT,
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE,
@@ -89,3 +93,12 @@ CREATE TABLE IF NOT EXISTS ai_usage_log (
 -- ALTER TABLE essay_ai_feedback ADD COLUMN prev_round LONGTEXT NULL AFTER review_round;
 -- ALTER TABLE essay_ai_feedback ADD COLUMN progress_comment TEXT NULL AFTER prev_round;
 -- ALTER TABLE essay_ai_feedback ADD COLUMN resolved_points LONGTEXT NULL AFTER progress_comment;
+
+-- ---------------------------------------------------------------------------
+-- เทียบกับฉบับตั้งต้นตามคู่ที่ครูกำหนด: D1.2 เทียบ D1.1 · D2.2 เทียบ D2.1 · หลังเรียน เทียบ ก่อนเรียน
+-- (db_config.php รันให้อัตโนมัติเมื่อเปิดเว็บ — บรรทัดด้านล่างไว้รันมือกรณีจำเป็น)
+-- ---------------------------------------------------------------------------
+-- ALTER TABLE essay_ai_feedback ADD COLUMN baseline_phase VARCHAR(20) DEFAULT NULL AFTER resolved_points;
+-- ALTER TABLE essay_ai_feedback ADD COLUMN baseline_snapshot LONGTEXT NULL AFTER baseline_phase;
+-- ALTER TABLE essay_ai_feedback ADD COLUMN draft_comment TEXT NULL AFTER baseline_snapshot;
+-- ALTER TABLE essay_ai_feedback ADD COLUMN draft_changes LONGTEXT NULL AFTER draft_comment;
