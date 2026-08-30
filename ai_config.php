@@ -451,12 +451,11 @@ function ai_system_prompt() {
 
 /**
  * สร้างคำสั่งหลัก (User Prompt) จากเนื้อหาเรียงความจริง
- * $prevRound = ผลตรวจครั้งก่อนของฉบับเดียวกัน (ว่าง = ตรวจครั้งแรก)
- *              ถ้ามี จะแนบให้ AI เทียบว่านักเรียนแก้ไขอะไรไปแล้วบ้าง และสั่งให้สรุปความเปลี่ยนแปลงกลับมาด้วย
- * $baseline  = "ฉบับตั้งต้น" ที่ต้องเทียบตามคู่ที่ครูกำหนด (D1.2 เทียบ D1.1, D2.2 เทียบ D2.1, หลังเรียน เทียบ ก่อนเรียน)
- *              แนบทั้งตัวเรียงความและคะแนนของฉบับตั้งต้นไปด้วย เพื่อให้ AI เทียบข้อความจริงได้ ไม่ใช่เดาจากคะแนน
+ * $baseline = "ฉบับตั้งต้น" ที่ต้องเทียบตามคู่ที่ครูกำหนด (D1.2 เทียบ D1.1, D2.2 เทียบ D2.1, หลังเรียน เทียบ ก่อนเรียน)
+ *             แนบทั้งตัวเรียงความและคะแนนของฉบับตั้งต้นไปด้วย เพื่อให้ AI เทียบข้อความจริงได้ ไม่ใช่เดาจากคะแนน
+ *             ระบบเทียบ "ตามคู่" อย่างเดียว ไม่มีการเทียบผลตรวจครั้งนี้กับการตรวจครั้งก่อนของฉบับเดียวกัน
  */
-function ai_build_prompt($topic, $phase, $intro, array $bodyArr, $conclusion, $wordCount, array $spellHints = [], array $prevRound = [], array $baseline = []) {
+function ai_build_prompt($topic, $phase, $intro, array $bodyArr, $conclusion, $wordCount, array $spellHints = [], array $baseline = []) {
     $rubricLines = [];
     foreach (ai_rubric() as $it) {
         if (!$it['ai']) continue;
@@ -476,53 +475,8 @@ function ai_build_prompt($topic, $phase, $intro, array $bodyArr, $conclusion, $w
             . implode(', ', array_slice($spellHints, 0, 40)) . "\n";
     }
 
-    // ---- ผลตรวจครั้งก่อนของฉบับเดียวกัน (มีเมื่อนักเรียนแก้ไขแล้วส่งให้ตรวจซ้ำ) ----
-    // แนบไปให้ AI เพื่อให้ "ตรวจครั้งที่ 2" บอกได้ว่าอะไรเปลี่ยนไปจากครั้งก่อน ไม่ใช่ตรวจใหม่แบบไม่รู้ประวัติ
-    $prevBlock  = '';
-    $isRecheck  = !empty($prevRound);
-    if ($isRecheck) {
-        $prevRoundNo = max(1, (int)($prevRound['round'] ?? 1));
-        $prevScores  = is_array($prevRound['scores'] ?? null) ? $prevRound['scores'] : [];
-        $prevImp     = is_array($prevRound['improvements'] ?? null) ? $prevRound['improvements'] : [];
-        $prevAt      = trim((string)($prevRound['reviewed_at'] ?? ''));
-
-        $scoreLine = [];
-        foreach (ai_rubric() as $it) {
-            if (!$it['ai']) continue;
-            if (!isset($prevScores[$it['id']]['raw'])) continue;
-            $scoreLine[] = $it['id'] . '=' . (float)$prevScores[$it['id']]['raw'];
-        }
-
-        $impLine = [];
-        foreach ($prevImp as $i => $im) {
-            if (!is_array($im)) continue;
-            $cid = trim((string)($im['criterion'] ?? ''));
-            $impLine[] = ($i + 1) . ') ' . ($cid !== '' ? 'ข้อ ' . $cid . ': ' : '')
-                . ai_clean_text($im['issue'] ?? '', 400)
-                . (trim((string)($im['suggestion'] ?? '')) !== ''
-                    ? ' | เคยแนะนำให้แก้ว่า: ' . ai_clean_text($im['suggestion'], 300) : '');
-        }
-
-        $prevBlock = implode("\n", array_filter([
-            '',
-            '=== ผลการตรวจครั้งก่อน (ครั้งที่ ' . $prevRoundNo . ($prevAt !== '' ? ' เมื่อ ' . $prevAt : '') . ') ===',
-            'เรียงความข้างบนคือ "ฉบับที่นักเรียนแก้ไขมาแล้ว" หลังได้รับข้อเสนอแนะชุดนี้',
-            ($scoreLine ? 'คะแนนดิบรายข้อครั้งก่อน: ' . implode(', ', $scoreLine) : ''),
-            (isset($prevRound['total_score'])
-                ? 'คะแนนรวมของ AI ครั้งก่อน: ' . (float)$prevRound['total_score']
-                    . ' / ' . (float)($prevRound['max_score'] ?? ai_rubric_max())
-                    . (trim((string)($prevRound['quality_level'] ?? '')) !== ''
-                        ? ' (ระดับ ' . $prevRound['quality_level'] . ')' : '')
-                : ''),
-            ($impLine ? "จุดที่เคยแจ้งให้นักเรียนแก้:\n" . implode("\n", $impLine) : ''),
-            '',
-            'ให้ประเมินฉบับใหม่นี้ตามเกณฑ์อย่างตรงไปตรงมาเหมือนเดิม (ห้ามบวกคะแนนให้เพราะเห็นว่าพยายามแก้)',
-            'แล้วเทียบให้ชัดว่า "จุดที่เคยแจ้งไว้" ข้อใดแก้ได้แล้ว ข้อใดยังแก้ไม่ตรงจุด และมีจุดใดที่เพิ่งเกิดขึ้นในฉบับแก้ไข',
-        ], function ($v) { return $v !== ''; }));
-    }
-
     // ---- ฉบับตั้งต้นตามคู่ที่ครูกำหนด (D1.1 / D2.1 / ก่อนเรียน) ----
-    // ต่างจาก $prevRound ตรงที่เป็น "คนละฉบับ" ไม่ใช่การตรวจซ้ำฉบับเดิม จึงแนบตัวเรียงความไปด้วยทั้งฉบับ
+    // แนบตัวเรียงความของฉบับตั้งต้นไปด้วยทั้งฉบับ
     // เพื่อให้ AI ยกข้อความของทั้งสองฉบับมาวางคู่กันได้จริง
     $baseBlock  = '';
     $hasBase    = !empty($baseline) && trim((string)($baseline['text'] ?? '')) !== '';
@@ -574,7 +528,7 @@ function ai_build_prompt($topic, $phase, $intro, array $bodyArr, $conclusion, $w
         ], function ($v) { return $v !== ''; }));
     }
 
-    // บรรทัดที่เป็น null คือส่วนที่ใช้เฉพาะตอนตรวจซ้ำ — ตรวจครั้งแรกจะถูกตัดออกไป ไม่เหลือบรรทัดว่างคั่น
+    // บรรทัดที่เป็น null คือส่วนที่ใช้เฉพาะรอบที่มีฉบับตั้งต้นให้เทียบ — รอบอื่นจะถูกตัดออกไป ไม่เหลือบรรทัดว่างคั่น
     return implode("\n", array_filter([
         'ต่อไปนี้คือเรียงความของนักเรียน โปรดอ่านให้ละเอียดแล้วประเมินตามเกณฑ์',
         '',
@@ -595,7 +549,6 @@ function ai_build_prompt($topic, $phase, $intro, array $bodyArr, $conclusion, $w
         '=== เกณฑ์การให้คะแนน (คะแนนดิบข้อละ 0-4) ===',
         implode("\n", $rubricLines),
         '',
-        ($prevBlock !== '' ? $prevBlock : null),
         ($baseBlock !== '' ? $baseBlock : null),
         '=== รูปแบบคำตอบ (ตอบเป็น JSON เท่านั้น) ===',
         '{',
@@ -607,19 +560,14 @@ function ai_build_prompt($topic, $phase, $intro, array $bodyArr, $conclusion, $w
         '      "issue": "ปัญหาที่พบ พร้อมยกข้อความจริงจากเรียงความมาอ้างอิง",',
         '      "suggestion": "วิธีแก้ที่นักเรียนลงมือทำได้ทันที อธิบายเป็นขั้นตอนสั้น ๆ",',
         '      "example": "ตัวอย่างการปรับแก้แบบวลีสั้น ๆ ไม่เกิน 1 ประโยค (ถ้าไม่มีให้ใส่ค่าว่าง)"'
-            . ($isRecheck ? ',' : ''),
-        ($isRecheck ? '      "status": "ยังไม่แก้ = เคยแจ้งไว้ครั้งก่อนแต่ยังเป็นปัญหาอยู่, แก้บางส่วน = ดีขึ้นแต่ยังไม่ครบ, ใหม่ = เพิ่งพบในฉบับแก้ไขนี้"' : null),
+,
         '    }',
         '  ],',
         '  "scores": { "1.1": 0-4, "1.2": 0-4, "1.3": 0-4, "2.1": 0-4, "2.2": 0-4, "3.1": 0-4, "3.2": 0-4, "3.3": 0-4, "4.1": 0-4, "4.2": 0-4 },',
         '  "score_reasons": { "1.1": "เหตุผลสั้น ๆ ว่าทำไมได้คะแนนระดับนี้", "1.2": "..." },',
         '  "next_steps": ["สิ่งที่ควรลงมือทำเป็นอันดับแรกในการแก้ร่างถัดไป", "..."],',
         '  "encouragement": "ข้อความให้กำลังใจ 1-2 ประโยค"'
-            . (($isRecheck || $hasBase) ? ',' : ''),
-        ($isRecheck ? '  "progress_comment": "สรุป 3-5 ประโยคว่าฉบับแก้ไขนี้ต่างจากฉบับที่ตรวจครั้งก่อนอย่างไร ดีขึ้นตรงไหน แย่ลงตรงไหน (ยกข้อความที่แก้มาให้เห็น) และเหลืออะไรที่ยังต้องแก้",' : null),
-        ($isRecheck ? '  "resolved": ["จุดที่เคยแจ้งไว้ครั้งก่อนแล้วนักเรียนแก้ได้แล้ว พร้อมบอกว่าแก้อย่างไร", "..."],' : null),
-        ($isRecheck ? '  "regressions": ["จุดที่ครั้งก่อนทำได้ดีอยู่แล้ว แต่ฉบับแก้ไขนี้กลับแย่ลง (ถ้าไม่มีให้ส่งอาเรย์ว่าง)", "..."]'
-            . ($hasBase ? ',' : '') : null),
+            . ($hasBase ? ',' : ''),
         ($hasBase ? '  "draft_comment": "สรุป 3-5 ประโยคว่าฉบับนี้ต่างจาก ' . $baseLabel
             . ' อย่างไร ดีขึ้นตรงไหน ยังเหมือนเดิมตรงไหน โดยอ้างข้อความจริงของทั้งสองฉบับ",' : null),
         ($hasBase ? '  "draft_changes": [' : null),
@@ -631,10 +579,6 @@ function ai_build_prompt($topic, $phase, $intro, array $bodyArr, $conclusion, $w
         '',
         'ข้อกำหนดเพิ่มเติม: strengths ให้ 2-4 ข้อ, improvements ให้ 3-6 ข้อ (เรียงจากสำคัญที่สุดก่อน),',
         'next_steps ให้ 2-4 ข้อ, ต้องให้คะแนนครบทั้ง 10 ข้อ และ score_reasons ต้องมีครบทุกข้อเช่นกัน',
-        ($isRecheck
-            ? 'สำคัญ: ต้องมี progress_comment เสมอ, ทุกข้อใน improvements ต้องระบุ status, '
-              . 'และ resolved ต้องอ้างถึงจุดที่เคยแจ้งไว้ครั้งก่อนเท่านั้น (ถ้ายังไม่มีจุดใดแก้ได้เลยให้ส่งอาเรย์ว่าง)'
-            : null),
         ($hasBase
             ? 'สำคัญ: ต้องมี draft_comment เสมอ และ draft_changes ต้องมีครบทุกข้อที่ให้คะแนน (10 ข้อ) '
               . 'โดยเรียงตามรหัสข้อ — ข้อที่ไม่เปลี่ยนก็ต้องมี พร้อมระบุ verdict ว่า "เท่าเดิม" และบอกวิธีทำให้ขยับขึ้นใน note'
@@ -872,22 +816,6 @@ function ai_clean_text($v, $maxLen = 2000) {
 }
 
 /**
- * แปลงคำว่า "จุดนี้เทียบกับการตรวจครั้งก่อนเป็นอย่างไร" ที่ AI ตอบมา ให้เป็นรหัสมาตรฐานของระบบ
- * 'new' = จุดที่เพิ่งพบในฉบับแก้ไข, 'partial' = แก้แล้วดีขึ้นแต่ยังไม่ครบ, 'open' = เคยแจ้งไว้แต่ยังไม่ได้แก้
- * '' = ตรวจครั้งแรก หรือ AI ไม่ได้ระบุ
- */
-function ai_change_status_code($v) {
-    $t = mb_strtolower(trim((string)$v), 'UTF-8');
-    if ($t === '') return '';
-    if (mb_strpos($t, 'ใหม่') !== false || mb_strpos($t, 'new') !== false)          return 'new';
-    if (mb_strpos($t, 'บางส่วน') !== false || mb_strpos($t, 'partial') !== false)   return 'partial';
-    if (mb_strpos($t, 'ยังไม่') !== false || mb_strpos($t, 'เดิม') !== false
-        || mb_strpos($t, 'open') !== false || mb_strpos($t, 'unchanged') !== false
-        || mb_strpos($t, 'repeat') !== false)                                        return 'open';
-    return '';
-}
-
-/**
  * แปลงคำตัดสินของ AI เมื่อเทียบฉบับนี้กับ "ฉบับตั้งต้น" ให้เป็นรหัสมาตรฐาน
  * 'better' = ดีขึ้น, 'worse' = แย่ลง, 'same' = เท่าเดิม, '' = AI ไม่ได้ระบุ
  */
@@ -934,18 +862,15 @@ function ai_parse_feedback($rawText) {
                     'issue'      => ai_clean_text($v['issue'] ?? '', 800),
                     'suggestion' => ai_clean_text($v['suggestion'] ?? '', 800),
                     'example'    => ai_clean_text($v['example'] ?? '', 400),
-                    // ตรวจซ้ำ: จุดนี้เป็นจุดใหม่ หรือเป็นจุดเดิมที่ยังแก้ไม่ตก
-                    'status'     => ai_change_status_code($v['status'] ?? ''),
                 ];
                 if ($item['issue'] !== '' || $item['suggestion'] !== '') $improvements[] = $item;
             } else {
                 $t = ai_clean_text($v, 800);
-                if ($t !== '') $improvements[] = ['criterion' => '', 'issue' => $t, 'suggestion' => '', 'example' => '', 'status' => ''];
+                if ($t !== '') $improvements[] = ['criterion' => '', 'issue' => $t, 'suggestion' => '', 'example' => ''];
             }
         }
     }
 
-    // ตรวจซ้ำ: จุดที่เคยแจ้งไว้ครั้งก่อนแล้วนักเรียนแก้ได้แล้ว / จุดที่เคยดีอยู่แต่กลับแย่ลง
     $listOf = function ($raw, $maxLen) {
         $out = [];
         if (is_array($raw)) {
@@ -956,9 +881,6 @@ function ai_parse_feedback($rawText) {
         }
         return $out;
     };
-    $resolved    = $listOf($obj['resolved']    ?? null, 600);
-    $regressions = $listOf($obj['regressions'] ?? null, 600);
-
     // เทียบกับ "ฉบับตั้งต้น" คนละฉบับ (D1.2 เทียบ D1.1, D2.2 เทียบ D2.1, หลังเรียน เทียบ ก่อนเรียน)
     $draftChanges = [];
     if (isset($obj['draft_changes']) && is_array($obj['draft_changes'])) {
@@ -1018,10 +940,6 @@ function ai_parse_feedback($rawText) {
         'improvements'  => $improvements,
         'next_steps'    => $nextSteps,
         'encouragement' => ai_clean_text($obj['encouragement'] ?? '', 600),
-        // มีเฉพาะตอนตรวจซ้ำ — AI สรุปว่าฉบับแก้ไขต่างจากฉบับที่ตรวจครั้งก่อนอย่างไร
-        'progress_comment' => ai_clean_text($obj['progress_comment'] ?? '', 1500),
-        'resolved'      => $resolved,
-        'regressions'   => $regressions,
         // มีเฉพาะรอบที่มีฉบับตั้งต้นให้เทียบ — AI สรุปว่าฉบับนี้ต่างจากฉบับตั้งต้นอย่างไร
         'draft_comment' => ai_clean_text($obj['draft_comment'] ?? '', 1500),
         'draft_changes' => $draftChanges,
@@ -1039,7 +957,7 @@ function ai_parse_feedback($rawText) {
 }
 
 /**
- * ฐานข้อมูลนี้มีคอลัมน์สำหรับ "เทียบกับการตรวจครั้งก่อน" แล้วหรือยัง
+ * ฐานข้อมูลนี้มีคอลัมน์ review_round (ตัวนับว่าฉบับนี้ถูกตรวจมาแล้วกี่ครั้ง) แล้วหรือยัง
  * (auto-migration ใน db_config.php เติมให้อัตโนมัติ ฟังก์ชันนี้ไว้กันกรณีเติมไม่สำเร็จ เช่นสิทธิ์ ALTER ไม่พอ)
  */
 function ai_feedback_has_round_columns(PDO $pdo) {
@@ -1052,165 +970,6 @@ function ai_feedback_has_round_columns(PDO $pdo) {
         $has = false;
     }
     return $has;
-}
-
-/**
- * ย่อผลตรวจ 1 รอบให้เหลือเฉพาะสิ่งที่ต้องใช้เทียบในรอบถัดไป (เก็บเป็น JSON ในคอลัมน์ prev_round)
- * เก็บแค่คะแนนรายข้อกับจุดที่ต้องแก้ ไม่เก็บข้อความยาว ๆ ทั้งก้อน เพื่อไม่ให้ฐานข้อมูลบวม
- */
-function ai_round_snapshot(array $data, $round, $reviewedAt) {
-    $scores = [];
-    $rawScores = (isset($data['scores']) && is_array($data['scores'])) ? $data['scores'] : [];
-    foreach ($rawScores as $id => $sc) {
-        if (!is_array($sc)) continue;
-        $scores[(string)$id] = [
-            'raw'      => (float)($sc['raw'] ?? 0),
-            'weighted' => (float)($sc['weighted'] ?? 0),
-            'max'      => (float)($sc['max'] ?? 0),
-            'name'     => (string)($sc['name'] ?? ''),
-        ];
-    }
-    $imps = [];
-    $rawImps = (isset($data['improvements']) && is_array($data['improvements'])) ? $data['improvements'] : [];
-    foreach ($rawImps as $im) {
-        if (!is_array($im)) continue;
-        $imps[] = [
-            'criterion'  => (string)($im['criterion'] ?? ''),
-            'issue'      => (string)($im['issue'] ?? ''),
-            'suggestion' => (string)($im['suggestion'] ?? ''),
-        ];
-    }
-    return [
-        'round'         => max(1, (int)$round),
-        'reviewed_at'   => (string)$reviewedAt,
-        'scores'        => $scores,
-        'improvements'  => $imps,
-        'total_score'   => (float)($data['total_score'] ?? 0),
-        'max_score'     => (float)($data['max_score'] ?? ai_rubric_max()),
-        'quality_level' => (string)($data['quality_level'] ?? ''),
-    ];
-}
-
-/**
- * เทียบผลตรวจรอบล่าสุดกับรอบก่อนหน้า แล้วสรุปว่า "ฉบับแก้ไขเปลี่ยนไปอย่างไร"
- * ใช้ทั้งตอนตรวจเสร็จใหม่ ๆ และตอนเปิดดูผลเก่า จึงคำนวณจากข้อมูลที่เก็บไว้เสมอ (ไม่ต้องพึ่ง AI)
- * คืน ['has_prev' => false] เมื่อฉบับนี้เพิ่งตรวจครั้งแรก
- */
-function ai_round_progress(array $curr, $prev, $round = 2) {
-    $comment     = (string)($curr['progress_comment'] ?? '');
-    $aiResolved  = (isset($curr['resolved'])    && is_array($curr['resolved']))    ? $curr['resolved']    : [];
-    $aiRegress   = (isset($curr['regressions']) && is_array($curr['regressions'])) ? $curr['regressions'] : [];
-
-    if (!is_array($prev) || (empty($prev['scores']) && empty($prev['improvements']))) {
-        return ['has_prev' => false, 'round' => max(1, (int)$round)];
-    }
-
-    $prevScores = (isset($prev['scores']) && is_array($prev['scores'])) ? $prev['scores'] : [];
-    $currScores = (isset($curr['scores']) && is_array($curr['scores'])) ? $curr['scores'] : [];
-
-    // เทียบคะแนนรายข้อ เรียงตามลำดับเกณฑ์จริงของครู
-    $criteria = [];
-    $up = $down = $same = 0;
-    foreach (ai_rubric() as $it) {
-        if (!$it['ai']) continue;
-        $id = $it['id'];
-        $hasPrev = isset($prevScores[$id]['weighted']);
-        $hasCurr = isset($currScores[$id]['weighted']);
-        if (!$hasPrev || !$hasCurr) continue;
-        $pw = round((float)$prevScores[$id]['weighted'], 2);
-        $cw = round((float)$currScores[$id]['weighted'], 2);
-        $delta = round($cw - $pw, 2);
-        $dir = ($delta > 0) ? 'up' : (($delta < 0) ? 'down' : 'same');
-        if ($dir === 'up') $up++; elseif ($dir === 'down') $down++; else $same++;
-        $criteria[] = [
-            'id'            => $id,
-            'name'          => (string)($currScores[$id]['name'] ?? $it['name']),
-            'max'           => (float)$it['max'],
-            'prev_raw'      => (float)($prevScores[$id]['raw'] ?? 0),
-            'raw'           => (float)($currScores[$id]['raw'] ?? 0),
-            'prev_weighted' => $pw,
-            'weighted'      => $cw,
-            'delta'         => $delta,
-            'dir'           => $dir,
-        ];
-    }
-    $deltaOf = function ($cid) use ($criteria) {
-        foreach ($criteria as $c) { if ($c['id'] === $cid) return $c['delta']; }
-        return null;
-    };
-    $nameOf = function ($cid) use ($criteria) {
-        foreach ($criteria as $c) { if ($c['id'] === $cid) return $c['name']; }
-        foreach (ai_rubric() as $it) { if ($it['id'] === $cid) return $it['name']; }
-        return '';
-    };
-
-    // จุดที่ต้องแก้: เทียบรายการของรอบก่อนกับรอบนี้ทีละเกณฑ์
-    $prevImps = (isset($prev['improvements']) && is_array($prev['improvements'])) ? $prev['improvements'] : [];
-    $currImps = (isset($curr['improvements']) && is_array($curr['improvements'])) ? $curr['improvements'] : [];
-    $currKeys = [];
-    foreach ($currImps as $im) {
-        if (is_array($im)) $currKeys[(string)($im['criterion'] ?? '')] = true;
-    }
-    $prevKeys = [];
-    foreach ($prevImps as $im) {
-        if (is_array($im)) $prevKeys[(string)($im['criterion'] ?? '')] = true;
-    }
-
-    $fixed = [];   // เคยแจ้งไว้ครั้งก่อน และรอบนี้ AI ไม่ยกขึ้นมาอีกแล้ว
-    $still = [];   // เคยแจ้งไว้ และรอบนี้ยังถูกยกขึ้นมาอีก
-    foreach ($prevImps as $im) {
-        if (!is_array($im)) continue;
-        $cid  = (string)($im['criterion'] ?? '');
-        $item = [
-            'criterion' => $cid,
-            'name'      => $nameOf($cid),
-            'issue'     => (string)($im['issue'] ?? ''),
-            'delta'     => $deltaOf($cid),
-        ];
-        if (isset($currKeys[$cid])) $still[] = $item; else $fixed[] = $item;
-    }
-
-    $fresh = [];   // จุดที่เพิ่งพบในฉบับแก้ไขนี้ (ครั้งก่อนไม่มี)
-    foreach ($currImps as $im) {
-        if (!is_array($im)) continue;
-        $cid = (string)($im['criterion'] ?? '');
-        if (isset($prevKeys[$cid])) continue;
-        $fresh[] = [
-            'criterion' => $cid,
-            'name'      => $nameOf($cid),
-            'issue'     => (string)($im['issue'] ?? ''),
-            'delta'     => $deltaOf($cid),
-        ];
-    }
-
-    $prevTotal = round((float)($prev['total_score'] ?? 0), 2);
-    $currTotal = round((float)($curr['total_score'] ?? 0), 2);
-    $prevQual  = (string)($prev['quality_level'] ?? '');
-    $currQual  = (string)($curr['quality_level'] ?? '');
-
-    return [
-        'has_prev'        => true,
-        'round'           => max(2, (int)$round),
-        'prev_round'      => max(1, (int)($prev['round'] ?? 1)),
-        'prev_at'         => (string)($prev['reviewed_at'] ?? ''),
-        'prev_total'      => $prevTotal,
-        'total'           => $currTotal,
-        'total_delta'     => round($currTotal - $prevTotal, 2),
-        'max_score'       => (float)($curr['max_score'] ?? ai_rubric_max()),
-        'prev_quality'    => $prevQual,
-        'quality'         => $currQual,
-        'quality_changed' => ($prevQual !== '' && $currQual !== '' && $prevQual !== $currQual),
-        'up'              => $up,
-        'down'            => $down,
-        'same'            => $same,
-        'criteria'        => $criteria,
-        'fixed'           => $fixed,
-        'still'           => $still,
-        'new'             => $fresh,
-        'comment'         => $comment,
-        'ai_resolved'     => $aiResolved,
-        'ai_regressions'  => $aiRegress,
-    ];
 }
 
 /**
@@ -1472,25 +1231,12 @@ function ai_feedback_row_to_array(array $row, ?array $evalManual = null) {
         // ต้นฉบับถูกแก้ไขหลัง AI ตรวจหรือยัง (ใช้แสดงป้าย "รอตรวจใหม่" และจัดคิวตรวจซ้ำ)
         'needs_recheck'     => !empty($row['recheck_needed']),
         'recheck_marked_at' => (string)($row['recheck_marked_at'] ?? ''),
-        // ตรวจฉบับนี้เป็นครั้งที่เท่าไร และ AI สรุปความเปลี่ยนแปลงจากครั้งก่อนไว้ว่าอย่างไร
+        // ตรวจฉบับนี้เป็นครั้งที่เท่าไร (ตัวนับเฉย ๆ — ระบบไม่ได้เทียบผลตรวจข้ามครั้งแล้ว)
         'review_round'      => max(1, (int)($row['review_round'] ?? 1)),
-        'progress_comment'  => (string)($row['progress_comment'] ?? ''),
         // เทียบกับฉบับตั้งต้นตามคู่ที่ครูกำหนด (D1.2↔D1.1, D2.2↔D2.1, หลังเรียน↔ก่อนเรียน)
         'draft_comment'     => (string)($row['draft_comment'] ?? ''),
         'baseline_phase'    => (string)($row['baseline_phase'] ?? ''),
     ];
-
-    // จุดที่แก้ได้แล้ว / จุดที่กลับแย่ลง ที่ AI ระบุไว้ตอนตรวจซ้ำ (เก็บรวมไว้ในคอลัมน์เดียว)
-    $rp = $decode($row['resolved_points'] ?? '');
-    $out['resolved']    = (isset($rp['resolved'])    && is_array($rp['resolved']))    ? $rp['resolved']    : [];
-    $out['regressions'] = (isset($rp['regressions']) && is_array($rp['regressions'])) ? $rp['regressions'] : [];
-
-    // เทียบกับผลตรวจครั้งก่อน (ถ้ามี) — ตรวจครั้งแรกจะได้ ['has_prev' => false]
-    $out['progress'] = ai_round_progress(
-        $out,
-        $decode($row['prev_round'] ?? ''),
-        $out['review_round']
-    );
 
     // เทียบกับ "ฉบับตั้งต้น" คนละฉบับ (ร่างที่ 1 ของหน่วยเดียวกัน หรือฉบับก่อนเรียน)
     $out['draft_changes'] = $decode($row['draft_changes'] ?? '');

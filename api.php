@@ -2461,32 +2461,18 @@ try {
             $aiTopics = essay_topics_map($pdo);
             $aiTopic  = (string)($aiTopics[essay_topic_phase($aiPhase)] ?? '');
 
-            // ผลตรวจครั้งก่อนของฉบับเดียวกัน (ถ้ามี) — ใช้ 2 ทาง
-            // 1) ส่งไปให้ AI เทียบว่านักเรียนแก้อะไรมาแล้วบ้าง  2) เก็บไว้เทียบคะแนนรายข้อให้ครู/นักเรียนเห็น
-            $aiPrevSnap = [];
-            $aiRound    = 1;
+            // ฉบับนี้เคยถูกตรวจมาแล้วกี่ครั้ง (เป็นตัวนับเฉย ๆ ไว้แสดงป้าย "ตรวจครั้งที่ N")
+            // ระบบไม่ได้เทียบผลตรวจข้ามครั้งแล้ว — การเทียบใช้ "คู่ที่ครูกำหนด" อย่างเดียว
+            $aiRound = 1;
             try {
-                $stmtP = $pdo->prepare('SELECT scores, improvements, total_score, max_score, quality_level,
-                                               review_round, updated_at
-                                          FROM essay_ai_feedback WHERE student_id = ? AND essay_phase = ?');
+                $stmtP = $pdo->prepare('SELECT review_round FROM essay_ai_feedback
+                                         WHERE student_id = ? AND essay_phase = ?');
                 $stmtP->execute([$aiSid, $aiPhase]);
                 $rowP = $stmtP->fetch();
-                if ($rowP) {
-                    $aiRound    = max(1, (int)($rowP['review_round'] ?? 1)) + 1;
-                    $prevScores = json_decode((string)$rowP['scores'], true);
-                    $prevImps   = json_decode((string)$rowP['improvements'], true);
-                    $aiPrevSnap = ai_round_snapshot([
-                        'scores'        => is_array($prevScores) ? $prevScores : [],
-                        'improvements'  => is_array($prevImps) ? $prevImps : [],
-                        'total_score'   => $rowP['total_score'],
-                        'max_score'     => $rowP['max_score'],
-                        'quality_level' => $rowP['quality_level'],
-                    ], (int)($rowP['review_round'] ?? 1), (string)$rowP['updated_at']);
-                }
+                if ($rowP) $aiRound = max(1, (int)($rowP['review_round'] ?? 1)) + 1;
             } catch (Exception $e) {
-                // ฐานข้อมูลเก่ายังไม่มีคอลัมน์เทียบรอบ — ตรวจต่อได้ตามปกติ แค่ไม่มีผลเทียบให้ดู
-                $aiPrevSnap = [];
-                $aiRound    = 1;
+                // ฐานข้อมูลเก่ายังไม่มีคอลัมน์ตัวนับ — ตรวจต่อได้ตามปกติ
+                $aiRound = 1;
             }
 
             // ---- ฉบับตั้งต้นที่ต้องเทียบทุกครั้งตามคู่ที่คุณครูกำหนด ----
@@ -2543,7 +2529,7 @@ try {
             @set_time_limit(150);
 
             $aiPrompt = ai_build_prompt($aiTopic, $aiPhase, $aiIntro, $aiBody, $aiConcl, $aiWords, $aiHints,
-                                        $aiPrevSnap, $aiBaseSnap);
+                                        $aiBaseSnap);
             $aiCall   = ai_call_model($aiSet, ai_system_prompt(), $aiPrompt);
             if (!$aiCall['ok']) {
                 ai_log_usage($pdo, $aiUser['id'], $aiRole, $aiSid, $aiPhase, false, $aiCall['error']);
@@ -2560,13 +2546,6 @@ try {
             $aiData = $aiParsed['data'];
 
             $jsonOpt = JSON_UNESCAPED_UNICODE;
-            // ผลตรวจครั้งนี้เทียบกับครั้งก่อน — คำนวณจากคะแนนที่เก็บไว้จริง (ไม่ได้เชื่อคำบรรยายของ AI อย่างเดียว)
-            $aiProgress = ai_round_progress($aiData, $aiPrevSnap, $aiRound);
-            $aiPrevJson = $aiPrevSnap ? json_encode($aiPrevSnap, $jsonOpt) : null;
-            $aiResJson  = json_encode([
-                'resolved'    => $aiData['resolved'] ?? [],
-                'regressions' => $aiData['regressions'] ?? [],
-            ], $jsonOpt);
 
             // เทียบกับฉบับตั้งต้นตามคู่ที่ครูกำหนด — คิดจากคะแนนที่เก็บไว้จริง ไม่ได้เชื่อคำบรรยายของ AI อย่างเดียว
             $aiEssayHash = ai_essay_hash($aiIntro, $aiBody, $aiConcl);
@@ -2588,10 +2567,10 @@ try {
                      encouragement, scores, total_score, max_score, quality_level,
                      provider, model, requested_by, requested_role, raw_response,
                      essay_hash, recheck_needed, recheck_marked_at'
-                     . ($aiRoundCols ? ', review_round, prev_round, progress_comment, resolved_points' : '')
+                     . ($aiRoundCols ? ', review_round' : '')
                      . ($aiBaseCols  ? ', baseline_phase, baseline_snapshot, draft_comment, draft_changes' : '') . ')
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL'
-                     . ($aiRoundCols ? ', ?, ?, ?, ?' : '')
+                     . ($aiRoundCols ? ', ?' : '')
                      . ($aiBaseCols  ? ', ?, ?, ?, ?' : '') . ')
                 ON DUPLICATE KEY UPDATE
                     overall_comment = VALUES(overall_comment),
@@ -2612,10 +2591,7 @@ try {
                     recheck_needed  = 0,
                     recheck_marked_at = NULL,'
                     . ($aiRoundCols ? '
-                    review_round     = VALUES(review_round),
-                    prev_round       = VALUES(prev_round),
-                    progress_comment = VALUES(progress_comment),
-                    resolved_points  = VALUES(resolved_points),' : '')
+                    review_round     = VALUES(review_round),' : '')
                     . ($aiBaseCols ? '
                     baseline_phase    = VALUES(baseline_phase),
                     baseline_snapshot = VALUES(baseline_snapshot),
@@ -2637,7 +2613,7 @@ try {
                 $aiEssayHash,
             ];
             if ($aiRoundCols) {
-                array_push($aiParams, $aiRound, $aiPrevJson, (string)($aiData['progress_comment'] ?? ''), $aiResJson);
+                array_push($aiParams, $aiRound);
             }
             if ($aiBaseCols) {
                 array_push($aiParams, ($aiBaseJson ? $aiBasePhase : null), $aiBaseJson,
@@ -2689,7 +2665,6 @@ try {
             $aiData['needs_recheck']     = false;
             $aiData['recheck_marked_at'] = '';
             $aiData['review_round']      = $aiRound;
-            $aiData['progress']          = $aiProgress;
             $aiData['baseline_phase']    = $aiBaseJson ? $aiBasePhase : '';
             $aiData['draft_compare']     = $aiDraftCompare;
 
@@ -2854,7 +2829,7 @@ try {
                 SELECT f.student_id, f.essay_phase, f.total_score, f.max_score, f.quality_level,
                        f.teacher_total, f.teacher_scores,
                        f.recheck_needed, f.recheck_marked_at,'
-                     . ($aiRoundCols ? ' f.review_round, f.prev_round,' : '')
+                     . ($aiRoundCols ? ' f.review_round,' : '')
                      . ($aiBaseCols  ? ' f.baseline_phase, f.baseline_snapshot,' : '') . '
                        f.model, f.provider, f.requested_role, f.updated_at,
                        s.student_name, s.classroom, s.student_group
@@ -2880,10 +2855,6 @@ try {
                         $aiTSrc   = 'evaluation';
                     }
                 }
-                // คะแนน AI ของการตรวจครั้งก่อน (เก็บไว้ในคอลัมน์ prev_round ตอนตรวจซ้ำ)
-                $aiPrevSnapRow = json_decode((string)($r['prev_round'] ?? ''), true);
-                $aiPrevTotal   = (is_array($aiPrevSnapRow) && isset($aiPrevSnapRow['total_score']))
-                    ? round((float)$aiPrevSnapRow['total_score'], 2) : null;
                 // เทียบกับฉบับตั้งต้นตามคู่ที่ครูกำหนด (D1.2↔D1.1, D2.2↔D2.1, หลังเรียน↔ก่อนเรียน)
                 $aiBaseSnapRow = json_decode((string)($r['baseline_snapshot'] ?? ''), true);
                 $aiBaseTotal   = (is_array($aiBaseSnapRow) && isset($aiBaseSnapRow['total_score']))
@@ -2909,10 +2880,8 @@ try {
                     'updated_at'    => $r['updated_at'],
                     'needs_recheck'     => !empty($r['recheck_needed']),
                     'recheck_marked_at' => (string)($r['recheck_marked_at'] ?? ''),
-                    // ตรวจฉบับนี้เป็นครั้งที่เท่าไร และคะแนน AI ขยับจากครั้งก่อนเท่าไร (null = ตรวจครั้งแรก)
+                    // ตรวจฉบับนี้เป็นครั้งที่เท่าไร (ตัวนับเฉย ๆ)
                     'review_round'      => max(1, (int)($r['review_round'] ?? 1)),
-                    'prev_total'        => $aiPrevTotal,
-                    'total_delta'       => ($aiPrevTotal === null) ? null : round((float)$r['total_score'] - $aiPrevTotal, 2),
                     // คู่เทียบตามที่ครูกำหนด: ฉบับตั้งต้นคือรอบไหน คะแนนของฉบับนั้นเท่าไร และรอบนี้ขยับขึ้นเท่าไร
                     'baseline_phase'    => ai_baseline_phase($r['essay_phase']),
                     'baseline_label'    => (ai_baseline_phase($r['essay_phase']) !== '')

@@ -44,9 +44,6 @@ CREATE TABLE IF NOT EXISTS essay_ai_feedback (
     recheck_needed  TINYINT(1)   NOT NULL DEFAULT 0,
     recheck_marked_at DATETIME   DEFAULT NULL,
     review_round    INT          NOT NULL DEFAULT 1,
-    prev_round      LONGTEXT,
-    progress_comment TEXT,
-    resolved_points LONGTEXT,
     baseline_phase  VARCHAR(20)  DEFAULT NULL,
     baseline_snapshot LONGTEXT,
     draft_comment   TEXT,
@@ -86,19 +83,20 @@ CREATE TABLE IF NOT EXISTS ai_usage_log (
 -- ALTER TABLE essay_ai_feedback ADD COLUMN recheck_marked_at DATETIME DEFAULT NULL AFTER recheck_needed;
 
 -- ---------------------------------------------------------------------------
--- เทียบกับการตรวจครั้งก่อน: เก็บผลตรวจรอบก่อนไว้ 1 ชุด เพื่อบอกว่าฉบับแก้ไข "เปลี่ยนไปอย่างไร"
+-- ตัวนับ "ตรวจฉบับนี้เป็นครั้งที่เท่าไร"
 -- (db_config.php รันให้อัตโนมัติเมื่อเปิดเว็บ — บรรทัดด้านล่างไว้รันมือกรณีจำเป็น)
+--
+-- หมายเหตุ: ระบบเคยมีคอลัมน์ prev_round / progress_comment / resolved_points ไว้เทียบผลตรวจ
+-- ข้ามครั้ง ตอนนี้เลิกใช้แล้ว (เทียบตามคู่ที่ครูกำหนดอย่างเดียว) ฐานข้อมูลเดิมที่มีคอลัมน์เหล่านี้
+-- ปล่อยไว้ได้เลย ระบบไม่อ่านไม่เขียนแล้ว
 -- ---------------------------------------------------------------------------
 -- ALTER TABLE essay_ai_feedback ADD COLUMN review_round INT NOT NULL DEFAULT 1 AFTER recheck_marked_at;
--- ALTER TABLE essay_ai_feedback ADD COLUMN prev_round LONGTEXT NULL AFTER review_round;
--- ALTER TABLE essay_ai_feedback ADD COLUMN progress_comment TEXT NULL AFTER prev_round;
--- ALTER TABLE essay_ai_feedback ADD COLUMN resolved_points LONGTEXT NULL AFTER progress_comment;
 
 -- ---------------------------------------------------------------------------
 -- เทียบกับฉบับตั้งต้นตามคู่ที่ครูกำหนด: D1.2 เทียบ D1.1 · D2.2 เทียบ D2.1 · หลังเรียน เทียบ ก่อนเรียน
 -- (db_config.php รันให้อัตโนมัติเมื่อเปิดเว็บ — บรรทัดด้านล่างไว้รันมือกรณีจำเป็น)
 -- ---------------------------------------------------------------------------
--- ALTER TABLE essay_ai_feedback ADD COLUMN baseline_phase VARCHAR(20) DEFAULT NULL AFTER resolved_points;
+-- ALTER TABLE essay_ai_feedback ADD COLUMN baseline_phase VARCHAR(20) DEFAULT NULL AFTER review_round;
 -- ALTER TABLE essay_ai_feedback ADD COLUMN baseline_snapshot LONGTEXT NULL AFTER baseline_phase;
 -- ALTER TABLE essay_ai_feedback ADD COLUMN draft_comment TEXT NULL AFTER baseline_snapshot;
 -- ALTER TABLE essay_ai_feedback ADD COLUMN draft_changes LONGTEXT NULL AFTER draft_comment;
