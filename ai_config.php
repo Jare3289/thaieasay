@@ -613,6 +613,176 @@ function ai_build_prompt($topic, $phase, $intro, array $bodyArr, $conclusion, $w
     ], function ($v) { return $v !== null; }));
 }
 
+/* ============================================================
+   ภาพรวมการนำเสนอรายรอบงาน (ทั้งชั้น)
+   ใช้เมื่อ AI ตรวจครบทั้งรอบแล้ว — สรุปว่านักเรียนทั้งชั้นนำเสนอภาระงานนั้นไปทางใด
+   มีประเด็นใดน่าสนใจ และมีข้อสังเกตอะไรที่เป็นประโยชน์ต่อการอ่านผลวิจัย
+   ============================================================ */
+
+/** คำสั่งกำกับบทบาทของ AI ตอนเขียนภาพรวมรายรอบงาน */
+function ai_overview_system_prompt() {
+    return implode("\n", [
+        'คุณคือ "นักวิจัยด้านการสอนภาษาไทย" ที่กำลังอ่านผลตรวจเรียงความของนักเรียนทั้งชั้นในภาระงานหนึ่ง',
+        'หน้าที่ของคุณคือเขียน "ภาพรวมการนำเสนอ" ของทั้งชั้น เพื่อให้ครูผู้วิจัยเห็นภาพว่า',
+        'นักเรียนเลือกนำเสนอไปในทิศทางใด มีประเด็นใดน่าสนใจ และมีข้อสังเกตอะไรบ้าง',
+        '',
+        'กติกาสำคัญที่ต้องทำตามอย่างเคร่งครัด:',
+        '1. เขียนจากข้อมูลที่ให้มาเท่านั้น ห้ามแต่งตัวเลขหรือเหตุการณ์ที่ไม่มีในข้อมูล',
+        '2. เมื่ออ้างจำนวน ให้ใช้คำบอกสัดส่วนอย่าง "ส่วนใหญ่ / ประมาณครึ่งหนึ่ง / ส่วนน้อย"',
+        '   หรือใช้ตัวเลขที่ระบบให้มาตรง ๆ ห้ามนับเองแล้วเดาเป็นตัวเลขใหม่',
+        '3. ห้ามสรุปว่าผลการวิจัย "มีนัยสำคัญทางสถิติ" หรือระบุค่า p / t เอง',
+        '   การทดสอบนัยสำคัญทำในหน้าวิเคราะห์สถิติของระบบด้วย Paired t-test อยู่แล้ว',
+        '   ให้คุณบรรยายเพียง "ทิศทางและขนาดของการเปลี่ยนแปลง" ตามตัวเลขที่ให้มา',
+        '4. เขียนเป็นภาษาไทยเชิงวิชาการที่อ่านง่าย ตรงไปตรงมา ไม่เยินยอเกินจริง',
+        '5. ตอบกลับเป็น JSON เพียงอย่างเดียว ห้ามมีข้อความอื่นนอกวงเล็บปีกกา ห้ามใส่ ```',
+    ]);
+}
+
+/**
+ * สร้างคำสั่งสำหรับเขียนภาพรวมรายรอบงาน
+ * $stats   = ตัวเลขสรุปของรอบนั้นที่ระบบคำนวณมาแล้ว (ห้ามให้ AI คำนวณเอง)
+ * $samples = ตัวอย่างการนำเสนอรายคน [['id','intro','conclusion','overall','score'], ...]
+ */
+function ai_build_overview_prompt($phase, $topic, array $stats, array $samples) {
+    $critLine = [];
+    foreach (($stats['criteria'] ?? []) as $id => $c) {
+        $critLine[] = $id . ' ' . $c['name'] . ' = ' . $c['mean'] . '/' . $c['max']
+                    . ' (' . $c['pct'] . '%)';
+    }
+
+    $levelLine = [];
+    foreach (($stats['levels'] ?? []) as $lv => $n) {
+        if ($n > 0) $levelLine[] = $lv . ' ' . $n . ' คน';
+    }
+
+    $pairLine = '';
+    if (!empty($stats['pair'])) {
+        $pr = $stats['pair'];
+        $pairLine = 'เทียบกับ ' . $pr['base_label'] . ': เทียบได้ ' . $pr['n'] . ' ฉบับ · '
+            . 'คะแนนเฉลี่ยเปลี่ยน ' . ($pr['mean_delta'] >= 0 ? '+' : '') . $pr['mean_delta'] . ' คะแนน · '
+            . 'ได้คะแนนสูงกว่าฉบับตั้งต้น ' . $pr['improved'] . ' ฉบับ · '
+            . 'เท่าเดิม ' . $pr['same'] . ' ฉบับ · ต่ำกว่า ' . $pr['worse'] . ' ฉบับ';
+    }
+
+    $sampleLines = [];
+    foreach ($samples as $i => $sp) {
+        $sampleLines[] = ($i + 1) . ') คะแนน ' . $sp['score'] . '/' . ($stats['max_score'] ?? ai_rubric_max())
+            . "\n   คำนำ: " . $sp['intro']
+            . "\n   สรุป: " . $sp['conclusion']
+            . ($sp['overall'] !== '' ? "\n   ผลตรวจโดยย่อ: " . $sp['overall'] : '');
+    }
+
+    return implode("\n", array_filter([
+        'ต่อไปนี้คือผลตรวจเรียงความของนักเรียนทั้งชั้นในภาระงานหนึ่ง โปรดอ่านแล้วเขียนภาพรวมการนำเสนอ',
+        '',
+        '=== ข้อมูลของรอบงาน ===',
+        'รอบงาน: ' . ai_phase_label($phase),
+        'หัวข้อที่ครูกำหนด: ' . ($topic !== '' ? $topic : '(ครูไม่ได้กำหนดหัวข้อตายตัว)'),
+        'จำนวนเรียงความที่ AI ตรวจแล้ว: ' . (int)($stats['n'] ?? 0) . ' ฉบับ',
+        'คะแนนเฉลี่ยของ AI: ' . ($stats['mean'] ?? 0) . ' / ' . ($stats['max_score'] ?? ai_rubric_max()),
+        'ความยาวเฉลี่ย: ' . (int)($stats['mean_words'] ?? 0) . ' คำ (เกณฑ์ของครูคือ 250-300 คำ)',
+        ($levelLine ? 'การกระจายระดับคุณภาพ: ' . implode(', ', $levelLine) : ''),
+        ($critLine ? "คะแนนเฉลี่ยรายเกณฑ์:\n- " . implode("\n- ", $critLine) : ''),
+        ($pairLine !== '' ? $pairLine : ''),
+        '',
+        '=== การนำเสนอของนักเรียนแต่ละคน (คำนำ / สรุป / ผลตรวจโดยย่อ) ===',
+        implode("\n", $sampleLines),
+        '',
+        '=== รูปแบบคำตอบ (ตอบเป็น JSON เท่านั้น) ===',
+        '{',
+        '  "overview": "ภาพรวม 4-6 ประโยคว่านักเรียนทั้งชั้นนำเสนอภาระงานนี้ไปในทิศทางใด มองประเด็นจากมุมไหนเป็นหลัก",',
+        '  "themes": [',
+        '    { "theme": "แนวทาง/ประเด็นที่นักเรียนเลือกนำเสนอ", "how_many": "ส่วนใหญ่ หรือ ประมาณครึ่งหนึ่ง หรือ ส่วนน้อย",',
+        '      "example": "ยกตัวอย่างสั้น ๆ จากงานจริงที่เห็นในข้อมูล" }',
+        '  ],',
+        '  "interesting": ["สิ่งที่น่าสนใจหรือเหนือความคาดหมายที่พบในงานชุดนี้", "..."],',
+        '  "common_strengths": ["จุดที่นักเรียนส่วนใหญ่ทำได้ดีในรอบนี้", "..."],',
+        '  "common_problems": ["จุดบกพร่องที่พบซ้ำ ๆ ทั้งชั้น พร้อมบอกว่าน่าจะมาจากอะไร", "..."],',
+        '  "observations": ["ข้อสังเกตเชิงวิจัยที่อ้างอิงตัวเลขที่ให้มาข้างบนเท่านั้น", "..."],',
+        '  "teaching_notes": ["สิ่งที่ครูควรทำต่อในคาบถัดไป จากสิ่งที่เห็นในงานชุดนี้", "..."]',
+        '}',
+        '',
+        'ข้อกำหนด: themes ให้ 3-5 ข้อ, interesting 2-4 ข้อ, common_strengths 2-4 ข้อ,',
+        'common_problems 2-4 ข้อ, observations 2-4 ข้อ, teaching_notes 2-4 ข้อ',
+        'ย้ำอีกครั้ง: ห้ามระบุค่าทางสถิติหรือสรุปว่า "มีนัยสำคัญ" เอง ให้บรรยายทิศทางและขนาดของการเปลี่ยนแปลงเท่านั้น',
+    ], function ($v) { return $v !== ''; }));
+}
+
+/** แปลงแถวในตาราง essay_ai_phase_summary ให้เป็นโครงสร้างที่หน้าเว็บใช้ได้ทันที */
+function ai_phase_overview_row(array $row) {
+    $dec = function ($v) {
+        $d = json_decode((string)$v, true);
+        return is_array($d) ? $d : [];
+    };
+    return [
+        'essay_phase'      => (string)$row['essay_phase'],
+        'phase_label'      => ai_phase_label($row['essay_phase']),
+        'overview'         => (string)$row['overview'],
+        'themes'           => $dec($row['themes']),
+        'interesting'      => $dec($row['interesting']),
+        'common_strengths' => $dec($row['common_strengths']),
+        'common_problems'  => $dec($row['common_problems']),
+        'observations'     => $dec($row['observations']),
+        'teaching_notes'   => $dec($row['teaching_notes']),
+        'stats'            => $dec($row['stats']),
+        'essay_count'      => (int)$row['essay_count'],
+        'provider'         => (string)$row['provider'],
+        'model'            => (string)$row['model'],
+        'updated_at'       => (string)$row['updated_at'],
+    ];
+}
+
+/** แปลงคำตอบภาพรวมรายรอบงานของ AI ให้เป็นโครงสร้างมาตรฐาน */
+function ai_parse_phase_overview($rawText) {
+    $obj = ai_extract_json($rawText);
+    if (!is_array($obj)) {
+        return ['ok' => false, 'data' => [], 'error' => 'อ่านคำตอบของ AI ไม่ได้ (ไม่ใช่ JSON ที่สมบูรณ์) กรุณาลองใหม่อีกครั้ง'];
+    }
+
+    $listOf = function ($raw, $maxLen = 600) {
+        $out = [];
+        if (is_array($raw)) {
+            foreach ($raw as $v) {
+                $t = ai_clean_text(is_array($v) ? implode(' ', $v) : $v, $maxLen);
+                if ($t !== '') $out[] = $t;
+            }
+        }
+        return $out;
+    };
+
+    $themes = [];
+    if (isset($obj['themes']) && is_array($obj['themes'])) {
+        foreach ($obj['themes'] as $t) {
+            if (is_array($t)) {
+                $item = [
+                    'theme'    => ai_clean_text($t['theme'] ?? '', 300),
+                    'how_many' => ai_clean_text($t['how_many'] ?? '', 60),
+                    'example'  => ai_clean_text($t['example'] ?? '', 400),
+                ];
+                if ($item['theme'] !== '') $themes[] = $item;
+            } else {
+                $tt = ai_clean_text($t, 300);
+                if ($tt !== '') $themes[] = ['theme' => $tt, 'how_many' => '', 'example' => ''];
+            }
+        }
+    }
+
+    $data = [
+        'overview'         => ai_clean_text($obj['overview'] ?? '', 2000),
+        'themes'           => $themes,
+        'interesting'      => $listOf($obj['interesting'] ?? null),
+        'common_strengths' => $listOf($obj['common_strengths'] ?? null),
+        'common_problems'  => $listOf($obj['common_problems'] ?? null),
+        'observations'     => $listOf($obj['observations'] ?? null, 800),
+        'teaching_notes'   => $listOf($obj['teaching_notes'] ?? null),
+    ];
+
+    if ($data['overview'] === '' && !$themes && !$data['observations']) {
+        return ['ok' => false, 'data' => [], 'error' => 'AI ตอบกลับมาไม่ครบถ้วน กรุณาลองใหม่อีกครั้ง'];
+    }
+    return ['ok' => true, 'data' => $data, 'error' => ''];
+}
+
 /**
  * ส่ง HTTP POST แบบ JSON (ใช้ cURL ถ้ามี ไม่มีก็ถอยไปใช้ stream context)
  * คืนค่า ['ok' => bool, 'status' => int, 'body' => string, 'error' => string]
@@ -1075,7 +1245,7 @@ function ai_baseline_snapshot($phase, array $data, $reviewedAt, $wordCount = 0, 
  *   identical  = คะแนนรวมและคะแนนรายข้อเท่ากันหมด (น่าสงสัยว่า AI ไม่ได้เทียบจริง หรือนักเรียนไม่ได้แก้)
  *   same_text  = ข้อความทั้งฉบับเหมือนฉบับตั้งต้นทุกตัวอักษร (นักเรียนคัดลอกมา ยังไม่ได้เขียนใหม่)
  */
-function ai_draft_progress(array $curr, $baseline, $currentHash = '', $currentWords = 0, array $edits = []) {
+function ai_draft_progress(array $curr, $baseline, $currentHash = '', $currentWords = 0, array $edits = [], $editsLive = false) {
     $phase   = (string)($curr['essay_phase'] ?? '');
     $basePh  = ai_baseline_phase($phase);
     $comment = (string)($curr['draft_comment'] ?? '');
@@ -1171,6 +1341,8 @@ function ai_draft_progress(array $curr, $baseline, $currentHash = '', $currentWo
         // ส่วนของเรียงความที่ถูกแก้จริง — ระบบเทียบข้อความเอง ไม่ได้ถาม AI
         'edits'           => array_values($edits),
         'edit_summary'    => ai_edit_summary($edits),
+        // true = เทียบจากต้นฉบับ ณ ตอนเปิดดู (ผลตรวจนี้บันทึกไว้ก่อนระบบจะเก็บผลเทียบให้)
+        'edits_live'      => (bool)$editsLive,
     ];
 }
 
@@ -1386,7 +1558,7 @@ function ai_log_usage(PDO $pdo, $userId, $role, $studentId, $phase, $ok, $errorM
 }
 
 /** แปลงแถวในตาราง essay_ai_feedback ให้เป็นโครงสร้างที่หน้าเว็บใช้ได้ทันที */
-function ai_feedback_row_to_array(array $row, ?array $evalManual = null) {
+function ai_feedback_row_to_array(array $row, ?array $evalManual = null, ?array $essayParts = null) {
     $decode = function ($v) {
         $d = json_decode((string)$v, true);
         return is_array($d) ? $d : [];
@@ -1428,12 +1600,26 @@ function ai_feedback_row_to_array(array $row, ?array $evalManual = null) {
     $dcCrit = (isset($dcRaw['criteria']) && is_array($dcRaw['criteria'])) ? $dcRaw['criteria'] : $dcRaw;
     $dcEdit = (isset($dcRaw['edits']) && is_array($dcRaw['edits'])) ? $dcRaw['edits'] : [];
     $out['draft_changes'] = $dcCrit;
+
+    // ผลตรวจที่บันทึกไว้ก่อนระบบจะเก็บ "ส่วนที่แก้" ให้ (หรือฐานข้อมูลเก่าที่ยังไม่มีคอลัมน์)
+    // ยังบอกได้ว่าแก้อะไรไปตรงไหน โดยเทียบข้อความของสองฉบับสด ๆ ตอนเปิดดู
+    // ผู้เรียกส่ง $essayParts มาเป็น [รหัสรอบงาน => ผลของ ai_essay_parts()] ถ้ามีข้อความให้เทียบ
+    $editsLive = false;
+    if (!$dcEdit && $essayParts !== null) {
+        $basePh = ai_baseline_phase($row['essay_phase']);
+        if ($basePh !== '' && !empty($essayParts[$basePh]) && !empty($essayParts[$row['essay_phase']])) {
+            $dcEdit    = ai_diff_essay_parts($essayParts[$basePh], $essayParts[$row['essay_phase']]);
+            $editsLive = true;
+        }
+    }
+
     $out['draft_compare'] = ai_draft_progress(
         $out,
         $decode($row['baseline_snapshot'] ?? ''),
         (string)($row['essay_hash'] ?? ''),
         (int)($row['word_count'] ?? 0),
-        $dcEdit
+        $dcEdit,
+        $editsLive
     );
 
     $tScores = $decode($row['teacher_scores'] ?? '');

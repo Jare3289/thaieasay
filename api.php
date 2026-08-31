@@ -2789,17 +2789,17 @@ try {
 
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
-            // คะแนนข้อที่ AI ตรวจแทนไม่ได้ ที่คุณครูเคยให้ไว้ในหน้า evaluation.php (ดึงครั้งเดียวใช้ได้ทุกรอบ)
-            $aiEvalManual = ai_teacher_eval_manual($pdo, $aiSid);
-            $aiRows = array_map(function ($r) use ($aiEvalManual) {
-                return ai_feedback_row_to_array($r, $aiEvalManual);
-            }, $stmt->fetchAll());
+            $aiFbRows = $stmt->fetchAll();
 
             // สถานะเรียงความของนักเรียนคนนี้ทุกรอบงาน — ใช้แยกว่า "ยังไม่ได้เขียน" กับ "เขียนแล้วแต่ยังไม่ตรวจ"
-            $aiEssays = [];
+            // ดึงตัวข้อความมาด้วย เพื่อเทียบให้เห็นว่าร่างที่ 2 แก้อะไรไปจากร่างที่ 1 บ้าง
+            // (ผลตรวจที่บันทึกไว้ก่อนมีฟีเจอร์นี้จึงยังเห็นผลเทียบได้ โดยไม่ต้องสั่ง AI ตรวจใหม่)
+            $aiEssays     = [];
+            $aiEssayParts = [];
             try {
                 $stmtE = $pdo->prepare('
-                    SELECT essay_phase, word_count, updated_at
+                    SELECT essay_phase, word_count, updated_at,
+                           intro_content, body_content, conclusion_content
                       FROM student_essays
                      WHERE student_id = ?
                        AND (COALESCE(intro_content,\'\') <> \'\'
@@ -2813,8 +2813,21 @@ try {
                         'too_short'  => ((int)$rE['word_count'] < AI_MIN_WORDS),
                         'updated_at' => (string)$rE['updated_at'],
                     ];
+                    $eBody = json_decode((string)($rE['body_content'] ?? ''), true);
+                    if (!is_array($eBody)) {
+                        $eBody = ($rE['body_content'] ?? '') !== '' ? [(string)$rE['body_content']] : [];
+                    }
+                    $aiEssayParts[$rE['essay_phase']] = ai_essay_parts(
+                        (string)($rE['intro_content'] ?? ''), $eBody, (string)($rE['conclusion_content'] ?? '')
+                    );
                 }
             } catch (Exception $e) { /* อ่านไม่ได้ก็ยังแสดงผลตรวจได้ตามปกติ */ }
+
+            // คะแนนข้อที่ AI ตรวจแทนไม่ได้ ที่คุณครูเคยให้ไว้ในหน้า evaluation.php (ดึงครั้งเดียวใช้ได้ทุกรอบ)
+            $aiEvalManual = ai_teacher_eval_manual($pdo, $aiSid);
+            $aiRows = array_map(function ($r) use ($aiEvalManual, $aiEssayParts) {
+                return ai_feedback_row_to_array($r, $aiEvalManual, $aiEssayParts);
+            }, $aiFbRows);
 
             echo json_encode([
                 'success'   => true,
@@ -2984,6 +2997,215 @@ try {
             echo json_encode([
                 'success'  => true,
                 'feedback' => $aiRow ? ai_feedback_row_to_array($aiRow, ai_teacher_eval_manual($pdo, $aiSid)) : null,
+            ]);
+            break;
+
+        // ครู/ผู้เชี่ยวชาญ: อ่าน "ภาพรวมการนำเสนอรายรอบงาน" ที่เคยให้ AI เขียนไว้
+        case 'get_ai_phase_overview':
+            if (!isset($_SESSION['user']) || !in_array($_SESSION['user']['role'], ['teacher', 'expert'], true)) {
+                echo json_encode(['success' => false, 'error' => 'ต้องเป็นครูหรือผู้เชี่ยวชาญ']);
+                exit;
+            }
+            $ovList = [];
+            try {
+                $st = $pdo->query('SELECT * FROM essay_ai_phase_summary');
+                while ($r = $st->fetch()) {
+                    $ovList[$r['essay_phase']] = ai_phase_overview_row($r);
+                }
+            } catch (Exception $e) { /* ยังไม่มีตาราง = ยังไม่เคยสร้างภาพรวม */ }
+            echo json_encode(['success' => true, 'overviews' => $ovList]);
+            break;
+
+        // ครู: ให้ AI เขียนภาพรวมการนำเสนอของทั้งชั้นในรอบงานหนึ่ง (ใช้เมื่อตรวจครบทั้งรอบแล้ว)
+        // ใช้โควตา 1 ครั้งต่อ 1 รอบงาน — ไม่ได้ตรวจเรียงความใหม่ แต่สังเคราะห์จากผลตรวจที่มีอยู่แล้ว
+        case 'ai_phase_overview':
+            $aiUser = isset($_SESSION['user']) ? $_SESSION['user'] : null;
+            $aiRole = $aiUser ? $aiUser['role'] : '';
+            if ($aiRole !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้นที่สั่งให้ AI เขียนภาพรวมได้']);
+                exit;
+            }
+            $ovPhase = isset($request_data['essay_phase']) ? trim((string)$request_data['essay_phase']) : '';
+            if (!in_array($ovPhase, ai_all_phases(), true)) {
+                echo json_encode(['success' => false, 'error' => 'รอบงานไม่ถูกต้อง']);
+                exit;
+            }
+
+            $aiSet = ai_settings($pdo);
+            if (!$aiSet['enabled'] || !$aiSet['configured']) {
+                echo json_encode(['success' => false, 'error' => 'ระบบ AI ยังไม่พร้อมใช้งาน กรุณาตรวจสอบการตั้งค่า']);
+                exit;
+            }
+            $aiLimit = AI_DAILY_LIMIT_TEACHER;
+            $aiUsed  = ai_usage_today($pdo, $aiUser['id']);
+            if ($aiUsed >= $aiLimit) {
+                echo json_encode(['success' => false, 'error' => 'วันนี้ใช้ AI ครบ ' . $aiLimit . ' ครั้งแล้ว กรุณาลองใหม่ในวันพรุ่งนี้']);
+                exit;
+            }
+
+            // ---- รวบรวมผลตรวจของรอบนี้ทั้งชั้น ----
+            $ovRows = [];
+            try {
+                $st = $pdo->prepare('
+                    SELECT f.*, se.intro_content, se.conclusion_content, se.word_count
+                      FROM essay_ai_feedback f
+                      LEFT JOIN student_essays se
+                             ON se.student_id = f.student_id AND se.essay_phase = f.essay_phase
+                     WHERE f.essay_phase = ?
+                     ORDER BY f.student_id ASC
+                ');
+                $st->execute([$ovPhase]);
+                $ovRows = $st->fetchAll();
+            } catch (Exception $e) {
+                $ovRows = [];
+            }
+            if (count($ovRows) < 2) {
+                echo json_encode(['success' => false, 'error' =>
+                    'รอบนี้มีผลตรวจของ AI เพียง ' . count($ovRows) . ' ฉบับ — ต้องมีอย่างน้อย 2 ฉบับจึงจะเขียนภาพรวมทั้งชั้นได้']);
+                exit;
+            }
+
+            // ---- ตัวเลขสรุป: ระบบคำนวณเองทั้งหมด ไม่ให้ AI นับเอง ----
+            $ovTotals = [];  $ovWords = [];  $ovLevels = [];  $ovCrit = [];
+            $ovDeltas = [];  $ovBetter = 0;  $ovSame = 0;  $ovWorse = 0;
+            $ovSamples = [];
+            $ovBasePh  = ai_baseline_phase($ovPhase);
+            foreach ($ovRows as $r) {
+                $ovTotals[] = (float)$r['total_score'];
+                if ((int)$r['word_count'] > 0) $ovWords[] = (int)$r['word_count'];
+                $lv = trim((string)$r['quality_level']);
+                if ($lv !== '') $ovLevels[$lv] = (int)($ovLevels[$lv] ?? 0) + 1;
+
+                $sc = json_decode((string)$r['scores'], true);
+                if (is_array($sc)) {
+                    foreach ($sc as $cid => $c) {
+                        if (!is_array($c)) continue;
+                        if (!isset($ovCrit[$cid])) {
+                            $ovCrit[$cid] = ['name' => (string)($c['name'] ?? ''), 'max' => (float)($c['max'] ?? 0), 'sum' => 0, 'n' => 0];
+                        }
+                        $ovCrit[$cid]['sum'] += (float)($c['weighted'] ?? 0);
+                        $ovCrit[$cid]['n']++;
+                    }
+                }
+
+                // ส่วนต่างจากฉบับตั้งต้นตามคู่ที่ครูกำหนด
+                $bs = json_decode((string)($r['baseline_snapshot'] ?? ''), true);
+                if (is_array($bs) && isset($bs['total_score'])) {
+                    $dl = round((float)$r['total_score'] - (float)$bs['total_score'], 2);
+                    $ovDeltas[] = $dl;
+                    if ($dl > 0) $ovBetter++; elseif ($dl < 0) $ovWorse++; else $ovSame++;
+                }
+
+                // ตัวอย่างการนำเสนอรายคน — ตัดให้สั้นพอที่คำสั่งจะไม่ยาวเกินไป
+                if (count($ovSamples) < 45) {
+                    $ovSamples[] = [
+                        'score'      => (float)$r['total_score'],
+                        'intro'      => ai_clean_text($r['intro_content'] ?? '', 220),
+                        'conclusion' => ai_clean_text($r['conclusion_content'] ?? '', 180),
+                        'overall'    => ai_clean_text($r['overall_comment'] ?? '', 260),
+                    ];
+                }
+            }
+
+            $ovCritOut = [];
+            foreach (ai_rubric() as $it) {
+                if (!$it['ai'] || empty($ovCrit[$it['id']]['n'])) continue;
+                $c    = $ovCrit[$it['id']];
+                $mean = round($c['sum'] / $c['n'], 2);
+                $ovCritOut[$it['id']] = [
+                    'name' => $c['name'] !== '' ? $c['name'] : $it['name'],
+                    'max'  => $it['max'],
+                    'mean' => $mean,
+                    'pct'  => $it['max'] > 0 ? (int)round(($mean / $it['max']) * 100) : 0,
+                ];
+            }
+
+            $ovStats = [
+                'phase'      => $ovPhase,
+                'n'          => count($ovRows),
+                'mean'       => $ovTotals ? round(array_sum($ovTotals) / count($ovTotals), 2) : 0,
+                'max_score'  => ai_rubric_max(),
+                'mean_words' => $ovWords ? (int)round(array_sum($ovWords) / count($ovWords)) : 0,
+                'levels'     => $ovLevels,
+                'criteria'   => $ovCritOut,
+            ];
+            if ($ovDeltas && $ovBasePh !== '') {
+                $ovStats['pair'] = [
+                    'base_phase' => $ovBasePh,
+                    'base_label' => ai_phase_label($ovBasePh),
+                    'n'          => count($ovDeltas),
+                    'mean_delta' => round(array_sum($ovDeltas) / count($ovDeltas), 2),
+                    'improved'   => $ovBetter,
+                    'same'       => $ovSame,
+                    'worse'      => $ovWorse,
+                ];
+            }
+
+            $ovTopics = essay_topics_map($pdo);
+            $ovTopic  = (string)($ovTopics[essay_topic_phase($ovPhase)] ?? '');
+
+            @set_time_limit(150);
+            $ovPrompt = ai_build_overview_prompt($ovPhase, $ovTopic, $ovStats, $ovSamples);
+            $ovCall   = ai_call_model($aiSet, ai_overview_system_prompt(), $ovPrompt);
+            if (!$ovCall['ok']) {
+                ai_log_usage($pdo, $aiUser['id'], $aiRole, null, $ovPhase, false, $ovCall['error']);
+                echo json_encode(['success' => false, 'error' => $ovCall['error']]);
+                exit;
+            }
+            $ovParsed = ai_parse_phase_overview($ovCall['text']);
+            if (!$ovParsed['ok']) {
+                ai_log_usage($pdo, $aiUser['id'], $aiRole, null, $ovPhase, false, $ovParsed['error']);
+                echo json_encode(['success' => false, 'error' => $ovParsed['error']]);
+                exit;
+            }
+            $ovData = $ovParsed['data'];
+
+            $jsonOpt = JSON_UNESCAPED_UNICODE;
+            try {
+                $st = $pdo->prepare('
+                    INSERT INTO essay_ai_phase_summary
+                        (essay_phase, overview, themes, interesting, common_strengths, common_problems,
+                         observations, teaching_notes, stats, essay_count, provider, model, generated_by)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE
+                        overview = VALUES(overview), themes = VALUES(themes),
+                        interesting = VALUES(interesting), common_strengths = VALUES(common_strengths),
+                        common_problems = VALUES(common_problems), observations = VALUES(observations),
+                        teaching_notes = VALUES(teaching_notes), stats = VALUES(stats),
+                        essay_count = VALUES(essay_count), provider = VALUES(provider),
+                        model = VALUES(model), generated_by = VALUES(generated_by),
+                        updated_at = CURRENT_TIMESTAMP
+                ');
+                $st->execute([
+                    $ovPhase, $ovData['overview'],
+                    json_encode($ovData['themes'], $jsonOpt),
+                    json_encode($ovData['interesting'], $jsonOpt),
+                    json_encode($ovData['common_strengths'], $jsonOpt),
+                    json_encode($ovData['common_problems'], $jsonOpt),
+                    json_encode($ovData['observations'], $jsonOpt),
+                    json_encode($ovData['teaching_notes'], $jsonOpt),
+                    json_encode($ovStats, $jsonOpt),
+                    count($ovRows), $aiSet['provider'], $aiSet['model'], $aiUser['id'],
+                ]);
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'error' => 'บันทึกภาพรวมไม่สำเร็จ: ' . $e->getMessage()]);
+                exit;
+            }
+
+            ai_log_usage($pdo, $aiUser['id'], $aiRole, null, $ovPhase, true);
+
+            $ovData['essay_phase'] = $ovPhase;
+            $ovData['phase_label'] = ai_phase_label($ovPhase);
+            $ovData['stats']       = $ovStats;
+            $ovData['essay_count'] = count($ovRows);
+            $ovData['model']       = $aiSet['model'];
+            $ovData['provider']    = $aiSet['provider'];
+            $ovData['updated_at']  = date('Y-m-d H:i:s');
+
+            echo json_encode([
+                'success'    => true,
+                'overview'   => $ovData,
+                'quota_left' => max(0, $aiLimit - ($aiUsed + 1)),
             ]);
             break;
 
