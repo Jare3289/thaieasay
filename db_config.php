@@ -735,6 +735,7 @@ try {
                 next_steps      TEXT,          -- JSON array ของสิ่งที่ควรทำต่อ
                 encouragement   TEXT,
                 scores          TEXT,          -- JSON map รหัสเกณฑ์ => {raw, weighted, max, name, reason}
+                score_overrides LONGTEXT,      -- JSON map ของข้อที่คะแนนถูกปรับหลัง AI ตรวจ (ครูปรับเอง/สั่ง AI ตรวจข้อนั้นใหม่)
                 teacher_scores  TEXT,          -- JSON map ของข้อที่ครูให้คะแนนเอง (AI ตรวจแทนไม่ได้)
                 teacher_total   DECIMAL(6,2) NOT NULL DEFAULT 0,
                 teacher_by      VARCHAR(50)  DEFAULT NULL,
@@ -801,6 +802,18 @@ try {
         safe_ddl($pdo, "ALTER TABLE essay_ai_feedback ADD COLUMN essay_hash CHAR(40) DEFAULT NULL AFTER raw_response");
         safe_ddl($pdo, "ALTER TABLE essay_ai_feedback ADD COLUMN recheck_needed TINYINT(1) NOT NULL DEFAULT 0 AFTER essay_hash");
         safe_ddl($pdo, "ALTER TABLE essay_ai_feedback ADD COLUMN recheck_marked_at DATETIME DEFAULT NULL AFTER recheck_needed");
+    }
+} catch (Exception $e) {
+    // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
+}
+
+// เพิ่มคอลัมน์ "คะแนนที่ถูกปรับรายข้อ" ให้ตาราง essay_ai_feedback (ฐานข้อมูลที่สร้างไว้ก่อนหน้านี้)
+// คุณครูปรับคะแนนข้อที่ไม่เห็นด้วยได้ หรือสั่งให้ AI ตรวจเฉพาะข้อนั้นใหม่ได้
+// เก็บแยกจากคอลัมน์ scores เพื่อให้คะแนนดั้งเดิมของ AI ยังตรวจสอบย้อนหลังได้เสมอ
+try {
+    $colSo = $pdo->query("SHOW COLUMNS FROM essay_ai_feedback LIKE 'score_overrides'");
+    if ($colSo && $colSo->rowCount() === 0) {
+        safe_ddl($pdo, "ALTER TABLE essay_ai_feedback ADD COLUMN score_overrides LONGTEXT NULL AFTER scores");
     }
 } catch (Exception $e) {
     // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ

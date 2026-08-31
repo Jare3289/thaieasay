@@ -374,18 +374,19 @@ $aiPhases    = ai_all_phases();
       <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
         <div>
           <h6 class="fw-bold text-dark mb-0"><i class="bi bi-table text-secondary me-2"></i>ภาพรวมผลตรวจ AI ทั้งชั้น</h6>
-          <div class="text-muted small mt-1">คะแนนรวมของนักเรียนแต่ละคนทุกรอบงาน พร้อมค่าเฉลี่ยรายบุคคลและค่าเฉลี่ยทั้งชั้น</div>
+          <div class="text-muted small mt-1">คะแนนรวมของนักเรียนแต่ละคนทุกรอบงาน พร้อมค่าเฉลี่ยรายบุคคลและค่าเฉลี่ยทั้งชั้น
+            · ใช้ช่องกรองเพื่อดูเฉพาะกลุ่ม เช่น คนที่คะแนนต่ำลงในร่างที่ 2</div>
         </div>
         <button class="btn btn-outline-secondary btn-sm rounded-pill" onclick="loadAiOverview()">
           <i class="bi bi-arrow-clockwise me-1"></i>รีเฟรช
         </button>
       </div>
       <div class="row g-2 mt-2">
-        <div class="col-sm-6 col-lg-5">
+        <div class="col-sm-6 col-lg-4">
           <input type="search" id="aiOverviewSearch" class="form-control form-control-sm rounded-3"
                  placeholder="ค้นหารหัส / ชื่อ / ห้อง" oninput="paintAiOverview()">
         </div>
-        <div class="col-sm-6 col-lg-4">
+        <div class="col-sm-6 col-lg-3">
           <select id="aiOverviewPhase" class="form-select form-select-sm rounded-3" onchange="paintAiOverview()">
             <option value="">ทุกรอบงาน (แสดงครบทุกคอลัมน์)</option>
             <?php foreach ($aiPhases as $ph): ?>
@@ -393,7 +394,19 @@ $aiPhases    = ai_all_phases();
             <?php endforeach; ?>
           </select>
         </div>
-        <div class="col-lg-3 d-flex align-items-center">
+        <div class="col-sm-6 col-lg-3">
+          <select id="aiOverviewFocus" class="form-select form-select-sm rounded-3" onchange="paintAiOverview()"
+                  title="คัดเฉพาะนักเรียนที่เข้าเงื่อนไข เพื่อดูเป็นกลุ่ม ๆ ได้เร็วขึ้น">
+            <option value="">ดูทุกคน (ไม่กรอง)</option>
+            <option value="down">คะแนนต่ำลงกว่าฉบับตั้งต้น</option>
+            <option value="flat">คะแนนเท่าเดิม ไม่ขยับ</option>
+            <option value="up">คะแนนดีขึ้น</option>
+            <option value="low">ระดับคุณภาพ พอใช้ / ต้องปรับปรุง</option>
+            <option value="notdone">ยังตรวจไม่ครบทุกรอบที่แสดงอยู่</option>
+            <option value="adjusted">มีข้อที่ครูปรับคะแนนไว้</option>
+          </select>
+        </div>
+        <div class="col-lg-2 d-flex align-items-center">
           <div>
             <div class="form-check mb-0">
               <input class="form-check-input" type="checkbox" id="aiOverviewNeedScore" onchange="paintAiOverview()">
@@ -417,6 +430,24 @@ $aiPhases    = ai_all_phases();
 <?php endif; ?>
 </div><!-- /tab-content -->
 </div>
+
+<?php if ($aiIsTeacher): ?>
+<!-- หน้าต่างปรับคะแนนรายข้อ: ครูปรับคะแนนเอง หรือสั่งให้ AI ตรวจเฉพาะข้อนั้นใหม่ -->
+<div class="modal fade" id="aiCritModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content border-0 rounded-4">
+      <div class="modal-header border-bottom">
+        <div>
+          <h6 class="fw-bold text-dark mb-0" id="aiCritTitle">ปรับคะแนนรายข้อ</h6>
+          <div class="text-muted small mt-1" id="aiCritSubtitle"></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
+      </div>
+      <div class="modal-body p-4" id="aiCritBody"></div>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
 
 <style>
   /* แท็บหลักของหน้า — แยกงาน "ดูรายคน" กับ "ดูทั้งชั้น" ออกจากกันให้ชัด */
@@ -505,6 +536,9 @@ $aiPhases    = ai_all_phases();
   /* สัญลักษณ์คู่เทียบตามที่ครูกำหนด (ร่างหลังต้องดีกว่าร่างก่อน) */
   .ai-cell-pair-up   { color: #0d9488; margin-left: 3px; font-size: 0.72rem; }
   .ai-cell-pair-flat { color: #d97706; margin-left: 3px; font-size: 0.72rem; }
+  .ai-cell-pair-down { color: #dc2626; margin-left: 3px; font-size: 0.72rem; }
+  /* ฉบับที่ครูตรวจทานคะแนนของ AI ไว้รายข้อ */
+  .ai-cell-ov { color: #6d28d9; margin-left: 3px; font-size: 0.72rem; }
   .ai-recheck-row { cursor: pointer; }
   .ai-recheck-row:hover { background: #fffbeb; }
   .ai-report-avg td {
@@ -524,6 +558,11 @@ const AI_IS_STUDENT = <?php echo $aiIsStudent ? 'true' : 'false'; ?>;
 const AI_IS_TEACHER = <?php echo $aiIsTeacher ? 'true' : 'false'; ?>;
 const AI_MY_ID      = <?php echo json_encode($sessionUser['id']); ?>;
 const AI_PHASES     = <?php echo json_encode($aiPhases); ?>;
+// เกณฑ์ของข้อที่ AI เป็นผู้ตรวจ — ใช้แสดงคำอธิบายระดับคะแนนตอนคุณครูปรับคะแนนรายข้อ
+const AI_RUBRIC_ITEMS = <?php
+    echo json_encode(array_values(array_filter(ai_rubric(), function ($it) { return $it['ai']; })),
+                     JSON_UNESCAPED_UNICODE);
+?>;
 
 let aiStatus    = null;   // สถานะฟีเจอร์ AI ของผู้ใช้คนนี้
 let aiProviders = [];     // รายชื่อผู้ให้บริการ (เฉพาะครู)
@@ -1278,7 +1317,8 @@ function renderFeedback(fb) {
     + aiFeedbackHTML(fb, {
         deleteAction:  AI_IS_TEACHER ? 'deleteFeedback()'  : '',
         manualAction:  AI_IS_TEACHER ? 'saveManualScores()' : '',
-        recheckAction: AI_IS_TEACHER ? `runAiReview('${phase}')` : ''
+        recheckAction: AI_IS_TEACHER ? `runAiReview('${phase}')` : '',
+        critEditFn:    AI_IS_TEACHER ? 'aiOpenCritPanel' : ''
       })
     + `</div></div>`;
 }
@@ -1301,6 +1341,15 @@ async function runAiReview(phase) {
     const ok = confirm(`รอบ "${AI_PHASE_LABELS[phase]}" ต้องเทียบกับ "${AI_PHASE_LABELS[basePh]}" เสมอ\n`
       + `แต่ ${AI_PHASE_SHORT_MAP[basePh]} ยังไม่มีผลตรวจของ AI — ตรวจตอนนี้จะยังไม่มีผลเทียบคะแนนรายข้อให้ดู\n\n`
       + `กด "ตกลง" เพื่อตรวจรอบนี้ต่อไป หรือ "ยกเลิก" เพื่อไปสั่งตรวจ ${AI_PHASE_SHORT_MAP[basePh]} ก่อน`);
+    if (!ok) return;
+  }
+
+  // ตรวจใหม่ทั้งฉบับ = AI อ่านงานใหม่หมดทุกข้อ คะแนนที่ครูปรับไว้รายข้อจึงถูกล้างทิ้ง
+  const ovCount = Number((aiAllFeedback[phase] || {}).override_count || 0);
+  if (ovCount > 0) {
+    const ok = confirm(`ฉบับนี้มีคะแนนที่ผ่านการตรวจทานของครูไว้แล้ว ${ovCount} ข้อ\n`
+      + `การให้ AI ตรวจใหม่ทั้งฉบับจะล้างคะแนนที่ปรับไว้ทั้งหมด แล้วใช้คะแนนชุดใหม่ของ AI แทน\n\n`
+      + `ถ้าต้องการแก้เฉพาะบางข้อ ให้กด "ยกเลิก" แล้วใช้ปุ่มปรับคะแนนท้ายแถวในตารางคะแนนรายเกณฑ์แทน`);
     if (!ok) return;
   }
 
@@ -1387,6 +1436,218 @@ async function deleteFeedback() {
     loadRecheckQueue();
   } catch (err) {
     showToast('เชื่อมต่อไม่สำเร็จ', 'error');
+  }
+}
+
+// ------------------------------------------------- ปรับคะแนนรายข้อ (เฉพาะครู)
+// คุณครูไม่เห็นด้วยกับคะแนนที่ AI ให้ข้อไหน เปิดหน้าต่างนี้จากปุ่มท้ายแถวในตารางคะแนนรายเกณฑ์
+// ทำได้ 2 ทาง: ปรับคะแนนเองพร้อมเหตุผล หรือสั่งให้ AI ตรวจเฉพาะข้อนั้นใหม่ (ใส่คำสั่งเพิ่มเติมได้)
+// ไม่ว่าทางไหน คะแนนที่ AI ให้ครั้งแรกยังถูกเก็บไว้เสมอ กดคืนค่าได้ตลอด
+let aiCritId      = '';    // รหัสข้อที่กำลังเปิดหน้าต่างอยู่
+let aiCritBusy    = false; // กันกดซ้ำระหว่างรอผลจาก AI
+
+function aiCritItem(id) {
+  return (AI_RUBRIC_ITEMS || []).find(it => String(it.id) === String(id)) || null;
+}
+
+// เกณฑ์ในระบบเก็บเป็นข้อความเดียว "4=..., 3=..., 2=..." — แยกออกมาเป็นคำอธิบายรายระดับ
+function aiSplitGuide(guide) {
+  const out = {};
+  String(guide || '').split(/,\s*(?=[0-4]\s*=)/).forEach(part => {
+    const m = part.match(/^\s*([0-4])\s*=\s*([\s\S]*)$/);
+    if (m) out[m[1]] = m[2].trim();
+  });
+  return out;
+}
+
+function aiOpenCritPanel(critId) {
+  const fb = selectedPhase ? aiAllFeedback[selectedPhase] : null;
+  const it = aiCritItem(critId);
+  const c  = (fb && fb.scores) ? fb.scores[critId] : null;
+  if (!fb || !it || !c) { showToast('ไม่พบคะแนนของข้อนี้', 'error'); return; }
+
+  aiCritId = critId;
+  const modalEl = document.getElementById('aiCritModal');
+  if (!modalEl) return;
+
+  const ov     = c.overridden ? (c.override || {}) : null;
+  const curRaw = ov ? Number(ov.raw) : Number(c.raw);
+  const guide  = aiSplitGuide(it.guide);
+
+  document.getElementById('aiCritTitle').textContent = `ข้อ ${it.id} ${it.name}`;
+  document.getElementById('aiCritSubtitle').innerHTML =
+    `${esc(fb.phase_label || AI_PHASE_LABELS[selectedPhase] || '')}`
+    + `${fb.student_name ? ' · ' + esc(fb.student_name) : ''}`
+    + ` · คะแนนเต็มข้อนี้ ${it.max} คะแนน (คะแนนดิบ 0-4 คูณ ${it.multiplier})`;
+
+  // การ์ดเลือกระดับคะแนน 0-4 หน้าตาเดียวกับแบบประเมินของครู
+  const cards = [4, 3, 2, 1, 0].map(n => `
+    <div class="col">
+      <input type="radio" name="aiCritRaw" value="${n}" id="aiCritRaw_${n}"
+             class="score-radio ai-crit-radio"${Number(curRaw) === n ? ' checked' : ''}>
+      <label for="aiCritRaw_${n}" class="rubric-card w-100 text-start">
+        <div class="d-flex justify-content-between align-items-start mb-2 gap-2">
+          <span class="fw-bold fs-6 text-dark">${n} <span class="text-muted fw-normal small">= ${aiNum1(n * it.multiplier)} คะแนน</span></span>
+          <div class="check-circle"><i class="bi bi-check-lg"></i></div>
+        </div>
+        <p class="text-secondary mb-0" style="font-size:13px; line-height:1.5;">${esc(guide[n] || '')}</p>
+      </label>
+    </div>`).join('');
+
+  const aiWeighted = ov ? Number(c.ai_weighted) : Number(c.weighted);
+  const aiRaw      = ov ? Number(c.ai_raw)      : Number(c.raw);
+  const aiReason   = ov ? String(c.ai_reason || '') : String(c.reason || '');
+
+  document.getElementById('aiCritBody').innerHTML = `
+    <div class="p-3 rounded-3 mb-4" style="background:#f8fafc; border-left:4px solid #6d28d9;">
+      <div class="fw-bold text-dark mb-1"><i class="bi bi-robot me-2 text-primary"></i>คะแนนที่ AI ให้ไว้ครั้งแรก</div>
+      <div class="fs-5 fw-bold text-primary">${aiNum1(aiRaw)} <span class="text-muted fs-6 fw-normal">(= ${aiNum(aiWeighted)} / ${it.max} คะแนน)</span></div>
+      ${aiReason ? `<div class="text-muted small mt-2">${esc(aiReason)}</div>` : ''}
+      ${ov ? `<hr class="my-2">
+        <div class="small">
+          <span class="badge ai-ov-badge ${ov.source === 'ai_recheck' ? 'ai-ov-recheck' : 'ai-ov-teacher'}">
+            ${ov.source === 'ai_recheck' ? 'AI ตรวจข้อนี้ใหม่' : 'ครูปรับคะแนน'}</span>
+          <span class="fw-bold ms-2">คะแนนที่ใช้อยู่ตอนนี้: ${aiNum1(ov.raw)} (= ${aiNum(ov.weighted)} / ${it.max})</span>
+          ${ov.reason ? `<div class="text-muted mt-1">${esc(ov.reason)}</div>` : ''}
+          ${ov.instruction ? `<div class="text-muted mt-1"><span class="fw-semibold">คำสั่งที่ครูให้ AI:</span> <span class="fst-italic">${esc(ov.instruction)}</span></div>` : ''}
+        </div>` : ''}
+    </div>
+
+    <h6 class="fw-bold text-dark mb-1"><i class="bi bi-pencil-square me-2"></i>1. ปรับคะแนนข้อนี้เอง</h6>
+    <div class="text-muted small mb-3">เลือกระดับคะแนนดิบที่คุณครูเห็นว่าเหมาะสม แล้วเขียนเหตุผลกำกับไว้ (เหตุผลจะแสดงคู่กับคะแนนเสมอ)</div>
+    <div class="row row-cols-1 row-cols-md-3 row-cols-lg-5 g-3 mb-3">${cards}</div>
+    <div class="mb-3">
+      <label class="form-label small fw-semibold text-dark" for="aiCritReason">เหตุผลที่ปรับคะแนน</label>
+      <textarea id="aiCritReason" class="form-control rounded-3" rows="2" maxlength="800"
+                placeholder="เช่น ย่อหน้าที่ 2 ยังอยู่ในขอบเขตของหัวข้อ AI ตัดคะแนนแรงเกินไป">${ov && ov.source !== 'ai_recheck' ? esc(ov.reason || '') : ''}</textarea>
+    </div>
+    <div class="d-flex justify-content-end gap-2 flex-wrap mb-4">
+      ${ov ? `<button class="btn btn-outline-secondary rounded-pill px-3" onclick="aiClearCritOverride()">
+        <i class="bi bi-arrow-counterclockwise me-1"></i>คืนค่าคะแนนของ AI
+      </button>` : ''}
+      <button class="btn btn-primary rounded-pill px-4 fw-bold" onclick="aiSaveCritOverride()">
+        <i class="bi bi-check2-circle me-1"></i>บันทึกคะแนนที่ปรับ
+      </button>
+    </div>
+
+    <hr class="my-4">
+
+    <h6 class="fw-bold text-dark mb-1"><i class="bi bi-arrow-repeat me-2"></i>2. ให้ AI ตรวจเฉพาะข้อนี้ใหม่</h6>
+    <div class="text-muted small mb-3">
+      AI จะอ่านเรียงความทั้งฉบับอีกครั้งแต่ให้คะแนน<strong>เฉพาะข้อ ${esc(it.id)}</strong> ข้ออื่นไม่ขยับ
+      · ระบบไม่บอกคะแนนเดิมให้ AI รู้ เพื่อให้ตรวจใหม่แบบสด ๆ · ใช้โควตา 1 ครั้ง
+    </div>
+    <div class="mb-3">
+      <label class="form-label small fw-semibold text-dark" for="aiCritInstr">คำสั่งเพิ่มเติมถึง AI (ไม่ใส่ก็ได้)</label>
+      <textarea id="aiCritInstr" class="form-control rounded-3" rows="3" maxlength="800"
+                placeholder="เช่น ให้ดูย่อหน้าที่ 3 ด้วย นักเรียนยกตัวอย่างไว้แล้ว / ข้อนี้ให้นับเฉพาะคำเชื่อมที่ใช้ผิด ไม่ต้องนับคำซ้ำ"></textarea>
+      <div class="form-text">คำสั่งนี้ใช้กับการตรวจข้อนี้ครั้งนี้เท่านั้น และถูกบันทึกไว้ให้ตรวจสอบย้อนหลังได้</div>
+    </div>
+    <div class="d-flex justify-content-end">
+      <button class="btn btn-success rounded-pill px-4 fw-bold" id="aiCritRecheckBtn" onclick="aiRecheckCriterion()">
+        <i class="bi bi-stars me-1"></i>ให้ AI ตรวจข้อนี้ใหม่
+      </button>
+    </div>`;
+
+  bootstrap.Modal.getOrCreateInstance(modalEl).show();
+}
+
+function aiCloseCritPanel() {
+  const modalEl = document.getElementById('aiCritModal');
+  if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+}
+
+// นำผลที่ได้กลับมาวาดใหม่ทั้งการ์ดคะแนนและรายละเอียด
+function aiApplyCritResult(fb) {
+  if (!fb) return;
+  aiAllFeedback[fb.essay_phase] = fb;
+  aiAttachDraftCompare(aiAllFeedback);
+  paintPhaseCards();
+  renderFeedback(fb);
+  loadAiOverview();
+}
+
+async function aiSaveCritOverride() {
+  const picked = document.querySelector('.ai-crit-radio:checked');
+  if (!picked) { showToast('กรุณาเลือกระดับคะแนนก่อน', 'error'); return; }
+  const reason = (document.getElementById('aiCritReason').value || '').trim();
+  if (!reason) {
+    if (!confirm('ยังไม่ได้เขียนเหตุผลที่ปรับคะแนน\n\nเหตุผลช่วยให้ย้อนกลับมาอธิบายได้ว่าทำไมคะแนนข้อนี้จึงต่างจากที่ AI ให้\nต้องการบันทึกโดยไม่ใส่เหตุผลหรือไม่?')) return;
+  }
+  await aiPostCritOverride({ raw: Number(picked.value), reason });
+}
+
+async function aiClearCritOverride() {
+  if (!confirm('คืนค่าคะแนนข้อนี้กลับไปใช้คะแนนที่ AI ให้ไว้เดิมหรือไม่?')) return;
+  await aiPostCritOverride({ raw: '', reason: '' });
+}
+
+async function aiPostCritOverride(payload) {
+  if (aiCritBusy) return;
+  aiCritBusy = true;
+  try {
+    const res = await fetch('api.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(Object.assign({
+        action:      'save_ai_score_override',
+        student_id:  currentStudentId(),
+        essay_phase: selectedPhase,
+        criterion:   aiCritId
+      }, payload))
+    });
+    const data = await res.json();
+    if (!data.success) { showToast(data.error || 'บันทึกไม่สำเร็จ', 'error'); return; }
+    aiApplyCritResult(data.feedback);
+    aiCloseCritPanel();
+    showToast(data.cleared ? 'คืนค่าคะแนนของ AI เรียบร้อยแล้ว' : 'บันทึกคะแนนที่ปรับเรียบร้อยแล้ว');
+  } catch (err) {
+    showToast('เชื่อมต่อไม่สำเร็จ', 'error');
+  } finally {
+    aiCritBusy = false;
+  }
+}
+
+async function aiRecheckCriterion() {
+  if (aiCritBusy) return;
+  const instruction = (document.getElementById('aiCritInstr').value || '').trim();
+  const btn = document.getElementById('aiCritRecheckBtn');
+
+  aiCritBusy = true;
+  if (btn) {
+    btn.disabled  = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>AI กำลังตรวจข้อนี้...';
+  }
+  try {
+    const res = await fetch('api.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action:      'ai_recheck_criterion',
+        student_id:  currentStudentId(),
+        essay_phase: selectedPhase,
+        criterion:   aiCritId,
+        instruction
+      })
+    });
+    const data = await res.json();
+    if (!data.success) { showToast(data.error || 'ตรวจไม่สำเร็จ', 'error'); return; }
+    if (aiStatus && typeof data.quota_left === 'number') {
+      aiStatus.quota_left = data.quota_left;
+      aiStatus.quota_used = aiStatus.quota_limit - data.quota_left;
+      paintStatusBar();
+    }
+    aiApplyCritResult(data.feedback);
+    aiCloseCritPanel();
+    showToast(`AI ตรวจข้อ ${aiCritId} ใหม่เรียบร้อยแล้ว`);
+  } catch (err) {
+    showToast('เชื่อมต่อไม่สำเร็จ', 'error');
+  } finally {
+    aiCritBusy = false;
+    if (btn) {
+      btn.disabled  = false;
+      btn.innerHTML = '<i class="bi bi-stars me-1"></i>ให้ AI ตรวจข้อนี้ใหม่';
+    }
   }
 }
 
@@ -1518,16 +1779,29 @@ function paintAiOverview() {
   const phase     = document.getElementById('aiOverviewPhase').value;
   const needScore = document.getElementById('aiOverviewNeedScore').checked;
   const needRecheckOnly = document.getElementById('aiOverviewNeedRecheck').checked;
+  const focus     = document.getElementById('aiOverviewFocus').value;
 
   // เลือกรอบงานไว้ = ดูเฉพาะคอลัมน์นั้น (ค่าเฉลี่ยคิดจากคอลัมน์ที่แสดงอยู่)
   const cols = phase ? AI_OVERVIEW_COLS.filter(c => c.key === phase) : AI_OVERVIEW_COLS;
   const fullMax = aiOverviewList[0] ? aiOverviewList[0].full_max : 60;
+
+  // ส่วนต่างเทียบกับฉบับตั้งต้นของฉบับหนึ่ง (null = ไม่มีคู่เทียบ หรือยังไม่ได้ตรวจฉบับตั้งต้น)
+  const deltaOf = r => ((r.draft_delta === null || r.draft_delta === undefined) ? null : Number(r.draft_delta));
 
   const students = aiOverviewByStudent().filter(stu => {
     const shown = cols.map(c => stu.cells[c.key]).filter(Boolean);
     if (!shown.length) return false;                                   // ไม่มีผลตรวจในคอลัมน์ที่ดูอยู่
     if (needScore && !shown.some(r => !r.manual_done)) return false;   // ให้คะแนนครบแล้วทุกฉบับ
     if (needRecheckOnly && !shown.some(r => r.needs_recheck)) return false;  // ไม่มีฉบับที่รอตรวจใหม่
+
+    // ตัวกรองแบบเจาะกลุ่ม — ดูเฉพาะคนที่เข้าเงื่อนไขในคอลัมน์ที่กำลังแสดงอยู่
+    if (focus === 'down' && !shown.some(r => deltaOf(r) !== null && deltaOf(r) < 0)) return false;
+    if (focus === 'flat' && !shown.some(r => deltaOf(r) === 0)) return false;
+    if (focus === 'up'   && !shown.some(r => deltaOf(r) !== null && deltaOf(r) > 0)) return false;
+    if (focus === 'low'  && !shown.some(r => ['พอใช้', 'ต้องปรับปรุง'].indexOf(r.quality_level) >= 0)) return false;
+    if (focus === 'notdone' && shown.length >= cols.length) return false;
+    if (focus === 'adjusted' && !shown.some(r => Number(r.override_count || 0) > 0)) return false;
+
     if (!kw) return true;
     return [stu.student_id, stu.student_name, stu.classroom].join(' ').toLowerCase().indexOf(kw) >= 0;
   });
@@ -1569,14 +1843,20 @@ function paintAiOverview() {
         ? ''
         : (r.draft_delta > 0
             ? '<i class="bi bi-arrow-up-right-circle-fill ai-cell-pair-up"></i>'
-            : '<i class="bi bi-exclamation-circle-fill ai-cell-pair-flat"></i>');
+            : (r.draft_delta < 0
+                ? '<i class="bi bi-arrow-down-right-circle-fill ai-cell-pair-down"></i>'
+                : '<i class="bi bi-dash-circle-fill ai-cell-pair-flat"></i>'));
+      // ข้อที่ครูตรวจทานคะแนนแล้ว ทำเครื่องหมายไว้ให้เห็นในตารางภาพรวมด้วย
+      const ovMark = Number(r.override_count || 0) > 0
+        ? `<i class="bi bi-sliders ai-cell-ov" title="ครูตรวจทานคะแนนไว้ ${Number(r.override_count)} ข้อ"></i>`
+        : '';
       return `<td class="ai-cell-score${r.needs_recheck ? ' ai-cell-stale' : ''}" title="${tip}"
                   onclick="jumpTo('${esc(stu.student_id)}','${esc(c.key)}')">
         <span class="fw-bold">${aiNum(r.combined_total)}</span>${r.manual_done
           ? ''
           : '<span class="ai-cell-wait" title="ยังรอคะแนนข้อที่คุณครูต้องให้เอง">*</span>'}${r.needs_recheck
           ? '<i class="bi bi-arrow-repeat ai-cell-stale-icon" title="ต้นฉบับถูกแก้หลังตรวจ รอตรวจใหม่"></i>'
-          : ''}${draftMark}
+          : ''}${draftMark}${ovMark}
       </td>`;
     }).join('');
 
@@ -1956,8 +2236,11 @@ async function startBatchReview() {
   const phase      = document.getElementById('batchPhase').value;
   const phaseLabel = AI_PHASE_LABELS[phase] || '';
   const reQueued   = queue.filter(t => t.needs_recheck).length;
+  // ฉบับที่เคยตรวจแล้วอาจมีคะแนนที่ครูปรับไว้รายข้อ ซึ่งจะถูกล้างเมื่อ AI ตรวจใหม่ทั้งฉบับ
+  const doneAgain  = queue.filter(t => t.reviewed).length;
   if (!confirm(`เริ่มให้ AI ตรวจ ${queue.length} ฉบับของ "${phaseLabel}" ใช่ไหม?\n`
       + (reQueued ? `(ในจำนวนนี้เป็นฉบับที่แก้ไขต้นฉบับแล้วรอตรวจใหม่ ${reQueued} ฉบับ)\n` : '')
+      + (doneAgain ? `(มีฉบับที่เคยตรวจไปแล้ว ${doneAgain} ฉบับ — ถ้าฉบับใดมีคะแนนที่ครูปรับไว้รายข้อ จะถูกล้างและใช้คะแนนชุดใหม่แทน)\n` : '')
       + `\nใช้เวลาประมาณ ${Math.max(1, Math.round(queue.length * 27000 / 60000))} นาที `
       + `กรุณาเปิดหน้านี้ค้างไว้จนกว่าจะเสร็จ`)) return;
 

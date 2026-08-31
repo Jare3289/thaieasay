@@ -290,9 +290,12 @@ function aiAttachDraftCompare(all) {
       if (!fb.draft_compare.kind) fb.draft_compare.kind = aiBaselineKind(ph);
       return;
     }
+    // ข้อความสองฉบับที่เซิร์ฟเวอร์วางคู่กันมาให้แล้ว ต้องไม่หายไปตอนคำนวณผลเทียบใหม่ในหน้าเว็บ
+    const sbs = fb.draft_compare ? fb.draft_compare.side_by_side : null;
     const basePh = AI_BASELINE_PAIRS[ph];
     if (!basePh) { fb.draft_compare = { has_baseline: false, pairable: false }; return; }
     fb.draft_compare = aiComputeDraftCompare(fb, all[basePh]);
+    if (sbs && !fb.draft_compare.side_by_side) fb.draft_compare.side_by_side = sbs;
   });
   return all;
 }
@@ -362,6 +365,70 @@ function aiEditListHTML(d) {
 }
 
 /**
+ * "อ่านเทียบสองฉบับ" — วางเรียงความฉบับตั้งต้นกับฉบับนี้ไว้คู่กันทีละส่วน
+ * วรรคที่หายไปขึ้นพื้นแดงขีดฆ่าทางซ้าย · วรรคที่เพิ่มเข้ามาขึ้นพื้นเขียวทางขวา
+ * คู่คนละหัวข้อ (ก่อนเรียน↔หลังเรียน) ไม่ไฮไลต์ เพราะเป็นงานเขียนคนละชิ้น วางไว้อ่านเทียบเฉย ๆ
+ */
+function aiSideBySideHTML(fb, d) {
+  const sbs = d.side_by_side;
+  if (!sbs || !sbs.parts || !sbs.parts.length) return '';
+
+  const marked    = !!sbs.marked;
+  const baseShort = d.short || aiPhaseShort(d.phase || '');
+  const thisShort = d.this_short || aiPhaseShort(fb.essay_phase || '');
+  const boxId     = 'aiSbs_' + String(fb.essay_phase || 'x').replace(/[^a-zA-Z0-9_]/g, '');
+
+  const chunks = (list, side) => {
+    if (!list || !list.length) return '<span class="text-muted fst-italic">— ส่วนนี้ไม่มีข้อความ —</span>';
+    return list.map(c => (marked && c.d)
+      ? `<span class="ai-sbs-mark ai-sbs-${side}">${aiEsc(c.t)}</span>`
+      : aiEsc(c.t)).join(' ');
+  };
+
+  const rows = sbs.parts.map(p => {
+    const st = AI_EDIT_STATUS[p.status] || null;
+    return `<div class="ai-sbs-part">
+      <div class="ai-sbs-head d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <span class="fw-semibold small text-dark">${aiEsc(p.label)}</span>
+        <span class="small text-muted">
+          ${st ? `<span class="badge ai-edit-badge ${st.cls} me-2"><i class="bi ${st.icon} me-1"></i>${st.label}</span>` : ''}
+          ${p.base_words} → ${p.words} คำ
+        </span>
+      </div>
+      <div class="row g-0">
+        <div class="col-md-6 ai-sbs-col ai-sbs-col-base">
+          <div class="ai-sbs-tag ai-draft-tag-before">${aiEsc(baseShort)}</div>
+          <div class="ai-sbs-text">${chunks(p.base, 'out')}</div>
+        </div>
+        <div class="col-md-6 ai-sbs-col">
+          <div class="ai-sbs-tag ai-draft-tag-after">${aiEsc(thisShort)}</div>
+          <div class="ai-sbs-text">${chunks(p.curr, 'in')}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  return `<div class="ai-sbs-box mt-3">
+    <button class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-semibold" type="button"
+            data-bs-toggle="collapse" data-bs-target="#${boxId}" aria-expanded="false">
+      <i class="bi bi-layout-split me-1"></i>อ่านเทียบ ${aiEsc(baseShort)} กับ ${aiEsc(thisShort)} เต็ม ๆ ทีละส่วน
+    </button>
+    <div class="collapse mt-2" id="${boxId}">
+      <div class="ai-sbs-inner">
+        <div class="small text-muted mb-2">
+          ${marked
+            ? '<i class="bi bi-info-circle me-1"></i>ข้อความขึ้นพื้น<span class="ai-sbs-mark ai-sbs-out">แดงขีดฆ่า</span>คือวรรคที่หายไปจากฉบับเดิม '
+              + '· ขึ้นพื้น<span class="ai-sbs-mark ai-sbs-in">เขียว</span>คือวรรคที่เพิ่งเพิ่มเข้ามา · ระบบเทียบข้อความเอง ไม่ได้ถาม AI'
+            : '<i class="bi bi-signpost-split me-1"></i>สองฉบับนี้เป็น<strong>คนละหัวข้อ</strong> จึงไม่ได้ทำเครื่องหมายว่าเปลี่ยนตรงไหน '
+              + 'วางไว้คู่กันให้อ่านเทียบสำนวนและวิธีเขียนของนักเรียนเอง'}
+        </div>
+        ${rows}
+      </div>
+    </div>
+  </div>`;
+}
+
+/**
  * กล่อง "ฉบับนี้ต่างจากฉบับตั้งต้นอย่างไร"
  * เทียบ "คนละฉบับ" ตามคู่ที่ครูกำหนด เพื่อตอบคำถามเดียวว่า "คะแนนดีขึ้นจริงไหม และต่างกันตรงไหน"
  */
@@ -387,6 +454,7 @@ function aiDraftCompareHTML(fb, opts) {
       </div>
       ${fb.draft_comment ? `<div class="ai-progress-comment mt-2">
         <span class="fw-semibold">${newTopic ? 'AI สรุปพัฒนาการไว้ว่า' : 'AI เทียบจากตัวข้อความไว้ว่า'}:</span> ${aiEsc(fb.draft_comment)}</div>` : ''}
+      ${aiSideBySideHTML(fb, d)}
     </div>`;
   }
 
@@ -549,6 +617,7 @@ function aiDraftCompareHTML(fb, opts) {
     <div class="d-flex flex-wrap gap-2 mt-2">${chips}</div>
     ${d.comment ? `<div class="ai-progress-comment mt-2">${aiEsc(d.comment)}</div>` : ''}
     ${(opts.compact || newTopic) ? '' : aiEditListHTML(d)}
+    ${opts.compact ? '' : aiSideBySideHTML(fb, d)}
     ${table}
     <div class="text-muted mt-2" style="font-size:0.75rem;">
       <i class="bi bi-info-circle me-1"></i>ส่วนต่างคำนวณจากคะแนนที่ AI ให้จริงทั้งสองฉบับ
@@ -598,14 +667,18 @@ function aiFeedbackHTML(fb, opts) {
     const c        = (fb.scores && fb.scores[it.criterion]) ? fb.scores[it.criterion] : null;
     const critName = c ? (c.name || '') : '';
     const lost     = c ? Math.round((c.max - c.weighted) * 100) / 100 : 0;
+    // ข้อที่คะแนนถูกปรับ (ครูปรับเอง / AI ตรวจข้อนั้นใหม่) ต้องไม่เขียนว่า "AI ให้" เพราะไม่ใช่คะแนนของรอบแรกแล้ว
     const scoreTag = c
-      ? `AI ให้ ${c.weighted} / ${c.max} คะแนน${lost > 0 ? ' · เสียไป ' + lost + ' คะแนน' : ''}`
+      ? `${c.overridden ? 'คะแนนที่ใช้' : 'AI ให้'} ${c.weighted} / ${c.max} คะแนน${lost > 0 ? ' · เสียไป ' + lost + ' คะแนน' : ''}`
+      : '';
+    const fromRecheck = it.from_recheck
+      ? '<span class="badge ai-ov-badge ai-ov-recheck ms-1"><i class="bi bi-arrow-repeat me-1"></i>จากการตรวจข้อนี้ใหม่</span>'
       : '';
     return `<div class="ai-improve-card rounded-3 mb-3 overflow-hidden">
       <div class="ai-improve-head d-flex align-items-center justify-content-between flex-wrap gap-2">
         <span class="fw-bold text-dark">
           <span class="badge bg-warning text-dark me-1">จุดที่ ${i + 1}</span>
-          ${it.criterion ? `ข้อ ${aiEsc(it.criterion)} ${aiEsc(critName)}` : 'ภาพรวมของงานเขียน'}
+          ${it.criterion ? `ข้อ ${aiEsc(it.criterion)} ${aiEsc(critName)}` : 'ภาพรวมของงานเขียน'}${fromRecheck}
         </span>
         ${scoreTag ? `<span class="badge bg-white border text-secondary fw-semibold">${aiEsc(scoreTag)}</span>` : ''}
       </div>
@@ -778,33 +851,97 @@ function aiFeedbackHTML(fb, opts) {
   }
 
   // ตารางคะแนนรายเกณฑ์ (ซ่อนในโหมดย่อ)
+  // ครูปรับคะแนนข้อที่ไม่เห็นด้วยได้ หรือสั่งให้ AI ตรวจเฉพาะข้อนั้นใหม่ได้จากปุ่มท้ายแถว
   let scoreTable = '';
   if (!opts.compact) {
+    const canEditCrit = !!opts.critEditFn;
+    const colCount    = canEditCrit ? 5 : 4;
     const critRows = Object.keys(fb.scores || {}).sort().map(k => {
-      const c = fb.scores[k];
+      const c    = fb.scores[k];
       const cpct = c.max > 0 ? Math.round((c.weighted / c.max) * 100) : 0;
-      return `<tr class="ai-crit-row">
+      const ov   = c.overridden ? (c.override || {}) : null;
+
+      // แถวที่คะแนนถูกปรับ ต้องเห็นทั้งคะแนนเดิมของ AI และคะแนนที่ใช้จริง พร้อมเหตุผลกำกับ
+      const ovBadge = ov
+        ? (ov.source === 'ai_recheck'
+            ? '<span class="badge ai-ov-badge ai-ov-recheck"><i class="bi bi-arrow-repeat me-1"></i>AI ตรวจข้อนี้ใหม่</span>'
+            : '<span class="badge ai-ov-badge ai-ov-teacher"><i class="bi bi-person-check me-1"></i>ครูปรับคะแนน</span>')
+        : '';
+      const ovNote = ov
+        ? `<div class="ai-ov-note mt-2 small">
+             <div><span class="fw-semibold">คะแนนเดิมที่ AI ให้:</span>
+               ${aiNum(c.ai_weighted)} / ${c.max}${c.ai_reason ? ' — ' + aiEsc(c.ai_reason) : ''}</div>
+             ${ov.instruction ? `<div class="mt-1"><span class="fw-semibold">คำสั่งที่ครูให้ AI:</span>
+               <span class="fst-italic">${aiEsc(ov.instruction)}</span></div>` : ''}
+             ${ov.by || ov.at ? `<div class="text-muted mt-1">โดย ${aiEsc(ov.by || '-')}${
+               ov.at ? ' · ' + aiEsc(String(ov.at).replace('T', ' ').slice(0, 16)) : ''}</div>` : ''}
+           </div>`
+        : '';
+
+      const scoreCell = ov
+        ? `<span class="text-muted text-decoration-line-through small d-block">${aiNum(c.ai_weighted)}</span>
+           ${c.weighted} <span class="text-muted fw-normal">/ ${c.max}</span>`
+        : `${c.weighted} <span class="text-muted fw-normal">/ ${c.max}</span>`;
+
+      const actionCell = canEditCrit
+        ? `<td class="text-nowrap text-center">
+             <button class="btn btn-outline-secondary btn-sm rounded-pill px-2 py-0"
+                     title="ปรับคะแนนข้อนี้เอง หรือให้ AI ตรวจข้อนี้ใหม่"
+                     onclick="${opts.critEditFn}('${aiEsc(k)}')">
+               <i class="bi bi-sliders"></i>
+             </button>
+           </td>`
+        : '';
+
+      return `<tr class="ai-crit-row${ov ? ' ai-crit-overridden' : ''}">
         <td class="text-nowrap fw-semibold">${aiEsc(k)}</td>
-        <td>${aiEsc(c.name || '')}${c.reason ? `<div class="text-muted small mt-1">${aiEsc(c.reason)}</div>` : ''}</td>
-        <td class="text-center text-nowrap fw-bold">${c.weighted} <span class="text-muted fw-normal">/ ${c.max}</span></td>
+        <td>${aiEsc(c.name || '')} ${ovBadge}
+          ${c.reason ? `<div class="text-muted small mt-1">${aiEsc(c.reason)}</div>` : ''}
+          ${ovNote}</td>
+        <td class="text-center text-nowrap fw-bold">${scoreCell}</td>
         <td style="min-width:110px;"><div class="ai-score-bar"><span style="width:${cpct}%"></span></div></td>
+        ${actionCell}
       </tr>`;
     }).join('');
+
+    // แถวของข้อที่ครูให้เอง ต้องมีจำนวนคอลัมน์เท่ากับแถวอื่นเมื่อเปิดคอลัมน์ปุ่ม
+    const manualRowsFull = canEditCrit
+      ? manualRows.replace(/<\/tr>/g, '<td></td></tr>')
+      : manualRows;
+
+    const ovCount = Number(fb.override_count || 0);
+    const ovSummary = ovCount > 0
+      ? `<div class="alert border-0 rounded-3 small py-2 px-3 mb-2"
+              style="background:#f5f3ff; border-left:4px solid #6d28d9 !important;">
+           <i class="bi bi-sliders me-1"></i>คะแนน ${ovCount} ข้อผ่านการตรวจทานของครูแล้ว —
+           คะแนนที่ AI ให้ครั้งแรกรวมได้ ${aiNum(fb.ai_total_score)} / ${aiNum(fb.max_score)}
+           · หลังตรวจทานเป็น ${aiNum(fb.total_score)} / ${aiNum(fb.max_score)}
+         </div>`
+      : '';
+
     scoreTable = `
       <h6 class="fw-bold text-dark mt-4 mb-2"><i class="bi bi-list-ol me-2"></i>คะแนนรายเกณฑ์ (ประมาณการ)</h6>
+      ${ovSummary}
+      ${canEditCrit ? `<div class="text-muted small mb-2">
+        <i class="bi bi-info-circle me-1"></i>ไม่เห็นด้วยกับคะแนนข้อไหน กดปุ่ม
+        <i class="bi bi-sliders"></i> ท้ายแถวเพื่อปรับคะแนนเอง หรือสั่งให้ AI ตรวจเฉพาะข้อนั้นใหม่
+        (คะแนนเดิมของ AI ถูกเก็บไว้เสมอ กดคืนค่าได้ตลอด)
+      </div>` : ''}
       <div class="table-responsive">
         <table class="table table-sm table-bordered align-middle mb-0">
           <thead class="table-light">
             <tr><th style="width:60px;">ข้อ</th><th>เกณฑ์ / เหตุผล</th>
                 <th class="text-center" style="width:110px;">คะแนน</th>
-                <th style="width:130px;">สัดส่วน</th></tr>
+                <th style="width:130px;">สัดส่วน</th>
+                ${canEditCrit ? '<th class="text-center" style="width:60px;">ปรับ</th>' : ''}</tr>
           </thead>
-          <tbody>${critRows || '<tr><td colspan="4" class="text-muted text-center">— ไม่มีข้อมูลคะแนน —</td></tr>'}${manualRows}</tbody>
+          <tbody>${critRows || `<tr><td colspan="${colCount}" class="text-muted text-center">— ไม่มีข้อมูลคะแนน —</td></tr>`}${manualRowsFull}</tbody>
           <tfoot class="table-light">
             <tr class="fw-bold">
               <td colspan="2" class="text-end">คะแนนรวมตามเกณฑ์ของครู</td>
               <td class="text-center text-nowrap">${combined} <span class="text-muted fw-normal">/ ${fullMax}</span></td>
               <td><div class="ai-score-bar"><span style="width:${pct}%"></span></div></td>
+              ${canEditCrit ? '<td></td>' : ''}
             </tr>
           </tfoot>
         </table>

@@ -2622,6 +2622,9 @@ try {
             // ฐานข้อมูลเก่าที่ยังไม่มีคอลัมน์เทียบรอบ ให้บันทึกแบบเดิมไปก่อน (auto-migration จะเติมให้ในรอบถัดไป)
             $aiRoundCols = ai_feedback_has_round_columns($pdo);
             $aiBaseCols  = ai_feedback_has_baseline_columns($pdo);
+            // ตรวจใหม่ทั้งฉบับ = อ่านงานใหม่หมดทุกข้อ คะแนนที่เคยปรับไว้รายข้อจึงใช้ต่อไม่ได้
+            // (หน้าเว็บเตือนคุณครูก่อนกดแล้วว่าการตรวจใหม่จะล้างคะแนนที่ปรับไว้)
+            $aiOvCol     = ai_feedback_has_override_column($pdo);
             $stmt = $pdo->prepare('
                 INSERT INTO essay_ai_feedback
                     (student_id, essay_phase, overall_comment, strengths, improvements, next_steps,
@@ -2639,7 +2642,9 @@ try {
                     improvements    = VALUES(improvements),
                     next_steps      = VALUES(next_steps),
                     encouragement   = VALUES(encouragement),
-                    scores          = VALUES(scores),
+                    scores          = VALUES(scores),'
+                    . ($aiOvCol ? '
+                    score_overrides = NULL,' : '') . '
                     total_score     = VALUES(total_score),
                     max_score       = VALUES(max_score),
                     quality_level   = VALUES(quality_level),
@@ -2681,6 +2686,9 @@ try {
                                       (string)($aiData['draft_comment'] ?? ''), $aiChangeJson);
             }
             $stmt->execute($aiParams);
+
+            // คะแนนของฉบับนี้เปลี่ยน → ฉบับที่ใช้ฉบับนี้เป็นฉบับตั้งต้นต้องเทียบกับคะแนนชุดใหม่ด้วย
+            ai_sync_baseline_snapshot($pdo, $aiSid, $aiPhase, $aiData['scores']);
 
             ai_log_usage($pdo, $aiUser['id'], $aiRole, $aiSid, $aiPhase, true);
 
@@ -2728,6 +2736,14 @@ try {
             $aiData['review_round']      = $aiRound;
             $aiData['baseline_phase']    = $aiBaseJson ? $aiBasePhase : '';
             $aiData['draft_compare']     = $aiDraftCompare;
+            // ข้อความของฉบับตั้งต้นกับฉบับนี้วางคู่กัน ให้ครูอ่านเทียบได้ทันทีโดยไม่ต้องรีเฟรชหน้า
+            if (!empty($aiBaseSnap['parts']) && is_array($aiBaseSnap['parts'])) {
+                $aiData['draft_compare']['side_by_side'] = ai_side_by_side_parts(
+                    $aiBaseSnap['parts'],
+                    ai_essay_parts($aiIntro, $aiBody, $aiConcl),
+                    ai_baseline_kind($aiPhase) !== 'newtopic'
+                );
+            }
 
             echo json_encode([
                 'success'    => true,
@@ -2913,11 +2929,13 @@ try {
             }
             $aiRoundCols = ai_feedback_has_round_columns($pdo);
             $aiBaseCols  = ai_feedback_has_baseline_columns($pdo);
+            $aiOvCol     = ai_feedback_has_override_column($pdo);
             $stmt = $pdo->query('
                 SELECT f.student_id, f.essay_phase, f.total_score, f.max_score, f.quality_level,
-                       f.teacher_total, f.teacher_scores,
+                       f.teacher_total, f.teacher_scores, f.scores,
                        f.recheck_needed, f.recheck_marked_at,'
                      . ($aiRoundCols ? ' f.review_round,' : '')
+                     . ($aiOvCol    ? ' f.score_overrides,' : '')
                      . ($aiBaseCols  ? ' f.baseline_phase, f.baseline_snapshot,' : '') . '
                        f.model, f.provider, f.requested_role, f.updated_at,
                        s.student_name, s.classroom, s.student_group
@@ -2943,6 +2961,21 @@ try {
                         $aiTSrc   = 'evaluation';
                     }
                 }
+                // คะแนนที่ครูปรับเอง / สั่งให้ AI ตรวจข้อนั้นใหม่ — ตารางภาพรวมต้องแสดงคะแนนที่ใช้จริง
+                $aiOvRow    = $aiOvCol ? ai_clean_score_overrides($r['score_overrides'] ?? '') : [];
+                $aiEffTotal = round((float)$r['total_score'], 2);
+                $aiEffLevel = (string)$r['quality_level'];
+                if ($aiOvRow) {
+                    $aiEff = ai_apply_score_overrides([
+                        'scores'        => json_decode((string)($r['scores'] ?? ''), true) ?: [],
+                        'total_score'   => (float)$r['total_score'],
+                        'max_score'     => (float)$r['max_score'],
+                        'quality_level' => (string)$r['quality_level'],
+                    ], $aiOvRow);
+                    $aiEffTotal = $aiEff['total_score'];
+                    $aiEffLevel = $aiEff['quality_level'];
+                }
+
                 // เทียบกับฉบับตั้งต้นตามคู่ที่ครูกำหนด (D1.2↔D1.1, D2.2↔D2.1, หลังเรียน↔ก่อนเรียน)
                 $aiBaseSnapRow = json_decode((string)($r['baseline_snapshot'] ?? ''), true);
                 $aiBaseTotal   = (is_array($aiBaseSnapRow) && isset($aiBaseSnapRow['total_score']))
@@ -2954,14 +2987,17 @@ try {
                     'student_group' => $r['student_group'],
                     'essay_phase'   => $r['essay_phase'],
                     'phase_label'   => ai_phase_label($r['essay_phase']),
-                    'total_score'   => (float)$r['total_score'],
+                    'total_score'   => $aiEffTotal,
+                    // คะแนนดั้งเดิมของ AI ก่อนถูกปรับ (เท่ากับ total_score เมื่อไม่มีการปรับ)
+                    'ai_total_score'  => round((float)$r['total_score'], 2),
+                    'override_count'  => count($aiOvRow),
                     'max_score'     => (float)$r['max_score'],
                     'teacher_total' => $aiTTotal,
                     'manual_done'   => (count($aiStored) >= $aiManualCount),
                     'teacher_source'=> $aiTSrc,
-                    'combined_total'=> round((float)$r['total_score'] + $aiTTotal, 2),
+                    'combined_total'=> round($aiEffTotal + $aiTTotal, 2),
                     'full_max'      => ai_full_max(),
-                    'quality_level' => $r['quality_level'],
+                    'quality_level' => $aiEffLevel,
                     'model'         => $r['model'],
                     'provider'      => $r['provider'],
                     'requested_role'=> $r['requested_role'],
@@ -2975,7 +3011,7 @@ try {
                     'baseline_label'    => (ai_baseline_phase($r['essay_phase']) !== '')
                                              ? ai_phase_short(ai_baseline_phase($r['essay_phase'])) : '',
                     'baseline_total'    => $aiBaseTotal,
-                    'draft_delta'       => ($aiBaseTotal === null) ? null : round((float)$r['total_score'] - $aiBaseTotal, 2),
+                    'draft_delta'       => ($aiBaseTotal === null) ? null : round($aiEffTotal - $aiBaseTotal, 2),
                 ];
             }
             echo json_encode(['success' => true, 'list' => $aiList]);
@@ -3062,7 +3098,236 @@ try {
             $aiRow = $stmt->fetch();
             echo json_encode([
                 'success'  => true,
-                'feedback' => $aiRow ? ai_feedback_row_to_array($aiRow, ai_teacher_eval_manual($pdo, $aiSid)) : null,
+                'feedback' => $aiRow ? ai_feedback_row_to_array($aiRow, ai_teacher_eval_manual($pdo, $aiSid),
+                                                                ai_student_essay_parts($pdo, $aiSid)) : null,
+            ]);
+            break;
+
+        // ครูปรับคะแนนของ AI เองรายข้อ (ไม่เห็นด้วยกับที่ AI ให้) พร้อมเหตุผลกำกับ
+        // ส่ง raw เป็นค่าว่าง = คืนค่ากลับไปใช้คะแนนที่ AI ให้ไว้เดิม
+        // คะแนนเดิมของ AI ไม่เคยถูกทับ — เก็บแยกไว้ในคอลัมน์ scores ตรวจสอบย้อนหลังได้เสมอ
+        case 'save_ai_score_override':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้นที่ปรับคะแนนได้']);
+                exit;
+            }
+            if (!ai_feedback_has_override_column($pdo)) {
+                echo json_encode(['success' => false, 'error' => 'ฐานข้อมูลยังไม่มีคอลัมน์สำหรับเก็บคะแนนที่ปรับ กรุณารีเฟรชหน้าเว็บอีกครั้ง']);
+                exit;
+            }
+            $aiUser  = $_SESSION['user'];
+            $aiSid   = isset($request_data['student_id'])  ? trim((string)$request_data['student_id'])  : '';
+            $aiPhase = isset($request_data['essay_phase']) ? trim((string)$request_data['essay_phase']) : '';
+            $aiCrit  = isset($request_data['criterion'])   ? trim((string)$request_data['criterion'])   : '';
+            $aiRawIn = $request_data['raw'] ?? '';
+            $aiWhy   = isset($request_data['reason']) ? (string)$request_data['reason'] : '';
+
+            if ($aiSid === '' || !in_array($aiPhase, ai_all_phases(), true)) {
+                echo json_encode(['success' => false, 'error' => 'ข้อมูลไม่ครบถ้วน']);
+                exit;
+            }
+            $aiItem = ai_rubric_item($aiCrit);
+            if (!$aiItem || !$aiItem['ai']) {
+                echo json_encode(['success' => false, 'error' => 'ปรับคะแนนได้เฉพาะข้อที่ AI เป็นผู้ตรวจเท่านั้น']);
+                exit;
+            }
+
+            $stmt = $pdo->prepare('SELECT scores, score_overrides FROM essay_ai_feedback
+                                    WHERE student_id = ? AND essay_phase = ?');
+            $stmt->execute([$aiSid, $aiPhase]);
+            $aiRow = $stmt->fetch();
+            if (!$aiRow) {
+                echo json_encode(['success' => false, 'error' => 'ยังไม่มีผลตรวจของ AI สำหรับเรียงความฉบับนี้ กรุณาให้ AI ตรวจก่อน']);
+                exit;
+            }
+            $aiBaseScores = json_decode((string)($aiRow['scores'] ?? ''), true);
+            if (!is_array($aiBaseScores) || !isset($aiBaseScores[$aiCrit])) {
+                echo json_encode(['success' => false, 'error' => 'ผลตรวจฉบับนี้ไม่มีคะแนนของข้อ ' . $aiCrit . ' ให้ปรับ']);
+                exit;
+            }
+
+            $aiOvs = ai_clean_score_overrides($aiRow['score_overrides'] ?? '');
+            $aiCleared = false;
+            if ($aiRawIn === '' || $aiRawIn === null || !is_numeric($aiRawIn)) {
+                // คืนค่ากลับไปใช้คะแนนที่ AI ให้ไว้เดิม
+                unset($aiOvs[$aiCrit]);
+                $aiCleared = true;
+            } else {
+                $aiOvs[$aiCrit] = [
+                    'raw'    => (float)$aiRawIn,
+                    'source' => 'teacher',
+                    'reason' => $aiWhy,
+                    'by'     => $aiUser['id'],
+                    'at'     => date('Y-m-d H:i:s'),
+                ];
+            }
+            $aiOvs = ai_clean_score_overrides($aiOvs);
+
+            $stmt = $pdo->prepare('UPDATE essay_ai_feedback SET score_overrides = ?
+                                    WHERE student_id = ? AND essay_phase = ?');
+            $stmt->execute([
+                $aiOvs ? json_encode($aiOvs, JSON_UNESCAPED_UNICODE) : null,
+                $aiSid, $aiPhase,
+            ]);
+
+            $stmt = $pdo->prepare('
+                SELECT f.*, s.student_name, s.classroom
+                  FROM essay_ai_feedback f
+                  LEFT JOIN students s ON f.student_id = s.student_id
+                 WHERE f.student_id = ? AND f.essay_phase = ?
+            ');
+            $stmt->execute([$aiSid, $aiPhase]);
+            $aiRow = $stmt->fetch();
+            $aiOut = $aiRow ? ai_feedback_row_to_array($aiRow, ai_teacher_eval_manual($pdo, $aiSid),
+                                                        ai_student_essay_parts($pdo, $aiSid)) : null;
+            // คะแนนของฉบับนี้เปลี่ยน → ฉบับที่ใช้ฉบับนี้เป็นฉบับตั้งต้นต้องเทียบกับคะแนนใหม่ด้วย
+            if ($aiOut) ai_sync_baseline_snapshot($pdo, $aiSid, $aiPhase, $aiOut['scores']);
+
+            echo json_encode([
+                'success'  => true,
+                'cleared'  => $aiCleared,
+                'feedback' => $aiOut,
+            ]);
+            break;
+
+        // ครูสั่งให้ AI ตรวจ "เฉพาะเกณฑ์ข้อเดียว" ใหม่ พร้อมพิมพ์คำสั่งเพิ่มเติมให้ AI ได้
+        // ใช้โควตา 1 ครั้งเท่ากับการตรวจทั้งฉบับ แต่คำสั่งสั้นกว่ามากและข้ออื่นไม่ขยับ
+        case 'ai_recheck_criterion':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้นที่สั่งให้ AI ตรวจได้']);
+                exit;
+            }
+            if (!ai_feedback_has_override_column($pdo)) {
+                echo json_encode(['success' => false, 'error' => 'ฐานข้อมูลยังไม่มีคอลัมน์สำหรับเก็บผลตรวจรายข้อ กรุณารีเฟรชหน้าเว็บอีกครั้ง']);
+                exit;
+            }
+            $aiUser  = $_SESSION['user'];
+            $aiSid   = isset($request_data['student_id'])  ? trim((string)$request_data['student_id'])  : '';
+            $aiPhase = isset($request_data['essay_phase']) ? trim((string)$request_data['essay_phase']) : '';
+            $aiCrit  = isset($request_data['criterion'])   ? trim((string)$request_data['criterion'])   : '';
+            $aiInstr = isset($request_data['instruction']) ? trim((string)$request_data['instruction']) : '';
+
+            if ($aiSid === '' || !in_array($aiPhase, ai_all_phases(), true)) {
+                echo json_encode(['success' => false, 'error' => 'ข้อมูลไม่ครบถ้วน']);
+                exit;
+            }
+            $aiItem = ai_rubric_item($aiCrit);
+            if (!$aiItem || !$aiItem['ai']) {
+                echo json_encode(['success' => false, 'error' => 'สั่งตรวจใหม่ได้เฉพาะข้อที่ AI เป็นผู้ตรวจเท่านั้น']);
+                exit;
+            }
+            if (mb_strlen($aiInstr, 'UTF-8') > 800) {
+                echo json_encode(['success' => false, 'error' => 'คำสั่งเพิ่มเติมยาวเกินไป (ไม่เกิน 800 ตัวอักษร)']);
+                exit;
+            }
+
+            $aiSet = ai_settings($pdo);
+            if (!$aiSet['enabled']) {
+                echo json_encode(['success' => false, 'error' => 'คุณครูปิดการใช้งานระบบ AI ไว้']);
+                exit;
+            }
+            if (!$aiSet['configured']) {
+                echo json_encode(['success' => false, 'error' => 'ยังไม่ได้ตั้งค่า AI กรุณาใส่ API key ในหน้า "ผู้ช่วย AI" ก่อน']);
+                exit;
+            }
+            $aiLimit = AI_DAILY_LIMIT_TEACHER;
+            $aiUsed  = ai_usage_today($pdo, $aiUser['id']);
+            if ($aiUsed >= $aiLimit) {
+                echo json_encode(['success' => false, 'error' => 'วันนี้ใช้ AI ตรวจครบ ' . $aiLimit . ' ครั้งแล้ว กรุณาลองใหม่ในวันพรุ่งนี้']);
+                exit;
+            }
+
+            // ต้องเคยตรวจทั้งฉบับมาก่อน — การตรวจรายข้อเป็นการ "แก้ผลเดิมเฉพาะข้อ" ไม่ใช่การตรวจครั้งแรก
+            $stmt = $pdo->prepare('SELECT scores, score_overrides FROM essay_ai_feedback
+                                    WHERE student_id = ? AND essay_phase = ?');
+            $stmt->execute([$aiSid, $aiPhase]);
+            $aiRow = $stmt->fetch();
+            $aiBaseScores = $aiRow ? json_decode((string)($aiRow['scores'] ?? ''), true) : null;
+            if (!$aiRow || !is_array($aiBaseScores) || !isset($aiBaseScores[$aiCrit])) {
+                echo json_encode(['success' => false, 'error' => 'ยังไม่มีผลตรวจของข้อ ' . $aiCrit . ' ให้ตรวจใหม่ กรุณาให้ AI ตรวจทั้งฉบับก่อน']);
+                exit;
+            }
+
+            $stmt = $pdo->prepare('SELECT * FROM student_essays WHERE student_id = ? AND essay_phase = ?');
+            $stmt->execute([$aiSid, $aiPhase]);
+            $aiEssay = $stmt->fetch();
+            if (!$aiEssay) {
+                echo json_encode(['success' => false, 'error' => 'ยังไม่มีเรียงความของรอบนี้ในระบบ']);
+                exit;
+            }
+            $aiIntro = (string)($aiEssay['intro_content'] ?? '');
+            $aiBody  = json_decode((string)($aiEssay['body_content'] ?? ''), true);
+            if (!is_array($aiBody)) $aiBody = ($aiEssay['body_content'] ?? '') !== '' ? [(string)$aiEssay['body_content']] : [];
+            $aiConcl = (string)($aiEssay['conclusion_content'] ?? '');
+            $aiFull  = trim($aiIntro . "\n" . implode("\n", $aiBody) . "\n" . $aiConcl);
+            if (mb_strlen($aiFull, 'UTF-8') > AI_MAX_CHARS) {
+                echo json_encode(['success' => false, 'error' => 'เรียงความยาวเกินกว่าที่ระบบจะส่งให้ AI ตรวจได้']);
+                exit;
+            }
+            $aiWords = count_thai_words($aiFull);
+
+            $aiHints = [];
+            try {
+                $aiHints = find_misspelled_thai_words($aiFull, load_confirmed_thai_words($pdo), 40);
+            } catch (Exception $e) { /* ไม่มีพจนานุกรมก็ตรวจต่อได้ */ }
+
+            $aiTopics = essay_topics_map($pdo);
+            $aiTopic  = (string)($aiTopics[essay_topic_phase($aiPhase)] ?? '');
+
+            @set_time_limit(120);
+            $aiPrompt = ai_build_criterion_prompt($aiItem, $aiTopic, $aiPhase, $aiIntro, $aiBody, $aiConcl,
+                                                  $aiWords, $aiInstr, $aiHints);
+            $aiCall = ai_call_model($aiSet, ai_system_prompt(), $aiPrompt);
+            if (!$aiCall['ok']) {
+                ai_log_usage($pdo, $aiUser['id'], 'teacher', $aiSid, $aiPhase, false, $aiCall['error']);
+                echo json_encode(['success' => false, 'error' => $aiCall['error']]);
+                exit;
+            }
+            $aiParsed = ai_parse_criterion_result($aiCall['text'], $aiItem);
+            if (!$aiParsed['ok']) {
+                ai_log_usage($pdo, $aiUser['id'], 'teacher', $aiSid, $aiPhase, false, $aiParsed['error']);
+                echo json_encode(['success' => false, 'error' => $aiParsed['error']]);
+                exit;
+            }
+
+            $aiOvs = ai_clean_score_overrides($aiRow['score_overrides'] ?? '');
+            $aiOvs[$aiCrit] = [
+                'raw'         => $aiParsed['data']['raw'],
+                'source'      => 'ai_recheck',
+                'reason'      => $aiParsed['data']['reason'],
+                'instruction' => $aiInstr,
+                'issue'       => $aiParsed['data']['issue'],
+                'suggestion'  => $aiParsed['data']['suggestion'],
+                'example'     => $aiParsed['data']['example'],
+                'by'          => $aiUser['id'],
+                'at'          => date('Y-m-d H:i:s'),
+                'model'       => $aiSet['model'],
+            ];
+            $aiOvs = ai_clean_score_overrides($aiOvs);
+
+            $stmt = $pdo->prepare('UPDATE essay_ai_feedback SET score_overrides = ?
+                                    WHERE student_id = ? AND essay_phase = ?');
+            $stmt->execute([json_encode($aiOvs, JSON_UNESCAPED_UNICODE), $aiSid, $aiPhase]);
+            ai_log_usage($pdo, $aiUser['id'], 'teacher', $aiSid, $aiPhase, true);
+
+            $stmt = $pdo->prepare('
+                SELECT f.*, s.student_name, s.classroom
+                  FROM essay_ai_feedback f
+                  LEFT JOIN students s ON f.student_id = s.student_id
+                 WHERE f.student_id = ? AND f.essay_phase = ?
+            ');
+            $stmt->execute([$aiSid, $aiPhase]);
+            $aiRow = $stmt->fetch();
+            $aiOut = $aiRow ? ai_feedback_row_to_array($aiRow, ai_teacher_eval_manual($pdo, $aiSid),
+                                                        ai_student_essay_parts($pdo, $aiSid)) : null;
+            if ($aiOut) ai_sync_baseline_snapshot($pdo, $aiSid, $aiPhase, $aiOut['scores']);
+
+            echo json_encode([
+                'success'    => true,
+                'criterion'  => $aiCrit,
+                'result'     => $aiParsed['data'],
+                'feedback'   => $aiOut,
+                'quota_left' => max(0, $aiLimit - ($aiUsed + 1)),
             ]);
             break;
 

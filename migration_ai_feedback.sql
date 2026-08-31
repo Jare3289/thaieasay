@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS essay_ai_feedback (
     next_steps      TEXT,
     encouragement   TEXT,
     scores          TEXT,
+    score_overrides LONGTEXT,
     teacher_scores  TEXT,
     teacher_total   DECIMAL(6,2) NOT NULL DEFAULT 0,
     teacher_by      VARCHAR(50)  DEFAULT NULL,
@@ -60,6 +61,11 @@ CREATE TABLE IF NOT EXISTS essay_ai_feedback (
 -- ALTER TABLE essay_ai_feedback ADD COLUMN teacher_total DECIMAL(6,2) NOT NULL DEFAULT 0 AFTER teacher_scores;
 -- ALTER TABLE essay_ai_feedback ADD COLUMN teacher_by VARCHAR(50) DEFAULT NULL AFTER teacher_total;
 -- ALTER TABLE essay_ai_feedback ADD COLUMN teacher_scored_at DATETIME DEFAULT NULL AFTER teacher_by;
+
+-- 2.2) คะแนนที่ "ถูกปรับรายข้อ" หลัง AI ตรวจเสร็จ — ครูปรับเอง หรือสั่งให้ AI ตรวจเฉพาะข้อนั้นใหม่
+--      เก็บแยกจากคอลัมน์ scores เพื่อให้คะแนนดั้งเดิมของ AI ยังตรวจสอบย้อนหลังได้เสมอ
+--      (auto-migration ใน db_config.php เติมให้อัตโนมัติ)
+-- ALTER TABLE essay_ai_feedback ADD COLUMN score_overrides LONGTEXT NULL AFTER scores;
 
 -- 3) บันทึกการเรียกใช้ AI — ใช้จำกัดโควตารายวันและให้ครูตรวจสอบย้อนหลังได้
 CREATE TABLE IF NOT EXISTS ai_usage_log (
