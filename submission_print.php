@@ -175,6 +175,48 @@ $genAt = date('d/m/Y H:i');
 
 // ตัวช่วยแสดงสถานะ ✓ / ว่าง
 $mark = function ($on) { return $on ? '✓' : ''; };
+
+// ---- ข้อมูลสำหรับ "กระดานข่าววิ่ง" (ticker) ใครเหลืองานอะไรบ้าง ----
+// ชื่อภาระงานแบบสั้น พอให้อ่านทันตอนวิ่งผ่าน (น.1 / น.2 = หน่วยการเรียนที่ 1 / 2)
+$colLabel = [
+    'pretest'     => 'ก่อนเรียน',
+    'd1_1'        => 'D1.1',
+    'd1_2'        => 'D1.2',
+    'self1'       => 'ประเมินตนเอง น.1',
+    'peer1'       => 'ประเมินเพื่อน น.1',
+    'problems1'   => 'ปัญหาการเขียน น.1',
+    'checklist1'  => 'ตรวจสอบตนเอง น.1',
+    'reflection1' => 'สะท้อนการเรียนรู้ น.1',
+    'd2_1'        => 'D2.1',
+    'd2_2'        => 'D2.2',
+    'self2'       => 'ประเมินตนเอง น.2',
+    'peer2'       => 'ประเมินเพื่อน น.2',
+    'problems2'   => 'ปัญหาการเขียน น.2',
+    'checklist2'  => 'ตรวจสอบตนเอง น.2',
+    'reflection2' => 'สะท้อนการเรียนรู้ น.2',
+    'posttest'    => 'หลังเรียน',
+];
+$colCount = count($statusCols);
+
+$ticker = [];
+foreach ($report as $r) {
+    $missing = [];
+    foreach ($statusCols as $k) { if (!$r[$k]) $missing[] = $colLabel[$k]; }
+    $ticker[] = [
+        'name'    => $r['student_name'],
+        'room'    => $r['classroom'],
+        'missing' => $missing,
+        'left'    => count($missing),
+    ];
+}
+// เรียงแบบกระดานหุ้น: ใครค้างมากที่สุดวิ่งมาก่อน (ค้างเท่ากันเรียงตามห้อง/ชื่อ)
+usort($ticker, function ($a, $b) {
+    if ($a['left'] !== $b['left']) return $b['left'] - $a['left'];
+    $c = strcmp((string)$a['room'], (string)$b['room']);
+    return $c !== 0 ? $c : strcmp((string)$a['name'], (string)$b['name']);
+});
+$pendingStudents = 0;
+foreach ($ticker as $t) { if ($t['left'] > 0) $pendingStudents++; }
 ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -245,9 +287,63 @@ $mark = function ($on) { return $on ? '✓' : ''; };
   .legend { font-size: 16px; color: #555; margin-top: 10px; }
   .empty { text-align: center; padding: 80px 20px; color: #94a3b8; font-family: "Tahoma", sans-serif; }
 
+  /* ── กระดานข่าววิ่ง "งานค้าง" แบบกระดานหุ้น (แสดงบนจอเท่านั้น) ── */
+  .ticker {
+    display: flex; align-items: stretch; overflow: hidden;
+    background: #0b1727; color: #e6edf5;
+    border-top: 1px solid rgba(255,255,255,.10); border-bottom: 3px solid #0d3b66;
+    font-family: "Tahoma", sans-serif;
+  }
+  .ticker-label {
+    flex: 0 0 auto; display: flex; align-items: center; gap: 10px;
+    background: #0d3b66; padding: 8px 14px; font-size: 13px; font-weight: 700;
+  }
+  .ticker-label .tk-rate {
+    background: rgba(255,255,255,.16); border-radius: 999px; padding: 2px 10px;
+    font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  .ticker-view { position: relative; flex: 1 1 auto; overflow: hidden; }
+  /* ไล่เงาขอบซ้าย-ขวา ให้ข้อความค่อย ๆ โผล่/หายเหมือนกระดานข่าว */
+  .ticker-view::before, .ticker-view::after {
+    content: ""; position: absolute; top: 0; bottom: 0; width: 34px; pointer-events: none; z-index: 2;
+  }
+  .ticker-view::before { left: 0;  background: linear-gradient(90deg, #0b1727, rgba(11,23,39,0)); }
+  .ticker-view::after  { right: 0; background: linear-gradient(270deg, #0b1727, rgba(11,23,39,0)); }
+  .ticker-track {
+    display: flex; width: max-content; will-change: transform;
+    animation: tk-scroll var(--tk-duration, 45s) linear infinite;
+  }
+  .ticker:hover .ticker-track, .ticker.paused .ticker-track { animation-play-state: paused; }
+  @keyframes tk-scroll {
+    from { transform: translateX(0); }
+    to   { transform: translateX(calc(-1 * var(--tk-shift, 100%))); }
+  }
+  .tk-group { display: flex; align-items: center; }
+  .tk-item {
+    display: inline-flex; align-items: baseline; gap: 9px; white-space: nowrap;
+    padding: 9px 18px; font-size: 14px; border-right: 1px solid rgba(255,255,255,.08);
+  }
+  .tk-name  { font-weight: 700; }
+  .tk-room  { color: #8fa6c0; font-size: 12px; }
+  .tk-delta { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .tk-jobs  { font-size: 13px; color: #cbd8e6; }
+  .tk-late .tk-delta { color: #ff6b6b; }
+  .tk-warn .tk-delta { color: #ffc65c; }
+  .tk-done .tk-delta, .tk-done .tk-jobs { color: #3ddc97; }
+  .ticker-toggle {
+    flex: 0 0 auto; background: transparent; color: #cbd8e6; border: 0; border-left: 1px solid rgba(255,255,255,.12);
+    padding: 0 14px; font-size: 13px; font-family: inherit; cursor: pointer; white-space: nowrap;
+  }
+  .ticker-toggle:hover { background: rgba(255,255,255,.08); color: #fff; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ticker-track { animation: none; }
+    .ticker-view { overflow-x: auto; }
+  }
+
   @media print {
     html, body { background: #fff; }
-    .toolbar { display: none !important; }
+    .toolbar, .ticker { display: none !important; }
     .paper { width: auto; max-width: none; margin: 0; padding: 0; box-shadow: none; }
   }
 </style>
@@ -260,6 +356,41 @@ $mark = function ($on) { return $on ? '✓' : ''; };
       <a class="tb-close" href="submission_report.php">ปิด</a>
     </div>
   </div>
+
+  <?php if (!empty($ticker)): ?>
+  <div class="ticker" id="submissionTicker">
+    <div class="ticker-label">
+      <span>📈 กระดานงานค้าง</span>
+      <span class="tk-rate">ส่งแล้ว <?php echo $rate; ?>% · ค้าง <?php echo $pendingStudents; ?> คน</span>
+    </div>
+    <div class="ticker-view">
+      <div class="ticker-track" id="tickerTrack">
+        <div class="tk-group">
+          <?php foreach ($ticker as $t): ?>
+            <?php
+              $left = $t['left'];
+              $cls  = $left === 0 ? 'tk-done' : ($left <= 3 ? 'tk-warn' : 'tk-late');
+              // โชว์ไม่เกิน 6 ชิ้นแรก ที่เหลือสรุปเป็นตัวเลข ไม่งั้นข้อความยาวจนอ่านไม่ทันตอนวิ่ง
+              $shown = array_slice($t['missing'], 0, 6);
+              $more  = $left - count($shown);
+              $jobs  = $left === 0
+                  ? 'ส่งครบทุกชิ้น'
+                  : implode(' · ', $shown) . ($more > 0 ? ' +อีก ' . $more : '');
+              $delta = $left === 0 ? '▲ ' . $colCount . '/' . $colCount : '▼ ค้าง ' . $left;
+            ?>
+            <span class="tk-item <?php echo $cls; ?>">
+              <span class="tk-name"><?php echo $hh($t['name']); ?></span>
+              <span class="tk-room"><?php echo $hh($t['room']); ?></span>
+              <span class="tk-delta"><?php echo $hh($delta); ?></span>
+              <span class="tk-jobs"><?php echo $hh($jobs); ?></span>
+            </span>
+          <?php endforeach; ?>
+        </div>
+      </div>
+    </div>
+    <button type="button" class="ticker-toggle" id="tickerToggle" aria-pressed="false">⏸ หยุด</button>
+  </div>
+  <?php endif; ?>
 
   <div class="paper">
       <h1 class="doc-title">รายงานการส่งงานรายบุคคล</h1>
@@ -327,5 +458,53 @@ $mark = function ($on) { return $on ? '✓' : ''; };
       <div class="legend">เครื่องหมาย ✓ = ส่งแล้ว · ช่องว่าง = ยังไม่ส่ง · D1/D2 = ร่างที่ 1 / ร่างที่ 2 ของภาระงานแต่ละหน่วย · ประเมินเพื่อน = นักเรียนคนนี้ประเมินงานให้เพื่อนแล้ว · การประเมินและสะท้อนคิดแยกบันทึกตามหน่วยการเรียน</div>
       <?php endif; ?>
   </div><!-- /.paper -->
+
+<script>
+// กระดานข่าววิ่ง: ทำสำเนาชุดข้อมูลให้ยาวพอเต็มจอ แล้วเลื่อนวนแบบไม่มีรอยต่อ
+(function () {
+  var ticker = document.getElementById('submissionTicker');
+  var track  = document.getElementById('tickerTrack');
+  if (!ticker || !track) return;
+
+  var group = track.querySelector('.tk-group');
+  var PX_PER_SEC = 70; // ความเร็วข่าววิ่ง (พิกเซลต่อวินาที)
+
+  function layout() {
+    var clones = track.querySelectorAll('.tk-group.tk-clone');
+    for (var i = 0; i < clones.length; i++) clones[i].remove();
+
+    var width = group.scrollWidth;
+    if (!width) return;
+    var viewWidth = ticker.querySelector('.ticker-view').clientWidth;
+    // ต้องมีเนื้อหาอย่างน้อย 1 ชุด + เต็มความกว้างจอ เพื่อให้วนแล้วไม่เห็นช่องว่าง
+    var copies = Math.ceil(viewWidth / width) + 1;
+    for (var j = 0; j < copies; j++) {
+      var clone = group.cloneNode(true);
+      clone.classList.add('tk-clone');
+      clone.setAttribute('aria-hidden', 'true');
+      track.appendChild(clone);
+    }
+    track.style.setProperty('--tk-shift', width + 'px');
+    track.style.setProperty('--tk-duration', Math.max(12, width / PX_PER_SEC) + 's');
+  }
+
+  layout();
+
+  var resizeTimer = null;
+  window.addEventListener('resize', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(layout, 200);
+  });
+
+  var toggle = document.getElementById('tickerToggle');
+  if (toggle) {
+    toggle.addEventListener('click', function () {
+      var paused = ticker.classList.toggle('paused');
+      toggle.textContent = paused ? '▶ เล่นต่อ' : '⏸ หยุด';
+      toggle.setAttribute('aria-pressed', paused ? 'true' : 'false');
+    });
+  }
+})();
+</script>
 </body>
 </html>
