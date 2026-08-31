@@ -170,6 +170,46 @@ $aiPhases    = ai_all_phases();
     <!-- ค่าเฉลี่ยทั้งชั้นรายรอบงาน (ย้ายมาจากแท็บรายบุคคล) -->
     <div id="aiClassAvgCards" class="mb-4"></div>
 
+    <!-- ภาพรวมการนำเสนอรายรอบงาน — ใช้เมื่อ AI ตรวจครบทั้งรอบแล้ว -->
+    <div class="card border-0 shadow-sm rounded-4 mb-4" style="border-top:4px solid #b45309 !important;">
+      <div class="card-header bg-white border-bottom py-3 px-4 rounded-top-4">
+        <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+          <div>
+            <h6 class="fw-bold text-dark mb-0">
+              <i class="bi bi-journal-richtext text-warning me-2"></i>ภาพรวมการนำเสนอรายรอบงาน
+            </h6>
+            <div class="text-muted small mt-1">
+              เมื่อ AI ตรวจครบทั้งรอบแล้ว ให้ AI อ่านงานทั้งชั้นรวดเดียว แล้วสรุปว่านักเรียนนำเสนอไปทางใด
+              มีประเด็นใดน่าสนใจ และมีข้อสังเกตอะไรที่เป็นประโยชน์ต่อการอ่านผลวิจัย
+            </div>
+          </div>
+        </div>
+        <div class="row g-2 mt-2">
+          <div class="col-md-5">
+            <select id="ovPhase" class="form-select form-select-sm rounded-3" onchange="paintPhaseOverview()">
+              <?php foreach ($aiPhases as $ph): ?>
+              <option value="<?php echo $ph; ?>"><?php echo htmlspecialchars(ai_phase_label($ph)); ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+<?php if ($aiIsTeacher): ?>
+          <div class="col-md-7 d-flex gap-2">
+            <button id="ovRunBtn" class="btn btn-sm fw-bold rounded-pill px-4 text-white"
+                    style="background:linear-gradient(135deg,#b45309,#6d28d9);" onclick="runPhaseOverview()">
+              <i class="bi bi-stars me-1"></i>ให้ AI เขียนภาพรวมรอบนี้
+            </button>
+            <span id="ovHint" class="small text-muted align-self-center"></span>
+          </div>
+<?php endif; ?>
+        </div>
+      </div>
+      <div class="card-body p-4">
+        <div id="ovBox">
+          <div class="text-center text-muted py-4"><i class="bi bi-hourglass-split me-2"></i>กำลังโหลด...</div>
+        </div>
+      </div>
+    </div>
+
 <?php if ($aiIsTeacher): ?>
   <!-- แถบเครื่องมือของคุณครู — เก็บงานตั้งค่า/ตรวจทั้งรอบไว้ในลิ้นชัก ไม่ให้บังแผงผลตรวจซึ่งใช้บ่อยที่สุด -->
   <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
@@ -393,6 +433,9 @@ $aiPhases    = ai_all_phases();
   .ai-person-figure { line-height: 1.1; }
   .ai-person-figure .num { font-size: 1.55rem; font-weight: 800; color: #4c1d95; }
   .ai-person-figure .cap { font-size: 0.75rem; color: #64748b; }
+
+  /* การ์ดแนวทางการนำเสนอในภาพรวมรายรอบงาน */
+  .ov-theme { background: #fffdf5; border: 1px solid #fde68a; border-left: 4px solid #f59e0b; }
 
   /* การ์ดตัวเลขเด่นของทั้งชั้น (แท็บภาพรวม) */
   .ai-hl-card { background: #ffffff; border: 1px solid var(--border-gray); }
@@ -850,6 +893,202 @@ function paintClassHighlights() {
     </div>`;
 }
 
+/* ============================================================
+   ภาพรวมการนำเสนอรายรอบงาน (ทั้งชั้น)
+   AI อ่านผลตรวจของทุกคนในรอบนั้นรวดเดียว แล้วสรุปว่านำเสนอไปทางใด มีอะไรน่าสนใจ
+   ตัวเลขทั้งหมดในกล่องนี้ระบบคำนวณเอง ไม่ได้ให้ AI นับ
+   ============================================================ */
+let aiOverviews = {};      // รหัสรอบงาน => ภาพรวมที่เคยสร้างไว้
+let ovRunning   = false;
+
+async function loadPhaseOverviews() {
+  const box = document.getElementById('ovBox');
+  if (!box) return;
+  try {
+    const res  = await fetch('api.php?action=get_ai_phase_overview');
+    const data = await res.json();
+    aiOverviews = (data.success && data.overviews) ? data.overviews : {};
+  } catch (err) {
+    aiOverviews = {};
+  }
+  paintPhaseOverview();
+}
+
+// จำนวนฉบับที่ตรวจแล้วในรอบนั้น (ใช้บอกครูว่าพร้อมให้เขียนภาพรวมหรือยัง)
+function ovReviewedCount(phase) {
+  return (aiOverviewList || []).filter(r => r.essay_phase === phase).length;
+}
+
+function paintPhaseOverview() {
+  const box = document.getElementById('ovBox');
+  const sel = document.getElementById('ovPhase');
+  if (!box || !sel) return;
+  const phase = sel.value;
+  const ov    = aiOverviews[phase];
+  const done  = ovReviewedCount(phase);
+
+  const hint = document.getElementById('ovHint');
+  if (hint) {
+    hint.innerHTML = done < 2
+      ? '<i class="bi bi-exclamation-circle me-1"></i>รอบนี้ตรวจแล้ว ' + done + ' ฉบับ (ต้องมีอย่างน้อย 2 ฉบับ)'
+      : '<i class="bi bi-check2-circle me-1"></i>รอบนี้ตรวจแล้ว ' + done + ' ฉบับ พร้อมเขียนภาพรวม';
+  }
+  const btn = document.getElementById('ovRunBtn');
+  if (btn && !ovRunning) {
+    btn.disabled = (done < 2);
+    btn.innerHTML = '<i class="bi bi-stars me-1"></i>' + (ov ? 'เขียนภาพรวมรอบนี้ใหม่' : 'ให้ AI เขียนภาพรวมรอบนี้');
+  }
+
+  if (!ov) {
+    box.innerHTML = `<div class="text-center text-muted py-4">
+      <i class="bi bi-journal-text fs-3 d-block mb-2 opacity-50"></i>
+      ยังไม่เคยให้ AI เขียนภาพรวมของรอบนี้
+      ${AI_IS_TEACHER
+        ? (done < 2
+            ? '<div class="small mt-2">ให้ AI ตรวจเรียงความในรอบนี้อย่างน้อย 2 ฉบับก่อน</div>'
+            : '<div class="small mt-2">กดปุ่ม &quot;ให้ AI เขียนภาพรวมรอบนี้&quot; ด้านบนได้เลย</div>')
+        : '<div class="small mt-2">รอคุณครูสั่งให้ AI เขียนภาพรวมของรอบนี้</div>'}
+    </div>`;
+    return;
+  }
+  box.innerHTML = overviewHTML(ov);
+}
+
+// รายการหัวข้อย่อยแบบมีสัญลักษณ์นำ
+function ovList(items, icon, color) {
+  if (!items || !items.length) return '<div class="text-muted small">— ไม่มีข้อมูล —</div>';
+  return items.map(t => `<div class="d-flex align-items-start gap-2 mb-2">
+    <i class="bi ${icon} mt-1" style="color:${color};"></i>
+    <span class="small" style="line-height:1.8;">${esc(t)}</span>
+  </div>`).join('');
+}
+
+function overviewHTML(ov) {
+  const st = ov.stats || {};
+  const when = ov.updated_at ? String(ov.updated_at).replace('T', ' ').slice(0, 16) : '';
+
+  // แถบตัวเลขของรอบนั้น — ระบบคำนวณเอง ไม่ได้มาจาก AI
+  const pair = st.pair;
+  const chips = [
+    `<span class="ai-progress-chip"><span class="text-muted">ตรวจแล้ว</span>
+       <span class="fw-bold">${st.n || ov.essay_count || 0} ฉบับ</span></span>`,
+    `<span class="ai-progress-chip"><span class="text-muted">คะแนนเฉลี่ย</span>
+       <span class="fw-bold">${aiNum(st.mean)}</span><span class="text-muted">/ ${aiNum(st.max_score)}</span></span>`,
+    st.mean_words ? `<span class="ai-progress-chip"><span class="text-muted">ความยาวเฉลี่ย</span>
+       <span class="fw-bold">${st.mean_words} คำ</span></span>` : '',
+    pair ? `<span class="ai-progress-chip"><span class="text-muted">เทียบ ${esc(AI_PHASE_SHORT_MAP[pair.base_phase] || pair.base_phase)}</span>
+       ${aiDeltaBadge(pair.mean_delta)}
+       <span class="text-muted">ดีขึ้น ${pair.improved}/${pair.n} ฉบับ</span></span>` : ''
+  ].filter(Boolean).join('');
+
+  const themes = (ov.themes || []).map((t, i) => `
+    <div class="ov-theme p-3 rounded-3 mb-2">
+      <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
+        <span class="fw-bold text-dark small">
+          <span class="badge bg-warning-subtle text-warning-emphasis me-1">แนวที่ ${i + 1}</span>${esc(t.theme)}
+        </span>
+        ${t.how_many ? `<span class="badge bg-light text-secondary border text-nowrap">${esc(t.how_many)}</span>` : ''}
+      </div>
+      ${t.example ? `<div class="small text-muted mt-1"><i class="bi bi-quote me-1"></i>${esc(t.example)}</div>` : ''}
+    </div>`).join('') || '<div class="text-muted small">— ไม่มีข้อมูล —</div>';
+
+  return `
+    <div class="d-flex flex-wrap gap-2 mb-3">${chips}</div>
+
+    <div class="alert border-0 rounded-3" style="background:#fffbeb; border-left:4px solid #f59e0b !important;">
+      <div class="fw-bold text-dark mb-1"><i class="bi bi-eye me-2"></i>ภาพรวมการนำเสนอของทั้งชั้น</div>
+      <div class="text-dark" style="line-height:1.9;">${esc(ov.overview)}</div>
+    </div>
+
+    <h6 class="fw-bold text-dark mt-4 mb-2"><i class="bi bi-signpost-split text-warning me-2"></i>นักเรียนนำเสนอไปทางใดบ้าง</h6>
+    ${themes}
+
+    <div class="row g-4 mt-1">
+      <div class="col-lg-6">
+        <h6 class="fw-bold text-primary mb-2"><i class="bi bi-lightbulb-fill me-2"></i>ประเด็นที่น่าสนใจ</h6>
+        ${ovList(ov.interesting, 'bi-stars', '#6d28d9')}
+      </div>
+      <div class="col-lg-6">
+        <h6 class="fw-bold text-dark mb-2"><i class="bi bi-clipboard2-data me-2"></i>ข้อสังเกตต่อผลวิจัย</h6>
+        ${ovList(ov.observations, 'bi-graph-up', '#0d7377')}
+      </div>
+    </div>
+
+    <div class="row g-4 mt-1">
+      <div class="col-lg-6">
+        <h6 class="fw-bold text-success mb-2"><i class="bi bi-hand-thumbs-up-fill me-2"></i>จุดที่ทั้งชั้นทำได้ดี</h6>
+        ${ovList(ov.common_strengths, 'bi-check-circle-fill', '#16a34a')}
+      </div>
+      <div class="col-lg-6">
+        <h6 class="fw-bold text-warning-emphasis mb-2"><i class="bi bi-tools me-2"></i>จุดบกพร่องที่พบซ้ำทั้งชั้น</h6>
+        ${ovList(ov.common_problems, 'bi-exclamation-triangle-fill', '#d97706')}
+      </div>
+    </div>
+
+    ${(ov.teaching_notes && ov.teaching_notes.length) ? `
+    <h6 class="fw-bold text-primary mt-4 mb-2"><i class="bi bi-mortarboard-fill me-2"></i>สิ่งที่ควรทำต่อในคาบถัดไป</h6>
+    <div class="row row-cols-1 row-cols-md-2 g-2">
+      ${ov.teaching_notes.map((t, i) => `<div class="col"><div class="ai-summary-step p-3 rounded-3 h-100 small">
+        <span class="badge bg-primary-subtle text-primary-emphasis me-1">${i + 1}</span>${esc(t)}</div></div>`).join('')}
+    </div>` : ''}
+
+    <div class="alert border-0 rounded-3 mt-4 mb-0 small" style="background:#f1f5f9;">
+      <i class="bi bi-exclamation-circle me-1"></i>
+      <strong>ข้อสังเกตนี้ไม่ใช่ผลทดสอบทางสถิติ</strong> — ตัวเลขในกล่องนี้เป็นค่าบรรยาย (ค่าเฉลี่ย จำนวนฉบับที่ดีขึ้น)
+      ที่ระบบคำนวณเอง ส่วนการทดสอบนัยสำคัญด้วย <strong>Paired t-test</strong> อยู่ในหน้า
+      <a href="research_analysis.php" class="alert-link">วิเคราะห์สถิติงานวิจัย</a> ให้อ้างอิงค่าจากหน้านั้นในการรายงานผล
+    </div>
+
+    <div class="text-muted mt-3" style="font-size:0.75rem;">
+      <i class="bi bi-cpu me-1"></i>เขียนโดยโมเดล ${esc(ov.model || '-')} (${esc(ov.provider || '-')})
+      ${when ? ' · เมื่อ ' + esc(when) : ''} · จากผลตรวจ ${ov.essay_count || 0} ฉบับ
+    </div>`;
+}
+
+<?php if ($aiIsTeacher): ?>
+async function runPhaseOverview() {
+  if (ovRunning) return;
+  const sel   = document.getElementById('ovPhase');
+  const phase = sel.value;
+  const done  = ovReviewedCount(phase);
+  if (done < 2) { showToast('รอบนี้ยังมีผลตรวจไม่พอสำหรับเขียนภาพรวม', 'error'); return; }
+  if (aiOverviews[phase] && !confirm(`เขียนภาพรวมของ "${AI_PHASE_LABELS[phase]}" ใหม่ทับของเดิมใช่ไหม?`)) return;
+
+  ovRunning = true;
+  const btn = document.getElementById('ovRunBtn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>กำลังเขียน...'; }
+  document.getElementById('ovBox').innerHTML =
+    aiLoadingHTML('AI กำลังอ่านงานทั้งชั้นแล้วเขียนภาพรวม', 'ปกติใช้เวลาประมาณ 20-60 วินาที กรุณาอย่าปิดหน้านี้');
+
+  try {
+    const res = await fetch('api.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'ai_phase_overview', essay_phase: phase })
+    });
+    const data = await res.json();
+    if (!data.success) {
+      showToast(data.error || 'เขียนภาพรวมไม่สำเร็จ', 'error');
+      document.getElementById('ovBox').innerHTML = aiErrorHTML(data.error || 'เขียนภาพรวมไม่สำเร็จ');
+      return;
+    }
+    aiOverviews[phase] = data.overview;
+    if (typeof data.quota_left === 'number' && aiStatus) {
+      aiStatus.quota_left = data.quota_left;
+      aiStatus.quota_used = aiStatus.quota_limit - data.quota_left;
+    }
+    showToast('เขียนภาพรวมของรอบนี้เรียบร้อยแล้ว');
+  } catch (err) {
+    showToast('เชื่อมต่อไม่สำเร็จ', 'error');
+    document.getElementById('ovBox').innerHTML = aiErrorHTML('เชื่อมต่อไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+  } finally {
+    ovRunning = false;
+    paintPhaseOverview();
+    updateReviewButton();
+  }
+}
+<?php endif; ?>
+
 // การ์ด 1 ใบต่อ 1 รอบงาน — เห็นคะแนนของตัวเองครบทุกฉบับในหน้าเดียว
 function paintPhaseCards() {
   const box = document.getElementById('aiPhaseCards');
@@ -1226,6 +1465,7 @@ async function loadAiOverview() {
     paintAiOverview();
     paintClassHighlights();   // ตัวเลขเด่นและการ์ดค่าเฉลี่ยใช้ข้อมูลชุดเดียวกันนี้
     paintClassAverages();
+    paintPhaseOverview();     // ป้ายบอกจำนวนฉบับที่ตรวจแล้วอิงข้อมูลชุดนี้
   } catch (err) {
     box.innerHTML = '<div class="text-center text-muted py-4">โหลดข้อมูลไม่สำเร็จ</div>';
   }
@@ -1866,6 +2106,7 @@ async function clearApiKey() {
   if (!AI_IS_STUDENT) {
     loadAiOverview();
     loadRecheckQueue();
+    loadPhaseOverviews();
   }
 })();
 </script>

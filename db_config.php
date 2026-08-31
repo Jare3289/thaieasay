@@ -818,6 +818,35 @@ try {
     // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
 }
 
+// ตาราง "ภาพรวมการนำเสนอรายรอบงาน" — AI สรุปว่าทั้งชั้นนำเสนอภาระงานนั้นไปทางใด
+// 1 รอบงาน = 1 แถว (สร้างใหม่ทับของเดิม) แยกจากผลตรวจรายบุคคลโดยสิ้นเชิง
+try {
+    $tOv = $pdo->query("SHOW TABLES LIKE 'essay_ai_phase_summary'");
+    if (!$tOv || $tOv->rowCount() === 0) {
+        safe_ddl($pdo, "
+            CREATE TABLE IF NOT EXISTS essay_ai_phase_summary (
+                essay_phase      VARCHAR(20) PRIMARY KEY,
+                overview         TEXT,          -- ภาพรวมว่าทั้งชั้นนำเสนอไปทางใด
+                themes           LONGTEXT,      -- JSON array ของ {theme, how_many, example}
+                interesting      LONGTEXT,      -- JSON array สิ่งที่น่าสนใจ
+                common_strengths LONGTEXT,      -- JSON array จุดที่ทำได้ดีร่วมกัน
+                common_problems  LONGTEXT,      -- JSON array จุดบกพร่องที่พบซ้ำ
+                observations     LONGTEXT,      -- JSON array ข้อสังเกตเชิงวิจัย
+                teaching_notes   LONGTEXT,      -- JSON array สิ่งที่ครูควรทำต่อ
+                stats            LONGTEXT,      -- JSON ตัวเลขที่ใช้ตอนสร้าง (ไว้อ้างอิงย้อนหลัง)
+                essay_count      INT NOT NULL DEFAULT 0,
+                provider         VARCHAR(30)  DEFAULT NULL,
+                model            VARCHAR(100) DEFAULT NULL,
+                generated_by     VARCHAR(50)  DEFAULT NULL,
+                created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+    }
+} catch (Exception $e) {
+    // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
+}
+
 // เพิ่มคอลัมน์ "เทียบกับฉบับตั้งต้น" ให้ตาราง essay_ai_feedback (ฐานข้อมูลที่สร้างไว้ก่อนหน้านี้)
 // คู่ที่ต้องเทียบกันเสมอตามที่คุณครูกำหนด: ร่างที่ 2 เทียบร่างที่ 1 ของหน่วยเดียวกัน และหลังเรียนเทียบก่อนเรียน
 // เก็บผลตรวจของฉบับตั้งต้นไว้ 1 ชุด เพื่อบอกได้ว่าคะแนน "ดีขึ้นจริงไหม" และต่างกันตรงไหน

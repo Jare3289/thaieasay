@@ -100,3 +100,25 @@ CREATE TABLE IF NOT EXISTS ai_usage_log (
 -- ALTER TABLE essay_ai_feedback ADD COLUMN baseline_snapshot LONGTEXT NULL AFTER baseline_phase;
 -- ALTER TABLE essay_ai_feedback ADD COLUMN draft_comment TEXT NULL AFTER baseline_snapshot;
 -- ALTER TABLE essay_ai_feedback ADD COLUMN draft_changes LONGTEXT NULL AFTER draft_comment;
+
+-- ---------------------------------------------------------------------------
+-- ภาพรวมการนำเสนอรายรอบงาน (ทั้งชั้น) — AI สรุปหลังตรวจครบทั้งรอบ
+-- 1 รอบงาน = 1 แถว สร้างใหม่ทับของเดิม
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS essay_ai_phase_summary (
+    essay_phase      VARCHAR(20) PRIMARY KEY,
+    overview         TEXT,
+    themes           LONGTEXT,
+    interesting      LONGTEXT,
+    common_strengths LONGTEXT,
+    common_problems  LONGTEXT,
+    observations     LONGTEXT,
+    teaching_notes   LONGTEXT,
+    stats            LONGTEXT,
+    essay_count      INT NOT NULL DEFAULT 0,
+    provider         VARCHAR(30)  DEFAULT NULL,
+    model            VARCHAR(100) DEFAULT NULL,
+    generated_by     VARCHAR(50)  DEFAULT NULL,
+    created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
