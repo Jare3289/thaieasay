@@ -391,9 +391,12 @@ function rs_ai($full, $no = '7') {
         <div class="kv" style="margin-bottom:5px;"><?php echo rp_esc($fb['overall']); ?></div>
         <?php endif; ?>
 
-        <?php if (!empty($fb['draft_compare']['has_baseline'])): $dc = $fb['draft_compare']; ?>
+        <?php if (!empty($fb['draft_compare']['has_baseline'])): $dc = $fb['draft_compare'];
+              // คู่คนละหัวข้อ (หลังเรียน↔ก่อนเรียน) เทียบที่คุณภาพเนื้อหาตามเกณฑ์ ไม่ใช่เทียบว่าแก้ข้อความตรงไหน
+              $dcNewTopic = (($dc['kind'] ?? '') === 'newtopic'); ?>
         <div class="box <?php echo ($dc['delta'] > 0) ? 'good' : (($dc['delta'] < 0) ? 'watch' : 'info'); ?>" style="margin-bottom:6px;">
-          <h4>เทียบกับ <?php echo rp_esc($dc['label']); ?></h4>
+          <h4><?php echo $dcNewTopic ? 'พัฒนาการเทียบกับ ' : 'เทียบกับ '; ?><?php echo rp_esc($dc['label']); ?><?php
+              echo $dcNewTopic ? ' (คนละหัวข้อ — เทียบที่คุณภาพเนื้อหาตามเกณฑ์)' : ''; ?></h4>
           <div class="kv">คะแนน <?php echo rp_num($dc['base_total'], 2); ?> → <?php echo rp_num($dc['total'], 2); ?>
             <?php echo rp_diff($dc['delta'], 2); ?>
             · <?php echo ($dc['delta'] > 0) ? 'ดีขึ้นตามที่ควรเป็น'
@@ -401,9 +404,13 @@ function rs_ai($full, $no = '7') {
             · ดีขึ้น <?php echo (int)$dc['up']; ?> ข้อ · ลดลง <?php echo (int)$dc['down']; ?> ข้อ
             · เท่าเดิม <?php echo (int)$dc['same']; ?> ข้อ</div>
           <?php if (!empty($dc['same_text'])): ?>
-          <div class="kv"><b>ข้อความเหมือนฉบับตั้งต้นทุกตัวอักษร</b> — นักเรียนยังไม่ได้แก้ไขงาน</div>
+          <div class="kv"><b>ข้อความเหมือนฉบับตั้งต้นทุกตัวอักษร</b> —
+            <?php echo $dcNewTopic ? 'ทั้งที่เป็นคนละหัวข้อ ควรตรวจสอบว่าส่งงานผิดฉบับหรือไม่'
+                                   : 'นักเรียนยังไม่ได้แก้ไขงาน'; ?></div>
           <?php elseif (!empty($dc['identical'])): ?>
-          <div class="kv"><b>คะแนนรายข้อเท่ากันทุกข้อ</b> — งานเปลี่ยนแล้วแต่ยังไม่ถึงระดับถัดไปสักข้อ</div>
+          <div class="kv"><b>คะแนนรายข้อเท่ากันทุกข้อ</b> —
+            <?php echo $dcNewTopic ? 'ความสามารถในการเขียนยังอยู่ระดับเดิมทุกด้าน'
+                                   : 'งานเปลี่ยนแล้วแต่ยังไม่ถึงระดับถัดไปสักข้อ'; ?></div>
           <?php endif; ?>
           <?php if (!empty($dc['comment'])): ?><div class="kv"><?php echo rp_esc($dc['comment']); ?></div><?php endif; ?>
           <?php
