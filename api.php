@@ -3274,9 +3274,43 @@ try {
             $aiTopics = essay_topics_map($pdo);
             $aiTopic  = (string)($aiTopics[essay_topic_phase($aiPhase)] ?? '');
 
+            // ---- คะแนนเดิมของข้อนี้ใน "ฉบับตั้งต้น" (D1.2 เทียบ D1.1 · D2.2 เทียบ D2.1 · หลังเรียน เทียบ ก่อนเรียน) ----
+            // ส่งไปกับคำสั่งด้วย เพื่อให้การตรวจใหม่รายข้อใช้มาตรฐานเดียวกับตอนตรวจฉบับตั้งต้น
+            // ไม่เช่นนั้นคะแนนข้อนี้อาจตกต่ำกว่าร่างก่อนหน้าทั้งที่นักเรียนแก้งานมาแล้ว
+            $aiCritBase  = [];
+            $aiCritBasePh = ai_baseline_phase($aiPhase);
+            if ($aiCritBasePh !== '') {
+                try {
+                    $stmtCB = $pdo->prepare('SELECT scores, score_overrides FROM essay_ai_feedback
+                                              WHERE student_id = ? AND essay_phase = ?');
+                    $stmtCB->execute([$aiSid, $aiCritBasePh]);
+                    $rowCB = $stmtCB->fetch();
+                    if ($rowCB) {
+                        $bScores = json_decode((string)($rowCB['scores'] ?? ''), true);
+                        if (is_array($bScores)) {
+                            // ใช้คะแนน "ที่ใช้จริง" (รวมข้อที่ครูปรับหรือสั่งตรวจใหม่ไปแล้ว) เป็นตัวเทียบ
+                            $bEff = ai_apply_score_overrides(
+                                ['scores' => $bScores, 'total_score' => 0, 'max_score' => ai_rubric_max()],
+                                $rowCB['score_overrides'] ?? ''
+                            );
+                            if (isset($bEff['scores'][$aiCrit]['raw'])) {
+                                $aiCritBase = [
+                                    'raw'      => (float)$bEff['scores'][$aiCrit]['raw'],
+                                    'label'    => ai_phase_label($aiCritBasePh),
+                                    'newtopic' => (ai_baseline_kind($aiPhase) === 'newtopic'),
+                                ];
+                            }
+                        }
+                    }
+                } catch (Exception $e) {
+                    // ยังไม่มีผลตรวจของฉบับตั้งต้น — ตรวจใหม่รายข้อต่อได้ แค่ไม่มีคะแนนเดิมให้ยึด
+                    $aiCritBase = [];
+                }
+            }
+
             @set_time_limit(120);
             $aiPrompt = ai_build_criterion_prompt($aiItem, $aiTopic, $aiPhase, $aiIntro, $aiBody, $aiConcl,
-                                                  $aiWords, $aiInstr, $aiHints);
+                                                  $aiWords, $aiInstr, $aiHints, $aiCritBase);
             $aiCall = ai_call_model($aiSet, ai_system_prompt(), $aiPrompt);
             if (!$aiCall['ok']) {
                 ai_log_usage($pdo, $aiUser['id'], 'teacher', $aiSid, $aiPhase, false, $aiCall['error']);
