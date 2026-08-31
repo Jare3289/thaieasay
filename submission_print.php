@@ -75,6 +75,46 @@ foreach ([
     } catch (Exception $e) { /* ตารางอาจยังไม่มี */ }
 }
 
+// ---- การประเมินตามเกณฑ์ (ประเมินตนเอง / ประเมินเพื่อน) แยกตามหน่วยการเรียน ----
+// ประเมินตนเอง = มีแถวที่นักเรียนประเมินงานของตัวเองในรอบนั้น
+// ประเมินเพื่อน = "นักเรียนคนนี้ไปประเมินให้เพื่อน" จึงดูจากชื่อผู้ประเมิน (evaluator_name)
+// ไม่ใช่ student_id ของแถว (ซึ่งเป็นเจ้าของผลงาน) — กติกาเดียวกับ api.php (get_submission_report)
+$evalSet = [
+    'self' => [1 => [], 2 => []],
+    'peer' => [1 => [], 2 => []],
+];
+$nameToIds = [];
+try {
+    $allStuStmt = $pdo->query('SELECT student_id, student_name FROM students');
+    while ($r = $allStuStmt->fetch()) {
+        foreach ([trim((string)$r['student_name']), trim(formatNamePrefix($r['student_name']))] as $variant) {
+            if ($variant === '') continue;
+            $nameToIds[$variant][$r['student_id']] = true;
+        }
+    }
+} catch (Exception $e) { /* ปล่อยว่าง */ }
+$phaseUnitMap = ['task1' => 1, 'task2' => 2];
+try {
+    $evStmt = $pdo->query("SELECT student_id, evaluator_type, evaluator_name, test_phase
+                           FROM evaluations
+                           WHERE evaluator_type IN ('ตนเองประเมิน', 'เพื่อนประเมิน')");
+    while ($r = $evStmt->fetch()) {
+        // ก่อนเรียน/หลังเรียนไม่มีภาระงานประเมินตนเอง-ประเมินเพื่อน
+        if (!isset($phaseUnitMap[$r['test_phase']])) continue;
+        $u = $phaseUnitMap[$r['test_phase']];
+        if ($r['evaluator_type'] === 'ตนเองประเมิน') {
+            $evalSet['self'][$u][$r['student_id']] = true;
+            continue;
+        }
+        $evName = trim((string)$r['evaluator_name']);
+        if (!isset($nameToIds[$evName])) continue;
+        foreach (array_keys($nameToIds[$evName]) as $reviewerId) {
+            if ($reviewerId === $r['student_id']) continue;
+            $evalSet['peer'][$u][$reviewerId] = true;
+        }
+    }
+} catch (Exception $e) { /* ตารางอาจยังไม่มี */ }
+
 // ---- ประกอบข้อมูลรายบุคคล ----
 $report = [];
 foreach ($stuRows as $s) {
@@ -86,11 +126,15 @@ foreach ($stuRows as $s) {
         'pretest'      => isset($essaySet['pretest'][$sid]),
         'd1_1'         => isset($essaySet['task1_d1'][$sid]),
         'd1_2'         => isset($essaySet['task1_d2'][$sid]),
+        'self1'        => isset($evalSet['self'][1][$sid]),
+        'peer1'        => isset($evalSet['peer'][1][$sid]),
         'problems1'    => isset($flagSet['problems'][1][$sid]),
         'checklist1'   => isset($flagSet['checklist'][1][$sid]),
         'reflection1'  => isset($flagSet['reflection'][1][$sid]),
         'd2_1'         => isset($essaySet['task2_d1'][$sid]),
         'd2_2'         => isset($essaySet['task2_d2'][$sid]),
+        'self2'        => isset($evalSet['self'][2][$sid]),
+        'peer2'        => isset($evalSet['peer'][2][$sid]),
         'problems2'    => isset($flagSet['problems'][2][$sid]),
         'checklist2'   => isset($flagSet['checklist'][2][$sid]),
         'reflection2'  => isset($flagSet['reflection'][2][$sid]),
@@ -98,17 +142,19 @@ foreach ($stuRows as $s) {
     ];
 }
 
-// คอลัมน์สถานะ 12 ช่อง (ตามลำดับการแสดงผล) พร้อมคลาสสีตามหน่วยการเรียน
+// คอลัมน์สถานะ 16 ช่อง (ตามลำดับการแสดงผล) พร้อมคลาสสีตามหน่วยการเรียน
 $statusCols = [
     'pretest',
-    'd1_1','d1_2','problems1','checklist1','reflection1',
-    'd2_1','d2_2','problems2','checklist2','reflection2',
+    'd1_1','d1_2','self1','peer1','problems1','checklist1','reflection1',
+    'd2_1','d2_2','self2','peer2','problems2','checklist2','reflection2',
     'posttest',
 ];
 $colUnitClass = [
     'pretest' => '', 'posttest' => '',
-    'd1_1' => 'u1', 'd1_2' => 'u1', 'problems1' => 'u1', 'checklist1' => 'u1', 'reflection1' => 'u1',
-    'd2_1' => 'u2', 'd2_2' => 'u2', 'problems2' => 'u2', 'checklist2' => 'u2', 'reflection2' => 'u2',
+    'd1_1' => 'u1', 'd1_2' => 'u1', 'self1' => 'u1', 'peer1' => 'u1',
+    'problems1' => 'u1', 'checklist1' => 'u1', 'reflection1' => 'u1',
+    'd2_1' => 'u2', 'd2_2' => 'u2', 'self2' => 'u2', 'peer2' => 'u2',
+    'problems2' => 'u2', 'checklist2' => 'u2', 'reflection2' => 'u2',
 ];
 
 // สรุปยอด
@@ -189,7 +235,9 @@ $mark = function ($on) { return $on ? '✓' : ''; };
   table.report td.sid { font-variant-numeric: tabular-nums; }
   table.report td.name { text-align: left; }
   /* ช่องสถานะที่เหลือ ขยายแบ่งพื้นที่เท่า ๆ กัน อ่านง่าย */
-  table.report td.mark { font-weight: 700; color: #0a6b2e; font-size: 20px; }
+  table.report td.mark { font-weight: 700; color: #0a6b2e; font-size: 20px; padding: 6px 2px; }
+  /* คอลัมน์เพิ่มเป็น 16 ช่อง — บีบหัวตารางแถวย่อยให้พอดีความกว้าง A4 แนวนอน */
+  table.report thead tr + tr th { font-size: 15px; padding: 5px 2px; line-height: 1.1; }
   table.report td.u1 { background: #f4f8ff; }
   table.report td.u2 { background: #f6f5ff; }
   table.report tfoot td { background: #f4f6f9; font-weight: 700; }
@@ -234,18 +282,22 @@ $mark = function ($on) { return $on ? '✓' : ''; };
             <th class="fit" rowspan="2">รหัส</th>
             <th class="fit" rowspan="2" style="text-align:left;">ชื่อ</th>
             <th rowspan="2">ก่อนเรียน</th>
-            <th colspan="5" class="u1">หน่วยการเรียนที่ 1</th>
-            <th colspan="5" class="u2">หน่วยการเรียนที่ 2</th>
+            <th colspan="7" class="u1">หน่วยการเรียนที่ 1</th>
+            <th colspan="7" class="u2">หน่วยการเรียนที่ 2</th>
             <th rowspan="2">หลังเรียน</th>
           </tr>
           <tr>
             <th class="u1">D1.1</th>
             <th class="u1">D1.2</th>
+            <th class="u1">ประเมิน<br>ตนเอง</th>
+            <th class="u1">ประเมิน<br>เพื่อน</th>
             <th class="u1">ปัญหา<br>การเขียน</th>
             <th class="u1">ตรวจสอบ<br>ตนเอง</th>
             <th class="u1">สะท้อน<br>การเรียนรู้</th>
             <th class="u2">D2.1</th>
             <th class="u2">D2.2</th>
+            <th class="u2">ประเมิน<br>ตนเอง</th>
+            <th class="u2">ประเมิน<br>เพื่อน</th>
             <th class="u2">ปัญหา<br>การเขียน</th>
             <th class="u2">ตรวจสอบ<br>ตนเอง</th>
             <th class="u2">สะท้อน<br>การเรียนรู้</th>
@@ -257,18 +309,9 @@ $mark = function ($on) { return $on ? '✓' : ''; };
             <td class="idx"><?php echo $i; ?></td>
             <td class="sid"><?php echo $hh($r['student_id']); ?></td>
             <td class="name"><?php echo $hh($r['student_name']); ?></td>
-            <td class="mark"><?php echo $mark($r['pretest']); ?></td>
-            <td class="mark u1"><?php echo $mark($r['d1_1']); ?></td>
-            <td class="mark u1"><?php echo $mark($r['d1_2']); ?></td>
-            <td class="mark u1"><?php echo $mark($r['problems1']); ?></td>
-            <td class="mark u1"><?php echo $mark($r['checklist1']); ?></td>
-            <td class="mark u1"><?php echo $mark($r['reflection1']); ?></td>
-            <td class="mark u2"><?php echo $mark($r['d2_1']); ?></td>
-            <td class="mark u2"><?php echo $mark($r['d2_2']); ?></td>
-            <td class="mark u2"><?php echo $mark($r['problems2']); ?></td>
-            <td class="mark u2"><?php echo $mark($r['checklist2']); ?></td>
-            <td class="mark u2"><?php echo $mark($r['reflection2']); ?></td>
-            <td class="mark"><?php echo $mark($r['posttest']); ?></td>
+            <?php foreach ($statusCols as $k): ?>
+              <td class="mark <?php echo $colUnitClass[$k]; ?>"><?php echo $mark($r[$k]); ?></td>
+            <?php endforeach; ?>
           </tr>
           <?php endforeach; ?>
         </tbody>
@@ -281,7 +324,7 @@ $mark = function ($on) { return $on ? '✓' : ''; };
           </tr>
         </tfoot>
       </table>
-      <div class="legend">เครื่องหมาย ✓ = ส่งแล้ว · ช่องว่าง = ยังไม่ส่ง · D1/D2 = ร่างที่ 1 / ร่างที่ 2 ของภาระงานแต่ละหน่วย · สะท้อนคิดแยกบันทึกตามหน่วยการเรียน</div>
+      <div class="legend">เครื่องหมาย ✓ = ส่งแล้ว · ช่องว่าง = ยังไม่ส่ง · D1/D2 = ร่างที่ 1 / ร่างที่ 2 ของภาระงานแต่ละหน่วย · ประเมินเพื่อน = นักเรียนคนนี้ประเมินงานให้เพื่อนแล้ว · การประเมินและสะท้อนคิดแยกบันทึกตามหน่วยการเรียน</div>
       <?php endif; ?>
   </div><!-- /.paper -->
 </body>
