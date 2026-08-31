@@ -2252,6 +2252,48 @@ try {
                 }
             } catch (Exception $e) { /* ตารางอาจยังไม่ถูกสร้าง — ปล่อยว่าง */ }
 
+            // การประเมินตามเกณฑ์ — ประเมินตนเอง / ประเมินเพื่อน (มีเฉพาะหน่วยการเรียนที่ 1 และ 2)
+            // ประเมินตนเอง = มีแถวที่นักเรียนคนนั้นประเมินงานของตัวเองในรอบนั้น
+            // ประเมินเพื่อน = "นักเรียนคนนี้ไปประเมินให้เพื่อน" จึงต้องดูจากชื่อผู้ประเมิน (evaluator_name)
+            //   ไม่ใช่ student_id ของแถว (ซึ่งเป็นเจ้าของผลงาน) และไม่อิงตารางจับคู่ (peer_pairs)
+            //   เพราะนักเรียนประเมินเพื่อนได้โดยไม่ผ่านการจับคู่ — กติกาเดียวกับหน้าแรกของนักเรียน
+            //   (get_my_todo_status) เพื่อไม่ให้สองหน้ารายงานไม่ตรงกัน
+            $evalSet = [
+                'self' => [1 => [], 2 => []],
+                'peer' => [1 => [], 2 => []],
+            ];
+            // แผนที่ "ชื่อผู้ประเมิน → รหัสนักเรียน" — ชื่อถูกบันทึกแบบตัดคำนำหน้าออกแล้ว (formatNamePrefix)
+            // แต่ข้อมูลเก่าอาจเก็บชื่อเต็มพร้อมคำนำหน้า จึงเก็บทั้งสองแบบไว้เทียบ
+            $nameToIds = [];
+            $allStuStmt = $pdo->query('SELECT student_id, student_name FROM students');
+            while ($r = $allStuStmt->fetch()) {
+                foreach ([trim((string)$r['student_name']), trim(formatNamePrefix($r['student_name']))] as $variant) {
+                    if ($variant === '') continue;
+                    $nameToIds[$variant][$r['student_id']] = true;
+                }
+            }
+            $phaseUnitMap = ['task1' => 1, 'task2' => 2];
+            try {
+                $evStmt = $pdo->query("SELECT student_id, evaluator_type, evaluator_name, test_phase
+                                       FROM evaluations
+                                       WHERE evaluator_type IN ('ตนเองประเมิน', 'เพื่อนประเมิน')");
+                while ($r = $evStmt->fetch()) {
+                    // ก่อนเรียน/หลังเรียนไม่มีภาระงานประเมินตนเอง-ประเมินเพื่อน จึงข้ามไป
+                    if (!isset($phaseUnitMap[$r['test_phase']])) continue;
+                    $u = $phaseUnitMap[$r['test_phase']];
+                    if ($r['evaluator_type'] === 'ตนเองประเมิน') {
+                        $evalSet['self'][$u][$r['student_id']] = true;
+                        continue;
+                    }
+                    $evName = trim((string)$r['evaluator_name']);
+                    if (!isset($nameToIds[$evName])) continue; // ชื่อผู้ประเมินเทียบกับทะเบียนไม่ได้
+                    foreach (array_keys($nameToIds[$evName]) as $reviewerId) {
+                        if ($reviewerId === $r['student_id']) continue; // กันกรณีบันทึกประเมินงานตัวเองไว้ผิดโหมด
+                        $evalSet['peer'][$u][$reviewerId] = true;
+                    }
+                }
+            } catch (Exception $e) { /* ตารางอาจยังไม่ถูกสร้าง — ปล่อยว่าง */ }
+
             $report = [];
             foreach ($stuRows as $s) {
                 $sid = $s['student_id'];
@@ -2263,6 +2305,9 @@ try {
                     'pretest'       => isset($essaySet['pretest'][$sid]),
                     'd1_1'          => isset($essaySet['task1_d1'][$sid]),
                     'd1_2'          => isset($essaySet['task1_d2'][$sid]),
+                    // ประเมินตามเกณฑ์หน่วยที่ 1
+                    'self1'         => isset($evalSet['self'][1][$sid]),
+                    'peer1'         => isset($evalSet['peer'][1][$sid]),
                     // สะท้อนคิดหน่วยที่ 1
                     'problems1'     => isset($flagSet['problems'][1][$sid]),
                     'checklist1'    => isset($flagSet['checklist'][1][$sid]),
@@ -2270,6 +2315,8 @@ try {
                     // ภาระงาน + สะท้อนคิดหน่วยที่ 2
                     'd2_1'          => isset($essaySet['task2_d1'][$sid]),
                     'd2_2'          => isset($essaySet['task2_d2'][$sid]),
+                    'self2'         => isset($evalSet['self'][2][$sid]),
+                    'peer2'         => isset($evalSet['peer'][2][$sid]),
                     'problems2'     => isset($flagSet['problems'][2][$sid]),
                     'checklist2'    => isset($flagSet['checklist'][2][$sid]),
                     'reflection2'   => isset($flagSet['reflection'][2][$sid]),
