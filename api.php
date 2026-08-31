@@ -2789,17 +2789,17 @@ try {
 
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
-            // คะแนนข้อที่ AI ตรวจแทนไม่ได้ ที่คุณครูเคยให้ไว้ในหน้า evaluation.php (ดึงครั้งเดียวใช้ได้ทุกรอบ)
-            $aiEvalManual = ai_teacher_eval_manual($pdo, $aiSid);
-            $aiRows = array_map(function ($r) use ($aiEvalManual) {
-                return ai_feedback_row_to_array($r, $aiEvalManual);
-            }, $stmt->fetchAll());
+            $aiFbRows = $stmt->fetchAll();
 
             // สถานะเรียงความของนักเรียนคนนี้ทุกรอบงาน — ใช้แยกว่า "ยังไม่ได้เขียน" กับ "เขียนแล้วแต่ยังไม่ตรวจ"
-            $aiEssays = [];
+            // ดึงตัวข้อความมาด้วย เพื่อเทียบให้เห็นว่าร่างที่ 2 แก้อะไรไปจากร่างที่ 1 บ้าง
+            // (ผลตรวจที่บันทึกไว้ก่อนมีฟีเจอร์นี้จึงยังเห็นผลเทียบได้ โดยไม่ต้องสั่ง AI ตรวจใหม่)
+            $aiEssays     = [];
+            $aiEssayParts = [];
             try {
                 $stmtE = $pdo->prepare('
-                    SELECT essay_phase, word_count, updated_at
+                    SELECT essay_phase, word_count, updated_at,
+                           intro_content, body_content, conclusion_content
                       FROM student_essays
                      WHERE student_id = ?
                        AND (COALESCE(intro_content,\'\') <> \'\'
@@ -2813,8 +2813,21 @@ try {
                         'too_short'  => ((int)$rE['word_count'] < AI_MIN_WORDS),
                         'updated_at' => (string)$rE['updated_at'],
                     ];
+                    $eBody = json_decode((string)($rE['body_content'] ?? ''), true);
+                    if (!is_array($eBody)) {
+                        $eBody = ($rE['body_content'] ?? '') !== '' ? [(string)$rE['body_content']] : [];
+                    }
+                    $aiEssayParts[$rE['essay_phase']] = ai_essay_parts(
+                        (string)($rE['intro_content'] ?? ''), $eBody, (string)($rE['conclusion_content'] ?? '')
+                    );
                 }
             } catch (Exception $e) { /* อ่านไม่ได้ก็ยังแสดงผลตรวจได้ตามปกติ */ }
+
+            // คะแนนข้อที่ AI ตรวจแทนไม่ได้ ที่คุณครูเคยให้ไว้ในหน้า evaluation.php (ดึงครั้งเดียวใช้ได้ทุกรอบ)
+            $aiEvalManual = ai_teacher_eval_manual($pdo, $aiSid);
+            $aiRows = array_map(function ($r) use ($aiEvalManual, $aiEssayParts) {
+                return ai_feedback_row_to_array($r, $aiEvalManual, $aiEssayParts);
+            }, $aiFbRows);
 
             echo json_encode([
                 'success'   => true,

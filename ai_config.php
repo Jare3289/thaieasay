@@ -1075,7 +1075,7 @@ function ai_baseline_snapshot($phase, array $data, $reviewedAt, $wordCount = 0, 
  *   identical  = คะแนนรวมและคะแนนรายข้อเท่ากันหมด (น่าสงสัยว่า AI ไม่ได้เทียบจริง หรือนักเรียนไม่ได้แก้)
  *   same_text  = ข้อความทั้งฉบับเหมือนฉบับตั้งต้นทุกตัวอักษร (นักเรียนคัดลอกมา ยังไม่ได้เขียนใหม่)
  */
-function ai_draft_progress(array $curr, $baseline, $currentHash = '', $currentWords = 0, array $edits = []) {
+function ai_draft_progress(array $curr, $baseline, $currentHash = '', $currentWords = 0, array $edits = [], $editsLive = false) {
     $phase   = (string)($curr['essay_phase'] ?? '');
     $basePh  = ai_baseline_phase($phase);
     $comment = (string)($curr['draft_comment'] ?? '');
@@ -1171,6 +1171,8 @@ function ai_draft_progress(array $curr, $baseline, $currentHash = '', $currentWo
         // ส่วนของเรียงความที่ถูกแก้จริง — ระบบเทียบข้อความเอง ไม่ได้ถาม AI
         'edits'           => array_values($edits),
         'edit_summary'    => ai_edit_summary($edits),
+        // true = เทียบจากต้นฉบับ ณ ตอนเปิดดู (ผลตรวจนี้บันทึกไว้ก่อนระบบจะเก็บผลเทียบให้)
+        'edits_live'      => (bool)$editsLive,
     ];
 }
 
@@ -1386,7 +1388,7 @@ function ai_log_usage(PDO $pdo, $userId, $role, $studentId, $phase, $ok, $errorM
 }
 
 /** แปลงแถวในตาราง essay_ai_feedback ให้เป็นโครงสร้างที่หน้าเว็บใช้ได้ทันที */
-function ai_feedback_row_to_array(array $row, ?array $evalManual = null) {
+function ai_feedback_row_to_array(array $row, ?array $evalManual = null, ?array $essayParts = null) {
     $decode = function ($v) {
         $d = json_decode((string)$v, true);
         return is_array($d) ? $d : [];
@@ -1428,12 +1430,26 @@ function ai_feedback_row_to_array(array $row, ?array $evalManual = null) {
     $dcCrit = (isset($dcRaw['criteria']) && is_array($dcRaw['criteria'])) ? $dcRaw['criteria'] : $dcRaw;
     $dcEdit = (isset($dcRaw['edits']) && is_array($dcRaw['edits'])) ? $dcRaw['edits'] : [];
     $out['draft_changes'] = $dcCrit;
+
+    // ผลตรวจที่บันทึกไว้ก่อนระบบจะเก็บ "ส่วนที่แก้" ให้ (หรือฐานข้อมูลเก่าที่ยังไม่มีคอลัมน์)
+    // ยังบอกได้ว่าแก้อะไรไปตรงไหน โดยเทียบข้อความของสองฉบับสด ๆ ตอนเปิดดู
+    // ผู้เรียกส่ง $essayParts มาเป็น [รหัสรอบงาน => ผลของ ai_essay_parts()] ถ้ามีข้อความให้เทียบ
+    $editsLive = false;
+    if (!$dcEdit && $essayParts !== null) {
+        $basePh = ai_baseline_phase($row['essay_phase']);
+        if ($basePh !== '' && !empty($essayParts[$basePh]) && !empty($essayParts[$row['essay_phase']])) {
+            $dcEdit    = ai_diff_essay_parts($essayParts[$basePh], $essayParts[$row['essay_phase']]);
+            $editsLive = true;
+        }
+    }
+
     $out['draft_compare'] = ai_draft_progress(
         $out,
         $decode($row['baseline_snapshot'] ?? ''),
         (string)($row['essay_hash'] ?? ''),
         (int)($row['word_count'] ?? 0),
-        $dcEdit
+        $dcEdit,
+        $editsLive
     );
 
     $tScores = $decode($row['teacher_scores'] ?? '');

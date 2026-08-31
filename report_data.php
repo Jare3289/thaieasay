@@ -765,6 +765,22 @@ function report_full_data(PDO $pdo, array $sids) {
     } catch (Exception $e) { /* ยังไม่มีผลประเมิน */ }
 
     // ---- ผลตรวจของ AI ทุกรอบงาน ----
+    // ข้อความเรียงความรายส่วน ไว้เทียบว่าร่างที่ 2 แก้อะไรไปจากร่างที่ 1 บ้าง
+    // (ผลตรวจที่บันทึกไว้ก่อนระบบจะเก็บผลเทียบให้ ก็ยังเห็นผลเทียบในรายงานได้)
+    $aiParts = [];
+    try {
+        $st = $pdo->prepare("SELECT student_id, essay_phase, intro_content, body_content, conclusion_content
+                               FROM student_essays WHERE student_id IN ($in)");
+        $st->execute($sids);
+        while ($r = $st->fetch()) {
+            $b = json_decode((string)($r['body_content'] ?? ''), true);
+            if (!is_array($b)) $b = ($r['body_content'] ?? '') !== '' ? [(string)$r['body_content']] : [];
+            $aiParts[$r['student_id']][$r['essay_phase']] = ai_essay_parts(
+                (string)($r['intro_content'] ?? ''), $b, (string)($r['conclusion_content'] ?? '')
+            );
+        }
+    } catch (Exception $e) { /* ไม่มีข้อความก็ยังแสดงผลตรวจได้ */ }
+
     try {
         $st = $pdo->prepare("SELECT f.*, s.student_name, s.classroom
                                FROM essay_ai_feedback f
@@ -772,7 +788,8 @@ function report_full_data(PDO $pdo, array $sids) {
                               WHERE f.student_id IN ($in)");
         $st->execute($sids);
         while ($r = $st->fetch()) {
-            $out[$r['student_id']]['ai'][$r['essay_phase']] = ai_feedback_row_to_array($r);
+            $out[$r['student_id']]['ai'][$r['essay_phase']] =
+                ai_feedback_row_to_array($r, null, $aiParts[$r['student_id']] ?? null);
         }
     } catch (Exception $e) { /* ยังไม่ได้ใช้ระบบ AI */ }
 

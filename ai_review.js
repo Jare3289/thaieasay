@@ -323,6 +323,8 @@ function aiEditListHTML(d) {
     <div class="text-muted mt-2" style="font-size:0.75rem;">
       <i class="bi bi-info-circle me-1"></i>ส่วนนี้ระบบเทียบข้อความของสองฉบับเอง ไม่ได้ถาม AI
       จึงยืนยันได้ว่าส่วนที่ขึ้นว่า &quot;ไม่ได้แก้&quot; คือเหมือนเดิมทุกตัวอักษรจริง
+      ${d.edits_live ? '<br><i class="bi bi-clock-history me-1"></i>เทียบจากต้นฉบับล่าสุดของทั้งสองฉบับ '
+        + '(ผลตรวจนี้บันทึกไว้ก่อนระบบจะเก็บผลเทียบให้)' : ''}
     </div>
   </div>`;
 }
@@ -403,6 +405,13 @@ function aiDraftCompareHTML(fb, opts) {
   ].filter(Boolean).join('');
 
   // ตารางเทียบรายข้อ: คะแนนก่อน → หลัง พร้อมข้อความจริงที่ AI ยกมาให้เห็นว่าต่างกันตรงไหน
+  // ผลตรวจเก่าที่ AI ยังไม่ได้อธิบายรายข้อ จะใช้สรุปจากผลเทียบข้อความของระบบมาเติมให้แทน
+  const touched = (d.edits || []).filter(e => e.status !== 'same');
+  const fallbackChange = touched.length
+    ? touched.map(e => aiEsc(e.label) + ' <span class="text-muted">('
+        + (AI_EDIT_STATUS[e.status] || AI_EDIT_STATUS.same).label + ')</span>').join(' · ')
+    : ((d.edits || []).length ? '<span class="text-muted">ไม่มีส่วนไหนถูกแก้เลย</span>' : '');
+
   let table = '';
   if (!opts.compact && (d.criteria || []).length) {
     const rows = d.criteria.map(c => {
@@ -414,13 +423,18 @@ function aiDraftCompareHTML(fb, opts) {
            </div>`
         : '';
       // AI อธิบายว่าข้อนี้ถูกแก้อะไรไปบ้างและแก้อย่างไร — ข้อที่ไม่มีอะไรเปลี่ยนก็บอกให้รู้
+      // ผลตรวจเก่าที่ AI ยังไม่ได้อธิบายไว้ ใช้ผลเทียบข้อความของระบบมาบอกแทน จะได้ไม่มีช่องว่างเปล่า
       const changeLine = c.change
         ? `<div class="ai-draft-change mt-1">
              <i class="bi ${c.changed === false ? 'bi-dash-circle' : 'bi-pencil-fill'} me-1"></i>
              <span class="fw-semibold">${c.changed === false ? 'ยังไม่ได้แก้:' : 'แก้อะไรไป:'}</span>
              ${aiEsc(c.change)}
            </div>`
-        : '';
+        : (fallbackChange ? `<div class="ai-draft-change ai-draft-change-auto mt-1">
+             <i class="bi bi-pencil-square me-1"></i>
+             <span class="fw-semibold">งานเขียนที่เปลี่ยนไป:</span> ${fallbackChange}
+             <span class="text-muted">— สั่งให้ AI ตรวจรอบนี้ใหม่ เพื่อให้ AI อธิบายเป็นรายข้อ</span>
+           </div>` : '');
       return `<tr class="${rowCls}">
         <td class="text-nowrap fw-semibold align-top">${aiEsc(c.id)}</td>
         <td class="align-top">

@@ -684,6 +684,7 @@ body {
   background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 8px;
   padding: 6px 10px; font-size: 0.82rem; color: #4c1d95; line-height: 1.7;
 }
+.ai-draft-change-auto { background: #f8fafc; border-color: #e2e8f0; color: #475569; }
 /* รายการ "สิ่งที่เปลี่ยนไปจากฉบับตั้งต้น" — ระบบเทียบข้อความเอง */
 .ai-edit-box {
   background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 14px;
