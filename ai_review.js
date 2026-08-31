@@ -183,6 +183,13 @@ function aiDeltaBadge(delta, opts) {
 
 /* ---- เทียบกับ "ฉบับตั้งต้น" ตามคู่ที่ครูกำหนด (D1.2↔D1.1 · D2.2↔D2.1 · หลังเรียน↔ก่อนเรียน) ---- */
 
+// ป้ายทิศทางที่คำนวณจากคะแนนจริง ใช้เมื่อ AI ไม่ได้ระบุคำตัดสินมา (เช่นผลตรวจที่บันทึกไว้ก่อนหน้า)
+function aiDirBadge(dir) {
+  if (dir === 'up')   return '<span class="badge ai-tag-better"><i class="bi bi-arrow-up-circle me-1"></i>คะแนนสูงขึ้น</span>';
+  if (dir === 'down') return '<span class="badge ai-tag-worse"><i class="bi bi-arrow-down-circle me-1"></i>คะแนนต่ำลง</span>';
+  return '<span class="badge ai-tag-same"><i class="bi bi-dash-circle me-1"></i>คะแนนเท่าเดิม</span>';
+}
+
 // ป้ายคำตัดสินรายข้อที่ AI ให้มา (ดีขึ้น / เท่าเดิม / แย่ลง)
 function aiVerdictBadge(v) {
   if (v === 'better') return '<span class="badge ai-tag-better"><i class="bi bi-arrow-up-circle me-1"></i>ดีขึ้น</span>';
@@ -404,58 +411,75 @@ function aiDraftCompareHTML(fb, opts) {
       : ''
   ].filter(Boolean).join('');
 
-  // ตารางเทียบรายข้อ: คะแนนก่อน → หลัง พร้อมข้อความจริงที่ AI ยกมาให้เห็นว่าต่างกันตรงไหน
-  // ผลตรวจเก่าที่ AI ยังไม่ได้อธิบายรายข้อ จะใช้สรุปจากผลเทียบข้อความของระบบมาเติมให้แทน
-  const touched = (d.edits || []).filter(e => e.status !== 'same');
-  const fallbackChange = touched.length
-    ? touched.map(e => aiEsc(e.label) + ' <span class="text-muted">('
-        + (AI_EDIT_STATUS[e.status] || AI_EDIT_STATUS.same).label + ')</span>').join(' · ')
-    : ((d.edits || []).length ? '<span class="text-muted">ไม่มีส่วนไหนถูกแก้เลย</span>' : '');
-
+  /* ตารางเทียบรายเกณฑ์ — ออกแบบให้ "อ่านจบได้ในแถวเดียว"
+     แต่ละแถวตอบ 4 เรื่องเรียงกัน: ข้อนี้คือเกณฑ์อะไร · คะแนนจากเท่าไรเป็นเท่าไร ·
+     อะไรเพิ่มเข้ามา/อะไรหายไป · เพราะอะไรคะแนนจึงขยับหรือไม่ขยับ */
   let table = '';
   if (!opts.compact && (d.criteria || []).length) {
+    // ผลตรวจเก่าที่ AI ยังไม่ได้อธิบายรายข้อ — บอกครั้งเดียวเหนือตาราง ไม่ต้องย้ำทุกแถว
+    const hasWhy = (d.criteria || []).some(c => c.reason || c.change || c.added || c.removed || c.before || c.after);
+    const noWhyNote = hasWhy ? '' : `<div class="ai-draft-note mb-2">
+      <i class="bi bi-info-circle me-1"></i><span class="fw-semibold">ยังไม่มีคำอธิบายรายข้อจาก AI ในรอบนี้</span>
+      — ตารางจึงบอกได้เฉพาะคะแนนที่ขยับ สั่งให้ AI ตรวจรอบนี้ใหม่
+      เพื่อให้ AI บอกว่าแต่ละข้อมีอะไรเพิ่มเข้ามา อะไรหายไป และทำไมคะแนนจึงเปลี่ยน
+    </div>`;
+
     const rows = d.criteria.map(c => {
       const rowCls = c.dir === 'up' ? 'ai-draft-row-up' : (c.dir === 'down' ? 'ai-draft-row-down' : '');
-      const words = (c.before || c.after)
-        ? `<div class="ai-draft-words mt-1">
-             ${c.before ? `<div><span class="ai-draft-tag ai-draft-tag-before">${aiEsc(d.short)}</span>${aiEsc(c.before)}</div>` : ''}
-             ${c.after  ? `<div class="mt-1"><span class="ai-draft-tag ai-draft-tag-after">ฉบับนี้</span>${aiEsc(c.after)}</div>` : ''}
-           </div>`
-        : '';
-      // AI อธิบายว่าข้อนี้ถูกแก้อะไรไปบ้างและแก้อย่างไร — ข้อที่ไม่มีอะไรเปลี่ยนก็บอกให้รู้
-      // ผลตรวจเก่าที่ AI ยังไม่ได้อธิบายไว้ ใช้ผลเทียบข้อความของระบบมาบอกแทน จะได้ไม่มีช่องว่างเปล่า
-      const changeLine = c.change
-        ? `<div class="ai-draft-change mt-1">
-             <i class="bi ${c.changed === false ? 'bi-dash-circle' : 'bi-pencil-fill'} me-1"></i>
-             <span class="fw-semibold">${c.changed === false ? 'ยังไม่ได้แก้:' : 'แก้อะไรไป:'}</span>
-             ${aiEsc(c.change)}
-           </div>`
-        : (fallbackChange ? `<div class="ai-draft-change ai-draft-change-auto mt-1">
-             <i class="bi bi-pencil-square me-1"></i>
-             <span class="fw-semibold">งานเขียนที่เปลี่ยนไป:</span> ${fallbackChange}
-             <span class="text-muted">— สั่งให้ AI ตรวจรอบนี้ใหม่ เพื่อให้ AI อธิบายเป็นรายข้อ</span>
-           </div>` : '');
+      const lost   = Math.round((c.max - c.weighted) * 100) / 100;
+
+      // ประโยคบอกที่มาที่ไปของคะแนนข้อนี้ อ่านได้โดยไม่ต้องเหลือบไปดูคอลัมน์อื่น
+      const move = c.dir === 'same'
+        ? `ได้ <span class="fw-bold">${aiFmt(c.weighted)}</span> คะแนนเท่าเดิมทั้งสองฉบับ`
+        : `จาก <span class="fw-bold">${aiFmt(c.base_weighted)}</span> คะแนน `
+          + `เป็น <span class="fw-bold">${aiFmt(c.weighted)}</span> คะแนน`;
+
+      // อะไรเพิ่มเข้ามา / อะไรหายไป — ใช้ของใหม่ก่อน ถ้าไม่มีค่อยถอยไปใช้ before/after แบบเดิม
+      const addTxt = c.added   || c.after;
+      const remTxt = c.removed || c.before;
+      const gain = addTxt ? `<div class="ai-why-line ai-why-add">
+          <span class="ai-why-tag ai-why-tag-add">เพิ่มเข้ามา</span>${aiEsc(addTxt)}</div>` : '';
+      const loss = remTxt ? `<div class="ai-why-line ai-why-rem">
+          <span class="ai-why-tag ai-why-tag-rem">หายไป / ของเดิม</span>${aiEsc(remTxt)}</div>` : '';
+
+      // เหตุผลว่าทำไมคะแนนถึงขยับ (หรือไม่ขยับ)
+      const whyTxt = c.reason || c.change;
+      const whyLabel = c.dir === 'up' ? 'ทำไมคะแนนถึงสูงขึ้น'
+                     : (c.dir === 'down' ? 'ทำไมคะแนนถึงต่ำลง' : 'ทำไมคะแนนถึงเท่าเดิม');
+      const why = whyTxt ? `<div class="ai-why-reason">
+          <i class="bi bi-arrow-return-right me-1"></i>
+          <span class="fw-semibold">${whyLabel}:</span> ${aiEsc(whyTxt)}</div>` : '';
+
       return `<tr class="${rowCls}">
         <td class="text-nowrap fw-semibold align-top">${aiEsc(c.id)}</td>
         <td class="align-top">
-          <span class="fw-semibold">${aiEsc(c.name || '')}</span> ${aiVerdictBadge(c.verdict)}
-          ${changeLine}
-          ${words}
-          ${c.note ? `<div class="ai-draft-note mt-1"><i class="bi bi-lightbulb me-1"></i>${aiEsc(c.note)}</div>` : ''}
+          <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
+            <span class="fw-bold text-dark">${aiEsc(c.name || '')}</span>
+            ${aiVerdictBadge(c.verdict) || aiDirBadge(c.dir)}
+          </div>
+          <div class="ai-why-move mt-1">${move}
+            <span class="text-muted">จากเต็ม ${aiFmt(c.max)} คะแนน</span>
+            ${lost > 0 ? `<span class="text-muted">· ยังเสียอยู่ ${aiFmt(lost)} คะแนน</span>` : ''}
+          </div>
+          ${gain}${loss}${why}
+          ${c.note ? `<div class="ai-draft-note mt-1"><i class="bi bi-lightbulb me-1"></i>
+            <span class="fw-semibold">ทำอย่างไรให้ขยับขึ้นอีก:</span> ${aiEsc(c.note)}</div>` : ''}
         </td>
-        <td class="text-center text-nowrap text-muted align-top">${aiFmt(c.base_weighted)}</td>
-        <td class="text-center text-nowrap fw-bold align-top">${aiFmt(c.weighted)}
-          <span class="text-muted fw-normal">/ ${aiFmt(c.max)}</span></td>
-        <td class="text-center text-nowrap align-top">${aiDeltaBadge(c.delta, { unit: false })}</td>
+        <td class="text-center align-top" style="min-width:104px;">
+          <div class="text-muted small text-nowrap">${aiEsc(d.short)} ${aiFmt(c.base_weighted)}</div>
+          <div class="fw-bold text-nowrap" style="font-size:1.05rem;">${aiFmt(c.weighted)}
+            <span class="text-muted fw-normal small">/ ${aiFmt(c.max)}</span></div>
+          <div class="mt-1">${aiDeltaBadge(c.delta, { unit: false })}</div>
+        </td>
       </tr>`;
     }).join('');
-    table = `<div class="table-responsive mt-2">
-      <table class="table table-sm table-bordered align-middle mb-0 bg-white">
+
+    table = `${noWhyNote}<div class="table-responsive mt-2">
+      <table class="table table-sm table-bordered align-middle mb-0 bg-white ai-why-table">
         <thead class="table-light">
-          <tr><th style="width:58px;">ข้อ</th><th>เกณฑ์ · แก้อะไรไป และต่างกันตรงไหน</th>
-              <th class="text-center" style="width:90px;">${aiEsc(d.short)}</th>
-              <th class="text-center" style="width:110px;">ฉบับนี้</th>
-              <th class="text-center" style="width:105px;">เปลี่ยนแปลง</th></tr>
+          <tr><th style="width:52px;">ข้อ</th>
+              <th>เกณฑ์ · คะแนนเปลี่ยนจากเท่าไรเป็นเท่าไร และเพราะอะไร</th>
+              <th class="text-center" style="width:118px;">คะแนน</th></tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>

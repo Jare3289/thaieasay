@@ -685,6 +685,26 @@ body {
   padding: 6px 10px; font-size: 0.82rem; color: #4c1d95; line-height: 1.7;
 }
 .ai-draft-change-auto { background: #f8fafc; border-color: #e2e8f0; color: #475569; }
+/* ตารางเทียบรายเกณฑ์ — แต่ละแถวอ่านจบในตัวเอง: คะแนนขยับเท่าไร อะไรเพิ่ม อะไรหาย เพราะอะไร */
+.ai-why-table td { vertical-align: top; }
+.ai-why-move { font-size: 0.86rem; color: #334155; line-height: 1.7; }
+.ai-why-line {
+  font-size: 0.82rem; line-height: 1.7; color: #334155;
+  border-radius: 8px; padding: 5px 9px; margin-top: 5px;
+}
+.ai-why-add { background: #f0fdf4; border: 1px solid #bbf7d0; }
+.ai-why-rem { background: #fef2f2; border: 1px solid #fecaca; }
+.ai-why-tag {
+  display: inline-block; border-radius: 6px; padding: 0 6px; margin-right: 6px;
+  font-size: 0.72rem; font-weight: 700; white-space: nowrap;
+}
+.ai-why-tag-add { background: #dcfce7; color: #166534; }
+.ai-why-tag-rem { background: #fee2e2; color: #991b1b; }
+.ai-why-reason {
+  font-size: 0.84rem; line-height: 1.75; color: #4c1d95;
+  background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 8px;
+  padding: 6px 10px; margin-top: 6px;
+}
 /* รายการ "สิ่งที่เปลี่ยนไปจากฉบับตั้งต้น" — ระบบเทียบข้อความเอง */
 .ai-edit-box {
   background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 14px;
