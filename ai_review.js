@@ -361,6 +361,90 @@ function aiEditListHTML(d) {
   </div>`;
 }
 
+// ตัวชี้วัดลักษณะการเขียนที่เทียบก่อน-หลังได้ แม้เป็นคนละหัวข้อ (ตรงกับ ai_profile_metrics() ฝั่งเซิร์ฟเวอร์)
+// better บอกว่าทิศทางไหนคือ "ดีขึ้น" — 'none' = ไม่ตัดสินให้ ต้องอ่านงานจริงประกอบ
+const AI_PROFILE_METRICS = [
+  { key: 'words',      label: 'จำนวนคำทั้งฉบับ',        unit: 'คำ',      crit: '2.x', better: 'none' },
+  { key: 'body_paras', label: 'ย่อหน้าในเนื้อเรื่อง',     unit: 'ย่อหน้า', crit: '2.1', better: 'none' },
+  { key: 'avg_para',   label: 'ความยาวเฉลี่ยต่อย่อหน้า', unit: 'คำ',      crit: '2.2', better: 'none' },
+  { key: 'chunks',     label: 'จำนวนวรรค',              unit: 'วรรค',    crit: '3.1', better: 'none' },
+  { key: 'avg_chunk',  label: 'ความยาวเฉลี่ยต่อวรรค',    unit: 'คำ',      crit: '3.1', better: 'none' },
+  { key: 'misspelled', label: 'คำที่สงสัยว่าสะกดผิด',     unit: 'คำ',      crit: '4.1', better: 'down' }
+];
+
+function aiProfNum(v) {
+  const n = Number(v);
+  if (!isFinite(n)) return '-';
+  return (Math.floor(n) === n) ? String(n) : String(Math.round(n * 10) / 10);
+}
+
+/**
+ * ตาราง "ลักษณะการเขียนก่อน–หลัง"
+ * ใช้แทนรายการ "ส่วนที่ถูกแก้" ในคู่คนละหัวข้อ (ก่อนเรียน↔หลังเรียน)
+ * ซึ่งเทียบตัวข้อความไม่ได้เพราะเป็นงานเขียนคนละชิ้น
+ * ตัวเลขทุกตัวระบบนับเอง ไม่ได้ถาม AI จึงยืนยันได้ว่าตรงกับงานจริง
+ */
+function aiProfileTableHTML(d) {
+  const p = d.profile;
+  if (!p || !p.base || !p.curr) return '';
+  const b = p.base, c = p.curr;
+
+  const rows = AI_PROFILE_METRICS.map(m => {
+    const bv = b[m.key], cv = c[m.key];
+    if (bv === null || bv === undefined || cv === null || cv === undefined) return '';
+    const diff = Math.round((Number(cv) - Number(bv)) * 10) / 10;
+    // ทิศทางที่ถือว่าดีขึ้น มีเฉพาะตัวที่ตัดสินได้ตรง ๆ (เช่น สะกดผิดน้อยลง = ดีขึ้น)
+    const good = (m.better === 'down') ? (diff < 0) : (m.better === 'up' ? (diff > 0) : null);
+    const cls  = (diff === 0 || good === null) ? 'text-secondary'
+                                               : (good ? 'text-success' : 'text-danger');
+    const sign = diff > 0 ? '+' : '';
+    const tag  = diff === 0 ? 'เท่าเดิม' : `${sign}${aiProfNum(diff)}`;
+    return `<tr>
+      <td class="align-middle">${aiEsc(m.label)}
+        <span class="text-muted small">· ข้อ ${aiEsc(m.crit)}</span></td>
+      <td class="text-center align-middle text-muted">${aiProfNum(bv)} <span class="small">${aiEsc(m.unit)}</span></td>
+      <td class="text-center align-middle fw-bold">${aiProfNum(cv)} <span class="text-muted fw-normal small">${aiEsc(m.unit)}</span></td>
+      <td class="text-center align-middle fw-semibold ${cls}">${aiEsc(tag)}</td>
+    </tr>`;
+  }).join('');
+
+  const yn = v => v ? 'มี' : '<span class="text-danger">ไม่มี</span>';
+  const structRow = `<tr>
+    <td class="align-middle">มีส่วนคำนำ / ส่วนสรุป <span class="text-muted small">· ข้อ 2.1</span></td>
+    <td class="text-center align-middle text-muted">${yn(b.has_intro)} / ${yn(b.has_concl)}</td>
+    <td class="text-center align-middle fw-bold">${yn(c.has_intro)} / ${yn(c.has_concl)}</td>
+    <td class="text-center align-middle text-secondary">—</td>
+  </tr>`;
+
+  return `<div class="ai-edit-box mt-3">
+    <div class="fw-bold text-dark mb-1">
+      <i class="bi bi-rulers text-primary me-2"></i>ลักษณะการเขียนก่อน–หลัง
+    </div>
+    <div class="small text-muted mb-2">
+      สองฉบับเป็นคนละหัวข้อ จึงเทียบตัวข้อความไม่ได้ — ตัวเลขชุดนี้วัดที่ลักษณะการเขียน
+      จึงเทียบก่อน-หลังได้ตรง ๆ และส่งให้ AI ใช้ประกอบการให้คะแนนด้วย
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm table-bordered align-middle mb-0 bg-white">
+        <thead class="table-light">
+          <tr>
+            <th>ตัวชี้วัด</th>
+            <th class="text-center" style="width:110px;">${aiEsc(d.short || 'ก่อนเรียน')}</th>
+            <th class="text-center" style="width:110px;">${aiEsc(d.this_short || 'หลังเรียน')}</th>
+            <th class="text-center" style="width:92px;">ต่างกัน</th>
+          </tr>
+        </thead>
+        <tbody>${rows}${structRow}</tbody>
+      </table>
+    </div>
+    <div class="text-muted mt-2" style="font-size:0.75rem;">
+      <i class="bi bi-info-circle me-1"></i>ระบบนับตัวเลขเหล่านี้เอง ไม่ได้ถาม AI
+      · เกณฑ์จำนวนคำของครูคือ 250-300 คำ
+      · ตัวเลขที่ขยับไม่ได้แปลว่าคะแนนต้องขยับตาม ต้องอ่านงานจริงประกอบเสมอ
+    </div>
+  </div>`;
+}
+
 /**
  * กล่อง "ฉบับนี้ต่างจากฉบับตั้งต้นอย่างไร"
  * เทียบ "คนละฉบับ" ตามคู่ที่ครูกำหนด เพื่อตอบคำถามเดียวว่า "คะแนนดีขึ้นจริงไหม และต่างกันตรงไหน"
@@ -548,14 +632,14 @@ function aiDraftCompareHTML(fb, opts) {
     ${flags.join('')}
     <div class="d-flex flex-wrap gap-2 mt-2">${chips}</div>
     ${d.comment ? `<div class="ai-progress-comment mt-2">${aiEsc(d.comment)}</div>` : ''}
-    ${(opts.compact || newTopic) ? '' : aiEditListHTML(d)}
+    ${opts.compact ? '' : (newTopic ? aiProfileTableHTML(d) : aiEditListHTML(d))}
     ${table}
     <div class="text-muted mt-2" style="font-size:0.75rem;">
       <i class="bi bi-info-circle me-1"></i>ส่วนต่างคำนวณจากคะแนนที่ AI ให้จริงทั้งสองฉบับ
       ไม่ได้เชื่อคำบรรยายของ AI อย่างเดียว
       ${newTopic ? '<br><i class="bi bi-signpost-split me-1"></i>ก่อนเรียนกับหลังเรียนเป็น<strong>คนละหัวข้อ</strong> '
         + 'ระบบจึงเทียบที่คุณภาพเนื้อหาและความสามารถในการเขียนตามเกณฑ์แต่ละข้อ ไม่ได้เทียบว่าเนื้อเรื่องต่างกันอย่างไร '
-        + 'และไม่มีรายการ &quot;ส่วนที่ถูกแก้&quot; เพราะไม่ใช่การแก้ร่างเดิม' : ''}
+        + 'ความต่างก่อน-หลังดูได้จากตาราง &quot;ลักษณะการเขียนก่อน–หลัง&quot; และคะแนนรายข้อด้านล่าง' : ''}
       ${d.estimated ? '<br><i class="bi bi-lightbulb me-1"></i>ผลตรวจฉบับนี้บันทึกไว้ก่อนระบบจะเทียบร่างให้อัตโนมัติ '
         + 'จึงเทียบได้เฉพาะคะแนน — สั่งให้ AI ตรวจรอบนี้ใหม่ เพื่อให้ AI อธิบายผลเทียบรายข้อให้เห็น' : ''}
     </div>

@@ -513,15 +513,30 @@ function ai_build_prompt($topic, $phase, $intro, array $bodyArr, $conclusion, $w
     $isNewTopic = ($baseKind === 'newtopic');
     $baseTopic  = trim((string)($baseline['topic'] ?? ''));
     $editLines  = [];
+    $profBlock  = '';
     if ($hasBase) {
-        // ระบบเทียบข้อความทีละส่วนเองก่อน แล้วบอก AI ไปเลยว่าส่วนไหนถูกแก้ ส่วนไหนไม่ได้แตะ
-        // กันไม่ให้ AI เดาว่านักเรียน "แก้แล้ว" ทั้งที่ข้อความยังเหมือนเดิมทุกตัวอักษร
-        // คู่คนละหัวข้อไม่ต้องเทียบข้อความ เพราะเป็นงานเขียนคนละชิ้น ไม่ใช่การแก้ร่างเดิม
-        if (!$isNewTopic && !empty($baseline['parts']) && is_array($baseline['parts'])) {
-            $editLines = ai_edit_lines(ai_diff_essay_parts(
-                $baseline['parts'],
-                ai_essay_parts($intro, $bodyArr, $conclusion)
-            ));
+        $currParts = ai_essay_parts($intro, $bodyArr, $conclusion);
+
+        if (!$isNewTopic) {
+            // ระบบเทียบข้อความทีละส่วนเองก่อน แล้วบอก AI ไปเลยว่าส่วนไหนถูกแก้ ส่วนไหนไม่ได้แตะ
+            // กันไม่ให้ AI เดาว่านักเรียน "แก้แล้ว" ทั้งที่ข้อความยังเหมือนเดิมทุกตัวอักษร
+            if (!empty($baseline['parts']) && is_array($baseline['parts'])) {
+                $editLines = ai_edit_lines(ai_diff_essay_parts($baseline['parts'], $currParts));
+            }
+        } else {
+            // คู่คนละหัวข้อ: เทียบข้อความตรง ๆ ไม่ได้ เพราะเป็นงานเขียนคนละชิ้น
+            // แต่ยังให้ AI "เห็นความต่างก่อน-หลัง" ได้ ด้วยการเทียบลักษณะการเขียนที่ระบบวัดเอง
+            $baseProf = (isset($baseline['profile']) && is_array($baseline['profile']))
+                ? $baseline['profile'] : null;
+            if ($baseProf) {
+                $currProf = ai_writing_profile($currParts,
+                    (($baseProf['misspelled'] ?? null) === null) ? null : count($spellHints));
+                $sameText = (!empty($baseline['text'])
+                    && trim(preg_replace('/\s+/u', ' ', (string)$baseline['text']))
+                       === trim(preg_replace('/\s+/u', ' ', (string)($intro . ' '
+                          . implode(' ', $bodyArr) . ' ' . $conclusion))));
+                $profBlock = ai_profile_lines($baseProf, $currProf, 'ก่อนเรียน', 'หลังเรียน', $sameText);
+            }
         }
         $baseScoreLine = [];
         $baseScores = is_array($baseline['scores'] ?? null) ? $baseline['scores'] : [];
@@ -625,6 +640,7 @@ function ai_build_prompt($topic, $phase, $intro, array $bodyArr, $conclusion, $w
                 ? "\n--- ระบบเทียบข้อความของสองฉบับให้แล้ว (ข้อมูลนี้ถูกต้องเสมอ ให้ยึดตามนี้) ---\n"
                   . implode("\n", $editLines)
                 : ''),
+            $profBlock,
             ''],
             $baseRules
         ), function ($v) { return $v !== ''; }));
@@ -1391,7 +1407,7 @@ function ai_baseline_snapshot($phase, array $data, $reviewedAt, $wordCount = 0, 
  *   'newtopic' = หลังเรียน เทียบ ก่อนเรียน คนละหัวข้อ → เทียบเฉพาะคุณภาพเนื้อหาตามเกณฑ์
  *                จึงไม่มีรายการ "ส่วนที่ถูกแก้" เพราะเป็นงานเขียนคนละชิ้น ไม่ใช่การแก้ร่างเดิม
  */
-function ai_draft_progress(array $curr, $baseline, $currentHash = '', $currentWords = 0, array $edits = [], $editsLive = false) {
+function ai_draft_progress(array $curr, $baseline, $currentHash = '', $currentWords = 0, array $edits = [], $editsLive = false, array $profile = []) {
     $phase   = (string)($curr['essay_phase'] ?? '');
     $basePh  = ai_baseline_phase($phase);
     $kind    = ai_baseline_kind($phase);
@@ -1497,6 +1513,9 @@ function ai_draft_progress(array $curr, $baseline, $currentHash = '', $currentWo
         // ส่วนของเรียงความที่ถูกแก้จริง — ระบบเทียบข้อความเอง ไม่ได้ถาม AI
         'edits'           => array_values($edits),
         'edit_summary'    => ai_edit_summary($edits),
+        // ตารางเทียบลักษณะการเขียนก่อน-หลัง ['base' => ..., 'curr' => ...]
+        // ใช้ในคู่คนละหัวข้อแทนรายการ "ส่วนที่ถูกแก้" — ระบบนับเอง ไม่ได้ถาม AI
+        'profile'         => (!empty($profile['base']) && !empty($profile['curr'])) ? $profile : null,
         // true = เทียบจากต้นฉบับ ณ ตอนเปิดดู (ผลตรวจนี้บันทึกไว้ก่อนระบบจะเก็บผลเทียบให้)
         'edits_live'      => (bool)$editsLive,
     ];
@@ -1536,6 +1555,108 @@ function ai_text_chunks($text) {
         if ($c !== '') $out[] = $c;
     }
     return $out;
+}
+
+/* ============================================================
+   ลักษณะการเขียนของเรียงความ 1 ฉบับ (Writing profile)
+   ------------------------------------------------------------
+   ใช้เทียบ "ก่อนเรียน ↔ หลังเรียน" ซึ่งเป็นคนละหัวข้อกัน
+   จึงเทียบตัวข้อความตรง ๆ ไม่ได้ แต่ตัวชี้วัดเหล่านี้เทียบกันได้เสมอ
+   เพราะวัดที่ "ลักษณะการเขียน" ไม่ใช่ "เรื่องที่เขียน"
+   และแต่ละตัวโยงกับเกณฑ์ของครูโดยตรง
+     จำนวนคำ / ย่อหน้า / คำนำ / สรุป → ข้อ 2.x องค์ประกอบและการลำดับ
+     ความยาวเฉลี่ยต่อวรรค            → ข้อ 3.x สำนวนภาษา
+     คำที่สงสัยว่าสะกดผิด             → ข้อ 4.1 อักขรวิธี
+   ระบบนับเองทั้งหมด ไม่ได้ถาม AI ตัวเลขจึงเชื่อถือได้
+   ============================================================ */
+
+/**
+ * วัดลักษณะการเขียนของเรียงความ 1 ฉบับ
+ * $parts      = ผลของ ai_essay_parts()
+ * $misspelled = จำนวนคำที่ระบบสงสัยว่าสะกดผิด (ส่ง null ถ้ายังไม่ได้ตรวจ)
+ */
+function ai_writing_profile(array $parts, $misspelled = null) {
+    $intro = ''; $concl = ''; $bodies = [];
+    foreach ($parts as $p) {
+        $key  = (string)($p['key'] ?? '');
+        $text = trim((string)($p['text'] ?? ''));
+        if ($key === 'intro')      $intro = $text;
+        elseif ($key === 'concl')  $concl = $text;
+        elseif ($text !== '')      $bodies[] = $text;
+    }
+    $all    = trim($intro . "\n" . implode("\n", $bodies) . "\n" . $concl);
+    $words  = ai_count_words($all);
+    $chunks = count(ai_text_chunks($all));
+    $bodyWords = 0;
+    foreach ($bodies as $b) $bodyWords += ai_count_words($b);
+
+    return [
+        'words'      => $words,
+        'body_paras' => count($bodies),
+        'avg_para'   => count($bodies) ? round($bodyWords / count($bodies), 1) : 0,
+        'chunks'     => $chunks,
+        'avg_chunk'  => $chunks ? round($words / $chunks, 1) : 0,
+        'has_intro'  => ($intro !== ''),
+        'has_concl'  => ($concl !== ''),
+        'misspelled' => ($misspelled === null ? null : (int)$misspelled),
+    ];
+}
+
+/** หัวข้อของตัวชี้วัดแต่ละตัว + หน่วย + เกณฑ์ที่เกี่ยวข้อง (ใช้ร่วมกันทั้งคำสั่ง AI และหน้าจอ) */
+function ai_profile_metrics() {
+    return [
+        ['key' => 'words',      'label' => 'จำนวนคำทั้งฉบับ',        'unit' => 'คำ',  'crit' => '2.x', 'better' => 'near'],
+        ['key' => 'body_paras', 'label' => 'ย่อหน้าในเนื้อเรื่อง',     'unit' => 'ย่อหน้า', 'crit' => '2.1', 'better' => 'up'],
+        ['key' => 'avg_para',   'label' => 'ความยาวเฉลี่ยต่อย่อหน้า', 'unit' => 'คำ',  'crit' => '2.2', 'better' => 'none'],
+        ['key' => 'chunks',     'label' => 'จำนวนวรรค',              'unit' => 'วรรค', 'crit' => '3.1', 'better' => 'none'],
+        ['key' => 'avg_chunk',  'label' => 'ความยาวเฉลี่ยต่อวรรค',    'unit' => 'คำ',  'crit' => '3.1', 'better' => 'none'],
+        ['key' => 'misspelled', 'label' => 'คำที่สงสัยว่าสะกดผิด',     'unit' => 'คำ',  'crit' => '4.1', 'better' => 'down'],
+    ];
+}
+
+/**
+ * บล็อกเทียบลักษณะการเขียนของสองฉบับ สำหรับแนบไปในคำสั่งให้ AI
+ * ใช้แทน "ผลเทียบข้อความทีละส่วน" ในคู่ที่เป็นคนละหัวข้อ
+ * เพราะการบอกว่า "ย่อหน้าที่ 3 ถูกตัดออก" ไม่เป็นความจริงเมื่อเป็นงานเขียนคนละชิ้น
+ */
+function ai_profile_lines(array $base, array $curr, $baseLabel, $currLabel, $sameText = false) {
+    $num = function ($v) {
+        return (floor((float)$v) == (float)$v) ? (string)(int)$v : (string)round((float)$v, 1);
+    };
+    $lines = [];
+    foreach (ai_profile_metrics() as $m) {
+        $b = $base[$m['key']] ?? null;
+        $c = $curr[$m['key']] ?? null;
+        if ($b === null || $c === null) continue;   // ตัวชี้วัดที่วัดไม่ได้ (เช่น ยังไม่ได้ตรวจการสะกด)
+        $d = round((float)$c - (float)$b, 1);
+        $tail = ($d > 0) ? ' (มากขึ้น ' . $num($d) . ')'
+              : (($d < 0) ? ' (น้อยลง ' . $num(abs($d)) . ')' : ' (เท่าเดิม)');
+        $lines[] = '- ' . $m['label'] . ': ' . $baseLabel . ' ' . $num($b) . ' ' . $m['unit']
+                 . ' → ' . $currLabel . ' ' . $num($c) . ' ' . $m['unit'] . $tail
+                 . ' [เกี่ยวกับเกณฑ์ข้อ ' . $m['crit'] . ']';
+    }
+    $yn = function ($v) { return $v ? 'มี' : 'ไม่มี'; };
+    $lines[] = '- มีส่วนคำนำ: ' . $yn($base['has_intro'] ?? false) . ' → ' . $yn($curr['has_intro'] ?? false)
+             . ' · มีส่วนสรุป: ' . $yn($base['has_concl'] ?? false) . ' → ' . $yn($curr['has_concl'] ?? false)
+             . ' [เกี่ยวกับเกณฑ์ข้อ 2.1]';
+
+    $head = [
+        '',
+        '--- ระบบวัดลักษณะการเขียนของทั้งสองฉบับให้แล้ว (ระบบนับเอง ตัวเลขนี้ถูกต้องเสมอ ให้ยึดตามนี้) ---',
+        'ตัวเลขชุดนี้เทียบกันได้แม้เป็นคนละหัวข้อ เพราะวัดที่ "ลักษณะการเขียน" ไม่ใช่ "เรื่องที่เขียน"',
+    ];
+    $tailNote = [
+        'ให้ใช้ตัวเลขชุดนี้ประกอบการให้คะแนนและการอธิบายพัฒนาการรายข้อ',
+        'แต่ห้ามตัดสินจากตัวเลขอย่างเดียว ต้องอ่านตัวงานจริงประกอบเสมอ',
+        '(เช่น ย่อหน้ามากขึ้นแต่แต่ละย่อหน้าไม่มีใจความเดียว ก็ยังไม่ถือว่าข้อ 2.1 ดีขึ้น)',
+    ];
+    // ส่งงานซ้ำฉบับเดิมทั้งที่คนละหัวข้อ = ไม่ได้เขียนตามหัวข้อที่ครูกำหนด ต้องสะท้อนในคะแนนด้านเนื้อหา
+    if ($sameText) {
+        $tailNote[] = '';
+        $tailNote[] = 'ข้อเท็จจริงสำคัญ: ข้อความของสองฉบับนี้เหมือนกันทุกตัวอักษร ทั้งที่ครูกำหนดคนละหัวข้อ';
+        $tailNote[] = 'แปลว่างานฉบับนี้ไม่ได้เขียนตามหัวข้อที่ครูกำหนด ให้สะท้อนข้อเท็จจริงนี้ในคะแนนด้านเนื้อหา (ข้อ 1.x) ตามความเป็นจริง';
+    }
+    return implode("\n", array_merge($head, $lines, $tailNote));
 }
 
 /** นับความยาวของข้อความเป็นคำ (ใช้ตัวตัดคำภาษาไทยของระบบ ไม่ใช่การนับช่องว่าง) */
@@ -1760,6 +1881,7 @@ function ai_feedback_row_to_array(array $row, ?array $evalManual = null, ?array 
     $dcRaw  = $decode($row['draft_changes'] ?? '');
     $dcCrit = (isset($dcRaw['criteria']) && is_array($dcRaw['criteria'])) ? $dcRaw['criteria'] : $dcRaw;
     $dcEdit = (isset($dcRaw['edits']) && is_array($dcRaw['edits'])) ? $dcRaw['edits'] : [];
+    $dcProf = (isset($dcRaw['profile']) && is_array($dcRaw['profile'])) ? $dcRaw['profile'] : [];
     $out['draft_changes'] = $dcCrit;
 
     // ผลตรวจที่บันทึกไว้ก่อนระบบจะเก็บ "ส่วนที่แก้" ให้ (หรือฐานข้อมูลเก่าที่ยังไม่มีคอลัมน์)
@@ -1781,7 +1903,8 @@ function ai_feedback_row_to_array(array $row, ?array $evalManual = null, ?array 
         (string)($row['essay_hash'] ?? ''),
         (int)($row['word_count'] ?? 0),
         $dcEdit,
-        $editsLive
+        $editsLive,
+        $dcProf
     );
 
     $tScores = $decode($row['teacher_scores'] ?? '');

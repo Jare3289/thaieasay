@@ -414,6 +414,27 @@ function rs_ai($full, $no = '7') {
           <?php endif; ?>
           <?php if (!empty($dc['comment'])): ?><div class="kv"><?php echo rp_esc($dc['comment']); ?></div><?php endif; ?>
           <?php
+          // คู่คนละหัวข้อ: เทียบตัวข้อความไม่ได้ จึงสรุป "ลักษณะการเขียนก่อน-หลัง" ที่ระบบวัดเองแทน
+          if ($dcNewTopic && !empty($dc['profile']['base']) && !empty($dc['profile']['curr'])) {
+              $pb = $dc['profile']['base'];
+              $pc = $dc['profile']['curr'];
+              $pn = function ($v) { return (floor((float)$v) == (float)$v) ? (int)$v : round((float)$v, 1); };
+              $bits = [];
+              foreach (ai_profile_metrics() as $m) {
+                  if (!isset($pb[$m['key']], $pc[$m['key']])) continue;
+                  if ($pb[$m['key']] === null || $pc[$m['key']] === null) continue;
+                  $bits[] = $m['label'] . ' ' . $pn($pb[$m['key']]) . ' → ' . $pn($pc[$m['key']]) . ' ' . $m['unit'];
+              }
+              $yn = function ($v) { return $v ? 'มี' : 'ไม่มี'; };
+              $bits[] = 'คำนำ ' . $yn($pb['has_intro']) . ' → ' . $yn($pc['has_intro'])
+                      . ' · สรุป ' . $yn($pb['has_concl']) . ' → ' . $yn($pc['has_concl']);
+              if ($bits) {
+                  echo '<div class="kv"><b>ลักษณะการเขียนก่อน-หลัง (ระบบนับเอง):</b> '
+                     . rp_esc(implode(' · ', $bits)) . '</div>';
+              }
+          }
+          ?>
+          <?php
           // ข้อที่คะแนนขยับ พร้อมข้อความที่ AI ยกมาเทียบให้เห็นว่าต่างกันตรงไหน
           foreach (($dc['criteria'] ?? []) as $c) {
               if ($c['dir'] === 'same' && trim((string)$c['note']) === '') continue;

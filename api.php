@@ -2500,9 +2500,12 @@ try {
             }
 
             // ส่งคำที่ระบบสงสัยว่าสะกดผิดไปเป็นข้อมูลประกอบการให้คะแนนข้อ 4.1
-            $aiHints = [];
+            // เก็บพจนานุกรมไว้ใช้ซ้ำ เพราะต้องนับคำสะกดผิดของฉบับตั้งต้นด้วยเพื่อเทียบก่อน-หลัง
+            $aiHints    = [];
+            $aiWordBook = [];
             try {
-                $aiHints = find_misspelled_thai_words($aiFull, load_confirmed_thai_words($pdo), 40);
+                $aiWordBook = load_confirmed_thai_words($pdo);
+                $aiHints    = find_misspelled_thai_words($aiFull, $aiWordBook, 40);
             } catch (Exception $e) { /* ไม่มีพจนานุกรมก็ตรวจต่อได้ */ }
 
             $aiTopics = essay_topics_map($pdo);
@@ -2566,6 +2569,16 @@ try {
                            // หัวข้อของฉบับตั้งต้น — ก่อนเรียนกับหลังเรียนเป็นคนละหัวข้อ ต้องบอก AI ให้รู้
                            (string)($aiTopics[essay_topic_phase($aiBasePhase)] ?? ''));
                         $aiBaseSnap['text'] = $aiBaseText;
+
+                        // ลักษณะการเขียนของฉบับตั้งต้น — ใช้เทียบก่อน-หลังในคู่ที่เป็นคนละหัวข้อ
+                        // (ใช้เพดานเดียวกับฉบับที่กำลังตรวจ ตัวเลขจึงเทียบกันได้ตรง ๆ)
+                        $bMis = null;
+                        if ($aiWordBook) {
+                            try { $bMis = count(find_misspelled_thai_words($aiBaseText, $aiWordBook, 40)); }
+                            catch (Exception $e) { $bMis = null; }
+                        }
+                        $aiBaseSnap['profile'] = ai_writing_profile(
+                            ai_essay_parts($bIntro, $bBody, $bConcl), $bMis);
                     }
                 } catch (Exception $e) {
                     // ยังไม่มีฉบับตั้งต้น หรืออ่านไม่ได้ — ตรวจต่อได้ตามปกติ แค่ไม่มีผลเทียบให้ดู
@@ -2609,14 +2622,25 @@ try {
                         && !empty($aiBaseSnap['parts']) && is_array($aiBaseSnap['parts']))
                 ? ai_diff_essay_parts($aiBaseSnap['parts'], ai_essay_parts($aiIntro, $aiBody, $aiConcl))
                 : [];
+            // ตารางเทียบลักษณะการเขียนก่อน-หลัง (เก็บไว้ให้หน้าจอและรายงานใช้ ไม่ต้องคำนวณซ้ำ)
+            $aiProfiles = [];
+            if (!empty($aiBaseSnap['profile'])) {
+                $aiProfiles = [
+                    'base' => $aiBaseSnap['profile'],
+                    'curr' => ai_writing_profile(
+                        ai_essay_parts($aiIntro, $aiBody, $aiConcl),
+                        ($aiBaseSnap['profile']['misspelled'] === null) ? null : count($aiHints)),
+                ];
+            }
             $aiDraftCompare = ai_draft_progress(
                 array_merge($aiData, ['essay_phase' => $aiPhase]),
-                $aiBaseStore, $aiEssayHash, $aiWords, $aiEdits
+                $aiBaseStore, $aiEssayHash, $aiWords, $aiEdits, false, $aiProfiles
             );
             $aiBaseJson   = $aiBaseStore ? json_encode($aiBaseStore, $jsonOpt) : null;
             $aiChangeJson = json_encode([
                 'criteria' => $aiData['draft_changes'] ?? [],
                 'edits'    => $aiEdits,
+                'profile'  => $aiProfiles,
             ], $jsonOpt);
 
             // ฐานข้อมูลเก่าที่ยังไม่มีคอลัมน์เทียบรอบ ให้บันทึกแบบเดิมไปก่อน (auto-migration จะเติมให้ในรอบถัดไป)
