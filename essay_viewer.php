@@ -195,8 +195,9 @@ require_once 'header.php';
         <input type="hidden" id="editEssayMode" value="edit">
         <div class="row g-3 mb-3">
           <div class="col-md-6" id="editStudentWrap">
-            <label class="form-label fw-semibold small mb-1">นักเรียน</label>
-            <select id="editStudentSelect" class="form-select form-select-sm border-2 rounded-3">
+            <label class="form-label fw-semibold small mb-1">นักเรียน <span class="text-muted fw-normal">(เฉพาะกลุ่มตัวอย่าง · พิมพ์ค้นหาได้)</span></label>
+            <select id="editStudentSelect" class="form-select form-select-sm border-2 rounded-3"
+                    data-search-select data-search-placeholder="พิมพ์ค้นหาด้วยรหัส หรือ ชื่อนักเรียน...">
               <option value="">— เลือกนักเรียน —</option>
             </select>
             <div class="form-text small" id="editStudentFixed"></div>
@@ -686,17 +687,20 @@ require_once 'header.php';
     const studentFixed = document.getElementById('editStudentFixed');
     const phaseSel     = document.getElementById('editPhaseSelect');
 
+    // กล่องที่ต้องซ่อน/แสดงจริง = กล่องครอบของช่องค้นหา (ถ้ามี) มิฉะนั้นคือ <select> เอง
+    const studentBox = studentSel.closest('.ss-wrap') || studentSel;
+
     if (sid) {
       // ระบุนักเรียนมาแล้ว (กดจากในตาราง) — ล็อกนักเรียน แสดงเป็นข้อความ
-      studentSel.classList.add('d-none');
+      studentBox.classList.add('d-none');
       const rec = pivotByStudent(allEssaysCache).find(r => r.student_id === String(sid));
       const nm = rec ? rec.student_name : '';
       studentFixed.innerHTML = `<span class="fw-semibold">${escapeHtml(sid)}</span> ${escapeHtml(nm)}`;
       studentSel.value = sid;
       studentSel.dataset.fixed = sid;
     } else {
-      // เลือกนักเรียนเอง — โหลดรายชื่อทั้งหมด
-      studentSel.classList.remove('d-none');
+      // เลือกนักเรียนเอง — โหลดรายชื่อ (เฉพาะกลุ่มตัวอย่าง)
+      studentBox.classList.remove('d-none');
       studentFixed.textContent = '';
       studentSel.dataset.fixed = '';
       await ensureStudentsList();
@@ -719,20 +723,23 @@ require_once 'header.php';
     essayEditorModal.show();
   }
 
-  // โหลดรายชื่อนักเรียนทั้งหมดลง select (ครั้งแรกครั้งเดียว)
+  // โหลดรายชื่อนักเรียนลง select (ครั้งแรกครั้งเดียว) — เอาเฉพาะ "กลุ่มตัวอย่าง"
   async function ensureStudentsList() {
     const sel = document.getElementById('editStudentSelect');
     if (!studentsListCache) {
       try {
         const res = await fetch('api.php?action=get_students_full');
         const data = await res.json();
-        studentsListCache = (data.success && data.students) ? data.students : [];
+        const all = (data.success && data.students) ? data.students : [];
+        const sampleGroup = window.TEG ? TEG.SAMPLE_GROUP : 'กลุ่มตัวอย่าง';
+        studentsListCache = all.filter(s => (s.student_group || '').trim() === sampleGroup);
       } catch (e) { studentsListCache = []; }
     }
     sel.innerHTML = '<option value="">— เลือกนักเรียน —</option>' +
       studentsListCache.map(s =>
         `<option value="${escapeHtml(s.student_id)}">${escapeHtml(s.student_id)} — ${escapeHtml(s.student_name)}${s.classroom ? ' (ห้อง ' + escapeHtml(s.classroom) + ')' : ''}</option>`
       ).join('');
+    if (window.SearchSelect) SearchSelect.refresh(sel);
     sel.onchange = updateOverwriteWarn;
     document.getElementById('editPhaseSelect').onchange = updateOverwriteWarn;
   }

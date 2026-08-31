@@ -113,7 +113,10 @@ if ($sessionUser) {
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <!-- โหลดไฟล์ CSS สไตล์หลัก -->
-  <link href="index.css?v=2.0" rel="stylesheet">
+  <link href="index.css?v=2.1" rel="stylesheet">
+
+  <!-- กล่องเลือกรายชื่อแบบพิมพ์ค้นหาได้ (ใช้กับ <select data-search-select> ทุกหน้า) -->
+  <script src="student_picker.js?v=1.0" defer></script>
 
   <!-- ========== Progressive Web App (PWA) — ไอคอนดินสอสีน้ำเงิน ========== -->
   <link rel="manifest" href="manifest.json">
@@ -132,8 +135,9 @@ if ($sessionUser) {
   <script>
     window.TEG = (function () {
       var KEY = 'thaieasay_teacher_group';
-      var DEFAULT_GROUP = 'กลุ่มตัวอย่าง'; // ค่าเริ่มต้นของทั้งระบบตามที่กำหนด
-      var GROUPS = ['กลุ่มทดลอง', 'กลุ่มตัวอย่าง']; // กลุ่มจริงที่มีในระบบ ('all' = ทุกกลุ่มรวมกัน)
+      var SAMPLE_GROUP = 'กลุ่มตัวอย่าง'; // กลุ่มตัวอย่าง = กลุ่มที่ใช้รายงานผลทั้งระบบ
+      var DEFAULT_GROUP = SAMPLE_GROUP;  // ค่าเริ่มต้นของทั้งระบบตามที่กำหนด
+      var GROUPS = ['กลุ่มทดลอง', SAMPLE_GROUP]; // กลุ่มจริงที่มีในระบบ ('all' = ทุกกลุ่มรวมกัน)
       function get() {
         try {
           var v = localStorage.getItem(KEY);
@@ -148,7 +152,10 @@ if ($sessionUser) {
       function filterValue() { var g = get(); return (g === 'all') ? '' : g; }
       // พารามิเตอร์ต่อ URL สำหรับ API (ส่งเฉพาะเมื่อเจาะจงกลุ่ม)
       function param() { var g = filterValue(); return g ? ('&group=' + encodeURIComponent(g)) : ''; }
-      return { get: get, set: set, filterValue: filterValue, param: param, KEY: KEY, DEFAULT_GROUP: DEFAULT_GROUP, GROUPS: GROUPS };
+      // ช่องเลือกรายชื่อนักเรียนทุกหน้าใช้ "กลุ่มตัวอย่าง" เท่านั้น (ไม่เอารายชื่อกลุ่มทดลองมาปน)
+      function sampleParam() { return '&group=' + encodeURIComponent(SAMPLE_GROUP); }
+      return { get: get, set: set, filterValue: filterValue, param: param, sampleParam: sampleParam,
+               KEY: KEY, SAMPLE_GROUP: SAMPLE_GROUP, DEFAULT_GROUP: DEFAULT_GROUP, GROUPS: GROUPS };
     })();
 
     // ทาสีปุ่มกลุ่มบน topbar ให้ตรงกับกลุ่มที่เลือกอยู่ (ปุ่มที่ active = พื้นทึบ)

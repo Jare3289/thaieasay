@@ -52,10 +52,11 @@ $aiViewId    = $aiIsStudent
     </div>
 <?php if (!$aiIsStudent): ?>
     <div class="bg-light border-top px-4 py-3 d-print-none">
-      <label class="form-label fw-bold small mb-1">นักเรียนที่กำลังดู</label>
+      <label class="form-label fw-bold small mb-1">นักเรียนที่กำลังดู <span class="text-muted fw-normal">(เฉพาะกลุ่มตัวอย่าง · พิมพ์ค้นหาด้วยรหัส/ชื่อได้)</span></label>
       <div class="row g-2">
         <div class="col-md-8">
-          <select id="aiSumStudent" class="form-select border-2 rounded-3" onchange="onSummaryStudentChange()">
+          <select id="aiSumStudent" class="form-select border-2 rounded-3" onchange="onSummaryStudentChange()"
+                  data-search-select data-search-placeholder="พิมพ์ค้นหาด้วยรหัส หรือ ชื่อนักเรียน...">
             <option value="">— กำลังโหลดรายชื่อ —</option>
           </select>
         </div>
@@ -136,13 +137,15 @@ async function loadSummaryStudents() {
   const sel = document.getElementById('aiSumStudent');
   if (!sel) return;
   try {
-    const res  = await fetch('api.php?action=get_students_list');
+    // รายชื่อในช่องนี้ใช้เฉพาะ "กลุ่มตัวอย่าง" (ผู้เชี่ยวชาญถูกบังคับกลุ่มทดลองที่ฝั่งเซิร์ฟเวอร์อยู่แล้ว)
+    const res  = await fetch('api.php?action=get_students_list' + (window.TEG ? TEG.sampleParam() : ''));
     const data = await res.json();
     if (!data.success) { sel.innerHTML = '<option value="">โหลดรายชื่อไม่สำเร็จ</option>'; return; }
     const opts = Object.keys(data.students).map(id =>
       `<option value="${aiEsc(id)}">${aiEsc(id)} — ${aiEsc(data.students[id])}</option>`).join('');
     sel.innerHTML = '<option value="">— เลือกนักเรียน —</option>' + opts;
     if (aiSumStudentId) sel.value = aiSumStudentId;
+    if (window.SearchSelect) SearchSelect.refresh(sel);
   } catch (err) {
     sel.innerHTML = '<option value="">โหลดรายชื่อไม่สำเร็จ</option>';
   }

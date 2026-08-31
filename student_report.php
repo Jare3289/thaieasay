@@ -33,9 +33,19 @@ if (!$isStaff) {
 
 $data = report_dataset($pdo, ['group' => $fGroup, 'classroom' => $fClassroom]);
 
+// รายชื่อในช่องเลือกด้านบน: เอาเฉพาะ "กลุ่มตัวอย่าง" ไม่นำนักเรียนกลุ่มทดลองมาปนในรายการ
+// (ค่าเฉลี่ยของชั้นเรียนยังคิดจากขอบเขตเดิมตามตัวกรอง group/classroom เหมือนเดิม)
+$rpSampleGroup = 'กลุ่มตัวอย่าง';
+$pickStudents  = [];
+foreach ($data['students'] as $sid => $stu) {
+    if (trim((string)($stu['student_group'] ?? '')) === $rpSampleGroup) $pickStudents[$sid] = $stu;
+}
+// ยังไม่มีใครถูกจัดเป็นกลุ่มตัวอย่างเลย → แสดงรายชื่อตามขอบเขตเดิม กันไม่ให้ช่องเลือกว่างเปล่า
+if (!$pickStudents) $pickStudents = $data['students'];
+
 // ยังไม่ได้เลือกนักเรียน (ครูเปิดหน้าครั้งแรก) → เลือกคนแรกในรายการให้
-if ($fStudent === '' && $data['students']) {
-    $fStudent = (string)array_key_first($data['students']);
+if ($fStudent === '' && $pickStudents) {
+    $fStudent = (string)array_key_first($pickStudents);
 }
 $sum = ($fStudent !== '' && isset($data['students'][$fStudent]))
     ? report_student_summary($data, $fStudent) : null;
@@ -76,8 +86,9 @@ require_once 'header.php';
           <?php if ($fGroup !== ''): ?><input type="hidden" name="group" value="<?php echo rp_esc($fGroup); ?>"><?php endif; ?>
           <?php if ($fClassroom !== ''): ?><input type="hidden" name="classroom" value="<?php echo rp_esc($fClassroom); ?>"><?php endif; ?>
           <select class="form-select form-select-sm rounded-pill px-3" name="student_id"
-                  style="min-width:280px;" onchange="this.form.submit()">
-            <?php foreach ($data['students'] as $sid => $stu): ?>
+                  style="min-width:280px;" onchange="this.form.submit()"
+                  data-search-select data-search-placeholder="พิมพ์ค้นหาด้วยรหัส หรือ ชื่อนักเรียน...">
+            <?php foreach ($pickStudents as $sid => $stu): ?>
             <option value="<?php echo rp_esc($sid); ?>"<?php echo ($sid === $fStudent) ? ' selected' : ''; ?>>
               <?php echo rp_esc($sid . ' · ' . $stu['student_name']
                     . ($stu['classroom'] !== '' ? ' (ห้อง ' . $stu['classroom'] . ')' : '')); ?>

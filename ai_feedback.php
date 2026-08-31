@@ -125,8 +125,9 @@ $aiPhases    = ai_all_phases();
   <!-- เลือกนักเรียนที่จะดูผล (ครู/ผู้เชี่ยวชาญ) — รอบงานไม่ต้องเลือก เพราะขึ้นให้ครบทุกฉบับอยู่แล้ว -->
   <div class="card border-0 shadow-sm rounded-4 mb-3" style="border-top:4px solid #0d7377 !important;">
     <div class="card-body p-4">
-      <label class="form-label fw-bold small">นักเรียน</label>
-      <select id="aiStudentSelect" class="form-select border-2 rounded-3" onchange="onSelectionChange()">
+      <label class="form-label fw-bold small">นักเรียน <span class="text-muted fw-normal">(เฉพาะกลุ่มตัวอย่าง · พิมพ์ค้นหาด้วยรหัส/ชื่อได้)</span></label>
+      <select id="aiStudentSelect" class="form-select border-2 rounded-3" onchange="onSelectionChange()"
+              data-search-select data-search-placeholder="พิมพ์ค้นหาด้วยรหัส หรือ ชื่อนักเรียน...">
         <option value="">— กำลังโหลดรายชื่อ —</option>
       </select>
       <div id="aiQuotaText" class="text-muted small mt-3"></div>
@@ -1675,7 +1676,8 @@ async function loadStudents() {
   const sel = document.getElementById('aiStudentSelect');
   if (!sel) return;
   try {
-    const res  = await fetch('api.php?action=get_students_list');
+    // รายชื่อในช่องนี้ใช้เฉพาะ "กลุ่มตัวอย่าง" (ผู้เชี่ยวชาญถูกบังคับกลุ่มทดลองที่ฝั่งเซิร์ฟเวอร์อยู่แล้ว)
+    const res  = await fetch('api.php?action=get_students_list' + (window.TEG ? TEG.sampleParam() : ''));
     const data = await res.json();
     if (!data.success) { sel.innerHTML = '<option value="">โหลดรายชื่อไม่สำเร็จ</option>'; return; }
     const opts = Object.keys(data.students).map(id =>
