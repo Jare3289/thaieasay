@@ -595,11 +595,14 @@ function ai_build_prompt($topic, $phase, $intro, array $bodyArr, $conclusion, $w
             . ' อย่างไร ดีขึ้นตรงไหน ยังเหมือนเดิมตรงไหน โดยอ้างข้อความจริงของทั้งสองฉบับ",' : null),
         ($hasBase ? '  "draft_changes": [' : null),
         ($hasBase ? '    { "criterion": "1.1", "changed": "yes หรือ no",' : null),
-        ($hasBase ? '      "change": "นักเรียนแก้อะไรในข้อนี้ แก้อย่างไร อยู่ส่วนไหนของเรียงความ'
-            . ' และการแก้นั้นทำให้ข้อนี้เปลี่ยนไปอย่างไร",' : null),
-        ($hasBase ? '      "before": "ข้อความ/ลักษณะเดิมในฉบับตั้งต้น",'
-            . ' "after": "ข้อความ/ลักษณะใหม่ในฉบับนี้", "verdict": "ดีขึ้น หรือ เท่าเดิม หรือ แย่ลง",'
-            . ' "note": "ถ้าเท่าเดิมให้บอกว่าต้องแก้อะไรจึงจะขยับขึ้น" }' : null),
+        ($hasBase ? '      "added": "สิ่งที่เพิ่มเข้ามาในฉบับนี้ซึ่งเกี่ยวกับเกณฑ์ข้อนี้ '
+            . 'ยกข้อความจริงมาด้วย ระบุว่าอยู่ส่วนไหน (ถ้าไม่มีให้ใส่ค่าว่าง)",' : null),
+        ($hasBase ? '      "removed": "สิ่งที่หายไปจากฉบับตั้งต้นซึ่งเกี่ยวกับเกณฑ์ข้อนี้ '
+            . 'ยกข้อความจริงมาด้วย ระบุว่าอยู่ส่วนไหน (ถ้าไม่มีให้ใส่ค่าว่าง)",' : null),
+        ($hasBase ? '      "reason": "อธิบายว่าเพราะอะไรคะแนนข้อนี้จึงสูงขึ้น ต่ำลง หรือเท่าเดิม '
+            . 'โดยโยงกับสิ่งที่เพิ่มเข้ามาและสิ่งที่หายไปข้างบน ให้เป็นเหตุเป็นผลตามเกณฑ์ข้อนี้",' : null),
+        ($hasBase ? '      "verdict": "ดีขึ้น หรือ เท่าเดิม หรือ แย่ลง",'
+            . ' "note": "ถ้ายังไม่ดีขึ้น ต้องแก้อะไรจึงจะขยับขึ้น (ถ้าดีขึ้นแล้วให้ใส่ค่าว่าง)" }' : null),
         ($hasBase ? '  ]' : null),
         '}',
         '',
@@ -607,8 +610,17 @@ function ai_build_prompt($topic, $phase, $intro, array $bodyArr, $conclusion, $w
         'next_steps ให้ 2-4 ข้อ, ต้องให้คะแนนครบทั้ง 10 ข้อ และ score_reasons ต้องมีครบทุกข้อเช่นกัน',
         ($hasBase
             ? 'สำคัญ: ต้องมี draft_comment เสมอ และ draft_changes ต้องมีครบทุกข้อที่ให้คะแนน (10 ข้อ) '
-              . 'โดยเรียงตามรหัสข้อ — ข้อที่ไม่เปลี่ยนก็ต้องมี พร้อมระบุ changed = "no", verdict = "เท่าเดิม" '
-              . 'และบอกวิธีทำให้ขยับขึ้นใน note ส่วนข้อที่เปลี่ยน ต้องเขียน change ให้เห็นภาพว่าแก้ตรงไหน แก้อย่างไร'
+              . 'เรียงตามรหัสข้อ — ข้อที่ไม่เปลี่ยนก็ต้องมี'
+            : null),
+        ($hasBase
+            ? 'ทุกข้อใน draft_changes ต้องตอบให้ครบ 3 คำถามนี้ในภาษาที่ครูอ่านแล้วเห็นภาพทันที: '
+              . '(1) อะไรเพิ่มเข้ามา (added) (2) อะไรหายไป (removed) (3) เพราะอะไรคะแนนข้อนี้จึงขยับหรือไม่ขยับ (reason) '
+              . 'ห้ามเขียน reason ลอย ๆ ว่า "เขียนดีขึ้น" — ต้องอ้างสิ่งที่เพิ่มหรือหายไปจริง ๆ ที่ระบุไว้ใน added/removed'
+            : null),
+        ($hasBase
+            ? 'ข้อที่ไม่มีอะไรเปลี่ยนเลย ให้ใส่ changed = "no", added และ removed เป็นค่าว่าง, '
+              . 'verdict = "เท่าเดิม" แล้วเขียน reason ว่าส่วนที่เกี่ยวกับเกณฑ์ข้อนี้ยังไม่ถูกแก้ '
+              . 'พร้อมบอกวิธีทำให้ขยับขึ้นใน note'
             : null),
     ], function ($v) { return $v !== null; }));
 }
@@ -1086,18 +1098,23 @@ function ai_parse_feedback($rawText) {
             $changedRaw = mb_strtolower(trim((string)($v['changed'] ?? '')), 'UTF-8');
             $item = [
                 'criterion' => ai_clean_text($v['criterion'] ?? '', 20),
-                // AI บอกว่าข้อนี้มีอะไรเปลี่ยนไหม และเปลี่ยนอะไรไปอย่างไร
+                // AI บอกว่าข้อนี้มีอะไรเปลี่ยนไหม
                 'changed'   => ($changedRaw === '' ? null
                                  : !in_array($changedRaw, ['no', 'false', 'ไม่', 'ไม่เปลี่ยน', 'ไม่ได้แก้'], true)),
+                // สามคำถามหลักของแต่ละข้อ: อะไรเพิ่มมา อะไรหายไป และทำไมคะแนนจึงขยับ
+                'added'     => ai_clean_text($v['added'] ?? '', 600),
+                'removed'   => ai_clean_text($v['removed'] ?? '', 600),
+                'reason'    => ai_clean_text($v['reason'] ?? '', 800),
+                // รูปแบบเดิมของคำตอบ (ยังรับไว้ เผื่อโมเดลตอบมาแบบเก่า และเพื่ออ่านข้อมูลที่เก็บไว้ก่อนหน้า)
                 'change'    => ai_clean_text($v['change'] ?? '', 800),
                 'before'    => ai_clean_text($v['before'] ?? '', 600),
                 'after'     => ai_clean_text($v['after'] ?? '', 600),
                 'verdict'   => ai_verdict_code($v['verdict'] ?? ''),
                 'note'      => ai_clean_text($v['note'] ?? '', 400),
             ];
-            if ($item['change'] !== '' || $item['before'] !== '' || $item['after'] !== '' || $item['note'] !== '') {
-                $draftChanges[] = $item;
-            }
+            $filled = $item['added'] . $item['removed'] . $item['reason']
+                    . $item['change'] . $item['before'] . $item['after'] . $item['note'];
+            if ($filled !== '') $draftChanges[] = $item;
         }
     }
 
@@ -1298,7 +1315,10 @@ function ai_draft_progress(array $curr, $baseline, $currentHash = '', $currentWo
             'after'         => (string)($ch['after'] ?? ''),
             'verdict'       => (string)($ch['verdict'] ?? ''),
             'note'          => (string)($ch['note'] ?? ''),
-            // AI อธิบายว่าข้อนี้ถูกแก้อะไรไปบ้าง และแก้อย่างไร
+            // AI อธิบายว่าข้อนี้ถูกแก้อะไรไปบ้าง และทำไมคะแนนจึงขยับ
+            'added'         => (string)($ch['added'] ?? ''),
+            'removed'       => (string)($ch['removed'] ?? ''),
+            'reason'        => (string)($ch['reason'] ?? ''),
             'change'        => (string)($ch['change'] ?? ''),
             'changed'       => array_key_exists('changed', $ch) ? $ch['changed'] : null,
         ];
