@@ -560,6 +560,25 @@ body {
   background: linear-gradient(90deg, #6d28d9, #0d7377);
 }
 
+/* ข้อที่คะแนนถูกปรับหลัง AI ตรวจ — ครูปรับเอง หรือสั่งให้ AI ตรวจเฉพาะข้อนั้นใหม่ */
+.ai-crit-overridden td { background: #faf5ff; }
+.ai-ov-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 3px 9px;
+  vertical-align: middle;
+}
+.ai-ov-teacher { background: #ede9fe; color: #5b21b6; border: 1px solid #ddd6fe; }
+.ai-ov-recheck { background: #e0f2fe; color: #075985; border: 1px solid #bae6fd; }
+.ai-ov-note {
+  background: #ffffff;
+  border: 1px dashed #d8b4fe;
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: #475569;
+}
+
 /* กล่อง "จุดที่ควรปรับปรุง พร้อมวิธีแก้" — แยกให้เห็นชัดว่าบกพร่องอะไร และแก้อย่างไร */
 .ai-improve-head {
   background: #fef3c7;
@@ -729,6 +748,27 @@ body {
 }
 .ai-edit-in  { background: #f0fdf4; border: 1px solid #bbf7d0; }
 .ai-edit-out { background: #fef2f2; border: 1px solid #fecaca; }
+/* "อ่านเทียบสองฉบับ" — วางข้อความของฉบับตั้งต้นกับฉบับนี้ไว้คู่กันทีละส่วน */
+.ai-sbs-inner {
+  background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 14px;
+}
+.ai-sbs-part { border-top: 1px dashed #e5e7eb; padding-top: 10px; margin-top: 10px; }
+.ai-sbs-part:first-of-type { border-top: 0; padding-top: 0; margin-top: 0; }
+.ai-sbs-head { margin-bottom: 6px; }
+.ai-sbs-col { padding: 8px 10px; }
+.ai-sbs-col-base { background: #f8fafc; border-radius: 8px 0 0 8px; }
+.ai-sbs-tag {
+  display: inline-block; font-size: 0.68rem; font-weight: 700;
+  border-radius: 999px; padding: 2px 9px; margin-bottom: 5px;
+}
+.ai-sbs-text { font-size: 0.85rem; line-height: 1.9; color: #1f2937; word-break: break-word; }
+.ai-sbs-mark { border-radius: 4px; padding: 0 3px; }
+.ai-sbs-in  { background: #dcfce7; color: #14532d; }
+.ai-sbs-out { background: #fee2e2; color: #7f1d1d; text-decoration: line-through; }
+@media (max-width: 767.98px) {
+  .ai-sbs-col-base { border-radius: 8px 8px 0 0; }
+}
+
 .ai-draft-row-up   td { background: #f6fff9; }
 .ai-draft-row-down td { background: #fff7f7; }
 .ai-tag-better { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; font-weight: 600; }

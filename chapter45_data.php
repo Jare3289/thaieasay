@@ -337,21 +337,38 @@ function ch45_dataset(PDO $pdo, array $opt = []) {
     // ---- 5) ผลตรวจของ AI รายฉบับ (ใช้เป็นข้อมูลประกอบเชิงคุณภาพ) ----
     $ai = [];
     try {
+        $aiOvCol = ai_feedback_has_override_column($pdo);
         $stmt = $pdo->prepare('SELECT student_id, essay_phase, overall_comment, strengths, improvements, '
-            . 'scores, total_score, max_score, quality_level FROM essay_ai_feedback WHERE student_id IN (' . $ph . ')');
+            . 'scores, ' . ($aiOvCol ? 'score_overrides, ' : '')
+            . 'total_score, max_score, quality_level FROM essay_ai_feedback WHERE student_id IN (' . $ph . ')');
         $stmt->execute($sids);
         foreach ($stmt->fetchAll() as $row) {
             // ผลตรวจที่ AI ให้คะแนนไม่ครบ = ตรวจไม่ผ่าน ถือว่ายังไม่ได้ตรวจ ไม่นำมาใช้ในบทที่ 4-5
             $aiScores = json_decode((string)($row['scores'] ?? ''), true);
             if (!is_array($aiScores) || !$aiScores) continue;
+            // คะแนนที่ผ่านการตรวจทานของครูแล้วคือคะแนนที่ใช้จริงในบทที่ 4-5
+            // (ครูปรับเอง หรือสั่งให้ AI ตรวจข้อนั้นใหม่) ส่วนคะแนนดั้งเดิมของ AI แนบไว้ใน ai_scores
+            $aiEff = ai_apply_score_overrides([
+                'overall'       => (string)($row['overall_comment'] ?? ''),
+                'strengths'     => json_decode((string)($row['strengths'] ?? ''), true) ?: [],
+                'improvements'  => json_decode((string)($row['improvements'] ?? ''), true) ?: [],
+                'scores'        => $aiScores,
+                'total_score'   => (float)($row['total_score'] ?? 0),
+                'max_score'     => (float)($row['max_score'] ?? 0),
+                'quality_level' => (string)($row['quality_level'] ?? ''),
+            ], $aiOvCol ? ($row['score_overrides'] ?? '') : '');
             $ai[(string)$row['student_id']][(string)$row['essay_phase']] = [
-                'overall'      => (string)($row['overall_comment'] ?? ''),
-                'strengths'    => json_decode((string)($row['strengths'] ?? ''), true) ?: [],
-                'improvements' => json_decode((string)($row['improvements'] ?? ''), true) ?: [],
-                'scores'       => json_decode((string)($row['scores'] ?? ''), true) ?: [],
-                'total'        => (float)($row['total_score'] ?? 0),
-                'max'          => (float)($row['max_score'] ?? 0),
-                'level'        => (string)($row['quality_level'] ?? ''),
+                'overall'      => $aiEff['overall'],
+                'strengths'    => $aiEff['strengths'],
+                'improvements' => $aiEff['improvements'],
+                'scores'       => $aiEff['scores'],
+                'total'        => $aiEff['total_score'],
+                'max'          => $aiEff['max_score'],
+                'level'        => $aiEff['quality_level'],
+                // คะแนนดั้งเดิมของ AI ก่อนครูตรวจทาน — ใช้รายงานว่าครูปรับไปกี่ข้อ ต่างกันเท่าไร
+                'ai_scores'      => $aiEff['ai_scores'],
+                'ai_total'       => $aiEff['ai_total_score'],
+                'override_count' => $aiEff['override_count'],
             ];
         }
     } catch (Exception $e) { /* ยังไม่มีตาราง AI ก็วิเคราะห์ส่วนอื่นต่อได้ */ }
