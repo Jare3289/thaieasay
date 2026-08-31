@@ -2562,7 +2562,9 @@ try {
                             'quality_level' => $rowB['quality_level'],
                         ], (string)($rowB['updated_at'] ?? ''), (int)($rowB['word_count'] ?? 0),
                            (string)($rowB['essay_hash'] ?? ai_essay_hash($bIntro, $bBody, $bConcl)),
-                           ai_essay_parts($bIntro, $bBody, $bConcl));
+                           ai_essay_parts($bIntro, $bBody, $bConcl),
+                           // หัวข้อของฉบับตั้งต้น — ก่อนเรียนกับหลังเรียนเป็นคนละหัวข้อ ต้องบอก AI ให้รู้
+                           (string)($aiTopics[essay_topic_phase($aiBasePhase)] ?? ''));
                         $aiBaseSnap['text'] = $aiBaseText;
                     }
                 } catch (Exception $e) {
@@ -2601,7 +2603,10 @@ try {
             // ตัวเรียงความอ่านจาก student_essays ได้อยู่แล้ว ไม่ต้องเก็บซ้ำลงฐานข้อมูล
             unset($aiBaseStore['text'], $aiBaseStore['parts']);
             // ส่วนของเรียงความที่ถูกแก้จริงเมื่อเทียบกับฉบับตั้งต้น — ระบบเทียบข้อความเอง เชื่อถือได้กว่าคำบรรยายของ AI
-            $aiEdits = (!empty($aiBaseSnap['parts']) && is_array($aiBaseSnap['parts']))
+            // เทียบเฉพาะคู่ที่เป็น "การแก้ร่างเดิม" (หัวข้อเดียวกัน) เท่านั้น
+            // คู่ก่อนเรียน↔หลังเรียนเป็นคนละหัวข้อ คนละงาน จึงไม่มีอะไรให้เทียบว่าแก้ตรงไหน
+            $aiEdits = (ai_baseline_kind($aiPhase) !== 'newtopic'
+                        && !empty($aiBaseSnap['parts']) && is_array($aiBaseSnap['parts']))
                 ? ai_diff_essay_parts($aiBaseSnap['parts'], ai_essay_parts($aiIntro, $aiBody, $aiConcl))
                 : [];
             $aiDraftCompare = ai_draft_progress(
@@ -2748,9 +2753,10 @@ try {
             $bRoom  = isset($_GET['classroom']) ? trim($_GET['classroom']) : '';
 
             // ดึงเฉพาะเรียงความที่มีเนื้อหาจริง พร้อมบอกว่าเคยให้ AI ตรวจไปแล้วหรือยัง
+            // ดึง scores มาด้วย เพื่อคัดผลตรวจที่ค้างไว้จากรอบที่ "ตรวจไม่ผ่าน" ออกไปเป็นยังไม่ตรวจ
             $sql = "
                 SELECT se.student_id, se.word_count, s.student_name, s.classroom, s.student_group,
-                       f.updated_at AS reviewed_at,
+                       f.updated_at AS reviewed_at, f.scores AS ai_scores,
                        f.recheck_needed, f.recheck_marked_at
                 FROM student_essays se
                 JOIN students s ON s.student_id = se.student_id
@@ -2772,19 +2778,31 @@ try {
             $bTargets  = [];
             $bTooShort = 0;
             $bRecheck  = 0;
+            $bFailedBefore = 0;   // เคยสั่งตรวจแล้วแต่ผลไม่สมบูรณ์ — นับเป็นยังไม่ตรวจ
             while ($r = $stmt->fetch()) {
                 // เรียงความสั้นเกินเกณฑ์จะถูกเซิร์ฟเวอร์ปฏิเสธอยู่ดี — คัดออกตั้งแต่ต้นเพื่อไม่ให้เปลืองรอบเรียก
                 if ((int)$r['word_count'] < AI_MIN_WORDS) { $bTooShort++; continue; }
-                if (!empty($r['recheck_needed'])) $bRecheck++;
+
+                // ผลตรวจที่ไม่มีคะแนน = การตรวจครั้งนั้น "ไม่ผ่าน" ถือว่ายังไม่ได้ตรวจ ต้องเข้าคิวตรวจใหม่
+                // (ข้อมูลเก่าที่บันทึกไว้ก่อนระบบจะปฏิเสธผลตรวจที่ให้คะแนนไม่ครบ ก็ถูกดึงกลับเข้าคิวด้วย)
+                $bScores   = json_decode((string)($r['ai_scores'] ?? ''), true);
+                $bHasScore = (is_array($bScores) && count($bScores) > 0);
+                $bReviewed = (!empty($r['reviewed_at']) && $bHasScore);
+                $bFailed   = (!empty($r['reviewed_at']) && !$bHasScore);
+                if ($bFailed) $bFailedBefore++;
+
+                if (!empty($r['recheck_needed']) && $bReviewed) $bRecheck++;
                 $bTargets[] = [
                     'student_id'   => $r['student_id'],
                     'student_name' => formatNamePrefix((string)$r['student_name']),
                     'classroom'    => $r['classroom'],
                     'word_count'   => (int)$r['word_count'],
-                    'reviewed'     => !empty($r['reviewed_at']),
-                    'reviewed_at'  => $r['reviewed_at'],
+                    'reviewed'     => $bReviewed,
+                    'reviewed_at'  => $bReviewed ? $r['reviewed_at'] : null,
+                    // เคยสั่งตรวจแล้วแต่ผลออกมาไม่สมบูรณ์ — ครูจะได้รู้ว่าฉบับนี้ต้องตรวจใหม่เพราะอะไร
+                    'failed_before'     => $bFailed,
                     // ตรวจไปแล้วแต่นักเรียนแก้ต้นฉบับต่อ → ต้องตรวจใหม่ แม้จะติ๊ก "ข้ามฉบับที่เคยตรวจแล้ว"
-                    'needs_recheck'     => !empty($r['recheck_needed']),
+                    'needs_recheck'     => (!empty($r['recheck_needed']) && $bReviewed),
                     'recheck_marked_at' => (string)($r['recheck_marked_at'] ?? ''),
                 ];
             }
@@ -2797,6 +2815,7 @@ try {
                 'targets'     => $bTargets,
                 'too_short'   => $bTooShort,
                 'recheck'     => $bRecheck,
+                'failed_before' => $bFailedBefore,
                 'min_words'   => AI_MIN_WORDS,
                 'quota_left'  => max(0, AI_DAILY_LIMIT_TEACHER - $bQuotaUsed),
             ]);

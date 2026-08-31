@@ -125,8 +125,9 @@ $aiPhases    = ai_all_phases();
   <!-- เลือกนักเรียนที่จะดูผล (ครู/ผู้เชี่ยวชาญ) — รอบงานไม่ต้องเลือก เพราะขึ้นให้ครบทุกฉบับอยู่แล้ว -->
   <div class="card border-0 shadow-sm rounded-4 mb-3" style="border-top:4px solid #0d7377 !important;">
     <div class="card-body p-4">
-      <label class="form-label fw-bold small">นักเรียน</label>
-      <select id="aiStudentSelect" class="form-select border-2 rounded-3" onchange="onSelectionChange()">
+      <label class="form-label fw-bold small">นักเรียน <span class="text-muted fw-normal">(เฉพาะกลุ่มตัวอย่าง · พิมพ์ค้นหาด้วยรหัส/ชื่อได้)</span></label>
+      <select id="aiStudentSelect" class="form-select border-2 rounded-3" onchange="onSelectionChange()"
+              data-search-select data-search-placeholder="พิมพ์ค้นหาด้วยรหัส หรือ ชื่อนักเรียน...">
         <option value="">— กำลังโหลดรายชื่อ —</option>
       </select>
       <div id="aiQuotaText" class="text-muted small mt-3"></div>
@@ -266,6 +267,11 @@ $aiPhases    = ai_all_phases();
               <i class="bi bi-stop-fill me-1"></i>หยุด
             </button>
           </div>
+          <!-- ฉบับที่ตรวจไม่สำเร็จในรอบที่แล้ว ถือว่ายังไม่ได้ตรวจ — กดตรวจซ้ำเฉพาะกลุ่มนั้นได้เลย -->
+          <button id="batchRetryBtn" class="btn btn-outline-warning fw-bold rounded-pill px-4 w-100 mt-2 d-none"
+                  onclick="retryFailedBatch()">
+            <i class="bi bi-arrow-clockwise me-1"></i>ตรวจซ้ำเฉพาะที่ไม่สำเร็จ (<span id="batchRetryCount">0</span> ฉบับ)
+          </button>
         </div>
       </div>
 
@@ -1675,7 +1681,8 @@ async function loadStudents() {
   const sel = document.getElementById('aiStudentSelect');
   if (!sel) return;
   try {
-    const res  = await fetch('api.php?action=get_students_list');
+    // รายชื่อในช่องนี้ใช้เฉพาะ "กลุ่มตัวอย่าง" (ผู้เชี่ยวชาญถูกบังคับกลุ่มทดลองที่ฝั่งเซิร์ฟเวอร์อยู่แล้ว)
+    const res  = await fetch('api.php?action=get_students_list' + (window.TEG ? TEG.sampleParam() : ''));
     const data = await res.json();
     if (!data.success) { sel.innerHTML = '<option value="">โหลดรายชื่อไม่สำเร็จ</option>'; return; }
     const opts = Object.keys(data.students).map(id =>
@@ -1755,6 +1762,8 @@ function paintBatchSummary() {
   const done  = batchTargets.filter(t => t.reviewed).length;
   const tooShort = batchTargets.__tooShort || 0;
   const reQueued = batchTargets.filter(t => t.needs_recheck).length;
+  // เคยสั่งตรวจแล้วแต่ผลไม่สมบูรณ์ (AI ให้คะแนนไม่ครบ) — นับเป็นยังไม่ตรวจ ต้องตรวจใหม่
+  const failedBefore = batchTargets.filter(t => t.failed_before).length;
 
   // ประเมินเวลาคร่าว ๆ: AI ใช้เวลาราว 25 วินาทีต่อฉบับ บวกจังหวะพักระหว่างฉบับ
   const mins = Math.max(1, Math.round(queue.length * (25000 + BATCH_GAP_MS) / 60000));
@@ -1764,6 +1773,11 @@ function paintBatchSummary() {
   if (reQueued > 0) {
     html += `<br><i class="bi bi-arrow-repeat text-warning me-1"></i>`
       + `<strong class="text-warning-emphasis">รอตรวจใหม่ ${reQueued} ฉบับ</strong> (นักเรียนแก้ไขต้นฉบับหลัง AI ตรวจไปแล้ว)`;
+  }
+  if (failedBefore > 0) {
+    html += `<br><i class="bi bi-exclamation-octagon text-danger me-1"></i>`
+      + `<strong class="text-danger-emphasis">เคยตรวจไม่สำเร็จ ${failedBefore} ฉบับ</strong>`
+      + ` — ผลตรวจครั้งนั้นให้คะแนนไม่ครบ ระบบถือว่ายังไม่ได้ตรวจ และจะตรวจให้ใหม่ในรอบนี้`;
   }
   if (tooShort > 0) {
     html += `<br><i class="bi bi-exclamation-triangle text-warning me-1"></i>`
@@ -1820,10 +1834,14 @@ function stopBatchReview() {
 /**
  * ไล่ให้ AI ตรวจตามรายการที่ส่งมาทีละฉบับ
  * items = [{ student_id, student_name, essay_phase, note }]
- * คืนค่า { ok, failed } — ผู้เรียกเป็นคนจัดการปุ่ม/ข้อความสรุปเอง
+ * คืนค่า { ok, failed, failedItems } — ผู้เรียกเป็นคนจัดการปุ่ม/ข้อความสรุปเอง
+ *
+ * ฉบับที่ตรวจไม่สำเร็จจะไม่ถูกทำเครื่องหมายว่าตรวจแล้วเด็ดขาด (เซิร์ฟเวอร์ก็ไม่บันทึกผลให้)
+ * และถูกส่งกลับไปใน failedItems เพื่อให้ครูกดตรวจซ้ำเฉพาะกลุ่มนั้นได้ทันที
  */
 async function runReviewQueue(items, ui) {
   let ok = 0, failed = 0, i = 0;
+  const failedItems = [];
   for (const t of items) {
     if (batchStopRequested) {
       reviewLogLine(ui, 'bi-stop-circle', 'text-secondary', 'หยุดตามคำสั่ง', `ตรวจไปแล้ว ${i} ฉบับ`);
@@ -1863,7 +1881,12 @@ async function runReviewQueue(items, ui) {
       }
     } else {
       failed++;
-      reviewLogLine(ui, 'bi-x-circle-fill', 'text-danger', who, data.error || 'ตรวจไม่สำเร็จ');
+      // ตรวจไม่ผ่าน = ยังไม่ได้ตรวจ ต้องไม่ถูกนับเป็น "ตรวจแล้ว" และต้องตรวจซ้ำได้
+      t.reviewed = false;
+      t.failed_before = true;
+      failedItems.push(t);
+      reviewLogLine(ui, 'bi-x-circle-fill', 'text-danger', who,
+        (data.error || 'ตรวจไม่สำเร็จ') + ' — ถือว่ายังไม่ได้ตรวจ ตรวจซ้ำได้');
       // โควตารายวันหมด = ตรวจต่อไปก็ไม่ผ่าน หยุดทั้งชุดเลยดีกว่าปล่อยให้พังทีละฉบับ
       if (/ใช้ AI ตรวจครบ/.test(data.error || '')) {
         reviewLogLine(ui, 'bi-battery', 'text-danger', 'หยุดอัตโนมัติ', 'โควตารายวันหมดแล้ว');
@@ -1874,7 +1897,55 @@ async function runReviewQueue(items, ui) {
     setReviewProgress(ui, i, items.length, `ตรวจแล้ว ${i} จาก ${items.length} ฉบับ`);
     if (i < items.length && !batchStopRequested) await sleep(BATCH_GAP_MS);
   }
-  return { ok, failed };
+  return { ok, failed, failedItems };
+}
+
+// ---- ตรวจซ้ำเฉพาะฉบับที่ตรวจไม่สำเร็จในรอบล่าสุด ----
+let batchFailedItems = [];   // รายการที่ตรวจไม่ผ่าน รอให้ครูกดตรวจซ้ำ
+
+function paintBatchRetry() {
+  const btn = document.getElementById('batchRetryBtn');
+  if (!btn) return;
+  const n = batchFailedItems.length;
+  document.getElementById('batchRetryCount').textContent = n;
+  btn.classList.toggle('d-none', n === 0);
+  btn.disabled = batchRunning;
+}
+
+async function retryFailedBatch() {
+  if (batchRunning) { showToast('กำลังตรวจชุดอื่นอยู่ กรุณารอให้เสร็จก่อน', 'error'); return; }
+  const items = batchFailedItems.slice();
+  if (!items.length) return;
+  if (!confirm(`ให้ AI ตรวจซ้ำ ${items.length} ฉบับที่ตรวจไม่สำเร็จ ใช่ไหม?\n\n`
+      + `ฉบับเหล่านี้ยังไม่มีผลตรวจในระบบ (ระบบไม่บันทึกผลที่ไม่สมบูรณ์)`)) return;
+
+  batchRunning = true;
+  batchStopRequested = false;
+  const btn = document.getElementById('batchRetryBtn');
+  if (btn) btn.disabled = true;
+  document.getElementById('batchStartBtn').disabled = true;
+  document.getElementById('batchStopBtn').classList.remove('d-none');
+  document.getElementById('batchLog').innerHTML = '';
+
+  let res = { ok: 0, failed: 0, failedItems: [] };
+  try {
+    res = await runReviewQueue(items, REVIEW_UI_BATCH);
+  } finally {
+    batchRunning = false;
+    batchFailedItems = res.failedItems || [];
+    document.getElementById('batchStartBtn').disabled = false;
+    document.getElementById('batchStopBtn').classList.add('d-none');
+    document.getElementById('batchProgressLabel').textContent =
+      `ตรวจซ้ำเสร็จสิ้น — สำเร็จ ${res.ok} ฉบับ` + (res.failed ? ` · ยังไม่สำเร็จ ${res.failed} ฉบับ` : '');
+    showToast(`ตรวจซ้ำเสร็จแล้ว: สำเร็จ ${res.ok} ฉบับ` + (res.failed ? `, ยังไม่สำเร็จ ${res.failed} ฉบับ` : ''),
+      res.failed ? 'error' : 'success');
+    loadBatchTargets();
+    updateReviewButton();
+    loadAiOverview();
+    loadRecheckQueue();
+    loadFeedback();
+    paintBatchRetry();
+  }
 }
 
 async function startBatchReview() {
@@ -1898,28 +1969,33 @@ async function startBatchReview() {
   document.getElementById('batchRoom').disabled = true;
   document.getElementById('batchLog').innerHTML = '';
 
-  let res = { ok: 0, failed: 0 };
+  let res = { ok: 0, failed: 0, failedItems: [] };
   try {
     res = await runReviewQueue(queue.map(t => ({
       student_id:   t.student_id,
       student_name: t.student_name,
       essay_phase:  phase,
-      note:         t.needs_recheck ? 'ตรวจใหม่' : '',
+      note:         t.needs_recheck ? 'ตรวจใหม่' : (t.failed_before ? 'เคยตรวจไม่สำเร็จ' : ''),
     })), REVIEW_UI_BATCH);
   } finally {
     batchRunning = false;
+    // ฉบับที่ตรวจไม่ผ่าน ยังไม่ถือว่าตรวจแล้ว — เก็บไว้ให้ครูกดตรวจซ้ำได้ทันที
+    batchFailedItems = res.failedItems || [];
     document.getElementById('batchStopBtn').classList.add('d-none');
     document.getElementById('batchPhase').disabled = false;
     document.getElementById('batchRoom').disabled = false;
     document.getElementById('batchProgressLabel').textContent =
-      `เสร็จสิ้น — สำเร็จ ${res.ok} ฉบับ` + (res.failed ? ` · ไม่สำเร็จ ${res.failed} ฉบับ` : '');
-    showToast(`ตรวจเสร็จแล้ว: สำเร็จ ${res.ok} ฉบับ` + (res.failed ? `, ไม่สำเร็จ ${res.failed} ฉบับ` : ''),
+      `เสร็จสิ้น — สำเร็จ ${res.ok} ฉบับ`
+      + (res.failed ? ` · ไม่สำเร็จ ${res.failed} ฉบับ (ถือว่ายังไม่ได้ตรวจ)` : '');
+    showToast(`ตรวจเสร็จแล้ว: สำเร็จ ${res.ok} ฉบับ`
+      + (res.failed ? `, ไม่สำเร็จ ${res.failed} ฉบับ — กด "ตรวจซ้ำเฉพาะที่ไม่สำเร็จ" ได้เลย` : ''),
       res.failed ? 'error' : 'success');
     loadBatchTargets();
     updateReviewButton();
     loadAiOverview();
     loadRecheckQueue();
     loadFeedback();
+    paintBatchRetry();
   }
 }
 

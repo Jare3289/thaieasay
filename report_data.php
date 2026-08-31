@@ -250,7 +250,11 @@ function report_dataset(PDO $pdo, array $opt = []) {
                             LEFT JOIN students s ON s.student_id = f.student_id');
         while ($r = $q->fetch()) {
             if (!isset($students[$r['student_id']])) continue;
-            $ai[$r['student_id']][$r['essay_phase']] = ai_feedback_row_to_array($r);
+            $row = ai_feedback_row_to_array($r);
+            // ผลตรวจที่ AI ให้คะแนนไม่ครบ = การตรวจครั้งนั้นไม่ผ่าน ถือว่ายังไม่ได้ตรวจ
+            // ต้องไม่นำคะแนนไปคิดในรายงาน มิฉะนั้นค่าเฉลี่ยจะถูกดึงลงด้วยคะแนนที่ไม่มีจริง
+            if (!empty($row['incomplete'])) continue;
+            $ai[$r['student_id']][$r['essay_phase']] = $row;
         }
     } catch (Exception $e) { /* ยังไม่ได้ใช้ระบบ AI */ }
 

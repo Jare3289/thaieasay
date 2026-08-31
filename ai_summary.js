@@ -181,8 +181,13 @@ function aiSumPairCard(targetPhase, all) {
     : (flat ? '<i class="bi bi-exclamation-triangle-fill me-1"></i>คะแนนเท่าเดิม ยังไม่ดีขึ้น'
             : '<i class="bi bi-arrow-down-circle-fill me-1"></i>คะแนนถอยลง');
 
+
+  // คนละหัวข้อ (หลังเรียน↔ก่อนเรียน) เป็นงานเขียนคนละชิ้น จึงพูดถึงพัฒนาการ ไม่ใช่การแก้งาน
+  const newTopic = (d.kind || aiBaselineKind(targetPhase)) === 'newtopic';
   const warn = d.same_text
-    ? '<div class="ai-pair-warn mt-2"><i class="bi bi-files me-1"></i>ข้อความเหมือนฉบับตั้งต้นทุกตัวอักษร — ยังไม่ได้แก้งาน</div>'
+    ? (newTopic
+        ? '<div class="ai-pair-warn mt-2"><i class="bi bi-files me-1"></i>ส่งข้อความเดิมของฉบับก่อนเรียนมาทั้งฉบับ ทั้งที่คนละหัวข้อ</div>'
+        : '<div class="ai-pair-warn mt-2"><i class="bi bi-files me-1"></i>ข้อความเหมือนฉบับตั้งต้นทุกตัวอักษร — ยังไม่ได้แก้งาน</div>')
     : (d.identical
         ? '<div class="ai-pair-warn mt-2"><i class="bi bi-exclamation-triangle me-1"></i>คะแนนรายข้อเท่ากันทุกข้อ</div>'
         : '');
@@ -220,13 +225,15 @@ function aiSumPairsHTML(all) {
       line = `ผ่านเกณฑ์ทุกคู่ที่เทียบได้ (${ok} จาก ${done.length} คู่) — ร่างหลังได้คะแนนสูงกว่าร่างก่อนทุกคู่`;
       lineCls = 'ai-pair-summary-ok';
     } else {
-      line = `ดีขึ้น ${ok} จาก ${done.length} คู่ที่เทียบได้ — คู่ที่ยังไม่ดีขึ้นควรกลับไปดูว่านักเรียนแก้อะไรไปบ้าง`;
+      line = `ดีขึ้น ${ok} จาก ${done.length} คู่ที่เทียบได้ — คู่ที่ยังไม่ดีขึ้นควรกลับไปดูผลเทียบรายข้อประกอบ`;
       lineCls = 'ai-pair-summary-warn';
     }
   }
 
   return `<h6 class="fw-bold text-dark mb-1">
-      <i class="bi bi-arrow-left-right text-primary me-2"></i>เทียบร่างตามคู่ที่คุณครูกำหนด
+      <i class="bi bi-arrow-left-right text-primary me-2"></i>เทียบตามคู่ที่คุณครูกำหนด
+      <span class="text-muted fw-normal small">(ร่างที่ 2 เทียบร่างที่ 1 หัวข้อเดียวกัน ·
+        หลังเรียนเทียบก่อนเรียนซึ่งเป็นคนละหัวข้อ จึงเทียบที่คุณภาพเนื้อหาตามเกณฑ์)</span>
     </h6>
     <div class="text-muted small mb-2">
       ร่างที่ 2 ของแต่ละหน่วยต้องดีกว่าร่างที่ 1 ของหน่วยเดียวกัน และหลังเรียนต้องดีกว่าก่อนเรียน

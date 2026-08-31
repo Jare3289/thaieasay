@@ -627,8 +627,10 @@ $role = $sessionUser['role'];
             <div class="card border-0 bg-light p-3 mb-4 rounded-3">
               <div class="row align-items-center">
                 <div class="col-md-6 col-12">
-                  <label for="inspectorStudentSelect" class="form-label fw-bold text-secondary small text-uppercase mb-1">เลือกนักเรียนที่ต้องการเข้าชมแฟ้มบันทึกคุณภาพ <span class="text-danger">*</span></label>
-                  <select id="inspectorStudentSelect" class="form-select border-2 rounded-3">
+                  <label for="inspectorStudentSelect" class="form-label fw-bold text-secondary small text-uppercase mb-1">เลือกนักเรียนที่ต้องการเข้าชมแฟ้มบันทึกคุณภาพ <span class="text-danger">*</span>
+                    <span class="text-muted fw-normal">(เฉพาะกลุ่มตัวอย่าง · พิมพ์ค้นหาได้)</span></label>
+                  <select id="inspectorStudentSelect" class="form-select border-2 rounded-3"
+                          data-search-select data-search-placeholder="พิมพ์ค้นหาด้วยรหัส หรือ ชื่อนักเรียน...">
                     <option value="" disabled selected>-- เลือกรายชื่อนักเรียน --</option>
                   </select>
                 </div>
@@ -768,7 +770,9 @@ $role = $sessionUser['role'];
   // โหลดรายชื่อนักเรียน
   async function loadStudents() {
     try {
-      const response = await fetch(`api.php?action=get_students_list&_t=${new Date().getTime()}`);
+      // รายชื่อในช่องเลือกใช้เฉพาะ "กลุ่มตัวอย่าง" ไม่นำนักเรียนกลุ่มทดลองมาปนในรายการ
+      const groupQS = window.TEG ? TEG.sampleParam() : '';
+      const response = await fetch(`api.php?action=get_students_list${groupQS}&_t=${new Date().getTime()}`);
       const res = await response.json();
       if (res.success) {
         studentDB = res.students;
@@ -806,6 +810,12 @@ $role = $sessionUser['role'];
         teacherSelect.appendChild(opt);
       }
     });
+
+    // อัปเดตกล่องค้นหาให้ตรงกับรายชื่อชุดใหม่
+    if (window.SearchSelect) {
+      if (peerSelect) SearchSelect.refresh(peerSelect);
+      if (teacherSelect) SearchSelect.refresh(teacherSelect);
+    }
   }
 
   // คำสำคัญที่ "สื่อถึงปัญหา/ทักษะการเขียนตามเกณฑ์" เท่านั้น (คัดมาแล้ว ไม่นับคำทั่วไป)

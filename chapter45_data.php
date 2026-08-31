@@ -341,6 +341,9 @@ function ch45_dataset(PDO $pdo, array $opt = []) {
             . 'scores, total_score, max_score, quality_level FROM essay_ai_feedback WHERE student_id IN (' . $ph . ')');
         $stmt->execute($sids);
         foreach ($stmt->fetchAll() as $row) {
+            // ผลตรวจที่ AI ให้คะแนนไม่ครบ = ตรวจไม่ผ่าน ถือว่ายังไม่ได้ตรวจ ไม่นำมาใช้ในบทที่ 4-5
+            $aiScores = json_decode((string)($row['scores'] ?? ''), true);
+            if (!is_array($aiScores) || !$aiScores) continue;
             $ai[(string)$row['student_id']][(string)$row['essay_phase']] = [
                 'overall'      => (string)($row['overall_comment'] ?? ''),
                 'strengths'    => json_decode((string)($row['strengths'] ?? ''), true) ?: [],

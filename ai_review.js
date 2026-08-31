@@ -34,6 +34,26 @@ const AI_BASELINE_PAIRS = {
   posttest: 'pretest'
 };
 
+// รอบหัวข้อของแต่ละรอบงาน — ร่าง D1/D2 ของหน่วยเดียวกันใช้หัวข้อเดียวกัน (ตรงกับ essay_topic_phase())
+function aiTopicPhase(phase) {
+  const p = String(phase || '');
+  if (p.indexOf('task1') === 0) return 'task1';
+  if (p.indexOf('task2') === 0) return 'task2';
+  return p;                      // pretest / posttest — คนละหัวข้อกัน
+}
+
+/**
+ * คู่นี้เทียบกันแบบไหน (ตรงกับ ai_baseline_kind() ฝั่งเซิร์ฟเวอร์)
+ *   'revision' = ร่างที่ 2 เทียบร่างที่ 1 ของหน่วยเดียวกัน หัวข้อเดียวกัน → เทียบตัวข้อความว่าแก้ตรงไหน
+ *   'newtopic' = หลังเรียน เทียบ ก่อนเรียน คนละหัวข้อ คนละเรื่อง เป็นงานเขียนคนละชิ้น
+ *                → เทียบเฉพาะ "คุณภาพเนื้อหาและความสามารถในการเขียนตามเกณฑ์" ไม่ใช่เทียบเนื้อเรื่อง
+ */
+function aiBaselineKind(phase) {
+  const base = AI_BASELINE_PAIRS[phase];
+  if (!base) return '';
+  return (aiTopicPhase(phase) === aiTopicPhase(base)) ? 'revision' : 'newtopic';
+}
+
 function aiPhaseLabel(phase) {
   return AI_PHASE_LABEL_MAP[phase] || phase;
 }
@@ -208,7 +228,8 @@ function aiComputeDraftCompare(fb, baseFb) {
   const basePh = AI_BASELINE_PAIRS[phase] || '';
   if (!basePh) return { has_baseline: false, pairable: false };
 
-  const info = { pairable: true, phase: basePh, label: aiPhaseLabel(basePh), short: aiPhaseShort(basePh) };
+  const info = { pairable: true, kind: aiBaselineKind(phase), phase: basePh,
+                 label: aiPhaseLabel(basePh), short: aiPhaseShort(basePh) };
   if (!baseFb || !baseFb.scores) return Object.assign({ has_baseline: false }, info);
 
   const criteria = [];
@@ -264,7 +285,11 @@ function aiAttachDraftCompare(all) {
   Object.keys(all || {}).forEach(ph => {
     const fb = all[ph];
     if (!fb) return;
-    if (fb.draft_compare && fb.draft_compare.has_baseline) return;
+    if (fb.draft_compare && fb.draft_compare.has_baseline) {
+      // ผลตรวจเก่าที่บันทึกไว้ก่อนระบบจะแยกประเภทคู่เทียบ — เติมให้ตรงกับรอบงานจริง
+      if (!fb.draft_compare.kind) fb.draft_compare.kind = aiBaselineKind(ph);
+      return;
+    }
     const basePh = AI_BASELINE_PAIRS[ph];
     if (!basePh) { fb.draft_compare = { has_baseline: false, pairable: false }; return; }
     fb.draft_compare = aiComputeDraftCompare(fb, all[basePh]);
@@ -345,6 +370,10 @@ function aiDraftCompareHTML(fb, opts) {
   const d = fb.draft_compare;
   if (!d || !d.pairable) return '';
 
+  // คนละหัวข้อ (หลังเรียน↔ก่อนเรียน) = งานเขียนคนละชิ้น ไม่ใช่การแก้ร่างเดิม
+  // จึงต้องพูดถึง "พัฒนาการของความสามารถในการเขียน" ไม่ใช่ "แก้อะไรไปบ้าง"
+  const newTopic = (d.kind || aiBaselineKind(fb.essay_phase || '')) === 'newtopic';
+
   // มีคู่ให้เทียบ แต่ฉบับตั้งต้นยังไม่ถูก AI ตรวจ → บอกครูว่าต้องตรวจฉบับนั้นก่อนจึงจะเทียบได้
   // (โหมดย่อในหน้าเขียนเรียงความไม่ต้องขึ้น เพราะนักเรียนสั่งตรวจเองไม่ได้อยู่แล้ว)
   if (!d.has_baseline) {
@@ -357,7 +386,7 @@ function aiDraftCompareHTML(fb, opts) {
         ระบบจะเทียบคะแนนรายข้อให้เอง
       </div>
       ${fb.draft_comment ? `<div class="ai-progress-comment mt-2">
-        <span class="fw-semibold">AI เทียบจากตัวข้อความไว้ว่า:</span> ${aiEsc(fb.draft_comment)}</div>` : ''}
+        <span class="fw-semibold">${newTopic ? 'AI สรุปพัฒนาการไว้ว่า' : 'AI เทียบจากตัวข้อความไว้ว่า'}:</span> ${aiEsc(fb.draft_comment)}</div>` : ''}
     </div>`;
   }
 
@@ -366,24 +395,38 @@ function aiDraftCompareHTML(fb, opts) {
 
   // คำตัดสินบรรทัดเดียวที่ครูอ่านแล้วรู้ทันทีว่า "ผ่าน" เกณฑ์ที่ตั้งไว้ไหม (ร่างหลังต้องดีขึ้นและต้องต่าง)
   const verdict = up
-    ? `<span class="ai-draft-verdict ai-draft-verdict-ok"><i class="bi bi-check-circle-fill me-1"></i>คะแนนดีขึ้นจาก ${aiEsc(d.short)} อยู่ ${aiFmt(Math.abs(d.delta))} คะแนน</span>`
+    ? `<span class="ai-draft-verdict ai-draft-verdict-ok"><i class="bi bi-check-circle-fill me-1"></i>${
+        newTopic ? `เขียนได้ดีขึ้นกว่า ${aiEsc(d.short)} อยู่ ${aiFmt(Math.abs(d.delta))} คะแนน`
+                 : `คะแนนดีขึ้นจาก ${aiEsc(d.short)} อยู่ ${aiFmt(Math.abs(d.delta))} คะแนน`}</span>`
     : (flat
-        ? `<span class="ai-draft-verdict ai-draft-verdict-warn"><i class="bi bi-exclamation-triangle-fill me-1"></i>คะแนนเท่ากับ ${aiEsc(d.short)} — ยังไม่ดีขึ้น</span>`
-        : `<span class="ai-draft-verdict ai-draft-verdict-bad"><i class="bi bi-arrow-down-circle-fill me-1"></i>คะแนนต่ำกว่า ${aiEsc(d.short)} อยู่ ${aiFmt(Math.abs(d.delta))} คะแนน</span>`);
+        ? `<span class="ai-draft-verdict ai-draft-verdict-warn"><i class="bi bi-exclamation-triangle-fill me-1"></i>${
+            newTopic ? `คะแนนเท่ากับ ${aiEsc(d.short)} — ยังไม่เห็นพัฒนาการ`
+                     : `คะแนนเท่ากับ ${aiEsc(d.short)} — ยังไม่ดีขึ้น`}</span>`
+        : `<span class="ai-draft-verdict ai-draft-verdict-bad"><i class="bi bi-arrow-down-circle-fill me-1"></i>${
+            newTopic ? `เขียนได้ด้อยกว่า ${aiEsc(d.short)} อยู่ ${aiFmt(Math.abs(d.delta))} คะแนน`
+                     : `คะแนนต่ำกว่า ${aiEsc(d.short)} อยู่ ${aiFmt(Math.abs(d.delta))} คะแนน`}</span>`);
 
   // ธงเตือนเมื่อผลออกมา "ผิดจากที่ควรเป็น" — ครูจะได้รู้ว่าควรกลับไปดูงานจริง
   const flags = [];
   if (d.same_text) {
-    flags.push(`<div class="ai-draft-flag ai-draft-flag-bad"><i class="bi bi-files me-1"></i>
-      <strong>ข้อความเหมือนฉบับ ${aiEsc(d.short)} ทุกตัวอักษร</strong> — นักเรียนยังไม่ได้แก้ไขงานเลย คะแนนจึงไม่ควรต่างกัน</div>`);
+    flags.push(newTopic
+      ? `<div class="ai-draft-flag ai-draft-flag-bad"><i class="bi bi-files me-1"></i>
+         <strong>ส่งข้อความเดิมของ ${aiEsc(d.short)} มาทั้งฉบับ</strong> — ทั้งที่เป็นคนละหัวข้อกัน
+         ควรตรวจสอบว่านักเรียนส่งงานผิดฉบับหรือคัดลอกงานเดิมมา</div>`
+      : `<div class="ai-draft-flag ai-draft-flag-bad"><i class="bi bi-files me-1"></i>
+         <strong>ข้อความเหมือนฉบับ ${aiEsc(d.short)} ทุกตัวอักษร</strong> — นักเรียนยังไม่ได้แก้ไขงานเลย คะแนนจึงไม่ควรต่างกัน</div>`);
   } else if (d.identical) {
-    flags.push(`<div class="ai-draft-flag ai-draft-flag-warn"><i class="bi bi-exclamation-triangle me-1"></i>
-      <strong>คะแนนรายข้อเท่ากันทุกข้อ</strong> — งานเปลี่ยนไปแล้วแต่ยังไม่ถึงระดับถัดไปสักข้อ
-      ลองอ่านคอลัมน์ &quot;ต้องแก้อะไรจึงจะขยับขึ้น&quot; ด้านล่างประกอบ</div>`);
+    flags.push(newTopic
+      ? `<div class="ai-draft-flag ai-draft-flag-warn"><i class="bi bi-exclamation-triangle me-1"></i>
+         <strong>คะแนนรายข้อเท่ากันทุกข้อ</strong> — ความสามารถในการเขียนยังอยู่ระดับเดิมทุกด้าน
+         ลองอ่านคอลัมน์ &quot;ต้องฝึกอะไรจึงจะขยับขึ้น&quot; ด้านล่างประกอบ</div>`
+      : `<div class="ai-draft-flag ai-draft-flag-warn"><i class="bi bi-exclamation-triangle me-1"></i>
+         <strong>คะแนนรายข้อเท่ากันทุกข้อ</strong> — งานเปลี่ยนไปแล้วแต่ยังไม่ถึงระดับถัดไปสักข้อ
+         ลองอ่านคอลัมน์ &quot;ต้องแก้อะไรจึงจะขยับขึ้น&quot; ด้านล่างประกอบ</div>`);
   }
   if (!up && !d.same_text && !d.identical) {
     flags.push(`<div class="ai-draft-flag ai-draft-flag-warn"><i class="bi bi-graph-down me-1"></i>
-      คะแนนรวมยัง<strong>ไม่ดีขึ้น</strong>จาก ${aiEsc(d.short)} — มีข้อที่ดีขึ้น ${d.up} ข้อ แต่ถอยลง ${d.down} ข้อ</div>`);
+      คะแนนรวมยัง<strong>${newTopic ? 'ไม่สูงขึ้น' : 'ไม่ดีขึ้น'}</strong>จาก ${aiEsc(d.short)} — มีข้อที่ดีขึ้น ${d.up} ข้อ แต่ถอยลง ${d.down} ข้อ</div>`);
   }
 
   const chips = [
@@ -421,7 +464,9 @@ function aiDraftCompareHTML(fb, opts) {
     const noWhyNote = hasWhy ? '' : `<div class="ai-draft-note mb-2">
       <i class="bi bi-info-circle me-1"></i><span class="fw-semibold">ยังไม่มีคำอธิบายรายข้อจาก AI ในรอบนี้</span>
       — ตารางจึงบอกได้เฉพาะคะแนนที่ขยับ สั่งให้ AI ตรวจรอบนี้ใหม่
-      เพื่อให้ AI บอกว่าแต่ละข้อมีอะไรเพิ่มเข้ามา อะไรหายไป และทำไมคะแนนจึงเปลี่ยน
+      ${newTopic
+        ? 'เพื่อให้ AI บอกว่าแต่ละข้อนักเรียนทำได้ดีขึ้นตรงไหน ยังไม่ถึงตรงไหน และทำไมคะแนนจึงเปลี่ยน'
+        : 'เพื่อให้ AI บอกว่าแต่ละข้อมีอะไรเพิ่มเข้ามา อะไรหายไป และทำไมคะแนนจึงเปลี่ยน'}
     </div>`;
 
     const rows = d.criteria.map(c => {
@@ -438,9 +483,9 @@ function aiDraftCompareHTML(fb, opts) {
       const addTxt = c.added   || c.after;
       const remTxt = c.removed || c.before;
       const gain = addTxt ? `<div class="ai-why-line ai-why-add">
-          <span class="ai-why-tag ai-why-tag-add">เพิ่มเข้ามา</span>${aiEsc(addTxt)}</div>` : '';
+          <span class="ai-why-tag ai-why-tag-add">${newTopic ? 'ทำได้ดีขึ้น' : 'เพิ่มเข้ามา'}</span>${aiEsc(addTxt)}</div>` : '';
       const loss = remTxt ? `<div class="ai-why-line ai-why-rem">
-          <span class="ai-why-tag ai-why-tag-rem">หายไป / ของเดิม</span>${aiEsc(remTxt)}</div>` : '';
+          <span class="ai-why-tag ai-why-tag-rem">${newTopic ? 'ยังทำได้ไม่เท่าเดิม' : 'หายไป / ของเดิม'}</span>${aiEsc(remTxt)}</div>` : '';
 
       // เหตุผลว่าทำไมคะแนนถึงขยับ (หรือไม่ขยับ)
       const whyTxt = c.reason || c.change;
@@ -463,7 +508,7 @@ function aiDraftCompareHTML(fb, opts) {
           </div>
           ${gain}${loss}${why}
           ${c.note ? `<div class="ai-draft-note mt-1"><i class="bi bi-lightbulb me-1"></i>
-            <span class="fw-semibold">ทำอย่างไรให้ขยับขึ้นอีก:</span> ${aiEsc(c.note)}</div>` : ''}
+            <span class="fw-semibold">${newTopic ? 'ต้องฝึกอะไรจึงจะขยับขึ้น' : 'ทำอย่างไรให้ขยับขึ้นอีก'}:</span> ${aiEsc(c.note)}</div>` : ''}
         </td>
         <td class="text-center align-top" style="min-width:104px;">
           <div class="text-muted small text-nowrap">${aiEsc(d.short)} ${aiFmt(c.base_weighted)}</div>
@@ -491,7 +536,11 @@ function aiDraftCompareHTML(fb, opts) {
   return `<div class="ai-draft-box ${headCls} rounded-3 p-3 mb-3">
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
       <span class="fw-bold text-dark">
-        <i class="bi bi-arrow-left-right text-primary me-2"></i>เทียบกับ ${aiEsc(d.label || '')}
+        <i class="bi bi-arrow-left-right text-primary me-2"></i>${
+          newTopic ? `พัฒนาการเทียบกับ ${aiEsc(d.label || '')}` : `เทียบกับ ${aiEsc(d.label || '')}`}
+        ${newTopic ? `<span class="badge bg-primary-subtle text-primary-emphasis fw-semibold ms-1"
+             title="ก่อนเรียนกับหลังเรียนเป็นคนละหัวข้อ จึงเทียบที่คุณภาพเนื้อหาตามเกณฑ์ ไม่ใช่เทียบเนื้อเรื่อง">
+             <i class="bi bi-info-circle me-1"></i>คนละหัวข้อ — เทียบที่คุณภาพเนื้อหาตามเกณฑ์</span>` : ''}
       </span>
       ${when ? `<span class="text-muted small">ฉบับตั้งต้นตรวจเมื่อ ${aiEsc(when)}</span>` : ''}
     </div>
@@ -499,13 +548,16 @@ function aiDraftCompareHTML(fb, opts) {
     ${flags.join('')}
     <div class="d-flex flex-wrap gap-2 mt-2">${chips}</div>
     ${d.comment ? `<div class="ai-progress-comment mt-2">${aiEsc(d.comment)}</div>` : ''}
-    ${opts.compact ? '' : aiEditListHTML(d)}
+    ${(opts.compact || newTopic) ? '' : aiEditListHTML(d)}
     ${table}
     <div class="text-muted mt-2" style="font-size:0.75rem;">
       <i class="bi bi-info-circle me-1"></i>ส่วนต่างคำนวณจากคะแนนที่ AI ให้จริงทั้งสองฉบับ
       ไม่ได้เชื่อคำบรรยายของ AI อย่างเดียว
+      ${newTopic ? '<br><i class="bi bi-signpost-split me-1"></i>ก่อนเรียนกับหลังเรียนเป็น<strong>คนละหัวข้อ</strong> '
+        + 'ระบบจึงเทียบที่คุณภาพเนื้อหาและความสามารถในการเขียนตามเกณฑ์แต่ละข้อ ไม่ได้เทียบว่าเนื้อเรื่องต่างกันอย่างไร '
+        + 'และไม่มีรายการ &quot;ส่วนที่ถูกแก้&quot; เพราะไม่ใช่การแก้ร่างเดิม' : ''}
       ${d.estimated ? '<br><i class="bi bi-lightbulb me-1"></i>ผลตรวจฉบับนี้บันทึกไว้ก่อนระบบจะเทียบร่างให้อัตโนมัติ '
-        + 'จึงเทียบได้เฉพาะคะแนน — สั่งให้ AI ตรวจรอบนี้ใหม่ เพื่อให้ AI ยกข้อความของทั้งสองฉบับมาวางคู่กันให้เห็น' : ''}
+        + 'จึงเทียบได้เฉพาะคะแนน — สั่งให้ AI ตรวจรอบนี้ใหม่ เพื่อให้ AI อธิบายผลเทียบรายข้อให้เห็น' : ''}
     </div>
   </div>`;
 }
@@ -576,7 +628,25 @@ function aiFeedbackHTML(fb, opts) {
 
   // แถบเตือนเมื่อนักเรียนแก้ไขต้นฉบับหลังจาก AI ตรวจไปแล้ว — ผลตรวจที่เห็นเป็นของฉบับก่อนแก้
   const markedAt = fb.recheck_marked_at ? String(fb.recheck_marked_at).replace('T', ' ').slice(0, 16) : '';
-  const recheckBox = fb.needs_recheck
+  // ผลตรวจเก่าที่ AI ให้คะแนนไม่ครบ = การตรวจครั้งนั้น "ไม่ผ่าน" ต้องไม่ให้อ่านเหมือนผลตรวจปกติ
+  // (ตอนนี้ระบบไม่บันทึกผลแบบนี้แล้ว กล่องนี้จึงขึ้นเฉพาะข้อมูลที่ค้างไว้จากก่อนหน้า)
+  const incompleteBox = fb.incomplete
+    ? `<div class="ai-recheck-alert rounded-3 p-3 mb-3 d-flex align-items-start gap-3 flex-wrap">
+         <i class="bi bi-exclamation-octagon-fill fs-4 text-danger"></i>
+         <div class="flex-grow-1">
+           <div class="fw-bold text-danger">การตรวจครั้งนั้นไม่สำเร็จ — ถือว่ายังไม่ได้ตรวจ</div>
+           <div class="small text-muted">
+             AI ให้คะแนนมาไม่ครบทุกข้อ คะแนนที่แสดงจึงใช้ไม่ได้และไม่ถูกนำไปคิดในรายงาน
+             ${opts.recheckAction ? '' : ' · รอคุณครูสั่งให้ AI ตรวจใหม่อีกครั้ง'}
+           </div>
+         </div>
+         ${opts.recheckAction ? `<button class="btn btn-danger fw-bold rounded-pill px-4" onclick="${opts.recheckAction}">
+           <i class="bi bi-stars me-1"></i>ให้ AI ตรวจใหม่ตอนนี้
+         </button>` : ''}
+       </div>`
+    : '';
+
+  const recheckBox = (fb.needs_recheck && !fb.incomplete)
     ? `<div class="ai-recheck-alert rounded-3 p-3 mb-3 d-flex align-items-start gap-3 flex-wrap">
          <i class="bi bi-arrow-repeat fs-4 text-warning-emphasis"></i>
          <div class="flex-grow-1">
@@ -761,6 +831,7 @@ function aiFeedbackHTML(fb, opts) {
       ${deleteBtn}
     </div>
 
+    ${incompleteBox}
     ${recheckBox}
 
     ${aiDraftCompareHTML(fb, opts)}
