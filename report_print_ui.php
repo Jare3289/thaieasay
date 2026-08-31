@@ -84,15 +84,22 @@ function rp_toolbar($extraHtml = '') {
 function rp_styles($scope = '') {
     $root = ($scope === '' || $scope === null) ? 'body' : $scope;
     $css  = <<<'RPCSS'
-  /* ขนาดตัวอักษรของเอกสารนี้กำหนดเป็น "พอยต์ (pt)" ทั้งหมด อยู่ในช่วง 14-16 pt
-     ตามมาตรฐานเอกสารราชการไทย (TH Sarabun New 16 pt) เพื่อให้อ่านง่ายทั้งบนจอและบนกระดาษ
-     ตัวเลข/ตารางใช้ 14 pt ส่วนหัวข้อใหญ่ขึ้นไปตามลำดับความสำคัญ
-     ความกว้างเนื้อหาบนจอถูกตั้งให้เท่ากับกระดาษ A4 จริง (190 มม.) จะได้เห็นการจัดหน้าตรงกับตอนพิมพ์ */
+  /* ขนาดตัวอักษรของเอกสารนี้กำหนดเป็น "พอยต์ (pt)" ทั้งหมด ตามมาตรฐานเอกสารราชการไทย
+     (TH Sarabun New 16 pt) เพื่อให้อ่านง่ายทั้งบนจอและบนกระดาษ
+     ความกว้างเนื้อหาบนจอถูกตั้งให้เท่ากับกระดาษ A4 จริง (190 มม.) จะได้เห็นการจัดหน้าตรงกับตอนพิมพ์
+
+     หลักการจัดตัวอักษรของเอกสารนี้ — ให้ "ตัวเน้น" กับ "ตัวปกติ" อยู่ด้วยกัน ไม่ให้ทุกอย่างหนักเท่ากัน
+     จนอ่านแล้วอึดอัด:
+       - ตัวเลขและคำตัดสิน (คะแนน ระดับคุณภาพ ส่วนต่าง) = ตัวหนา สีเข้ม → สายตาจับได้ก่อน
+       - ป้ายกำกับและคำอธิบายประกอบ = ตัวปกติ สีอ่อนลงหนึ่งระดับ → ไม่แย่งความสนใจ
+       - เนื้อความยาว (เรียงความ บทวิเคราะห์) = ตัวปกติ ระยะบรรทัดโปร่ง อ่านต่อเนื่องได้สบาย
+     และเว้นระยะหายใจให้มากขึ้นทั้งในตาราง กล่อง และระหว่างหัวข้อ */
   @@ * { box-sizing: border-box; }
   @@ {
     font-family: "TH Sarabun New", "Sarabun", "Segoe UI", Tahoma, sans-serif;
     color: #1e293b; margin: 0; padding: 0; background: #f1f5f9;
-    font-size: 16pt; line-height: 1.45;
+    font-size: 16pt; line-height: 1.55;
+    font-weight: 400;
   }
   @@ .toolbar {
     position: sticky; top: 0; z-index: 10;
@@ -112,44 +119,63 @@ function rp_styles($scope = '') {
 
   /* 770px - padding ซ้ายขวา = 718px ≈ 190 มม. เท่ากับพื้นที่พิมพ์จริงของ A4 */
   @@ .sheet {
-    background: #fff; max-width: 770px; margin: 16px auto; padding: 22px 26px;
+    background: #fff; max-width: 770px; margin: 16px auto; padding: 26px 30px 30px;
     box-shadow: 0 4px 18px rgba(0,0,0,0.08);
   }
-  @@ .doc-head { text-align: center; border-bottom: 3px double #334155; padding-bottom: 8px; }
-  @@ .doc-head h1 { font-size: 22pt; margin: 0 0 2px; line-height: 1.25; }
-  @@ .doc-head .sub { font-size: 16pt; color: #475569; }
+  @@ .doc-head { text-align: center; border-bottom: 2px solid #1e3a8a; padding-bottom: 10px; }
+  @@ .doc-head h1 { font-size: 23pt; font-weight: 700; margin: 0 0 3px; line-height: 1.3; color: #0f172a; }
+  @@ .doc-head .sub { font-size: 15.5pt; font-weight: 400; color: #64748b; }
   @@ .idbox {
-    display: flex; flex-wrap: wrap; gap: 2px 20px; font-size: 15pt;
-    margin: 8px 0 12px; padding: 6px 10px; background: #f8fafc;
-    border: 1px solid #e2e8f0; border-radius: 8px; line-height: 1.4;
+    display: flex; flex-wrap: wrap; gap: 4px 22px; font-size: 15pt;
+    margin: 12px 0 16px; padding: 9px 13px; background: #f8fafc;
+    border: 1px solid #e2e8f0; border-left: 4px solid #1e3a8a; border-radius: 8px;
+    line-height: 1.55; color: #475569;
   }
-  @@ .idbox b { color: #0f172a; }
+  /* ป้ายกำกับเป็นตัวปกติสีอ่อน ค่าที่ตามมาเป็นตัวหนาสีเข้ม */
+  @@ .idbox b { color: #0f172a; font-weight: 700; }
   @@ .idbox .grow { margin-left: auto; }
 
+  /* หัวข้อใหญ่: เปลี่ยนจากแถบทึบเต็มความกว้าง (กินหมึกและดูหนัก) มาเป็นเส้นนำสีน้ำเงิน
+     + ตัวอักษรหนาสีเข้ม อ่านง่ายกว่าและยังแยกส่วนได้ชัดแม้เครื่องพิมพ์ไม่พิมพ์พื้นหลัง */
   @@ h2.sec-title {
-    font-size: 18pt; margin: 14px 0 7px; padding: 4px 10px; line-height: 1.35;
-    background: #1e3a8a; color: #fff; border-radius: 6px;
+    font-size: 18.5pt; font-weight: 700; color: #1e3a8a;
+    margin: 20px 0 9px; padding: 2px 0 5px 12px; line-height: 1.4;
+    border-left: 5px solid #1e3a8a; border-bottom: 1px solid #dbe2ef;
   }
-  @@ h2.sec-title span { font-weight: 400; font-size: 14pt; opacity: .88; }
-  @@ h3.sub-title { font-size: 16pt; margin: 10px 0 4px; color: #1e3a8a; }
+  @@ .sheet > .sec-title:first-of-type, @@ .doc-head + .sec-title { margin-top: 14px; }
+  @@ h2.sec-title span { font-weight: 400; font-size: 14.5pt; color: #64748b; }
+  @@ h3.sub-title {
+    font-size: 16pt; font-weight: 700; margin: 14px 0 6px; color: #1e40af;
+    padding-bottom: 3px; border-bottom: 1px dotted #cbd5e1;
+  }
 
   /* การ์ดสรุปตัวเลข — จัดเป็นตารางกริดให้ทุกใบกว้างเท่ากันเสมอ ใบสุดท้ายจะไม่ยืดเต็มแถว */
-  @@ .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 7px; }
+  @@ .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 9px; margin: 10px 0; }
   @@ .card {
-    border: 1px solid #cbd5e1; border-radius: 8px;
-    padding: 6px 9px; background: #f8fafc;
+    border: 1px solid #dbe2ef; border-top: 3px solid #1e3a8a; border-radius: 8px;
+    padding: 8px 11px 9px; background: #fbfcfe;
   }
-  @@ .card .lbl { font-size: 14pt; color: #64748b; line-height: 1.3; }
-  @@ .card .val { font-size: 20pt; font-weight: 700; color: #0f172a; line-height: 1.25; }
-  @@ .card .foot { font-size: 14pt; color: #64748b; line-height: 1.3; }
+  /* ป้ายกำกับตัวปกติสีอ่อน — ตัวเลขตัวหนาใหญ่ ให้สายตาจับตัวเลขได้ก่อน */
+  @@ .card .lbl { font-size: 14pt; font-weight: 400; color: #64748b; line-height: 1.35; }
+  @@ .card .val { font-size: 21pt; font-weight: 700; color: #0f172a; line-height: 1.3; margin: 2px 0 1px; }
+  @@ .card .foot { font-size: 13.5pt; font-weight: 400; color: #64748b; line-height: 1.35; }
 
-  @@ table { width: 100%; border-collapse: collapse; font-size: 14pt; }
-  @@ th, @@ td { border: 1px solid #cbd5e1; padding: 2px 5px; vertical-align: middle; text-align: left; line-height: 1.35; }
-  @@ th { background: #f1f5f9; font-weight: 700; text-align: center; }
+  @@ table { width: 100%; border-collapse: collapse; font-size: 14.5pt; margin: 8px 0 4px; }
+  @@ th, @@ td {
+    border: 1px solid #dbe2ef; padding: 5px 9px;
+    vertical-align: middle; text-align: left; line-height: 1.45;
+  }
+  /* หัวตารางเป็นตัวหนาแต่ไม่ทึบจนหนัก และเนื้อตารางเป็นตัวปกติ */
+  @@ th { background: #eef2f9; font-weight: 700; color: #1e3a8a; text-align: center; }
+  @@ td { font-weight: 400; }
+  /* แถบสลับสีอ่อน ๆ ช่วยให้สายตาไล่บรรทัดยาว ๆ ไม่หลง */
+  @@ tbody tr:nth-child(even) td { background: #fbfcfe; }
+  /* ช่องตัวเลขคือใจความของตาราง จึงเน้นให้หนากว่าคำอธิบายรอบ ๆ */
   @@ td.num, @@ th.num { text-align: center; white-space: nowrap; }
+  @@ td.num { font-weight: 600; color: #0f172a; }
   /* ช่องที่จัดกึ่งกลางแต่ยอมให้ตัดบรรทัดได้ (เช่น วันที่-เวลา) กันไม่ให้ไปเบียดคอลัมน์ข้าง ๆ */
   @@ td.wrap, @@ th.wrap { text-align: center; white-space: normal; }
-  @@ tfoot td { background: #f8fafc; font-weight: 700; }
+  @@ tfoot td { background: #eef2f9; font-weight: 700; color: #0f172a; }
   @@ tr.hi td { background: #fffbeb; }
 
   @@ .bar { height: 8px; border-radius: 999px; background: #e2e8f0; overflow: hidden; min-width: 55px; }
@@ -170,33 +196,40 @@ function rp_styles($scope = '') {
   @@ .lv-1 { background: #ffedd5; color: #9a3412; }
   @@ .lv-0 { background: #fee2e2; color: #991b1b; }
 
-  @@ .muted { color: #94a3b8; }
+  @@ .muted { color: #94a3b8; font-weight: 400; }
+  /* ตัวช่วยจัดน้ำหนักตัวอักษรในเนื้อหา ใช้คู่กันเพื่อไม่ให้ทุกอย่างหนักเท่ากัน */
+  @@ .em  { font-weight: 700; color: #0f172a; }
+  @@ .dim { font-weight: 400; color: #64748b; }
+  @@ .lead { font-size: 15.5pt; line-height: 1.7; color: #334155; }
   @@ .note {
-    font-size: 14pt; color: #475569; background: #f8fafc; line-height: 1.4;
-    border-left: 3px solid #94a3b8; padding: 5px 9px; border-radius: 4px; margin-top: 5px;
+    font-size: 14pt; color: #475569; background: #f8fafc; line-height: 1.55;
+    border-left: 3px solid #94a3b8; padding: 7px 11px; border-radius: 6px; margin-top: 7px;
   }
-  @@ .twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  @@ .box { border: 1px solid #cbd5e1; border-radius: 8px; padding: 6px 9px; font-size: 14pt; line-height: 1.4; }
-  @@ .box h4 { margin: 0 0 3px; font-size: 15pt; }
-  @@ .box.good { border-left: 3px solid #10b981; }
-  @@ .box.watch { border-left: 3px solid #f59e0b; }
-  @@ .box.info { border-left: 3px solid #3b82f6; }
-  @@ .box ul { margin: 0; padding-left: 20px; }
-  @@ .box li { margin-bottom: 2px; }
+  @@ .twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @@ .box {
+    border: 1px solid #dbe2ef; border-radius: 8px; padding: 9px 12px;
+    font-size: 14.5pt; line-height: 1.55;
+  }
+  @@ .box h4 { margin: 0 0 5px; font-size: 15pt; font-weight: 700; }
+  @@ .box.good { border-left: 4px solid #10b981; }
+  @@ .box.watch { border-left: 4px solid #f59e0b; }
+  @@ .box.info { border-left: 4px solid #3b82f6; }
+  @@ .box ul { margin: 0; padding-left: 22px; }
+  @@ .box li { margin-bottom: 3px; }
 
-  @@ .checklist { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; font-size: 14pt; }
-  @@ .checklist .item { display: flex; justify-content: space-between; gap: 8px;
-                     border-bottom: 1px dotted #e2e8f0; padding: 1px 3px 1px 0; }
+  @@ .checklist { display: grid; grid-template-columns: 1fr 1fr; gap: 0 22px; font-size: 14.5pt; }
+  @@ .checklist .item { display: flex; justify-content: space-between; gap: 10px;
+                     border-bottom: 1px dotted #dbe2ef; padding: 4px 4px 4px 0; line-height: 1.5; }
   @@ .checklist .yes { color: #166534; font-weight: 700; white-space: nowrap; }
   @@ .checklist .no { color: #b91c1c; font-weight: 700; white-space: nowrap; }
 
   /* ---- บทวิเคราะห์รายบุคคล ---- */
-  @@ .ins { border: 1px solid #cbd5e1; border-left-width: 4px; border-radius: 8px;
-         padding: 6px 10px; margin-bottom: 6px; font-size: 14pt; line-height: 1.45;
+  @@ .ins { border: 1px solid #dbe2ef; border-left-width: 5px; border-radius: 8px;
+         padding: 9px 13px; margin-bottom: 8px; font-size: 14.5pt; line-height: 1.6;
          page-break-inside: avoid; }
-  @@ .ins h4 { margin: 0 0 2px; font-size: 15pt; }
-  @@ .ins ul { margin: 3px 0 0; padding-left: 20px; }
-  @@ .ins li { margin-bottom: 1px; }
+  @@ .ins h4 { margin: 0 0 4px; font-size: 15.5pt; font-weight: 700; }
+  @@ .ins ul { margin: 6px 0 0; padding-left: 22px; }
+  @@ .ins li { margin-bottom: 3px; }
   @@ .ins.good { border-color: #cbd5e1; border-left-color: #10b981; background: #f0fdf4; }
   @@ .ins.warn { border-color: #cbd5e1; border-left-color: #f59e0b; background: #fffbeb; }
   @@ .ins.info { border-color: #cbd5e1; border-left-color: #3b82f6; background: #f8fafc; }
@@ -205,45 +238,55 @@ function rp_styles($scope = '') {
   @@ .ins.info h4 { color: #1e40af; }
 
   /* ---- เรียงความฉบับเต็ม ---- */
-  @@ .essay-doc { border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 12px; margin-bottom: 8px;
+  @@ .essay-doc { border: 1px solid #dbe2ef; border-radius: 8px; padding: 10px 14px; margin-bottom: 10px;
                page-break-inside: auto; }
   @@ .essay-doc > .head { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap;
-                       border-bottom: 1px dashed #cbd5e1; padding-bottom: 3px; margin-bottom: 5px; }
-  @@ .essay-doc > .head b { font-size: 15pt; }
-  @@ .essay-doc .meta { font-size: 14pt; color: #64748b; }
-  @@ .essay-doc .topic { font-size: 14pt; color: #475569; margin-bottom: 4px; }
-  @@ .essay-doc .part { font-size: 14pt; font-weight: 700; color: #1e3a8a; margin-top: 4px; }
-  @@ .essay-doc p { margin: 0 0 4px; text-indent: 2.2em; line-height: 1.7; }
+                       border-bottom: 1px dashed #cbd5e1; padding-bottom: 5px; margin-bottom: 8px; }
+  @@ .essay-doc > .head b { font-size: 15.5pt; font-weight: 700; }
+  @@ .essay-doc .meta { font-size: 13.5pt; font-weight: 400; color: #64748b; }
+  @@ .essay-doc .topic { font-size: 14pt; font-weight: 400; color: #475569; margin-bottom: 6px; }
+  @@ .essay-doc .part { font-size: 14pt; font-weight: 700; color: #1e3a8a; margin-top: 9px; margin-bottom: 2px; }
+  /* ตัวเรียงความของนักเรียนคือส่วนที่อ่านต่อเนื่องยาวที่สุด จึงให้ระยะบรรทัดโปร่งที่สุดในเอกสาร */
+  @@ .essay-doc p { margin: 0 0 5px; text-indent: 2.2em; line-height: 1.75; font-weight: 400; }
 
   /* ---- คู่ ป้ายกำกับ/ค่า และป้ายสถานะสั้น ๆ ---- */
-  @@ .kv { font-size: 14pt; line-height: 1.5; }
-  @@ .kv b { color: #0f172a; }
-  @@ .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  /* บรรทัด "ป้ายกำกับ: ค่า" — ป้ายเป็นตัวหนา ส่วนค่าเป็นตัวปกติ อ่านไล่ลงมาได้สบาย */
+  @@ .kv { font-size: 14.5pt; font-weight: 400; line-height: 1.6; margin-bottom: 2px; }
+  @@ .kv b { color: #0f172a; font-weight: 700; }
+  @@ .chips { display: flex; flex-wrap: wrap; gap: 5px; }
 
-  @@ .signrow { display: flex; gap: 34px; margin-top: 22px; page-break-inside: avoid; }
+  @@ .signrow { display: flex; gap: 34px; margin-top: 30px; page-break-inside: avoid; }
   @@ .signrow .sign { flex: 1; text-align: center; font-size: 15pt; color: #475569; }
   @@ .signrow .line { border-bottom: 1px dotted #64748b; height: 30px; margin-bottom: 3px; }
 
-  @@ .foot-note { margin-top: 12px; font-size: 14pt; color: #64748b; line-height: 1.4;
-               border-top: 1px solid #e2e8f0; padding-top: 5px; }
+  @@ .foot-note { margin-top: 18px; font-size: 13.5pt; font-weight: 400; color: #64748b; line-height: 1.6;
+               border-top: 1px solid #e2e8f0; padding-top: 8px; }
   @@ .no-data { text-align: center; color: #64748b; padding: 40px; font-size: 16pt; }
   @@ .page-break { page-break-after: always; }
 
   @media print {
+    /* บังคับให้เครื่องพิมพ์พิมพ์พื้นหลังและเส้นสีตามที่ออกแบบไว้
+       ถ้าไม่ใส่ เบราว์เซอร์จะตัดพื้นหลังทิ้ง เอกสารจะกลายเป็นตัวหนังสือดำล้วนแบนราบ อ่านยาก */
+    @@, @@ * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     @@ { background: #fff; }
     @@ .no-print { display: none !important; }
     @@ .sheet { box-shadow: none; margin: 0; max-width: none; padding: 0; }
     @@ .sheet + .sheet { page-break-before: always; }
-    @@ table, @@ .box, @@ .signrow, @@ .cards { page-break-inside: avoid; }
+    @@ table, @@ .box, @@ .signrow, @@ .cards, @@ .ins { page-break-inside: avoid; }
     @@ tr { page-break-inside: avoid; }
     @@ thead { display: table-header-group; }   /* ตารางยาวข้ามหน้า ให้หัวตารางซ้ำทุกหน้า */
-    @page { size: A4 portrait; margin: 10mm 10mm 12mm; }
+    /* หัวข้อต้องไม่ตกค้างอยู่ท้ายหน้าโดยไม่มีเนื้อหาตามมา และห้ามทิ้งบรรทัดเดี่ยวข้ามหน้า */
+    @@ h2.sec-title, @@ h3.sub-title { break-after: avoid; page-break-after: avoid; }
+    @@ h2.sec-title { margin-top: 15px; }
+    @@ p, @@ li, @@ .kv { orphans: 2; widows: 2; }
+    @page { size: A4 portrait; margin: 12mm 12mm 14mm; }
   }
 
   /* จอแคบ (ดูบนมือถือก่อนสั่งพิมพ์) — ให้ตารางเลื่อนแนวนอนได้แทนที่จะบีบตัวอักษร */
   @media screen and (max-width: 820px) {
-    @@ .sheet { padding: 16px 14px; }
+    @@ .sheet { padding: 18px 16px; }
     @@ .twocol, @@ .checklist { grid-template-columns: 1fr; }
+    @@ h2.sec-title { margin-top: 20px; }
   }
 RPCSS;
     echo "<style>\n" . str_replace('@@', $root, $css) . "\n</style>";
