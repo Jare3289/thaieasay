@@ -2481,6 +2481,10 @@ try {
             $aiLimit = ai_daily_limit($pdo);
             $aiUsed  = ai_usage_today($pdo, $aiUser['id']);
             if ($aiUsed >= $aiLimit) {
+                // บันทึกไว้ในประวัติด้วย (success = 0 จึงไม่กินโควตา) เพื่อให้ระบบรู้ทีหลังว่า
+                // การตรวจชุดนั้น "หยุดเพราะโควตาครบ" และตรวจต่อจากจุดนี้ได้ถูกฉบับ
+                ai_log_usage($pdo, $aiUser['id'], $aiRole, $aiSid, $aiPhase, false,
+                    'วันนี้ใช้ AI ตรวจครบ ' . $aiLimit . ' ครั้งแล้ว');
                 echo json_encode(['success' => false, 'error' => 'วันนี้ใช้ AI ตรวจครบ ' . $aiLimit . ' ครั้งแล้ว กรุณาลองใหม่ในวันพรุ่งนี้']);
                 exit;
             }
@@ -2849,6 +2853,160 @@ try {
                 'failed_before' => $bFailedBefore,
                 'min_words'   => AI_MIN_WORDS,
                 'quota_left'  => max(0, ai_daily_limit($pdo) - $bQuotaUsed),
+            ]);
+            break;
+
+        // ครู: "ตรวจถึงไหนแล้ว" — ดูจากประวัติการเรียกใช้จริงในระบบ ไม่ใช่ความจำของเบราว์เซอร์
+        // ใช้ตอบว่า การตรวจครั้งล่าสุดจบลงที่ฉบับไหน หยุดเพราะโควตาครบหรือเปล่า
+        // และ "ถ้าจะตรวจต่อจากจุดนั้น" ต้องตรวจฉบับไหนบ้าง (เรียงตามลำดับการเรียน)
+        case 'get_ai_resume_point':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้น']);
+                exit;
+            }
+            $rpUid  = $_SESSION['user']['id'];
+            $rpRoom = isset($_GET['classroom']) ? trim($_GET['classroom']) : '';
+            // ห่างกันเกินเท่านี้ถือว่าเป็นการตรวจคนละครั้ง (ตรวจ 1 ฉบับใช้เวลาราว 25-30 วินาที)
+            $rpGapSec = 900;
+
+            // ---- 1) ย้อนดูประวัติล่าสุด แล้วตัดออกมาเฉพาะ "การตรวจครั้งล่าสุด" ----
+            $rpRun = [];
+            try {
+                $stmt = $pdo->prepare('
+                    SELECT l.student_id, l.essay_phase, l.success, l.error_message, l.created_at,
+                           s.student_name, s.classroom
+                    FROM ai_usage_log l
+                    LEFT JOIN students s ON s.student_id = l.student_id
+                    WHERE l.user_id = ?
+                    ORDER BY l.created_at DESC, l.id DESC
+                    LIMIT 1000
+                ');
+                $stmt->execute([$rpUid]);
+                $rpLogs = $stmt->fetchAll();
+                $prevTs = null;
+                foreach ($rpLogs as $lg) {
+                    $ts = strtotime((string)$lg['created_at']);
+                    if ($prevTs !== null && ($prevTs - $ts) > $rpGapSec) break;   // เว้นช่วงนาน = คนละครั้ง
+                    $rpRun[]  = $lg;      // เรียงจากใหม่ไปเก่า
+                    $prevTs   = $ts;
+                }
+            } catch (Exception $e) { /* ตารางอาจยังไม่ถูกสร้าง — ถือว่ายังไม่เคยตรวจ */ }
+
+            $rpLast = null;   // ฉบับสุดท้ายที่ตรวจ "สำเร็จ" ในครั้งล่าสุด = จุดที่ค้างไว้
+            $rpOk = 0; $rpFailed = 0; $rpLimitHit = false;
+            $rpPhasesTouched = [];
+            $rpRoomsTouched  = [];
+            foreach ($rpRun as $lg) {
+                if ((int)$lg['success'] === 1) {
+                    $rpOk++;
+                    // ประวัติมีทั้งการตรวจเรียงความและการเขียนภาพรวมรายรอบ (ไม่มี student_id)
+                    // "จุดที่ค้างไว้" ต้องเป็นเรียงความของนักเรียนเท่านั้น
+                    if ($rpLast === null && !empty($lg['student_id'])) $rpLast = $lg;
+                } else {
+                    $rpFailed++;
+                    if (mb_strpos((string)$lg['error_message'], 'ตรวจครบ', 0, 'UTF-8') !== false) $rpLimitHit = true;
+                }
+                if (!empty($lg['essay_phase']) && !in_array($lg['essay_phase'], $rpPhasesTouched, true)) {
+                    $rpPhasesTouched[] = $lg['essay_phase'];
+                }
+                if (!empty($lg['classroom']) && !in_array($lg['classroom'], $rpRoomsTouched, true)) {
+                    $rpRoomsTouched[] = $lg['classroom'];
+                }
+            }
+            // ประวัติเก่าที่บันทึกก่อนระบบจะจดว่า "โควตาครบ" — เดาจากยอดของวันนั้นแทน
+            if (!$rpLimitHit && $rpRun) {
+                try {
+                    $rpDay = date('Y-m-d', strtotime((string)$rpRun[0]['created_at']));
+                    $stmt = $pdo->prepare('SELECT COUNT(*) AS c FROM ai_usage_log
+                                            WHERE user_id = ? AND success = 1 AND DATE(created_at) = ?');
+                    $stmt->execute([$rpUid, $rpDay]);
+                    $rpDayRow = $stmt->fetch();
+                    if ($rpDayRow && (int)$rpDayRow['c'] >= ai_daily_limit($pdo)) $rpLimitHit = true;
+                } catch (Exception $e) { /* เดาไม่ได้ก็ไม่เป็นไร */ }
+            }
+
+            // ---- 2) รายชื่อที่ "ยังไม่มีผลตรวจที่ใช้ได้" ทุกรอบ = คิวที่ต้องตรวจต่อ ----
+            // นับรวมฉบับที่เคยตรวจแล้วผลไม่สมบูรณ์ และฉบับที่นักเรียนแก้ต้นฉบับหลังตรวจ
+            $rpSql = "
+                SELECT se.essay_phase, se.student_id, se.word_count, s.student_name, s.classroom,
+                       f.updated_at AS reviewed_at, f.scores AS ai_scores, f.recheck_needed
+                FROM student_essays se
+                JOIN students s ON s.student_id = se.student_id
+                LEFT JOIN essay_ai_feedback f
+                       ON f.student_id = se.student_id AND f.essay_phase = se.essay_phase
+                WHERE (COALESCE(se.intro_content,'') <> ''
+                    OR COALESCE(se.body_content,'') <> ''
+                    OR COALESCE(se.conclusion_content,'') <> '')
+            ";
+            $rpParams = [];
+            if ($rpRoom !== '') { $rpSql .= ' AND s.classroom = ?'; $rpParams[] = $rpRoom; }
+            $rpSql .= ' ORDER BY s.classroom ASC, se.student_id ASC';
+            $stmt = $pdo->prepare($rpSql);
+            $stmt->execute($rpParams);
+
+            $rpPhaseOrder = array_flip(ai_all_phases());
+            $rpPending = [];
+            $rpTooShort = 0;
+            $rpDone     = 0;
+            while ($r = $stmt->fetch()) {
+                if (!isset($rpPhaseOrder[$r['essay_phase']])) continue;     // รอบงานนอกระบบ AI
+                if ((int)$r['word_count'] < AI_MIN_WORDS) { $rpTooShort++; continue; }
+
+                $rpScores   = json_decode((string)($r['ai_scores'] ?? ''), true);
+                $rpHasScore = (is_array($rpScores) && count($rpScores) > 0);
+                $rpReviewed = (!empty($r['reviewed_at']) && $rpHasScore);
+                $rpRecheck  = (!empty($r['recheck_needed']) && $rpReviewed);
+                if ($rpReviewed && !$rpRecheck) { $rpDone++; continue; }    // มีผลตรวจที่ใช้ได้แล้ว
+
+                $rpPending[] = [
+                    'student_id'    => $r['student_id'],
+                    'student_name'  => formatNamePrefix((string)$r['student_name']),
+                    'classroom'     => $r['classroom'],
+                    'essay_phase'   => $r['essay_phase'],
+                    'phase_label'   => ai_phase_label($r['essay_phase']),
+                    'word_count'    => (int)$r['word_count'],
+                    'needs_recheck' => $rpRecheck,
+                    // เคยสั่งตรวจแล้วแต่ผลไม่สมบูรณ์ — ถือว่ายังไม่ได้ตรวจ
+                    'failed_before' => (!empty($r['reviewed_at']) && !$rpHasScore),
+                ];
+            }
+            // เรียงตามลำดับการเรียน เพื่อให้ฉบับตั้งต้นถูกตรวจก่อนร่างที่ต้องเทียบกับมันเสมอ
+            usort($rpPending, function ($a, $b) use ($rpPhaseOrder) {
+                $pa = $rpPhaseOrder[$a['essay_phase']];
+                $pb = $rpPhaseOrder[$b['essay_phase']];
+                if ($pa !== $pb) return $pa - $pb;
+                if ($a['classroom'] !== $b['classroom']) return strcmp((string)$a['classroom'], (string)$b['classroom']);
+                return strcmp((string)$a['student_id'], (string)$b['student_id']);
+            });
+
+            $rpLimit = ai_daily_limit($pdo);
+            $rpUsed  = ai_usage_today($pdo, $rpUid);
+            echo json_encode([
+                'success'  => true,
+                'last_run' => $rpRun ? [
+                    'ended_at'     => $rpRun[0]['created_at'],
+                    'started_at'   => $rpRun[count($rpRun) - 1]['created_at'],
+                    'total'        => count($rpRun),
+                    'ok'           => $rpOk,
+                    'failed'       => $rpFailed,
+                    'stopped_by_limit' => $rpLimitHit,
+                    'phases'       => array_reverse($rpPhasesTouched),
+                    'classrooms'   => $rpRoomsTouched,
+                    // ฉบับสุดท้ายที่ตรวจสำเร็จ = "จุดที่ค้างไว้" ที่จะตรวจต่อจากตรงนี้
+                    'last_student_id'   => $rpLast ? $rpLast['student_id'] : null,
+                    'last_student_name' => $rpLast ? formatNamePrefix((string)($rpLast['student_name'] ?? '')) : '',
+                    'last_classroom'    => $rpLast ? (string)($rpLast['classroom'] ?? '') : '',
+                    'last_phase'        => $rpLast ? $rpLast['essay_phase'] : null,
+                    'last_phase_label'  => $rpLast ? ai_phase_label($rpLast['essay_phase']) : '',
+                    'last_at'           => $rpLast ? $rpLast['created_at'] : null,
+                ] : null,
+                'pending'       => $rpPending,
+                'pending_total' => count($rpPending),
+                'reviewed_total'=> $rpDone,
+                'too_short'     => $rpTooShort,
+                'min_words'     => AI_MIN_WORDS,
+                'quota_limit'   => $rpLimit,
+                'quota_left'    => max(0, $rpLimit - $rpUsed),
             ]);
             break;
 

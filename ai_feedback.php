@@ -251,7 +251,8 @@ $aiPhases    = ai_all_phases();
         </div>
         <div class="col-md-3">
           <label class="form-label fw-bold small">ห้องเรียน</label>
-          <select id="batchRoom" class="form-select border-2 rounded-3" onchange="loadBatchTargets()">
+          <select id="batchRoom" class="form-select border-2 rounded-3"
+                  onchange="loadBatchTargets(); loadServerResume();">
             <option value="">ทุกห้องเรียน</option>
           </select>
         </div>
@@ -299,6 +300,30 @@ $aiPhases    = ai_all_phases();
           <button class="btn btn-outline-secondary rounded-pill px-3" onclick="discardBatchResume()">
             <i class="bi bi-x-circle me-1"></i>ล้างคิวที่ค้าง
           </button>
+        </div>
+      </div>
+
+      <!-- ตรวจต่อจาก "ข้อมูลจริงในระบบ" — ดูจากประวัติการตรวจว่าครั้งล่าสุดจบที่ฉบับไหน
+           แล้วไล่ตรวจฉบับที่ยังไม่มีผลตรวจต่อจากจุดนั้น ใช้ได้แม้เปลี่ยนเครื่อง/ล้างเบราว์เซอร์ -->
+      <div id="batchServerResume" class="border rounded-3 p-3 mt-3">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+          <div class="flex-grow-1">
+            <div class="fw-bold small">
+              <i class="bi bi-clock-history text-primary me-1"></i>ตรวจถึงไหนแล้ว
+              <span class="text-muted fw-normal">(ตรวจสอบจากข้อมูลในระบบ ไม่ใช่ความจำของเบราว์เซอร์)</span>
+            </div>
+            <div id="batchServerResumeInfo" class="small text-muted mt-1">กำลังตรวจสอบ...</div>
+          </div>
+          <div class="d-flex gap-2 align-items-center">
+            <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" onclick="loadServerResume()"
+                    title="ตรวจสอบใหม่จากข้อมูลล่าสุด">
+              <i class="bi bi-arrow-clockwise"></i>
+            </button>
+            <button id="batchServerResumeBtn" class="btn btn-success btn-sm fw-bold rounded-pill px-3 d-none"
+                    onclick="startServerResume()">
+              <i class="bi bi-play-fill me-1"></i>ตรวจต่อจากจุดนี้ (<span id="batchServerResumeCount">0</span> ฉบับ)
+            </button>
+          </div>
         </div>
       </div>
 
@@ -2328,6 +2353,166 @@ async function resumeBatchReview() {
     loadFeedback();
     paintBatchRetry();
     paintBatchResume();
+    loadServerResume();
+  }
+}
+
+/* ------------------------------ ตรวจต่อจากครั้งล่าสุด (ดูจากข้อมูลจริงในระบบ)
+   คิวที่จำไว้ในเครื่องด้านบนใช้ได้เฉพาะเครื่องเดิม-เบราว์เซอร์เดิม ถ้าเปลี่ยนเครื่อง ล้างข้อมูล
+   หรือปิดหน้าไปก่อนที่ระบบจะจำ ก็ยังตรวจต่อได้ — ตรงนี้ถามเซิร์ฟเวอร์ว่า "ครั้งล่าสุดตรวจถึงฉบับไหน
+   หยุดเพราะโควตาครบหรือเปล่า และเหลือฉบับไหนที่ยังไม่มีผลตรวจ" แล้วไล่ตรวจต่อจากจุดนั้น */
+let serverResume = null;   // ผลจาก get_ai_resume_point ครั้งล่าสุด
+
+async function loadServerResume() {
+  const box = document.getElementById('batchServerResumeInfo');
+  const btn = document.getElementById('batchServerResumeBtn');
+  if (!box) return;
+  box.textContent = 'กำลังตรวจสอบ...';
+  btn.classList.add('d-none');
+  try {
+    const params = new URLSearchParams({ action: 'get_ai_resume_point' });
+    const room = document.getElementById('batchRoom').value;
+    if (room) params.set('classroom', room);
+    const res  = await fetch('api.php?' + params.toString());
+    const data = await res.json();
+    if (!data.success) { box.textContent = data.error || 'ตรวจสอบไม่สำเร็จ'; serverResume = null; return; }
+    serverResume = data;
+    paintServerResume();
+  } catch (err) {
+    box.textContent = 'ตรวจสอบไม่สำเร็จ กดปุ่มรีเฟรชเพื่อลองใหม่';
+    serverResume = null;
+  }
+}
+
+function paintServerResume() {
+  const box = document.getElementById('batchServerResumeInfo');
+  const btn = document.getElementById('batchServerResumeBtn');
+  if (!box || !serverResume) return;
+  const d    = serverResume;
+  const run  = d.last_run;
+  const room = document.getElementById('batchRoom').value;
+
+  let html = '';
+  if (!run) {
+    html = '<i class="bi bi-info-circle me-1"></i>ยังไม่มีประวัติการตรวจในระบบ';
+  } else {
+    const when = run.ended_at ? new Date(run.ended_at.replace(' ', 'T')).toLocaleString('th-TH',
+                    { dateStyle: 'medium', timeStyle: 'short' }) : '';
+    html = `<i class="bi bi-check2-square me-1"></i>ตรวจครั้งล่าสุดเมื่อ <strong>${esc(when)}</strong>`
+         + ` — ครั้งนั้นตรวจไป ${run.ok} ฉบับ` + (run.failed ? ` (ไม่สำเร็จ ${run.failed} ฉบับ)` : '');
+    if (run.last_student_name) {
+      html += `<br><i class="bi bi-bookmark-check me-1"></i>ฉบับสุดท้ายที่ตรวจสำเร็จ: `
+            + `<strong>${esc(run.last_student_name)}</strong>`
+            + ` · ${esc(AI_PHASE_SHORT_MAP[run.last_phase] || run.last_phase_label || '')}`
+            + (run.last_classroom ? ` · ห้อง ${esc(run.last_classroom)}` : '');
+    }
+    if (run.stopped_by_limit) {
+      html += `<br><i class="bi bi-battery text-danger me-1"></i>`
+            + `<strong class="text-danger-emphasis">ครั้งนั้นหยุดเพราะโควตาของวันนั้นครบ</strong>`
+            + ` — ฉบับที่เหลือจึงยังไม่ได้ตรวจ`;
+    }
+  }
+
+  if (d.pending_total > 0) {
+    // สรุปว่าเหลือรอบไหนบ้าง (เรียงตามลำดับการเรียน — ฉบับตั้งต้นจะถูกตรวจก่อนร่างที่ต้องเทียบกับมัน)
+    const byPhase = {};
+    d.pending.forEach(t => { byPhase[t.essay_phase] = (byPhase[t.essay_phase] || 0) + 1; });
+    const phaseText = AI_PHASES.filter(ph => byPhase[ph])
+      .map(ph => `${AI_PHASE_SHORT_MAP[ph] || ph} ${byPhase[ph]}`).join(' · ');
+    const reQueued = d.pending.filter(t => t.needs_recheck).length;
+    const failedBefore = d.pending.filter(t => t.failed_before).length;
+
+    html += `<br><i class="bi bi-list-task text-primary me-1"></i>`
+          + `<strong class="text-primary">ยังไม่มีผลตรวจอีก ${d.pending_total} ฉบับ</strong>`
+          + ` (ตรวจแล้ว ${d.reviewed_total} ฉบับ)` + (room ? ` · เฉพาะห้อง ${esc(room)}` : ' · ทุกห้องเรียน')
+          + `<br><span class="ms-3">${esc(phaseText)}</span>`;
+    if (reQueued)     html += `<br><i class="bi bi-arrow-repeat text-warning me-1"></i>ในจำนวนนี้เป็นฉบับที่นักเรียนแก้ต้นฉบับหลังตรวจ ${reQueued} ฉบับ`;
+    if (failedBefore) html += `<br><i class="bi bi-exclamation-octagon text-danger me-1"></i>เคยตรวจแล้วผลไม่สมบูรณ์ ${failedBefore} ฉบับ`;
+    if (d.too_short)  html += `<br><i class="bi bi-exclamation-triangle text-warning me-1"></i>ข้าม ${d.too_short} ฉบับที่สั้นกว่า ${d.min_words} คำ`;
+    if (typeof d.quota_left === 'number' && d.quota_left < d.pending_total) {
+      html += `<br><i class="bi bi-battery-low text-danger me-1"></i>`
+            + `โควตาวันนี้เหลือ ${d.quota_left} ครั้ง ไม่พอตรวจครบ — ตรวจเท่าที่เหลือได้ แล้วค่อยกดต่อวันถัดไป`;
+    }
+    document.getElementById('batchServerResumeCount').textContent = d.pending_total;
+    btn.classList.toggle('d-none', batchRunning);
+    btn.disabled = batchRunning;
+  } else if (d.reviewed_total > 0) {
+    html += `<br><i class="bi bi-check-circle-fill text-success me-1"></i>`
+          + `<strong class="text-success">ทุกฉบับที่ส่งเข้ามามีผลตรวจครบแล้ว</strong>`
+          + (room ? ` (เฉพาะห้อง ${esc(room)})` : '');
+    btn.classList.add('d-none');
+  } else {
+    html += `<br><i class="bi bi-inbox me-1"></i>ยังไม่มีเรียงความที่รอตรวจ`
+          + (room ? ` ในห้อง ${esc(room)}` : '');
+    btn.classList.add('d-none');
+  }
+  box.innerHTML = html;
+}
+
+// ไล่ตรวจฉบับที่ยังไม่มีผลตรวจทั้งหมด ต่อจากจุดที่ครั้งล่าสุดค้างไว้
+async function startServerResume() {
+  if (batchRunning) { showToast('กำลังตรวจชุดอื่นอยู่ กรุณารอให้เสร็จก่อน', 'error'); return; }
+  if (!serverResume || !serverResume.pending_total) return;
+
+  const items = serverResume.pending.map(t => ({
+    student_id:   t.student_id,
+    student_name: t.student_name,
+    essay_phase:  t.essay_phase,
+    note:         AI_PHASE_SHORT_MAP[t.essay_phase] || t.phase_label || t.essay_phase,
+  }));
+  const run   = serverResume.last_run;
+  const room  = document.getElementById('batchRoom').value;
+  const mins  = Math.max(1, Math.round(items.length * (25000 + BATCH_GAP_MS) / 60000));
+  const quota = (aiStatus && typeof aiStatus.quota_left === 'number') ? aiStatus.quota_left : null;
+
+  if (!confirm(`ตรวจต่อจากครั้งล่าสุด ${items.length} ฉบับ ใช่ไหม?\n\n`
+      + (run && run.last_student_name
+          ? `• ครั้งล่าสุดตรวจถึง: ${run.last_student_name} (${AI_PHASE_SHORT_MAP[run.last_phase] || run.last_phase_label || ''})\n` : '')
+      + `• ตรวจเฉพาะฉบับที่ "ยังไม่มีผลตรวจ" — ฉบับที่ตรวจไปแล้วจะไม่ถูกตรวจซ้ำ `
+      + `คะแนนที่คุณครูปรับไว้รายข้อจึงไม่ถูกล้าง\n`
+      + `• ไล่ตามลำดับการเรียน ฉบับตั้งต้นถูกตรวจก่อนร่างที่ต้องเทียบกับมันเสมอ\n`
+      + (room ? `• เฉพาะห้อง ${room}\n` : '• ทุกห้องเรียน\n')
+      + (quota !== null && quota < items.length
+          ? `• โควตาวันนี้เหลือ ${quota} ครั้ง ไม่พอตรวจครบ ระบบจะตรวจเท่าที่เหลือ แล้วกดต่อได้อีกในวันถัดไป\n` : '')
+      + `\nใช้เวลาประมาณ ${mins} นาที กรุณาเปิดหน้านี้ค้างไว้จนกว่าจะเสร็จ`)) return;
+
+  batchRunning = true;
+  batchStopRequested = false;
+  document.getElementById('batchServerResumeBtn').classList.add('d-none');
+  document.getElementById('batchResumeWrap').classList.add('d-none');
+  document.getElementById('batchStartBtn').disabled = true;
+  document.getElementById('batchAllBtn').disabled = true;
+  document.getElementById('batchStopBtn').classList.remove('d-none');
+  document.getElementById('batchPhase').disabled = true;
+  document.getElementById('batchRoom').disabled  = true;
+  document.getElementById('batchLog').innerHTML  = '';
+
+  let res = { ok: 0, failed: 0, failedItems: [] };
+  try {
+    res = await runReviewQueue(items, REVIEW_UI_BATCH, {
+      kind: 'server', label: 'ตรวจต่อจากครั้งล่าสุด', room: room || '',
+    });
+  } finally {
+    batchRunning = false;
+    batchFailedItems = res.failedItems || [];
+    document.getElementById('batchStartBtn').disabled = false;
+    document.getElementById('batchAllBtn').disabled = false;
+    document.getElementById('batchStopBtn').classList.add('d-none');
+    document.getElementById('batchPhase').disabled = false;
+    document.getElementById('batchRoom').disabled  = false;
+    document.getElementById('batchProgressLabel').textContent =
+      `ตรวจต่อเสร็จสิ้น — สำเร็จ ${res.ok} ฉบับ`
+      + (res.failed ? ` · ไม่สำเร็จ ${res.failed} ฉบับ (ถือว่ายังไม่ได้ตรวจ)` : '');
+    showToast(`ตรวจต่อเสร็จแล้ว: สำเร็จ ${res.ok} ฉบับ` + (res.failed ? `, ไม่สำเร็จ ${res.failed} ฉบับ` : ''),
+      res.failed ? 'error' : 'success');
+    loadBatchTargets();
+    updateReviewButton();
+    loadAiOverview();
+    loadRecheckQueue();
+    loadFeedback();
+    paintBatchRetry();
+    paintBatchResume();
+    loadServerResume();
   }
 }
 
@@ -2487,6 +2672,7 @@ async function retryFailedBatch() {
     loadFeedback();
     paintBatchRetry();
     paintBatchResume();
+    loadServerResume();
   }
 }
 
@@ -2546,6 +2732,7 @@ async function startBatchReview() {
     loadFeedback();
     paintBatchRetry();
     paintBatchResume();
+    loadServerResume();
   }
 }
 
@@ -2647,6 +2834,7 @@ async function startBatchReviewAllPhases() {
     loadFeedback();
     paintBatchRetry();
     paintBatchResume();
+    loadServerResume();
   }
 }
 
@@ -2691,6 +2879,7 @@ async function startRecheckQueue() {
     loadFeedback();
     if (document.getElementById('batchSummary')) loadBatchTargets();
     paintBatchResume();
+    loadServerResume();
   }
 }
 
@@ -2842,6 +3031,8 @@ async function clearApiKey() {
   await loadBatchTargets();
   // มีคิวค้างจากการตรวจครั้งก่อนไหม (โควตาหมด/กดหยุด/ปิดหน้าไปกลางคัน) → กางการ์ดเสนอให้ตรวจต่อ
   paintBatchResume(true);
+  // และตรวจสอบจากข้อมูลจริงในระบบด้วยว่าครั้งล่าสุดตรวจถึงไหน เหลืออะไรบ้าง
+  loadServerResume();
 <?php endif; ?>
   await loadFeedback();
   // มีรอบงานระบุมาทาง URL (เช่นลิงก์จากหน้าเรียงความนักเรียน) → เปิดรายละเอียดฉบับนั้นให้ทันที
