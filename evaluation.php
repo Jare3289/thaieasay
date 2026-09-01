@@ -12,6 +12,13 @@ if (!in_array($phase_param, ['pretest', 'task1', 'task2', 'posttest'], true)) {
     $phase_param = '';
 }
 
+// นักเรียนที่ระบุมาทาง URL (เช่นลิงก์ "ให้คะแนน" จากรายการงานที่ครูยังไม่ได้ตรวจ)
+// เพื่อกระโดดไปที่ "คนนี้ + รอบนี้" ได้ทันทีโดยไม่ต้องค้นรายชื่อเอง — รับเฉพาะรหัสนักเรียนเท่านั้น
+$student_param = isset($_GET['student']) ? trim((string)$_GET['student']) : '';
+if (!preg_match('/^[A-Za-z0-9_-]{1,20}$/', $student_param)) {
+    $student_param = '';
+}
+
 if ($mode_param === 'self') {
     require_login('student');
     $currentMode = 'ตนเองประเมิน';
@@ -629,6 +636,7 @@ require_once 'header.php';
   let currentMode = "<?php echo $currentMode; ?>";
   let modeParam = "<?php echo $mode_param; ?>";
   const initialPhaseParam = "<?php echo $phase_param; ?>"; // รอบที่ระบุมาจาก URL (ถ้ามี) — ใช้ข้ามหน้าเลือกรอบไปเริ่มประเมินทันที
+  const initialStudentParam = "<?php echo $student_param; ?>"; // นักเรียนที่ระบุมาจาก URL (ถ้ามี) — ใช้เปิดฟอร์มของคนนั้นทันที
   let studentDB = {};
 
   // กันข้อมูลหายกรณีเน็ตหลุด/เซสชันหมดอายุ/ปิดแท็บกลางคัน — เก็บคะแนนที่กำลังให้ + ความเห็นเชิงคุณภาพไว้ใน localStorage ของเครื่อง
@@ -1868,8 +1876,32 @@ require_once 'header.php';
       dimRubric();
     }
 
+    // มีนักเรียนระบุมาจาก URL (ลิงก์ "ให้คะแนน" จากตารางคะแนนครูประเมิน) → เติมช่องเป้าหมายไว้ก่อนเลือกรอบ
+    // ต้องเติมก่อน selectPhase เพราะ selectPhase จะสั่งโหลดคะแนนเดิมของคนนั้นในรอบนั้นให้ทันที
+    const canPickTarget = (modeParam === 'teacher' || modeParam === 'expert');
+    if (initialStudentParam && canPickTarget && tInput) {
+      if (studentDB[initialStudentParam] !== undefined) {
+        tInput.value = `${initialStudentParam} - ${studentDB[initialStudentParam]}`;
+      } else {
+        tInput.value = initialStudentParam;  // ไม่อยู่ในรายชื่อกลุ่มที่เลือกอยู่ — ให้ resolveTargetStudent แจ้งเตือนเอง
+      }
+    }
+
     // มีรอบระบุมาจาก URL (เช่นลิงก์จากรายการ "สิ่งที่ยังไม่ได้ทำ") → ข้ามหน้าเลือกรอบไปเริ่มประเมินรอบนั้นทันที
     if (initialPhaseParam) selectPhase(initialPhaseParam);
+
+    // ระบุนักเรียนมาด้วย → แสดงชื่อผู้ถูกประเมินให้ชัด
+    // ถ้ามีรอบมาด้วย selectPhase โหลดคะแนนเดิมของรอบนั้นไปแล้ว จึงไม่ยิงคำขอซ้ำให้ชนกันเอง
+    if (initialStudentParam && canPickTarget) {
+      if (initialPhaseParam && studentDB[initialStudentParam] !== undefined) {
+        if (resolvedEl) {
+          resolvedEl.textContent = `✓ ผู้ถูกประเมิน: ${initialStudentParam} - ${studentDB[initialStudentParam]}`;
+          resolvedEl.classList.remove('d-none');
+        }
+      } else {
+        resolveTargetStudent();   // ยังไม่รู้รอบ หรือหาชื่อในรายชื่อกลุ่มที่เลือกอยู่ไม่เจอ
+      }
+    }
   })();
 </script>
 
