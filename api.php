@@ -2340,7 +2340,7 @@ try {
             $aiSet  = ai_settings($pdo);
             // เฉพาะครูเท่านั้นที่สั่งให้ AI ตรวจได้ นักเรียนและผู้เชี่ยวชาญดูผลได้อย่างเดียว
             $isTeacher = ($aiUser['role'] === 'teacher');
-            $limit     = AI_DAILY_LIMIT_TEACHER;
+            $limit     = ai_daily_limit($pdo);
             $used      = $isTeacher ? ai_usage_today($pdo, $aiUser['id']) : 0;
             echo json_encode([
                 'success'        => true,
@@ -2394,6 +2394,11 @@ try {
                     'locked_by_file'  => ($aiSet['key_source'] === 'file'),
                     'enabled'         => (bool)$aiSet['enabled'],
                     'configured'      => (bool)$aiSet['configured'],
+                    // โควตาการตรวจต่อวันของครู (ปรับได้ในหน้าตั้งค่า)
+                    'daily_limit'     => ai_daily_limit($pdo),
+                    'daily_limit_default' => AI_DAILY_LIMIT_TEACHER,
+                    'daily_limit_min' => AI_DAILY_LIMIT_MIN,
+                    'daily_limit_max' => AI_DAILY_LIMIT_MAX,
                 ],
                 'usage'     => $usageRows,
                 'all_phases'=> ai_all_phases(),
@@ -2423,6 +2428,16 @@ try {
                 elseif ($newKey !== '')       ai_save_setting($pdo, 'ai_api_key', $newKey);
             }
             if (isset($request_data['enabled'])) ai_save_setting($pdo, 'ai_enabled', !empty($request_data['enabled']) ? '1' : '0');
+            // โควตาการตรวจต่อวัน — จำกัดช่วงไว้กันตั้งค่าพลาดจนเปลืองโควตาฟรีของผู้ให้บริการ
+            if (isset($request_data['daily_limit']) && $request_data['daily_limit'] !== '') {
+                $dl = (int)$request_data['daily_limit'];
+                if ($dl < AI_DAILY_LIMIT_MIN || $dl > AI_DAILY_LIMIT_MAX) {
+                    echo json_encode(['success' => false,
+                        'error' => 'โควตาต่อวันต้องอยู่ระหว่าง ' . AI_DAILY_LIMIT_MIN . ' ถึง ' . AI_DAILY_LIMIT_MAX . ' ครั้ง']);
+                    exit;
+                }
+                ai_save_setting($pdo, 'ai_daily_limit', (string)$dl);
+            }
             echo json_encode(['success' => true]);
             break;
 
@@ -2463,7 +2478,7 @@ try {
             }
 
             // โควตารายวัน (กันการกดรัวจนโควตาฟรีของผู้ให้บริการหมด)
-            $aiLimit = AI_DAILY_LIMIT_TEACHER;
+            $aiLimit = ai_daily_limit($pdo);
             $aiUsed  = ai_usage_today($pdo, $aiUser['id']);
             if ($aiUsed >= $aiLimit) {
                 echo json_encode(['success' => false, 'error' => 'วันนี้ใช้ AI ตรวจครบ ' . $aiLimit . ' ครั้งแล้ว กรุณาลองใหม่ในวันพรุ่งนี้']);
@@ -2833,7 +2848,7 @@ try {
                 'recheck'     => $bRecheck,
                 'failed_before' => $bFailedBefore,
                 'min_words'   => AI_MIN_WORDS,
-                'quota_left'  => max(0, AI_DAILY_LIMIT_TEACHER - $bQuotaUsed),
+                'quota_left'  => max(0, ai_daily_limit($pdo) - $bQuotaUsed),
             ]);
             break;
 
@@ -3230,7 +3245,7 @@ try {
                 echo json_encode(['success' => false, 'error' => 'ยังไม่ได้ตั้งค่า AI กรุณาใส่ API key ในหน้า "ผู้ช่วย AI" ก่อน']);
                 exit;
             }
-            $aiLimit = AI_DAILY_LIMIT_TEACHER;
+            $aiLimit = ai_daily_limit($pdo);
             $aiUsed  = ai_usage_today($pdo, $aiUser['id']);
             if ($aiUsed >= $aiLimit) {
                 echo json_encode(['success' => false, 'error' => 'วันนี้ใช้ AI ตรวจครบ ' . $aiLimit . ' ครั้งแล้ว กรุณาลองใหม่ในวันพรุ่งนี้']);
@@ -3401,7 +3416,7 @@ try {
                 echo json_encode(['success' => false, 'error' => 'ระบบ AI ยังไม่พร้อมใช้งาน กรุณาตรวจสอบการตั้งค่า']);
                 exit;
             }
-            $aiLimit = AI_DAILY_LIMIT_TEACHER;
+            $aiLimit = ai_daily_limit($pdo);
             $aiUsed  = ai_usage_today($pdo, $aiUser['id']);
             if ($aiUsed >= $aiLimit) {
                 echo json_encode(['success' => false, 'error' => 'วันนี้ใช้ AI ครบ ' . $aiLimit . ' ครั้งแล้ว กรุณาลองใหม่ในวันพรุ่งนี้']);
