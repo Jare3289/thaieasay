@@ -329,10 +329,10 @@ require_once 'header.php';
           </div>
         </div>
 
-        <!-- สรุปคะแนนที่คำนวณอัตโนมัติ (แสดงสด), คะแนน/ระดับเดิมที่เคยประเมินไว้ และคะแนนรอบคู่เทียบ (ก่อน-หลังเรียน / หน่วย 1-2) -->
+        <!-- สรุปคะแนนที่คำนวณอัตโนมัติ (แสดงสด), คะแนน/ระดับเดิมที่เคยประเมินไว้, คะแนนรอบคู่เทียบ (ก่อน-หลังเรียน / หน่วย 1-2) และคะแนนรวมจากผู้ช่วย AI -->
         <div class="row g-3 mt-1">
           <!-- คะแนนที่ระบบคำนวณอัตโนมัติจากตัวเลือกปัจจุบัน -->
-          <div class="col-lg-4 col-md-6 col-12">
+          <div class="col-xl-3 col-lg-6 col-md-6 col-12">
             <div class="d-flex align-items-center justify-content-between rounded-3 px-3 py-2 h-100" style="background:#eff6ff; border:1px solid #bfdbfe;">
               <div class="d-flex align-items-center gap-2">
                 <i class="bi bi-calculator-fill text-primary fs-5"></i>
@@ -346,7 +346,7 @@ require_once 'header.php';
             </div>
           </div>
           <!-- คะแนน/ระดับเดิมที่เคยบันทึกไว้ (โหมดแก้ไข) -->
-          <div class="col-lg-4 col-md-6 col-12">
+          <div class="col-xl-3 col-lg-6 col-md-6 col-12">
             <div id="originalScoreBox" class="d-none d-flex align-items-center justify-content-between rounded-3 px-3 py-2 h-100" style="background:#fefce8; border:1px solid #fde68a;">
               <div class="d-flex align-items-center gap-2">
                 <i class="bi bi-clock-history text-warning fs-5"></i>
@@ -360,7 +360,7 @@ require_once 'header.php';
             </div>
           </div>
           <!-- คะแนนรอบคู่เทียบ (pretest↔posttest, task1↔task2) ให้ดูพัฒนาการของนักเรียนตอนให้คะแนน -->
-          <div class="col-lg-4 col-md-6 col-12">
+          <div class="col-xl-3 col-lg-6 col-md-6 col-12">
             <div id="comparisonScoreBox" class="d-none d-flex align-items-center justify-content-between rounded-3 px-3 py-2 h-100" style="background:#ecfdf5; border:1px solid #a7f3d0;">
               <div class="d-flex align-items-center gap-2">
                 <i class="bi bi-graph-up-arrow text-success fs-5"></i>
@@ -370,6 +370,20 @@ require_once 'header.php';
                 <span id="comparisonScoreValue" class="fw-bold fs-5" style="color:#047857;">0</span>
                 <span class="text-muted small">/ 60</span>
                 <span id="comparisonScoreLevel" class="badge ms-1" style="background:#a7f3d0; color:#065f46;">—</span>
+              </div>
+            </div>
+          </div>
+          <!-- คะแนนรวมที่ผู้ช่วย AI ตรวจให้ในรอบเดียวกัน (ข้อมูลประกอบการพิจารณา ไม่ใช่คะแนนที่บันทึก) -->
+          <div class="col-xl-3 col-lg-6 col-md-6 col-12">
+            <div id="aiScoreBox" class="d-none d-flex align-items-center justify-content-between rounded-3 px-3 py-2 h-100" style="background:#f5f3ff; border:1px solid #ddd6fe;">
+              <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-robot fs-5" style="color:#7c3aed;"></i>
+                <span class="fw-bold small" id="aiScoreLabel" style="color:#5b21b6;">คะแนนรวมจาก AI</span>
+              </div>
+              <div class="text-end">
+                <span id="aiScoreValue" class="fw-bold fs-5" style="color:#6d28d9;">0</span>
+                <span class="text-muted small">/ <span id="aiScoreMax">60</span></span>
+                <span id="aiScoreLevel" class="badge ms-1" style="background:#ede9fe; color:#5b21b6;">—</span>
               </div>
             </div>
           </div>
@@ -1450,8 +1464,13 @@ require_once 'header.php';
      เป็นเพียงข้อมูลประกอบ ไม่ถูกกรอกลงฟอร์มและไม่นับเป็นคะแนนจริงของผู้ประเมิน
      ============================================================ */
 
-  // ล้างป้ายและกล่องหมายเหตุจาก AI ของทุกข้อ
+  // ล้างป้ายและกล่องหมายเหตุจาก AI ของทุกข้อ (รวมทั้งกล่องคะแนนรวมจาก AI ด้านบน)
   function clearAiNotes() {
+    const aiBox = document.getElementById('aiScoreBox');
+    if (aiBox) {
+      aiBox.classList.add('d-none');
+      aiBox.removeAttribute('title');
+    }
     document.querySelectorAll('[id^="aiScore_"]').forEach(el => el.classList.add('d-none'));
     document.querySelectorAll('[id^="aiNote_"]').forEach(el => {
       el.classList.add('d-none');
@@ -1477,8 +1496,50 @@ require_once 'header.php';
     }
   }
 
+  /* กล่อง "คะแนนรวมจาก AI" ด้านบน — วางคู่กับคะแนนที่คำนวณอัตโนมัติ/คะแนนเดิม/รอบคู่เทียบ
+     ให้ผู้ประเมินเห็นยอดรวมที่ AI ให้ไว้ทั้งฉบับ ไม่ต้องไล่อ่านทีละข้อหรือเปิดหน้าผู้ช่วย AI
+     - ครูให้คะแนนข้อที่ AI ตรวจแทนไม่ได้ครบแล้ว → แสดงคะแนนรวมเต็ม 60 พร้อมระดับคุณภาพจริง
+     - ยังไม่ครบ → แสดงเฉพาะส่วนที่ AI ตรวจ (เต็มตาม max_score) และกำกับว่าเป็นระดับโดยประมาณ
+     เป็นข้อมูลประกอบเท่านั้น ไม่ถูกนำไปบันทึกเป็นคะแนนของผู้ประเมิน */
+  function renderAiTotalScore(fb) {
+    const box = document.getElementById('aiScoreBox');
+    if (!box || !fb || fb.incomplete) return;   // ยังไม่มีผลตรวจที่มีคะแนน — ไม่ต้องแสดงกล่องนี้
+
+    const aiTotal    = Number(fb.total_score) || 0;
+    const aiMax      = Number(fb.max_score) || 0;
+    const fullMax    = Number(fb.full_max || fb.max_score || 60);
+    const manualMax  = Number(fb.manual_max || (fullMax - aiMax)) || 0;
+    const manualDone = !!fb.manual_done;
+    const combined   = Number(fb.combined_total != null ? fb.combined_total : aiTotal) || 0;
+
+    const shownValue = manualDone ? combined : aiTotal;
+    const shownMax   = manualDone ? fullMax : aiMax;
+    const level      = (manualDone && fb.full_quality_level) ? fb.full_quality_level : (fb.quality_level || '—');
+
+    const labelEl = document.getElementById('aiScoreLabel');
+    const valEl   = document.getElementById('aiScoreValue');
+    const maxEl   = document.getElementById('aiScoreMax');
+    const lvlEl   = document.getElementById('aiScoreLevel');
+    if (labelEl) labelEl.textContent = manualDone ? 'คะแนนรวมจาก AI' : 'คะแนนจาก AI (เฉพาะข้อที่ AI ตรวจ)';
+    if (valEl)   valEl.textContent = Math.round(shownValue * 100) / 100;
+    if (maxEl)   maxEl.textContent = Math.round(shownMax * 100) / 100;
+    if (lvlEl)   lvlEl.textContent = manualDone ? level : (level !== '—' ? level + ' (โดยประมาณ)' : '—');
+
+    // รายละเอียดการรวมคะแนน (ชี้ค้างไว้เพื่อดู) — AI ตรวจได้กี่คะแนน ครูให้ข้อที่ AI ตรวจแทนไม่ได้กี่คะแนน
+    const tips = [`AI ${Math.round(aiTotal * 100) / 100} / ${Math.round(aiMax * 100) / 100} คะแนน`];
+    if (manualMax > 0) {
+      tips.push(`ข้อที่ AI ตรวจแทนไม่ได้ (คุณครูให้) ${manualDone ? Math.round(Number(fb.teacher_total || 0) * 100) / 100 : 'ยังไม่ครบ'} / ${Math.round(manualMax * 100) / 100} คะแนน`);
+    }
+    if (fb.needs_recheck) tips.push('ต้นฉบับถูกแก้หลัง AI ตรวจ — รอตรวจใหม่');
+    tips.push('เป็นข้อมูลประกอบการพิจารณาเท่านั้น ไม่ใช่คะแนนที่บันทึก');
+    box.setAttribute('title', tips.join(' · '));
+
+    box.classList.remove('d-none');
+  }
+
   function renderAiNotes(fb) {
     const scores = fb.scores || {};
+    renderAiTotalScore(fb);
 
     // รวมข้อเสนอแนะของ AI ตามรหัสเกณฑ์ เพื่อแปะไว้ใต้ข้อนั้น ๆ
     const fixesByItem = {};
