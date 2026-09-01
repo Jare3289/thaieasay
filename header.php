@@ -49,6 +49,7 @@ function teg_menu_for_role($role) {
     'main' => [
       ['แดชบอร์ดหลัก',        'index.php',                    'bi-grid-1x2-fill',      'index'],
       ['ประเมินให้คะแนน',     'evaluation.php?mode=teacher',  'bi-clipboard-check',    'evaluation:teacher'],
+      ['ตารางคะแนนครูประเมิน','teacher_scores.php',           'bi-clipboard2-check',   'teacher_scores'],
       ['แดชบอร์ดวิจัย',       'dashboard.php',                'bi-bar-chart-line-fill','dashboard'],
       ['รายงานการส่งงาน',     'submission_report.php',        'bi-table',              'submission_report'],
       ['เรียงความนักเรียน',   'essay_viewer.php',             'bi-journal-text',       'essay_viewer'],
