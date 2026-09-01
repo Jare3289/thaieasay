@@ -215,9 +215,13 @@ $aiPhases    = ai_all_phases();
   <!-- แถบเครื่องมือของคุณครู — เก็บงานตั้งค่า/ตรวจทั้งรอบไว้ในลิ้นชัก ไม่ให้บังแผงผลตรวจซึ่งใช้บ่อยที่สุด -->
   <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
     <span class="fw-bold text-muted small me-1"><i class="bi bi-tools me-1"></i>เครื่องมือของคุณครู</span>
-    <button class="btn btn-outline-primary btn-sm rounded-pill px-3" type="button"
+    <button id="aiBatchToggleBtn" class="btn btn-outline-primary btn-sm rounded-pill px-3" type="button"
             data-bs-toggle="collapse" data-bs-target="#aiBatchCard">
       <i class="bi bi-lightning-charge-fill me-1"></i>ตรวจทั้งรอบรวดเดียว
+      <!-- ป้ายเตือนเมื่อมีคิวตรวจค้างอยู่ ครูจะได้ไม่พลาดแม้การ์ดนี้จะพับอยู่ -->
+      <span id="aiBatchResumeBadge" class="badge rounded-pill bg-warning text-dark ms-1 d-none">
+        ค้าง <span id="aiBatchResumeBadgeCount">0</span>
+      </span>
     </button>
     <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" type="button"
             data-bs-toggle="collapse" data-bs-target="#aiSettingsCard">
@@ -277,6 +281,23 @@ $aiPhases    = ai_all_phases();
           <button id="batchAllBtn" class="btn btn-outline-danger fw-bold rounded-pill px-4 w-100 mt-2"
                   onclick="startBatchReviewAllPhases()">
             <i class="bi bi-arrow-repeat me-1"></i>ตรวจใหม่ทุกรอบรวดเดียว (ทั้ง <?php echo count($aiPhases); ?> รอบ)
+          </button>
+        </div>
+      </div>
+
+      <!-- คิวที่ค้างอยู่จากการตรวจครั้งก่อน (โควตาหมด / กดหยุด / เผลอปิดหน้าไปกลางคัน)
+           ระบบจำรายการที่ยังไม่ได้ตรวจไว้ในเครื่อง จึงกด "ตรวจต่อ" ได้โดยไม่ต้องเริ่มใหม่ทั้งชุด -->
+      <div id="batchResumeWrap" class="alert alert-warning border-0 rounded-3 mt-3 mb-0 d-none">
+        <div class="fw-bold mb-1">
+          <i class="bi bi-hourglass-split me-1"></i>มีคิวตรวจค้างอยู่จากครั้งที่แล้ว
+        </div>
+        <div id="batchResumeDetail" class="small mb-2"></div>
+        <div class="d-flex flex-wrap gap-2">
+          <button id="batchResumeBtn" class="btn btn-warning fw-bold rounded-pill px-4" onclick="resumeBatchReview()">
+            <i class="bi bi-play-circle-fill me-1"></i>ตรวจต่อจากที่ค้างไว้ (<span id="batchResumeCount">0</span> ฉบับ)
+          </button>
+          <button class="btn btn-outline-secondary rounded-pill px-3" onclick="discardBatchResume()">
+            <i class="bi bi-x-circle me-1"></i>ล้างคิวที่ค้าง
           </button>
         </div>
       </div>
@@ -358,6 +379,24 @@ $aiPhases    = ai_all_phases();
         </div>
         <div class="form-text small">
           ปิดสวิตช์นี้เมื่อไม่ต้องการให้สั่งตรวจเพิ่ม — ผลตรวจที่บันทึกไว้แล้วยังแสดงให้นักเรียนดูได้ตามปกติ
+        </div>
+
+        <div class="row g-3 mt-1">
+          <div class="col-md-4">
+            <label class="form-label fw-bold small" for="aiDailyLimit">โควตาการตรวจต่อวัน (ครั้ง)</label>
+            <input type="number" id="aiDailyLimit" class="form-control border-2 rounded-3"
+                   min="50" max="5000" step="10">
+            <div class="form-text small" id="aiDailyLimitHint"></div>
+          </div>
+          <div class="col-md-8 d-flex align-items-end">
+            <div class="form-text small mb-1">
+              <i class="bi bi-battery-half me-1"></i>
+              เพดานนี้เป็นของ<strong>ระบบเรา</strong> ไว้กันเผลอสั่งตรวจรัวจนโควตาฟรีของผู้ให้บริการหมด
+              — นับเฉพาะ<strong>ครั้งที่ตรวจสำเร็จ</strong> และรีเซ็ตทุกเที่ยงคืน
+              ถ้าตรวจทั้งชั้นหลายรอบในวันเดียวแล้วโควตาไม่พอ ปรับเพิ่มตรงนี้ได้เลย
+              แต่ผู้ให้บริการ AI ยังมีเพดานของตัวเองอีกชั้นหนึ่ง (ปรับตรงนี้ไม่ได้ช่วยให้เกินเพดานของเขา)
+            </div>
+          </div>
         </div>
         <div class="alert alert-secondary border-0 rounded-3 small mt-3 mb-0">
           <i class="bi bi-person-lock me-1"></i>
@@ -2113,7 +2152,8 @@ function paintBatchSummary() {
     html += `<br><i class="bi bi-clock me-1"></i>ใช้เวลาประมาณ ${mins} นาที — เปิดหน้านี้ค้างไว้จนกว่าจะเสร็จ`;
     if (aiStatus && aiStatus.quota_left < queue.length) {
       html += `<br><i class="bi bi-battery-low text-danger me-1"></i>`
-        + `<strong class="text-danger">โควตาวันนี้เหลือ ${aiStatus.quota_left} ครั้ง ไม่พอตรวจครบ</strong> — ระบบจะตรวจเท่าที่โควตาเหลือ`;
+        + `<strong class="text-danger">โควตาวันนี้เหลือ ${aiStatus.quota_left} ครั้ง ไม่พอตรวจครบ</strong> — `
+        + `ระบบจะตรวจเท่าที่โควตาเหลือ แล้วจำคิวที่เหลือไว้ให้กด "ตรวจต่อจากที่ค้างไว้" ในวันถัดไป`;
     }
   }
   box.innerHTML = html;
@@ -2149,6 +2189,148 @@ function setReviewProgress(ui, done, total, label) {
   document.getElementById(ui.bar).style.width = pct + '%';
 }
 
+/* ---------------------------------------- คิวที่ค้างอยู่ (ตรวจต่อจากเดิม)
+   การตรวจเป็นชุดอาจหยุดกลางคันได้หลายแบบ — โควตารายวันหมด, ครูกดหยุด, เน็ตหลุด
+   หรือเผลอปิดหน้าไป ระบบจึงจำ "รายการที่ยังไม่ได้ตรวจ" ไว้ในเครื่องของครูหลังตรวจทุกฉบับ
+   ครั้งหน้าเปิดหน้านี้จะมีปุ่มให้ตรวจต่อจากจุดเดิมได้ทันที ไม่ต้องเริ่มใหม่ทั้งชุดให้เปลืองโควตา */
+const BATCH_RESUME_KEY  = 'aiBatchResume_v1';
+const BATCH_RESUME_DAYS = 30;   // คิวที่ค้างนานเกินนี้ถือว่าเก่าเกินไป ไม่ต้องเสนอให้ตรวจต่อ
+
+function loadBatchResume() {
+  try {
+    const raw = localStorage.getItem(BATCH_RESUME_KEY);
+    if (!raw) return null;
+    const st = JSON.parse(raw);
+    if (!st || !Array.isArray(st.remaining) || !st.remaining.length) return null;
+    // คิวเก่าเก็บไว้ก็ไม่ตรงกับงานปัจจุบันแล้ว — ทิ้งไปเลยดีกว่าเสนอให้ตรวจผิดชุด
+    if (st.saved_at && (Date.now() - st.saved_at) > BATCH_RESUME_DAYS * 86400000) {
+      localStorage.removeItem(BATCH_RESUME_KEY);
+      return null;
+    }
+    return st;
+  } catch (err) { return null; }
+}
+
+function saveBatchResume(state) {
+  try { localStorage.setItem(BATCH_RESUME_KEY, JSON.stringify(state)); } catch (err) { /* เต็ม/ปิดไว้ ก็ยังตรวจต่อได้ในรอบนี้ */ }
+}
+
+function clearBatchResume() {
+  try { localStorage.removeItem(BATCH_RESUME_KEY); } catch (err) { /* ไม่เป็นไร */ }
+}
+
+// อธิบายคิวที่ค้างให้ครูเห็นว่าเป็นชุดไหน ค้างเพราะอะไร และเหลือรอบไหนบ้าง
+// autoOpen = กางการ์ด "ตรวจทั้งรอบรวดเดียว" ให้เอง (ใช้ตอนเปิดหน้าเว็บ ครูจะได้เห็นคิวที่ค้างทันที)
+function paintBatchResume(autoOpen) {
+  const wrap  = document.getElementById('batchResumeWrap');
+  const badge = document.getElementById('aiBatchResumeBadge');
+  if (!wrap) return;
+  const st = loadBatchResume();
+  if (!st || batchRunning) {
+    wrap.classList.add('d-none');
+    if (badge) badge.classList.add('d-none');
+    return;
+  }
+
+  if (badge) {
+    document.getElementById('aiBatchResumeBadgeCount').textContent = st.remaining.length;
+    badge.classList.remove('d-none');
+  }
+  if (autoOpen) {
+    const card = document.getElementById('aiBatchCard');
+    if (card) card.classList.add('show');   // กางการ์ดแบบเดียวกับที่ Bootstrap ทำ
+  }
+
+  document.getElementById('batchResumeCount').textContent = st.remaining.length;
+
+  // สรุปว่าเหลือรอบไหนบ้าง กี่ฉบับ (เรียงตามลำดับการเรียน)
+  const byPhase = {};
+  st.remaining.forEach(t => { byPhase[t.essay_phase] = (byPhase[t.essay_phase] || 0) + 1; });
+  const phaseText = AI_PHASES.filter(ph => byPhase[ph])
+    .map(ph => `${AI_PHASE_SHORT_MAP[ph] || AI_PHASE_LABELS[ph] || ph} ${byPhase[ph]} ฉบับ`).join(' · ');
+
+  const when   = st.saved_at ? new Date(st.saved_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) : '';
+  const reason = st.reason === 'quota'   ? 'โควตาการตรวจของวันนั้นหมดก่อน'
+               : st.reason === 'stopped' ? 'คุณครูกดหยุดไว้'
+               : 'การตรวจหยุดไปกลางคัน (เช่น ปิดหน้าเว็บหรือเน็ตหลุด)';
+
+  let html = `<strong>${esc(st.label || 'ตรวจเป็นชุด')}</strong>`
+    + ` — ตรวจไปแล้ว ${st.done || 0} จาก ${st.total || 0} ฉบับ แล้ว${reason}`
+    + (when ? ` เมื่อ ${esc(when)}` : '');
+  if (st.room) html += `<br><i class="bi bi-house-door me-1"></i>เฉพาะห้อง ${esc(st.room)}`;
+  if (phaseText) html += `<br><i class="bi bi-list-ol me-1"></i>ที่ยังไม่ได้ตรวจ: ${esc(phaseText)}`;
+  if (st.reason === 'quota' && aiStatus && typeof aiStatus.quota_left === 'number') {
+    html += aiStatus.quota_left > 0
+      ? `<br><i class="bi bi-battery-half me-1"></i>วันนี้โควตาเหลือ ${aiStatus.quota_left} ครั้ง — กดตรวจต่อได้เลย`
+      : `<br><i class="bi bi-battery text-danger me-1"></i>วันนี้โควตาหมดแล้ว กลับมากด "ตรวจต่อ" พรุ่งนี้ `
+        + `หรือเพิ่มโควตาต่อวันได้ในการ์ด "ตั้งค่าผู้ช่วย AI"`;
+  }
+  document.getElementById('batchResumeDetail').innerHTML = html;
+  wrap.classList.remove('d-none');
+}
+
+function discardBatchResume() {
+  if (!confirm('ล้างคิวที่ค้างไว้ใช่ไหม?\n\nฉบับที่ยังไม่ได้ตรวจจะไม่หายไปไหน — ยังสั่งตรวจใหม่ได้จากปุ่ม "เริ่มตรวจทั้งรอบ" ตามปกติ')) return;
+  clearBatchResume();
+  paintBatchResume();
+}
+
+// ตรวจต่อจากจุดที่ค้างไว้ — ใช้รายการเดิมที่บันทึกไว้ ไม่เริ่มนับหนึ่งใหม่
+async function resumeBatchReview() {
+  if (batchRunning) { showToast('กำลังตรวจชุดอื่นอยู่ กรุณารอให้เสร็จก่อน', 'error'); return; }
+  const st = loadBatchResume();
+  if (!st) { paintBatchResume(); return; }
+
+  const items = st.remaining;
+  const mins  = Math.max(1, Math.round(items.length * (25000 + BATCH_GAP_MS) / 60000));
+  const quota = (aiStatus && typeof aiStatus.quota_left === 'number') ? aiStatus.quota_left : null;
+  if (!confirm(`ตรวจต่อจากที่ค้างไว้ ${items.length} ฉบับ ใช่ไหม?\n\n`
+      + `• ชุดเดิม: ${st.label || 'ตรวจเป็นชุด'} (ตรวจไปแล้ว ${st.done || 0} จาก ${st.total || 0} ฉบับ)\n`
+      + `• ระบบจะตรวจเฉพาะฉบับที่ยังไม่ได้ตรวจในชุดนั้น ฉบับที่ตรวจไปแล้วจะไม่ถูกตรวจซ้ำ\n`
+      + (quota !== null && quota < items.length
+          ? `• โควตาวันนี้เหลือ ${quota} ครั้ง ไม่พอตรวจครบ ระบบจะตรวจเท่าที่เหลือแล้วจำคิวที่เหลือไว้ให้อีกครั้ง\n` : '')
+      + `\nใช้เวลาประมาณ ${mins} นาที กรุณาเปิดหน้านี้ค้างไว้จนกว่าจะเสร็จ`)) return;
+
+  batchRunning = true;
+  batchStopRequested = false;
+  document.getElementById('batchResumeWrap').classList.add('d-none');
+  document.getElementById('batchStartBtn').disabled = true;
+  document.getElementById('batchAllBtn').disabled = true;
+  document.getElementById('batchStopBtn').classList.remove('d-none');
+  document.getElementById('batchPhase').disabled = true;
+  document.getElementById('batchRoom').disabled  = true;
+  document.getElementById('batchLog').innerHTML  = '';
+
+  let res = { ok: 0, failed: 0, failedItems: [] };
+  try {
+    // นับต่อจากของเดิม เพื่อให้ตัวเลขสรุปในคิวที่ค้างยังเป็นชุดเดียวกัน
+    res = await runReviewQueue(items, REVIEW_UI_BATCH, {
+      kind: st.kind, label: st.label, room: st.room || '',
+      total: st.total || items.length,
+    });
+  } finally {
+    batchRunning = false;
+    batchFailedItems = res.failedItems || [];
+    document.getElementById('batchStartBtn').disabled = false;
+    document.getElementById('batchAllBtn').disabled = false;
+    document.getElementById('batchStopBtn').classList.add('d-none');
+    document.getElementById('batchPhase').disabled = false;
+    document.getElementById('batchRoom').disabled  = false;
+    document.getElementById('batchProgressLabel').textContent =
+      `ตรวจต่อเสร็จสิ้น — สำเร็จ ${res.ok} ฉบับ`
+      + (res.failed ? ` · ไม่สำเร็จ ${res.failed} ฉบับ (ถือว่ายังไม่ได้ตรวจ)` : '');
+    showToast(`ตรวจต่อเสร็จแล้ว: สำเร็จ ${res.ok} ฉบับ` + (res.failed ? `, ไม่สำเร็จ ${res.failed} ฉบับ` : ''),
+      res.failed ? 'error' : 'success');
+    loadBatchTargets();
+    updateReviewButton();
+    loadAiOverview();
+    loadRecheckQueue();
+    loadFeedback();
+    paintBatchRetry();
+    paintBatchResume();
+  }
+}
+
 function stopBatchReview() {
   batchStopRequested = true;
   ['batchProgressLabel', 'rcProgressLabel'].forEach(id => {
@@ -2164,13 +2346,38 @@ function stopBatchReview() {
  *
  * ฉบับที่ตรวจไม่สำเร็จจะไม่ถูกทำเครื่องหมายว่าตรวจแล้วเด็ดขาด (เซิร์ฟเวอร์ก็ไม่บันทึกผลให้)
  * และถูกส่งกลับไปใน failedItems เพื่อให้ครูกดตรวจซ้ำเฉพาะกลุ่มนั้นได้ทันที
+ *
+ * resume = { kind, label, room, total, offset } — ถ้าส่งมา ระบบจะจำ "รายการที่ยังไม่ได้ตรวจ"
+ * ไว้ในเครื่องหลังตรวจทุกฉบับ ครูจึงกดตรวจต่อจากจุดเดิมได้ถ้าชุดนี้หยุดกลางคัน
  */
-async function runReviewQueue(items, ui) {
+async function runReviewQueue(items, ui, resume = null) {
   let ok = 0, failed = 0, i = 0;
   const failedItems = [];
+  let stopReason = '';
+
+  // บันทึกสถานะคิวหลังตรวจทุกฉบับ (extra = ฉบับที่ยังไม่ได้ตรวจและต้องเอากลับเข้าคิวด้วย)
+  const keepResume = (extra) => {
+    if (!resume) return;
+    const remaining = (extra || []).concat(items.slice(i));
+    if (!remaining.length) { clearBatchResume(); return; }
+    const total = resume.total || items.length;
+    saveBatchResume({
+      kind:      resume.kind || 'phase',
+      label:     resume.label || 'ตรวจเป็นชุด',
+      room:      resume.room || '',
+      remaining: remaining,
+      done:      total - remaining.length,
+      total:     total,
+      reason:    stopReason,
+      saved_at:  Date.now(),
+    });
+  };
+
   for (const t of items) {
     if (batchStopRequested) {
       reviewLogLine(ui, 'bi-stop-circle', 'text-secondary', 'หยุดตามคำสั่ง', `ตรวจไปแล้ว ${i} ฉบับ`);
+      stopReason = 'stopped';
+      keepResume();
       break;
     }
     const who = t.student_name + (t.note ? ` (${t.note})` : '');
@@ -2182,7 +2389,8 @@ async function runReviewQueue(items, ui) {
     if (!data.success && /โควตาฟรีของผู้ให้บริการ|429/.test(data.error || '')) {
       reviewLogLine(ui, 'bi-hourglass-split', 'text-warning', who, 'ผู้ให้บริการจำกัดอัตราคำขอ กำลังพักแล้วลองใหม่');
       await sleep(BATCH_RATELIMIT_MS);
-      if (batchStopRequested) break;
+      // กดหยุดระหว่างพัก — ฉบับนี้ยังไม่ได้ตรวจ ต้องอยู่ในคิวที่ค้างไว้ด้วย
+      if (batchStopRequested) { stopReason = 'stopped'; keepResume(); break; }
       data = await aiRequestReview(t.student_id, t.essay_phase);
     }
 
@@ -2214,12 +2422,17 @@ async function runReviewQueue(items, ui) {
       reviewLogLine(ui, 'bi-x-circle-fill', 'text-danger', who,
         (data.error || 'ตรวจไม่สำเร็จ') + ' — ถือว่ายังไม่ได้ตรวจ ตรวจซ้ำได้');
       // โควตารายวันหมด = ตรวจต่อไปก็ไม่ผ่าน หยุดทั้งชุดเลยดีกว่าปล่อยให้พังทีละฉบับ
+      // ฉบับที่เพิ่งโดนปฏิเสธเพราะโควตายังไม่ได้ตรวจจริง จึงเอากลับเข้าคิวที่ค้างไว้ด้วย
       if (/ใช้ AI ตรวจครบ/.test(data.error || '')) {
-        reviewLogLine(ui, 'bi-battery', 'text-danger', 'หยุดอัตโนมัติ', 'โควตารายวันหมดแล้ว');
+        reviewLogLine(ui, 'bi-battery', 'text-danger', 'หยุดอัตโนมัติ',
+          'โควตารายวันหมดแล้ว — จำคิวที่เหลือไว้ให้ กดปุ่ม "ตรวจต่อจากที่ค้างไว้" ได้เลยเมื่อโควตากลับมา');
+        stopReason = 'quota';
+        keepResume([t]);
         break;
       }
     }
 
+    keepResume();
     setReviewProgress(ui, i, items.length, `ตรวจแล้ว ${i} จาก ${items.length} ฉบับ`);
     if (i < items.length && !batchStopRequested) await sleep(BATCH_GAP_MS);
   }
@@ -2255,7 +2468,9 @@ async function retryFailedBatch() {
 
   let res = { ok: 0, failed: 0, failedItems: [] };
   try {
-    res = await runReviewQueue(items, REVIEW_UI_BATCH);
+    res = await runReviewQueue(items, REVIEW_UI_BATCH, {
+      kind: 'retry', label: 'ตรวจซ้ำเฉพาะฉบับที่ตรวจไม่สำเร็จ', room: '',
+    });
   } finally {
     batchRunning = false;
     batchFailedItems = res.failedItems || [];
@@ -2271,6 +2486,7 @@ async function retryFailedBatch() {
     loadRecheckQueue();
     loadFeedback();
     paintBatchRetry();
+    paintBatchResume();
   }
 }
 
@@ -2305,7 +2521,11 @@ async function startBatchReview() {
       student_name: t.student_name,
       essay_phase:  phase,
       note:         t.needs_recheck ? 'ตรวจใหม่' : (t.failed_before ? 'เคยตรวจไม่สำเร็จ' : ''),
-    })), REVIEW_UI_BATCH);
+    })), REVIEW_UI_BATCH, {
+      kind:  'phase',
+      label: `ตรวจทั้งรอบ "${phaseLabel}"`,
+      room:  document.getElementById('batchRoom').value || '',
+    });
   } finally {
     batchRunning = false;
     // ฉบับที่ตรวจไม่ผ่าน ยังไม่ถือว่าตรวจแล้ว — เก็บไว้ให้ครูกดตรวจซ้ำได้ทันที
@@ -2325,6 +2545,7 @@ async function startBatchReview() {
     loadRecheckQueue();
     loadFeedback();
     paintBatchRetry();
+    paintBatchResume();
   }
 }
 
@@ -2386,7 +2607,8 @@ async function startBatchReviewAllPhases() {
       + `• ไล่ตามลำดับการเรียน ฉบับตั้งต้นจะถูกตรวจก่อนร่างหลังเสมอ\n`
       + (tooShort ? `• ข้าม ${tooShort} ฉบับที่สั้นกว่าเกณฑ์ ระบบไม่ส่งให้ AI ตรวจ\n` : '')
       + (quota !== null && quota < items.length
-          ? `• โควตาวันนี้เหลือ ${quota} ครั้ง ไม่พอตรวจครบ ระบบจะตรวจเท่าที่เหลือแล้วหยุด\n` : '')
+          ? `• โควตาวันนี้เหลือ ${quota} ครั้ง ไม่พอตรวจครบ ระบบจะตรวจเท่าที่เหลือ `
+            + `แล้วจำคิวที่ค้างไว้ให้กด "ตรวจต่อจากที่ค้างไว้" ภายหลัง\n` : '')
       + `\nใช้เวลาประมาณ ${mins} นาที กรุณาเปิดหน้านี้ค้างไว้จนกว่าจะเสร็จ`)) return;
 
   batchRunning = true;
@@ -2401,7 +2623,9 @@ async function startBatchReviewAllPhases() {
 
   let res = { ok: 0, failed: 0, failedItems: [] };
   try {
-    res = await runReviewQueue(items, REVIEW_UI_BATCH);
+    res = await runReviewQueue(items, REVIEW_UI_BATCH, {
+      kind: 'all', label: 'ตรวจใหม่ทุกรอบรวดเดียว', room: room || '',
+    });
   } finally {
     batchRunning = false;
     batchFailedItems = res.failedItems || [];
@@ -2422,6 +2646,7 @@ async function startBatchReviewAllPhases() {
     loadRecheckQueue();
     loadFeedback();
     paintBatchRetry();
+    paintBatchResume();
   }
 }
 
@@ -2449,7 +2674,9 @@ async function startRecheckQueue() {
       student_name: r.student_name,
       essay_phase:  r.essay_phase,
       note:         r.phase_label,
-    })), REVIEW_UI_RECHECK);
+    })), REVIEW_UI_RECHECK, {
+      kind: 'recheck', label: 'ตรวจใหม่ทั้งคิว (นักเรียนแก้ต้นฉบับหลัง AI ตรวจ)', room: '',
+    });
   } finally {
     batchRunning = false;
     if (startBtn) startBtn.disabled = false;
@@ -2463,6 +2690,7 @@ async function startRecheckQueue() {
     loadRecheckQueue();
     loadFeedback();
     if (document.getElementById('batchSummary')) loadBatchTargets();
+    paintBatchResume();
   }
 }
 
@@ -2482,6 +2710,16 @@ async function loadAiSettings() {
     document.getElementById('aiModel').value    = data.settings.model || '';
     document.getElementById('aiBaseUrl').value  = data.settings.base_url || '';
     document.getElementById('aiEnabled').checked = !!data.settings.enabled;
+
+    const limInput = document.getElementById('aiDailyLimit');
+    if (limInput) {
+      limInput.value = data.settings.daily_limit || '';
+      limInput.min   = data.settings.daily_limit_min || 50;
+      limInput.max   = data.settings.daily_limit_max || 5000;
+      document.getElementById('aiDailyLimitHint').textContent =
+        `ตั้งได้ ${data.settings.daily_limit_min}–${data.settings.daily_limit_max} ครั้ง/วัน `
+        + `(ค่าเริ่มต้นของระบบคือ ${data.settings.daily_limit_default} ครั้ง)`;
+    }
 
     const hint = document.getElementById('aiKeyHint');
     if (data.settings.locked_by_file) {
@@ -2547,7 +2785,8 @@ async function saveAiSettings() {
         model: document.getElementById('aiModel').value.trim(),
         base_url: document.getElementById('aiBaseUrl').value.trim(),
         api_key: document.getElementById('aiApiKey').value.trim(),
-        enabled: document.getElementById('aiEnabled').checked
+        enabled: document.getElementById('aiEnabled').checked,
+        daily_limit: document.getElementById('aiDailyLimit').value.trim()
       })
     });
     const data = await res.json();
@@ -2601,6 +2840,8 @@ async function clearApiKey() {
   await loadBatchRooms();
   if (ph && AI_PHASE_LABELS[ph]) document.getElementById('batchPhase').value = ph;
   await loadBatchTargets();
+  // มีคิวค้างจากการตรวจครั้งก่อนไหม (โควตาหมด/กดหยุด/ปิดหน้าไปกลางคัน) → กางการ์ดเสนอให้ตรวจต่อ
+  paintBatchResume(true);
 <?php endif; ?>
   await loadFeedback();
   // มีรอบงานระบุมาทาง URL (เช่นลิงก์จากหน้าเรียงความนักเรียน) → เปิดรายละเอียดฉบับนั้นให้ทันที
