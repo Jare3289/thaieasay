@@ -272,10 +272,23 @@ $aiPhases    = ai_all_phases();
                   onclick="retryFailedBatch()">
             <i class="bi bi-arrow-clockwise me-1"></i>ตรวจซ้ำเฉพาะที่ไม่สำเร็จ (<span id="batchRetryCount">0</span> ฉบับ)
           </button>
+          <!-- ตรวจใหม่ทุกรอบรวดเดียว — ใช้เมื่อเกณฑ์/คำสั่งตรวจเปลี่ยน แล้วอยากให้ผลทั้งชุดมาจากกติกาเดียวกัน
+               ระบบไล่ตามลำดับการเรียนเสมอ ฉบับตั้งต้นจึงถูกตรวจก่อนร่างหลังที่ต้องเทียบกับมัน -->
+          <button id="batchAllBtn" class="btn btn-outline-danger fw-bold rounded-pill px-4 w-100 mt-2"
+                  onclick="startBatchReviewAllPhases()">
+            <i class="bi bi-arrow-repeat me-1"></i>ตรวจใหม่ทุกรอบรวดเดียว (ทั้ง <?php echo count($aiPhases); ?> รอบ)
+          </button>
         </div>
       </div>
 
       <div id="batchSummary" class="mt-3 small text-muted">กำลังโหลดรายการ...</div>
+      <div class="mt-2 small text-muted">
+        <i class="bi bi-info-circle me-1"></i>ปุ่ม <strong>&quot;ตรวจใหม่ทุกรอบรวดเดียว&quot;</strong>
+        ใช้ตอนที่อยากให้ผลตรวจทั้งชุดมาจากกติกาเดียวกัน — ระบบจะไล่ตรวจ
+        <strong>ทุกรอบตามลำดับการเรียน</strong> (ก่อนเรียน → D1.1 → D1.2 → D2.1 → D2.2 → หลังเรียน)
+        ฉบับตั้งต้นจึงถูกตรวจก่อนร่างหลังเสมอ ผลเทียบร่างจึงครบ · ตรวจซ้ำแม้ฉบับที่เคยตรวจแล้ว
+        และคะแนนที่คุณครูปรับไว้รายข้อจะถูกล้าง
+      </div>
 
       <div id="batchProgressWrap" class="mt-3 d-none">
         <div class="d-flex justify-content-between small fw-bold mb-1">
@@ -558,6 +571,21 @@ const AI_IS_STUDENT = <?php echo $aiIsStudent ? 'true' : 'false'; ?>;
 const AI_IS_TEACHER = <?php echo $aiIsTeacher ? 'true' : 'false'; ?>;
 const AI_MY_ID      = <?php echo json_encode($sessionUser['id']); ?>;
 const AI_PHASES     = <?php echo json_encode($aiPhases); ?>;
+// ลักษณะงานเขียนของแต่ละรอบ (เชิงบรรยาย/เชิงวิจารณ์ + คำสำคัญที่ครูกำหนด)
+// ใช้บอกบนการ์ดว่ารอบนั้นเป็นงานชนิดใด ครูจะได้รู้ว่า AI ตรวจด้วยหลักอะไร
+const AI_PHASE_STYLE = <?php
+    $aiStyleMap = [];
+    foreach ($aiPhases as $aiPh) {
+        $aiSt = ai_essay_style($aiPh);
+        if (!$aiSt) continue;
+        $aiStyleMap[$aiPh] = [
+            'kind' => $aiSt['kind'],
+            'name' => $aiSt['name'],
+            'keys' => array_values(array_filter((array)($aiSt['keys'] ?? []))),
+        ];
+    }
+    echo json_encode($aiStyleMap, JSON_UNESCAPED_UNICODE);
+?>;
 // เกณฑ์ของข้อที่ AI เป็นผู้ตรวจ — ใช้แสดงคำอธิบายระดับคะแนนตอนคุณครูปรับคะแนนรายข้อ
 const AI_RUBRIC_ITEMS = <?php
     echo json_encode(array_values(array_filter(ai_rubric(), function ($it) { return $it['ai']; })),
@@ -1265,7 +1293,7 @@ function phaseCardHTML(ph, blocked) {
          ${fb ? `role="button" tabindex="0" onclick="selectPhase('${esc(ph)}')"
                 onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectPhase('${esc(ph)}');}"` : ''}>
       <div class="d-flex align-items-start justify-content-between gap-2 mb-2 flex-wrap">
-        <span class="fw-bold text-dark">${esc(label)}</span>
+        <span class="fw-bold text-dark">${esc(label)}${aiStyleChip(ph)}</span>
         <span class="d-flex gap-1 flex-wrap">${badges}</span>
       </div>
       ${body}
@@ -1275,6 +1303,18 @@ function phaseCardHTML(ph, blocked) {
       </div>
     </div>
   </div>`;
+}
+
+// ป้ายเล็ก ๆ บอกชนิดงานเขียนของรอบนั้น (หน่วยที่ 1 มีคำสำคัญกำกับใน tooltip ด้วย)
+function aiStyleChip(ph) {
+  const st = AI_PHASE_STYLE[ph];
+  if (!st) return '';
+  const tip = st.keys && st.keys.length
+    ? `${st.name} · ต้องกล่าวถึงและเชื่อมโยง: ${st.keys.join(' + ')}`
+    : `${st.name} — ต้องแสดงทรรศนะและการประเมินค่า ไม่ใช่เล่าเรื่องเฉย ๆ`;
+  const cls = st.kind === 'critical' ? 'bg-primary-subtle text-primary-emphasis' : 'bg-info-subtle text-info-emphasis';
+  return ` <span class="badge rounded-pill fw-normal ${cls}" style="font-size:0.66rem;"
+                 title="${esc(tip)}">${esc(st.name.replace('เรียงความ', ''))}</span>`;
 }
 
 // คลิกการ์ด → เปิด/ปิดรายละเอียดของรอบนั้น (คลิกใบเดิมซ้ำ = ปิด)
@@ -2277,6 +2317,103 @@ async function startBatchReview() {
       `เสร็จสิ้น — สำเร็จ ${res.ok} ฉบับ`
       + (res.failed ? ` · ไม่สำเร็จ ${res.failed} ฉบับ (ถือว่ายังไม่ได้ตรวจ)` : '');
     showToast(`ตรวจเสร็จแล้ว: สำเร็จ ${res.ok} ฉบับ`
+      + (res.failed ? `, ไม่สำเร็จ ${res.failed} ฉบับ — กด "ตรวจซ้ำเฉพาะที่ไม่สำเร็จ" ได้เลย` : ''),
+      res.failed ? 'error' : 'success');
+    loadBatchTargets();
+    updateReviewButton();
+    loadAiOverview();
+    loadRecheckQueue();
+    loadFeedback();
+    paintBatchRetry();
+  }
+}
+
+/* --------------------------------------- ตรวจใหม่ "ทุกรอบ" รวดเดียว (ครู)
+   ใช้เมื่อกติกาการตรวจเปลี่ยน แล้วอยากให้ผลตรวจของทั้งชั้นทุกรอบมาจากกติกาชุดเดียวกัน
+   ไล่ตามลำดับการเรียนเสมอ (ก่อนเรียน → D1.1 → D1.2 → D2.1 → D2.2 → หลังเรียน)
+   เพราะร่างหลังต้องเทียบกับฉบับตั้งต้น ถ้าตรวจสลับลำดับ ผลเทียบร่างจะอ้างคะแนนชุดเก่า */
+
+// รวมรายการเรียงความของทุกรอบเป็นคิวเดียว (เรียงตามลำดับการเรียน) ตามห้องที่กรองอยู่
+async function loadAllPhaseTargets(room) {
+  const items = [];
+  let tooShort = 0;
+  for (const ph of AI_PHASES) {
+    const params = new URLSearchParams({ action: 'get_ai_batch_targets', essay_phase: ph });
+    if (room) params.set('classroom', room);
+    const res  = await fetch('api.php?' + params.toString());
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'โหลดรายการไม่สำเร็จ');
+    tooShort += Number(data.too_short || 0);
+    (data.targets || []).forEach(t => items.push({
+      student_id:   t.student_id,
+      student_name: t.student_name,
+      essay_phase:  ph,
+      note:         AI_PHASE_SHORT_MAP[ph] || AI_PHASE_LABELS[ph] || ph,
+    }));
+  }
+  return { items, tooShort };
+}
+
+async function startBatchReviewAllPhases() {
+  if (batchRunning) { showToast('กำลังตรวจชุดอื่นอยู่ กรุณารอให้เสร็จก่อน', 'error'); return; }
+  const allBtn = document.getElementById('batchAllBtn');
+  const room   = document.getElementById('batchRoom').value;
+
+  allBtn.disabled = true;
+  allBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>กำลังรวบรวมรายการทุกรอบ...';
+  let items = [], tooShort = 0;
+  try {
+    ({ items, tooShort } = await loadAllPhaseTargets(room));
+  } catch (err) {
+    showToast('โหลดรายการไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 'error');
+    allBtn.disabled = false;
+    allBtn.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>ตรวจใหม่ทุกรอบรวดเดียว (ทั้ง ' + AI_PHASES.length + ' รอบ)';
+    return;
+  }
+  allBtn.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>ตรวจใหม่ทุกรอบรวดเดียว (ทั้ง ' + AI_PHASES.length + ' รอบ)';
+  allBtn.disabled = false;
+
+  if (!items.length) {
+    showToast('ยังไม่มีเรียงความที่ส่งเข้ามาในรอบใดเลย', 'error');
+    return;
+  }
+
+  const mins  = Math.max(1, Math.round(items.length * (25000 + BATCH_GAP_MS) / 60000));
+  const quota = (aiStatus && typeof aiStatus.quota_left === 'number') ? aiStatus.quota_left : null;
+  if (!confirm(`ตรวจใหม่ทุกรอบรวดเดียว ${items.length} ฉบับ`
+      + (room ? ` (เฉพาะห้อง ${room})` : ' (ทุกห้องเรียน)') + ` ใช่ไหม?\n\n`
+      + `• ตรวจซ้ำทุกฉบับ รวมฉบับที่เคยตรวจแล้ว — คะแนนที่คุณครูปรับไว้รายข้อจะถูกล้างทั้งหมด\n`
+      + `• ไล่ตามลำดับการเรียน ฉบับตั้งต้นจะถูกตรวจก่อนร่างหลังเสมอ\n`
+      + (tooShort ? `• ข้าม ${tooShort} ฉบับที่สั้นกว่าเกณฑ์ ระบบไม่ส่งให้ AI ตรวจ\n` : '')
+      + (quota !== null && quota < items.length
+          ? `• โควตาวันนี้เหลือ ${quota} ครั้ง ไม่พอตรวจครบ ระบบจะตรวจเท่าที่เหลือแล้วหยุด\n` : '')
+      + `\nใช้เวลาประมาณ ${mins} นาที กรุณาเปิดหน้านี้ค้างไว้จนกว่าจะเสร็จ`)) return;
+
+  batchRunning = true;
+  batchStopRequested = false;
+  allBtn.disabled = true;
+  document.getElementById('batchStartBtn').disabled = true;
+  document.getElementById('batchRetryBtn').disabled = true;
+  document.getElementById('batchStopBtn').classList.remove('d-none');
+  document.getElementById('batchPhase').disabled = true;
+  document.getElementById('batchRoom').disabled  = true;
+  document.getElementById('batchLog').innerHTML  = '';
+
+  let res = { ok: 0, failed: 0, failedItems: [] };
+  try {
+    res = await runReviewQueue(items, REVIEW_UI_BATCH);
+  } finally {
+    batchRunning = false;
+    batchFailedItems = res.failedItems || [];
+    allBtn.disabled = false;
+    document.getElementById('batchStartBtn').disabled = false;
+    document.getElementById('batchStopBtn').classList.add('d-none');
+    document.getElementById('batchPhase').disabled = false;
+    document.getElementById('batchRoom').disabled  = false;
+    document.getElementById('batchProgressLabel').textContent =
+      `ตรวจใหม่ทุกรอบเสร็จสิ้น — สำเร็จ ${res.ok} ฉบับ`
+      + (res.failed ? ` · ไม่สำเร็จ ${res.failed} ฉบับ (ถือว่ายังไม่ได้ตรวจ)` : '');
+    showToast(`ตรวจใหม่ทุกรอบเสร็จแล้ว: สำเร็จ ${res.ok} ฉบับ`
       + (res.failed ? `, ไม่สำเร็จ ${res.failed} ฉบับ — กด "ตรวจซ้ำเฉพาะที่ไม่สำเร็จ" ได้เลย` : ''),
       res.failed ? 'error' : 'success');
     loadBatchTargets();
