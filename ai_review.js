@@ -496,6 +496,16 @@ function aiDraftCompareHTML(fb, opts) {
     flags.push(`<div class="ai-draft-flag ai-draft-flag-warn"><i class="bi bi-graph-down me-1"></i>
       คะแนนรวมยัง<strong>${newTopic ? 'ไม่สูงขึ้น' : 'ไม่ดีขึ้น'}</strong>จาก ${aiEsc(d.short)} — มีข้อที่ดีขึ้น ${d.up} ข้อ แต่ถอยลง ${d.down} ข้อ</div>`);
   }
+  // คะแนนที่พุ่งขึ้นทีเดียวหลายระดับในข้อเดียว มักเป็นสัญญาณว่า AI ให้เกินจริง
+  // การแก้ร่างหนึ่งครั้งตามปกติควรขยับได้ทีละ 1 ระดับ (คะแนนดิบ 0-4) จึงติดธงให้ครูตรวจทานก่อน
+  const bigUp = (d.criteria || []).filter(c => (Number(c.raw) - Number(c.base_raw)) >= 2);
+  if (bigUp.length) {
+    flags.push(`<div class="ai-draft-flag ai-draft-flag-warn"><i class="bi bi-arrow-up-circle me-1"></i>
+      <strong>คะแนนกระโดดขึ้นหลายระดับใน ${bigUp.length} ข้อ</strong>
+      (${bigUp.map(c => aiEsc(c.id) + ' ' + aiEsc(c.name) + ' ' + aiFmt(c.base_raw) + '→' + aiFmt(c.raw)).join(' · ')})
+      — ${newTopic ? 'ทักษะที่ขยับขึ้นทีเดียว 2 ระดับถือว่ามากผิดปกติ' : 'การแก้ร่างหนึ่งครั้งตามปกติจะขยับได้ทีละ 1 ระดับ'}
+      ลองอ่านเหตุผลของข้อนั้นในตารางด้านล่าง ถ้าฟังไม่ขึ้น ปรับคะแนนข้อนั้นเองหรือสั่งให้ AI ตรวจข้อนั้นใหม่ได้</div>`);
+  }
 
   const chips = [
     `<span class="ai-progress-chip">
