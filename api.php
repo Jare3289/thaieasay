@@ -2,8 +2,8 @@
 // บังคับให้เริ่มเปิดใช้งาน Session และระบุประเภทการตอบกลับเป็น JSON
 require_once 'auth_helper.php';
 require_once 'thai_text_utils.php';
-require_once 'ai_config.php';
-require_once 'chapter45_ai.php';
+require_once 'writing_check_config.php';
+require_once 'chapter45_engine.php';
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Cache-Control: post-check=0, pre-check=0', false);
@@ -1926,7 +1926,7 @@ try {
             ');
             $stmt->execute([$studentId, $essayPhase, $intro, $bodyJson, $conclusion, $wordCount]);
 
-            // เคยให้ AI ตรวจฉบับนี้ไปแล้วและเนื้อหาเปลี่ยนไปจริง → เข้าคิวให้คุณครูสั่ง AI ตรวจใหม่
+            // เคยให้ระบบตรวจฉบับนี้ไปแล้วและเนื้อหาเปลี่ยนไปจริง → เข้าคิวให้คุณครูสั่งระบบตรวจใหม่
             $reQueued = ai_mark_essay_recheck($pdo, $studentId, $essayPhase, ai_essay_hash($intro, $bodyArr, $conclusion));
 
             echo json_encode([
@@ -1934,7 +1934,7 @@ try {
                 'word_count'   => $wordCount,
                 'ai_requeued'  => $reQueued,
                 'ai_requeue_message' => $reQueued
-                    ? 'ต้นฉบับนี้เคยให้ AI ตรวจไว้แล้ว ระบบได้จัดเข้าคิวให้คุณครูสั่ง AI ตรวจใหม่อีกครั้ง'
+                    ? 'ต้นฉบับนี้เคยให้ระบบตรวจไว้แล้ว ระบบได้จัดเข้าคิวให้คุณครูสั่งระบบตรวจใหม่อีกครั้ง'
                     : '',
             ]);
             break;
@@ -2327,10 +2327,10 @@ try {
             break;
 
         // ===================================================================
-        // ระบบให้ข้อเสนอแนะเรียงความอัตโนมัติด้วย AI (ดู ai_config.php)
+        // ระบบให้ข้อเสนอแนะเรียงความอัตโนมัติ (ดู writing_check_config.php)
         // ===================================================================
 
-        // สถานะฟีเจอร์ AI สำหรับผู้ใช้ปัจจุบัน — ใช้ตัดสินว่าจะแสดงปุ่ม "ให้ AI ตรวจ" หรือไม่
+        // สถานะฟีเจอร์ตรวจอัตโนมัติสำหรับผู้ใช้ปัจจุบัน — ใช้ตัดสินว่าจะแสดงปุ่ม "ให้ระบบตรวจ" หรือไม่
         case 'get_ai_status':
             if (!isset($_SESSION['user'])) {
                 echo json_encode(['success' => false, 'error' => 'Not logged in']);
@@ -2338,7 +2338,7 @@ try {
             }
             $aiUser = $_SESSION['user'];
             $aiSet  = ai_settings($pdo);
-            // เฉพาะครูเท่านั้นที่สั่งให้ AI ตรวจได้ นักเรียนและผู้เชี่ยวชาญดูผลได้อย่างเดียว
+            // เฉพาะครูเท่านั้นที่สั่งให้ระบบตรวจได้ นักเรียนและผู้เชี่ยวชาญดูผลได้อย่างเดียว
             $isTeacher = ($aiUser['role'] === 'teacher');
             $limit     = ai_daily_limit($pdo);
             $used      = $isTeacher ? ai_usage_today($pdo, $aiUser['id']) : 0;
@@ -2356,7 +2356,7 @@ try {
             ]);
             break;
 
-        // ครูอ่านการตั้งค่า AI (ไม่ส่ง API key จริงกลับไป — ส่งเฉพาะแบบปิดบัง)
+        // ครูอ่านการตั้งค่าระบบตรวจอัตโนมัติ (ไม่ส่ง API key จริงกลับไป — ส่งเฉพาะแบบปิดบัง)
         case 'get_ai_settings':
             if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
                 echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้น']);
@@ -2405,7 +2405,7 @@ try {
             ]);
             break;
 
-        // ครูบันทึกการตั้งค่า AI
+        // ครูบันทึกการตั้งค่าระบบตรวจอัตโนมัติ
         case 'save_ai_settings':
             if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
                 echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้น']);
@@ -2441,7 +2441,7 @@ try {
             echo json_encode(['success' => true]);
             break;
 
-        // สั่งให้ AI ตรวจเรียงความ 1 ฉบับ แล้วบันทึกผลลงฐานข้อมูล (ตรวจซ้ำจะทับผลเดิม)
+        // สั่งให้ระบบตรวจเรียงความ 1 ฉบับ แล้วบันทึกผลลงฐานข้อมูล (ตรวจซ้ำจะทับผลเดิม)
         case 'ai_review_essay':
             if (!isset($_SESSION['user'])) {
                 echo json_encode(['success' => false, 'error' => 'Not logged in']);
@@ -2457,9 +2457,9 @@ try {
                 exit;
             }
 
-            // เฉพาะครูเท่านั้นที่สั่งให้ AI ตรวจได้ (นักเรียน/ผู้เชี่ยวชาญดูผลได้อย่างเดียว)
+            // เฉพาะครูเท่านั้นที่สั่งให้ระบบตรวจได้ (นักเรียน/ผู้เชี่ยวชาญดูผลได้อย่างเดียว)
             if ($aiRole !== 'teacher') {
-                echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้นที่สั่งให้ AI ตรวจได้']);
+                echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้นที่สั่งให้ระบบตรวจได้']);
                 exit;
             }
             if ($aiSid === '') {
@@ -2469,11 +2469,11 @@ try {
 
             $aiSet = ai_settings($pdo);
             if (!$aiSet['enabled']) {
-                echo json_encode(['success' => false, 'error' => 'คุณครูปิดการใช้งานระบบ AI ไว้']);
+                echo json_encode(['success' => false, 'error' => 'คุณครูปิดการใช้งานระบบตรวจอัตโนมัติไว้']);
                 exit;
             }
             if (!$aiSet['configured']) {
-                echo json_encode(['success' => false, 'error' => 'ยังไม่ได้ตั้งค่า AI กรุณาใส่ API key ในหน้า "ผู้ช่วย AI" ก่อน']);
+                echo json_encode(['success' => false, 'error' => 'ยังไม่ได้ตั้งค่าระบบตรวจอัตโนมัติกรุณาใส่ API key ในหน้า "ระบบตรวจอัตโนมัติ" ก่อน']);
                 exit;
             }
 
@@ -2484,8 +2484,8 @@ try {
                 // บันทึกไว้ในประวัติด้วย (success = 0 จึงไม่กินโควตา) เพื่อให้ระบบรู้ทีหลังว่า
                 // การตรวจชุดนั้น "หยุดเพราะโควตาครบ" และตรวจต่อจากจุดนี้ได้ถูกฉบับ
                 ai_log_usage($pdo, $aiUser['id'], $aiRole, $aiSid, $aiPhase, false,
-                    'วันนี้ใช้ AI ตรวจครบ ' . $aiLimit . ' ครั้งแล้ว');
-                echo json_encode(['success' => false, 'error' => 'วันนี้ใช้ AI ตรวจครบ ' . $aiLimit . ' ครั้งแล้ว กรุณาลองใหม่ในวันพรุ่งนี้']);
+                    'วันนี้ใช้ระบบตรวจครบ ' . $aiLimit . ' ครั้งแล้ว');
+                echo json_encode(['success' => false, 'error' => 'วันนี้ใช้ระบบตรวจครบ ' . $aiLimit . ' ครั้งแล้ว กรุณาลองใหม่ในวันพรุ่งนี้']);
                 exit;
             }
 
@@ -2509,12 +2509,12 @@ try {
             $aiFull  = trim($aiIntro . "\n" . implode("\n", $aiBody) . "\n" . $aiConcl);
 
             if (mb_strlen($aiFull, 'UTF-8') > AI_MAX_CHARS) {
-                echo json_encode(['success' => false, 'error' => 'เรียงความยาวเกินกว่าที่ระบบจะส่งให้ AI ตรวจได้']);
+                echo json_encode(['success' => false, 'error' => 'เรียงความยาวเกินกว่าที่ระบบจะส่งให้ระบบตรวจได้']);
                 exit;
             }
             $aiWords = count_thai_words($aiFull);
             if ($aiWords < AI_MIN_WORDS) {
-                echo json_encode(['success' => false, 'error' => 'เรียงความสั้นเกินไป (ต้องมีอย่างน้อย ' . AI_MIN_WORDS . ' คำ) กรุณาเขียนเพิ่มก่อนให้ AI ตรวจ']);
+                echo json_encode(['success' => false, 'error' => 'เรียงความสั้นเกินไป (ต้องมีอย่างน้อย ' . AI_MIN_WORDS . ' คำ) กรุณาเขียนเพิ่มก่อนให้ระบบตรวจ']);
                 exit;
             }
 
@@ -2543,7 +2543,7 @@ try {
 
             // ---- ฉบับตั้งต้นที่ต้องเทียบทุกครั้งตามคู่ที่คุณครูกำหนด ----
             // D1.2 เทียบกับ D1.1 · D2.2 เทียบกับ D2.1 · หลังเรียน เทียบกับก่อนเรียน (คู่อื่นไม่เทียบข้ามกัน)
-            // แนบทั้งตัวเรียงความและคะแนนของฉบับตั้งต้นไปให้ AI เพื่อให้ยกข้อความจริงมาเทียบได้ ไม่ใช่เดาจากคะแนน
+            // แนบทั้งตัวเรียงความและคะแนนของฉบับตั้งต้นไปให้ระบบเพื่อให้ยกข้อความจริงมาเทียบได้ ไม่ใช่เดาจากคะแนน
             $aiBasePhase = ai_baseline_phase($aiPhase);
             $aiBaseSnap  = [];
             $aiBaseText  = '';
@@ -2582,7 +2582,7 @@ try {
                         ], (string)($rowB['updated_at'] ?? ''), (int)($rowB['word_count'] ?? 0),
                            (string)($rowB['essay_hash'] ?? ai_essay_hash($bIntro, $bBody, $bConcl)),
                            ai_essay_parts($bIntro, $bBody, $bConcl),
-                           // หัวข้อของฉบับตั้งต้น — ก่อนเรียนกับหลังเรียนเป็นคนละหัวข้อ ต้องบอก AI ให้รู้
+                           // หัวข้อของฉบับตั้งต้น — ก่อนเรียนกับหลังเรียนเป็นคนละหัวข้อ ต้องบอกระบบให้รู้
                            (string)($aiTopics[essay_topic_phase($aiBasePhase)] ?? ''));
                         $aiBaseSnap['text'] = $aiBaseText;
                     }
@@ -2591,7 +2591,7 @@ try {
                     $aiBaseSnap = [];
                 }
             }
-            // ไม่มีตัวเรียงความของฉบับตั้งต้น = เทียบไม่ได้ ไม่ต้องส่งบล็อกเทียบไปให้ AI
+            // ไม่มีตัวเรียงความของฉบับตั้งต้น = เทียบไม่ได้ ไม่ต้องส่งบล็อกเทียบไปให้ระบบ
             if ($aiBaseText === '') $aiBaseSnap = [];
 
             // การเรียก API ภายนอกอาจใช้เวลาหลายสิบวินาที — ขยายเวลาทำงานของสคริปต์
@@ -2616,12 +2616,12 @@ try {
 
             $jsonOpt = JSON_UNESCAPED_UNICODE;
 
-            // เทียบกับฉบับตั้งต้นตามคู่ที่ครูกำหนด — คิดจากคะแนนที่เก็บไว้จริง ไม่ได้เชื่อคำบรรยายของ AI อย่างเดียว
+            // เทียบกับฉบับตั้งต้นตามคู่ที่ครูกำหนด — คิดจากคะแนนที่เก็บไว้จริง ไม่ได้เชื่อคำบรรยายของระบบอย่างเดียว
             $aiEssayHash = ai_essay_hash($aiIntro, $aiBody, $aiConcl);
             $aiBaseStore = $aiBaseSnap;
             // ตัวเรียงความอ่านจาก student_essays ได้อยู่แล้ว ไม่ต้องเก็บซ้ำลงฐานข้อมูล
             unset($aiBaseStore['text'], $aiBaseStore['parts']);
-            // ส่วนของเรียงความที่ถูกแก้จริงเมื่อเทียบกับฉบับตั้งต้น — ระบบเทียบข้อความเอง เชื่อถือได้กว่าคำบรรยายของ AI
+            // ส่วนของเรียงความที่ถูกแก้จริงเมื่อเทียบกับฉบับตั้งต้น — ระบบเทียบข้อความเอง เชื่อถือได้กว่าคำบรรยายของระบบ
             // เทียบเฉพาะคู่ที่เป็น "การแก้ร่างเดิม" (หัวข้อเดียวกัน) เท่านั้น
             // คู่ก่อนเรียน↔หลังเรียนเป็นคนละหัวข้อ คนละงาน จึงไม่มีอะไรให้เทียบว่าแก้ตรงไหน
             $aiEdits = (ai_baseline_kind($aiPhase) !== 'newtopic'
@@ -2771,9 +2771,9 @@ try {
             ]);
             break;
 
-        // ครู: รายชื่อเรียงความที่ "พร้อมให้ AI ตรวจ" ในรอบงานหนึ่ง สำหรับโหมดตรวจทั้งรอบ
+        // ครู: รายชื่อเรียงความที่ "พร้อมให้ระบบตรวจ" ในรอบงานหนึ่ง สำหรับโหมดตรวจทั้งรอบ
         // หน้าเว็บจะวนเรียก ai_review_essay ทีละคนตามรายการนี้ (ไม่ตรวจรวดเดียวในคำขอเดียว
-        // เพราะ PHP บนโฮสต์มีเพดานเวลาทำงาน และผู้ให้บริการ AI จำกัดจำนวนคำขอต่อนาที)
+        // เพราะ PHP บนโฮสต์มีเพดานเวลาทำงาน และผู้ให้บริการโมเดลภาษาจำกัดจำนวนคำขอต่อนาที)
         case 'get_ai_batch_targets':
             if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
                 echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้น']);
@@ -2787,7 +2787,7 @@ try {
             $bGroup = isset($_GET['group']) ? trim($_GET['group']) : '';
             $bRoom  = isset($_GET['classroom']) ? trim($_GET['classroom']) : '';
 
-            // ดึงเฉพาะเรียงความที่มีเนื้อหาจริง พร้อมบอกว่าเคยให้ AI ตรวจไปแล้วหรือยัง
+            // ดึงเฉพาะเรียงความที่มีเนื้อหาจริง พร้อมบอกว่าเคยให้ระบบตรวจไปแล้วหรือยัง
             // ดึง scores มาด้วย เพื่อคัดผลตรวจที่ค้างไว้จากรอบที่ "ตรวจไม่ผ่าน" ออกไปเป็นยังไม่ตรวจ
             $sql = "
                 SELECT se.student_id, se.word_count, s.student_name, s.classroom, s.student_group,
@@ -2949,7 +2949,7 @@ try {
             $rpTooShort = 0;
             $rpDone     = 0;
             while ($r = $stmt->fetch()) {
-                if (!isset($rpPhaseOrder[$r['essay_phase']])) continue;     // รอบงานนอกระบบ AI
+                if (!isset($rpPhaseOrder[$r['essay_phase']])) continue;     // รอบงานนอกระบบตรวจอัตโนมัติ
                 if ((int)$r['word_count'] < AI_MIN_WORDS) { $rpTooShort++; continue; }
 
                 $rpScores   = json_decode((string)($r['ai_scores'] ?? ''), true);
@@ -3010,7 +3010,7 @@ try {
             ]);
             break;
 
-        // ดึงผลตรวจของ AI — นักเรียนดูของตนเองได้, ครู/ผู้เชี่ยวชาญดูได้ทุกคน
+        // ดึงผลตรวจของระบบ — นักเรียนดูของตนเองได้, ครู/ผู้เชี่ยวชาญดูได้ทุกคน
         // ระบุ essay_phase = ดึงรอบเดียว, ไม่ระบุ = ดึงทุกรอบของนักเรียนคนนั้น
         case 'get_ai_feedback':
             if (!isset($_SESSION['user'])) {
@@ -3048,7 +3048,7 @@ try {
 
             // สถานะเรียงความของนักเรียนคนนี้ทุกรอบงาน — ใช้แยกว่า "ยังไม่ได้เขียน" กับ "เขียนแล้วแต่ยังไม่ตรวจ"
             // ดึงตัวข้อความมาด้วย เพื่อเทียบให้เห็นว่าร่างที่ 2 แก้อะไรไปจากร่างที่ 1 บ้าง
-            // (ผลตรวจที่บันทึกไว้ก่อนมีฟีเจอร์นี้จึงยังเห็นผลเทียบได้ โดยไม่ต้องสั่ง AI ตรวจใหม่)
+            // (ผลตรวจที่บันทึกไว้ก่อนมีฟีเจอร์นี้จึงยังเห็นผลเทียบได้ โดยไม่ต้องสั่งระบบตรวจใหม่)
             $aiEssays     = [];
             $aiEssayParts = [];
             try {
@@ -3078,7 +3078,7 @@ try {
                 }
             } catch (Exception $e) { /* อ่านไม่ได้ก็ยังแสดงผลตรวจได้ตามปกติ */ }
 
-            // คะแนนข้อที่ AI ตรวจแทนไม่ได้ ที่คุณครูเคยให้ไว้ในหน้า evaluation.php (ดึงครั้งเดียวใช้ได้ทุกรอบ)
+            // คะแนนข้อที่ระบบตรวจแทนไม่ได้ ที่คุณครูเคยให้ไว้ในหน้า evaluation.php (ดึงครั้งเดียวใช้ได้ทุกรอบ)
             $aiEvalManual = ai_teacher_eval_manual($pdo, $aiSid);
             $aiRows = array_map(function ($r) use ($aiEvalManual, $aiEssayParts) {
                 return ai_feedback_row_to_array($r, $aiEvalManual, $aiEssayParts);
@@ -3094,7 +3094,7 @@ try {
             ]);
             break;
 
-        // ครู/ผู้เชี่ยวชาญ: ภาพรวมผลตรวจ AI ทั้งชั้น (โหมดเบา ไม่ดึงข้อเสนอแนะฉบับเต็ม)
+        // ครู/ผู้เชี่ยวชาญ: ภาพรวมผลตรวจอัตโนมัติทั้งชั้น (โหมดเบา ไม่ดึงข้อเสนอแนะฉบับเต็ม)
         case 'get_all_ai_feedback':
             if (!isset($_SESSION['user']) || !in_array($_SESSION['user']['role'], ['teacher', 'expert'], true)) {
                 echo json_encode(['success' => false, 'error' => 'ต้องเป็นครูหรือผู้เชี่ยวชาญ']);
@@ -3116,8 +3116,8 @@ try {
                 LEFT JOIN students s ON f.student_id = s.student_id
                 ORDER BY s.classroom ASC, f.student_id ASC
             ');
-            // ครูให้คะแนนข้อที่ AI ตรวจแทนไม่ได้ครบแล้วหรือยัง (ใช้ทำเครื่องหมายเตือนในตารางภาพรวม)
-            // นับรวมคะแนนที่คุณครูให้ไว้ในแบบประเมิน (evaluation.php) ด้วย ไม่ใช่เฉพาะที่กรอกในหน้าผู้ช่วย AI
+            // ครูให้คะแนนข้อที่ระบบตรวจแทนไม่ได้ครบแล้วหรือยัง (ใช้ทำเครื่องหมายเตือนในตารางภาพรวม)
+            // นับรวมคะแนนที่คุณครูให้ไว้ในแบบประเมิน (evaluation.php) ด้วย ไม่ใช่เฉพาะที่กรอกในหน้าระบบตรวจอัตโนมัติ
             $aiManualCount = count(ai_rubric_manual());
             $aiEvalAll     = ai_teacher_eval_manual_all($pdo);
             $aiList = [];
@@ -3134,7 +3134,7 @@ try {
                         $aiTSrc   = 'evaluation';
                     }
                 }
-                // คะแนนที่ครูปรับเอง / สั่งให้ AI ตรวจข้อนั้นใหม่ — ตารางภาพรวมต้องแสดงคะแนนที่ใช้จริง
+                // คะแนนที่ครูปรับเอง / สั่งให้ระบบตรวจข้อนั้นใหม่ — ตารางภาพรวมต้องแสดงคะแนนที่ใช้จริง
                 $aiOvRow    = $aiOvCol ? ai_clean_score_overrides($r['score_overrides'] ?? '') : [];
                 $aiEffTotal = round((float)$r['total_score'], 2);
                 $aiEffLevel = (string)$r['quality_level'];
@@ -3161,7 +3161,7 @@ try {
                     'essay_phase'   => $r['essay_phase'],
                     'phase_label'   => ai_phase_label($r['essay_phase']),
                     'total_score'   => $aiEffTotal,
-                    // คะแนนดั้งเดิมของ AI ก่อนถูกปรับ (เท่ากับ total_score เมื่อไม่มีการปรับ)
+                    // คะแนนดั้งเดิมของระบบก่อนถูกปรับ (เท่ากับ total_score เมื่อไม่มีการปรับ)
                     'ai_total_score'  => round((float)$r['total_score'], 2),
                     'override_count'  => count($aiOvRow),
                     'max_score'     => (float)$r['max_score'],
@@ -3190,7 +3190,7 @@ try {
             echo json_encode(['success' => true, 'list' => $aiList]);
             break;
 
-        // ครู/ผู้เชี่ยวชาญ: คิว "รอตรวจใหม่" — เรียงความที่นักเรียนแก้ไขต้นฉบับหลังจาก AI ตรวจไปแล้ว
+        // ครู/ผู้เชี่ยวชาญ: คิว "รอตรวจใหม่" — เรียงความที่นักเรียนแก้ไขต้นฉบับหลังจากระบบตรวจไปแล้ว
         case 'get_ai_recheck_queue':
             if (!isset($_SESSION['user']) || !in_array($_SESSION['user']['role'], ['teacher', 'expert'], true)) {
                 echo json_encode(['success' => false, 'error' => 'ต้องเป็นครูหรือผู้เชี่ยวชาญ']);
@@ -3228,7 +3228,7 @@ try {
             echo json_encode(['success' => true, 'queue' => $aiQueue, 'min_words' => AI_MIN_WORDS]);
             break;
 
-        // ครูกรอกคะแนนข้อที่ AI ตรวจแทนไม่ได้ (เช่น 4.3 ความเรียบร้อย/ลายมือ) ให้คะแนนรวมครบเต็ม 60
+        // ครูกรอกคะแนนข้อที่ระบบตรวจแทนไม่ได้ (เช่น 4.3 ความเรียบร้อย/ลายมือ) ให้คะแนนรวมครบเต็ม 60
         case 'save_ai_manual_score':
             if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
                 echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้นที่ให้คะแนนได้']);
@@ -3246,7 +3246,7 @@ try {
             $stmt = $pdo->prepare('SELECT id FROM essay_ai_feedback WHERE student_id = ? AND essay_phase = ?');
             $stmt->execute([$aiSid, $aiPhase]);
             if (!$stmt->fetch()) {
-                echo json_encode(['success' => false, 'error' => 'ยังไม่มีผลตรวจของ AI สำหรับเรียงความฉบับนี้ กรุณาให้ AI ตรวจก่อน']);
+                echo json_encode(['success' => false, 'error' => 'ยังไม่มีผลตรวจของระบบสำหรับเรียงความฉบับนี้ กรุณาให้ระบบตรวจก่อน']);
                 exit;
             }
 
@@ -3276,9 +3276,9 @@ try {
             ]);
             break;
 
-        // ครูปรับคะแนนของ AI เองรายข้อ (ไม่เห็นด้วยกับที่ AI ให้) พร้อมเหตุผลกำกับ
-        // ส่ง raw เป็นค่าว่าง = คืนค่ากลับไปใช้คะแนนที่ AI ให้ไว้เดิม
-        // คะแนนเดิมของ AI ไม่เคยถูกทับ — เก็บแยกไว้ในคอลัมน์ scores ตรวจสอบย้อนหลังได้เสมอ
+        // ครูปรับคะแนนของระบบเองรายข้อ (ไม่เห็นด้วยกับที่ระบบให้) พร้อมเหตุผลกำกับ
+        // ส่ง raw เป็นค่าว่าง = คืนค่ากลับไปใช้คะแนนที่ระบบให้ไว้เดิม
+        // คะแนนเดิมของระบบไม่เคยถูกทับ — เก็บแยกไว้ในคอลัมน์ scores ตรวจสอบย้อนหลังได้เสมอ
         case 'save_ai_score_override':
             if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
                 echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้นที่ปรับคะแนนได้']);
@@ -3301,7 +3301,7 @@ try {
             }
             $aiItem = ai_rubric_item($aiCrit);
             if (!$aiItem || !$aiItem['ai']) {
-                echo json_encode(['success' => false, 'error' => 'ปรับคะแนนได้เฉพาะข้อที่ AI เป็นผู้ตรวจเท่านั้น']);
+                echo json_encode(['success' => false, 'error' => 'ปรับคะแนนได้เฉพาะข้อที่ระบบเป็นผู้ตรวจเท่านั้น']);
                 exit;
             }
 
@@ -3310,7 +3310,7 @@ try {
             $stmt->execute([$aiSid, $aiPhase]);
             $aiRow = $stmt->fetch();
             if (!$aiRow) {
-                echo json_encode(['success' => false, 'error' => 'ยังไม่มีผลตรวจของ AI สำหรับเรียงความฉบับนี้ กรุณาให้ AI ตรวจก่อน']);
+                echo json_encode(['success' => false, 'error' => 'ยังไม่มีผลตรวจของระบบสำหรับเรียงความฉบับนี้ กรุณาให้ระบบตรวจก่อน']);
                 exit;
             }
             $aiBaseScores = json_decode((string)($aiRow['scores'] ?? ''), true);
@@ -3322,7 +3322,7 @@ try {
             $aiOvs = ai_clean_score_overrides($aiRow['score_overrides'] ?? '');
             $aiCleared = false;
             if ($aiRawIn === '' || $aiRawIn === null || !is_numeric($aiRawIn)) {
-                // คืนค่ากลับไปใช้คะแนนที่ AI ให้ไว้เดิม
+                // คืนค่ากลับไปใช้คะแนนที่ระบบให้ไว้เดิม
                 unset($aiOvs[$aiCrit]);
                 $aiCleared = true;
             } else {
@@ -3363,11 +3363,11 @@ try {
             ]);
             break;
 
-        // ครูสั่งให้ AI ตรวจ "เฉพาะเกณฑ์ข้อเดียว" ใหม่ พร้อมพิมพ์คำสั่งเพิ่มเติมให้ AI ได้
+        // ครูสั่งให้ระบบตรวจ "เฉพาะเกณฑ์ข้อเดียว" ใหม่ พร้อมพิมพ์คำสั่งเพิ่มเติมให้ระบบได้
         // ใช้โควตา 1 ครั้งเท่ากับการตรวจทั้งฉบับ แต่คำสั่งสั้นกว่ามากและข้ออื่นไม่ขยับ
         case 'ai_recheck_criterion':
             if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
-                echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้นที่สั่งให้ AI ตรวจได้']);
+                echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้นที่สั่งให้ระบบตรวจได้']);
                 exit;
             }
             if (!ai_feedback_has_override_column($pdo)) {
@@ -3386,7 +3386,7 @@ try {
             }
             $aiItem = ai_rubric_item($aiCrit);
             if (!$aiItem || !$aiItem['ai']) {
-                echo json_encode(['success' => false, 'error' => 'สั่งตรวจใหม่ได้เฉพาะข้อที่ AI เป็นผู้ตรวจเท่านั้น']);
+                echo json_encode(['success' => false, 'error' => 'สั่งตรวจใหม่ได้เฉพาะข้อที่ระบบเป็นผู้ตรวจเท่านั้น']);
                 exit;
             }
             if (mb_strlen($aiInstr, 'UTF-8') > 800) {
@@ -3396,17 +3396,17 @@ try {
 
             $aiSet = ai_settings($pdo);
             if (!$aiSet['enabled']) {
-                echo json_encode(['success' => false, 'error' => 'คุณครูปิดการใช้งานระบบ AI ไว้']);
+                echo json_encode(['success' => false, 'error' => 'คุณครูปิดการใช้งานระบบตรวจอัตโนมัติไว้']);
                 exit;
             }
             if (!$aiSet['configured']) {
-                echo json_encode(['success' => false, 'error' => 'ยังไม่ได้ตั้งค่า AI กรุณาใส่ API key ในหน้า "ผู้ช่วย AI" ก่อน']);
+                echo json_encode(['success' => false, 'error' => 'ยังไม่ได้ตั้งค่าระบบตรวจอัตโนมัติกรุณาใส่ API key ในหน้า "ระบบตรวจอัตโนมัติ" ก่อน']);
                 exit;
             }
             $aiLimit = ai_daily_limit($pdo);
             $aiUsed  = ai_usage_today($pdo, $aiUser['id']);
             if ($aiUsed >= $aiLimit) {
-                echo json_encode(['success' => false, 'error' => 'วันนี้ใช้ AI ตรวจครบ ' . $aiLimit . ' ครั้งแล้ว กรุณาลองใหม่ในวันพรุ่งนี้']);
+                echo json_encode(['success' => false, 'error' => 'วันนี้ใช้ระบบตรวจครบ ' . $aiLimit . ' ครั้งแล้ว กรุณาลองใหม่ในวันพรุ่งนี้']);
                 exit;
             }
 
@@ -3417,7 +3417,7 @@ try {
             $aiRow = $stmt->fetch();
             $aiBaseScores = $aiRow ? json_decode((string)($aiRow['scores'] ?? ''), true) : null;
             if (!$aiRow || !is_array($aiBaseScores) || !isset($aiBaseScores[$aiCrit])) {
-                echo json_encode(['success' => false, 'error' => 'ยังไม่มีผลตรวจของข้อ ' . $aiCrit . ' ให้ตรวจใหม่ กรุณาให้ AI ตรวจทั้งฉบับก่อน']);
+                echo json_encode(['success' => false, 'error' => 'ยังไม่มีผลตรวจของข้อ ' . $aiCrit . ' ให้ตรวจใหม่ กรุณาให้ระบบตรวจทั้งฉบับก่อน']);
                 exit;
             }
 
@@ -3434,7 +3434,7 @@ try {
             $aiConcl = (string)($aiEssay['conclusion_content'] ?? '');
             $aiFull  = trim($aiIntro . "\n" . implode("\n", $aiBody) . "\n" . $aiConcl);
             if (mb_strlen($aiFull, 'UTF-8') > AI_MAX_CHARS) {
-                echo json_encode(['success' => false, 'error' => 'เรียงความยาวเกินกว่าที่ระบบจะส่งให้ AI ตรวจได้']);
+                echo json_encode(['success' => false, 'error' => 'เรียงความยาวเกินกว่าที่ระบบจะส่งให้ระบบตรวจได้']);
                 exit;
             }
             $aiWords = count_thai_words($aiFull);
@@ -3538,7 +3538,7 @@ try {
             ]);
             break;
 
-        // ครู/ผู้เชี่ยวชาญ: อ่าน "ภาพรวมการนำเสนอรายรอบงาน" ที่เคยให้ AI เขียนไว้
+        // ครู/ผู้เชี่ยวชาญ: อ่าน "ภาพรวมการนำเสนอรายรอบงาน" ที่เคยให้ระบบเขียนไว้
         case 'get_ai_phase_overview':
             if (!isset($_SESSION['user']) || !in_array($_SESSION['user']['role'], ['teacher', 'expert'], true)) {
                 echo json_encode(['success' => false, 'error' => 'ต้องเป็นครูหรือผู้เชี่ยวชาญ']);
@@ -3554,13 +3554,13 @@ try {
             echo json_encode(['success' => true, 'overviews' => $ovList]);
             break;
 
-        // ครู: ให้ AI เขียนภาพรวมการนำเสนอของทั้งชั้นในรอบงานหนึ่ง (ใช้เมื่อตรวจครบทั้งรอบแล้ว)
+        // ครู: ให้ระบบเขียนภาพรวมการนำเสนอของทั้งชั้นในรอบงานหนึ่ง (ใช้เมื่อตรวจครบทั้งรอบแล้ว)
         // ใช้โควตา 1 ครั้งต่อ 1 รอบงาน — ไม่ได้ตรวจเรียงความใหม่ แต่สังเคราะห์จากผลตรวจที่มีอยู่แล้ว
         case 'ai_phase_overview':
             $aiUser = isset($_SESSION['user']) ? $_SESSION['user'] : null;
             $aiRole = $aiUser ? $aiUser['role'] : '';
             if ($aiRole !== 'teacher') {
-                echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้นที่สั่งให้ AI เขียนภาพรวมได้']);
+                echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้นที่สั่งให้ระบบเขียนภาพรวมได้']);
                 exit;
             }
             $ovPhase = isset($request_data['essay_phase']) ? trim((string)$request_data['essay_phase']) : '';
@@ -3571,13 +3571,13 @@ try {
 
             $aiSet = ai_settings($pdo);
             if (!$aiSet['enabled'] || !$aiSet['configured']) {
-                echo json_encode(['success' => false, 'error' => 'ระบบ AI ยังไม่พร้อมใช้งาน กรุณาตรวจสอบการตั้งค่า']);
+                echo json_encode(['success' => false, 'error' => 'ระบบตรวจอัตโนมัติยังไม่พร้อมใช้งาน กรุณาตรวจสอบการตั้งค่า']);
                 exit;
             }
             $aiLimit = ai_daily_limit($pdo);
             $aiUsed  = ai_usage_today($pdo, $aiUser['id']);
             if ($aiUsed >= $aiLimit) {
-                echo json_encode(['success' => false, 'error' => 'วันนี้ใช้ AI ครบ ' . $aiLimit . ' ครั้งแล้ว กรุณาลองใหม่ในวันพรุ่งนี้']);
+                echo json_encode(['success' => false, 'error' => 'วันนี้ใช้ระบบครบ ' . $aiLimit . ' ครั้งแล้ว กรุณาลองใหม่ในวันพรุ่งนี้']);
                 exit;
             }
 
@@ -3599,11 +3599,11 @@ try {
             }
             if (count($ovRows) < 2) {
                 echo json_encode(['success' => false, 'error' =>
-                    'รอบนี้มีผลตรวจของ AI เพียง ' . count($ovRows) . ' ฉบับ — ต้องมีอย่างน้อย 2 ฉบับจึงจะเขียนภาพรวมทั้งชั้นได้']);
+                    'รอบนี้มีผลตรวจของระบบเพียง ' . count($ovRows) . ' ฉบับ — ต้องมีอย่างน้อย 2 ฉบับจึงจะเขียนภาพรวมทั้งชั้นได้']);
                 exit;
             }
 
-            // ---- ตัวเลขสรุป: ระบบคำนวณเองทั้งหมด ไม่ให้ AI นับเอง ----
+            // ---- ตัวเลขสรุป: ระบบคำนวณเองทั้งหมด ไม่ให้โมเดลนับเอง ----
             $ovTotals = [];  $ovWords = [];  $ovLevels = [];  $ovCrit = [];
             $ovDeltas = [];  $ovBetter = 0;  $ovSame = 0;  $ovWorse = 0;
             $ovSamples = [];
@@ -3747,7 +3747,7 @@ try {
             ]);
             break;
 
-        // ครูลบผลตรวจ AI ของเรียงความฉบับใดฉบับหนึ่ง (เช่นผลที่ไม่เหมาะสม)
+        // ครูลบผลตรวจอัตโนมัติของเรียงความฉบับใดฉบับหนึ่ง (เช่นผลที่ไม่เหมาะสม)
         case 'delete_ai_feedback':
             if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
                 echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้น']);
@@ -3836,7 +3836,7 @@ try {
             ], JSON_UNESCAPED_UNICODE);
             break;
 
-        // สั่งให้ AI วิเคราะห์หัวข้อหนึ่งของบทที่ 4/5
+        // สั่งให้ระบบวิเคราะห์หัวข้อหนึ่งของบทที่ 4/5
         case 'ch45_run_job':
             if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
                 echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้นที่สั่งวิเคราะห์ได้']);
@@ -3850,7 +3850,7 @@ try {
             $c45Used = ai_usage_today($pdo, $_SESSION['user']['id']);
             if ($c45Used >= CH45_DAILY_LIMIT) {
                 echo json_encode(['success' => false,
-                    'error' => 'วันนี้ใช้ AI ครบ ' . CH45_DAILY_LIMIT . ' ครั้งแล้ว กรุณาลองใหม่ในวันพรุ่งนี้']);
+                    'error' => 'วันนี้ใช้ระบบครบ ' . CH45_DAILY_LIMIT . ' ครั้งแล้ว กรุณาลองใหม่ในวันพรุ่งนี้']);
                 exit;
             }
             $c45Ctx = ch45_build_context($pdo, [
@@ -3940,7 +3940,7 @@ try {
             echo json_encode(['success' => $c45Ok, 'logs' => ch45_teaching_logs($pdo)], JSON_UNESCAPED_UNICODE);
             break;
 
-        // ดูคลังผลงานจริงที่ระบบคัดไว้ให้ AI ยกเป็นตัวอย่างของตัวบ่งชี้หนึ่ง (ไว้ตรวจสอบย้อนหลัง)
+        // ดูคลังผลงานจริงที่ระบบคัดไว้ให้โมเดลยกเป็นตัวอย่างของตัวบ่งชี้หนึ่ง (ไว้ตรวจสอบย้อนหลัง)
         case 'ch45_get_evidence':
             if (!isset($_SESSION['user']) || !in_array($_SESSION['user']['role'], ['teacher', 'expert'], true)) {
                 echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูและผู้เชี่ยวชาญเท่านั้น']);

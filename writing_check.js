@@ -1,5 +1,5 @@
-/* ai_review.js — ตัวช่วยฝั่งหน้าเว็บของระบบ "ให้ข้อเสนอแนะเรียงความอัตโนมัติด้วย AI"
-   ใช้ร่วมกันระหว่างหน้า ai_feedback.php (หน้าเต็ม) และ essay_writer.php (แผงย่อในหน้าเขียน)
+/* writing_check.js — ตัวช่วยฝั่งหน้าเว็บของระบบ "ให้ข้อเสนอแนะเรียงความอัตโนมัติ"
+   ใช้ร่วมกันระหว่างหน้า writing_feedback.php (หน้าเต็ม) และ essay_writer.php (แผงย่อในหน้าเขียน)
    ทุกฟังก์ชันขึ้นต้นด้วย ai เพื่อไม่ให้ชนกับฟังก์ชันเดิมของแต่ละหน้า */
 
 const AI_PHASE_LABEL_MAP = {
@@ -62,7 +62,7 @@ function aiPhaseShort(phase) {
   return AI_PHASE_SHORT_MAP[phase] || phase;
 }
 
-/* ---- ตัวเลข/ระดับคุณภาพ (ใช้ร่วมกันทุกหน้าของระบบผู้ช่วย AI) ---- */
+/* ---- ตัวเลข/ระดับคุณภาพ (ใช้ร่วมกันทุกหน้าของระบบระบบตรวจอัตโนมัติ) ---- */
 
 // ตัดทศนิยมท้ายที่ไม่จำเป็นออก (45.00 → 45, 45.50 → 45.5)
 function aiNum(v) {
@@ -76,7 +76,7 @@ function aiNum1(v) {
   return isNaN(n) ? '-' : String(n);
 }
 
-// แปลงคะแนนรวม (เต็ม 60) เป็นระดับคุณภาพ — เกณฑ์เดียวกับหน้า evaluation.php และ ai_config.php
+// แปลงคะแนนรวม (เต็ม 60) เป็นระดับคุณภาพ — เกณฑ์เดียวกับหน้า evaluation.php และ writing_check_config.php
 function aiLevelFromScore(total60) {
   const n = parseFloat(total60);
   if (isNaN(n)) return '';
@@ -111,7 +111,7 @@ function aiCombinedOf(fb) {
 
 /* ---- เรียก API ---- */
 
-// สถานะฟีเจอร์ AI ของผู้ใช้ปัจจุบัน (เปิดใช้ไหม / ตั้งค่าแล้วหรือยัง / โควตาเหลือเท่าไร)
+// สถานะฟีเจอร์ตรวจอัตโนมัติของผู้ใช้ปัจจุบัน (เปิดใช้ไหม / ตั้งค่าแล้วหรือยัง / โควตาเหลือเท่าไร)
 async function aiGetStatus() {
   try {
     const res  = await fetch('api.php?action=get_ai_status');
@@ -137,7 +137,7 @@ async function aiGetFeedback(studentId, phase) {
   }
 }
 
-// สั่งให้ AI ตรวจ — คืน {success, feedback, error, quota_left}
+// สั่งให้ระบบตรวจ — คืน {success, feedback, error, quota_left}
 async function aiRequestReview(studentId, phase) {
   try {
     const body = { action: 'ai_review_essay', essay_phase: phase };
@@ -158,7 +158,7 @@ async function aiRequestReview(studentId, phase) {
 
 function aiEmptyHTML(msg) {
   return `<div class="text-center text-muted py-5">
-    <i class="bi bi-robot fs-1 d-block mb-3 opacity-50"></i>${aiEsc(msg)}
+    <i class="bi bi-file-earmark-check fs-1 d-block mb-3 opacity-50"></i>${aiEsc(msg)}
   </div>`;
 }
 
@@ -203,14 +203,14 @@ function aiDeltaBadge(delta, opts) {
 
 /* ---- เทียบกับ "ฉบับตั้งต้น" ตามคู่ที่ครูกำหนด (D1.2↔D1.1 · D2.2↔D2.1 · หลังเรียน↔ก่อนเรียน) ---- */
 
-// ป้ายทิศทางที่คำนวณจากคะแนนจริง ใช้เมื่อ AI ไม่ได้ระบุคำตัดสินมา (เช่นผลตรวจที่บันทึกไว้ก่อนหน้า)
+// ป้ายทิศทางที่คำนวณจากคะแนนจริง ใช้เมื่อระบบไม่ได้ระบุคำตัดสินมา (เช่นผลตรวจที่บันทึกไว้ก่อนหน้า)
 function aiDirBadge(dir) {
   if (dir === 'up')   return '<span class="badge ai-tag-better"><i class="bi bi-arrow-up-circle me-1"></i>คะแนนสูงขึ้น</span>';
   if (dir === 'down') return '<span class="badge ai-tag-worse"><i class="bi bi-arrow-down-circle me-1"></i>คะแนนต่ำลง</span>';
   return '<span class="badge ai-tag-same"><i class="bi bi-dash-circle me-1"></i>คะแนนเท่าเดิม</span>';
 }
 
-// ป้ายคำตัดสินรายข้อที่ AI ให้มา (ดีขึ้น / เท่าเดิม / แย่ลง)
+// ป้ายคำตัดสินรายข้อที่ระบบให้มา (ดีขึ้น / เท่าเดิม / แย่ลง)
 function aiVerdictBadge(v) {
   if (v === 'better') return '<span class="badge ai-tag-better"><i class="bi bi-arrow-up-circle me-1"></i>ดีขึ้น</span>';
   if (v === 'worse')  return '<span class="badge ai-tag-worse"><i class="bi bi-arrow-down-circle me-1"></i>แย่ลง</span>';
@@ -221,7 +221,7 @@ function aiVerdictBadge(v) {
 /**
  * คำนวณผลเทียบกับฉบับตั้งต้นจาก "ผลตรวจสองฉบับที่บันทึกไว้แล้ว"
  * ใช้เป็นตัวสำรองเมื่อฐานข้อมูลยังไม่มีคอลัมน์เทียบ หรือผลตรวจถูกบันทึกไว้ก่อนมีฟีเจอร์นี้
- * ได้โครงสร้างเดียวกับ ai_draft_progress() ฝั่งเซิร์ฟเวอร์ แต่ไม่มีข้อความ before/after ที่ AI ยกมา
+ * ได้โครงสร้างเดียวกับ ai_draft_progress() ฝั่งเซิร์ฟเวอร์ แต่ไม่มีข้อความ before/after ที่ระบบยกมา
  */
 function aiComputeDraftCompare(fb, baseFb) {
   const phase  = fb.essay_phase || '';
@@ -254,7 +254,7 @@ function aiComputeDraftCompare(fb, baseFb) {
   const total     = Math.round(Number(fb.total_score) * 100) / 100;
   return Object.assign({
     has_baseline:    true,
-    estimated:       true,          // คำนวณจากคะแนนที่บันทึกไว้ ไม่ได้มาจากการเทียบข้อความของ AI
+    estimated:       true,          // คำนวณจากคะแนนที่บันทึกไว้ ไม่ได้มาจากการเทียบข้อความของระบบ
     this_short:      aiPhaseShort(phase),
     reviewed_at:     baseFb.updated_at || baseFb.created_at || '',
     base_total:      baseTotal,
@@ -356,7 +356,7 @@ function aiEditListHTML(d) {
     <div class="small mb-2">${head}</div>
     ${rows}
     <div class="text-muted mt-2" style="font-size:0.75rem;">
-      <i class="bi bi-info-circle me-1"></i>ส่วนนี้ระบบเทียบข้อความของสองฉบับเอง ไม่ได้ถาม AI
+      <i class="bi bi-info-circle me-1"></i>ส่วนนี้ระบบเทียบข้อความของสองฉบับเอง ไม่ได้ถามโมเดล
       จึงยืนยันได้ว่าส่วนที่ขึ้นว่า &quot;ไม่ได้แก้&quot; คือเหมือนเดิมทุกตัวอักษรจริง
       ${d.edits_live ? '<br><i class="bi bi-clock-history me-1"></i>เทียบจากต้นฉบับล่าสุดของทั้งสองฉบับ '
         + '(ผลตรวจนี้บันทึกไว้ก่อนระบบจะเก็บผลเทียบให้)' : ''}
@@ -418,7 +418,7 @@ function aiSideBySideHTML(fb, d) {
         <div class="small text-muted mb-2">
           ${marked
             ? '<i class="bi bi-info-circle me-1"></i>ข้อความขึ้นพื้น<span class="ai-sbs-mark ai-sbs-out">แดงขีดฆ่า</span>คือวรรคที่หายไปจากฉบับเดิม '
-              + '· ขึ้นพื้น<span class="ai-sbs-mark ai-sbs-in">เขียว</span>คือวรรคที่เพิ่งเพิ่มเข้ามา · ระบบเทียบข้อความเอง ไม่ได้ถาม AI'
+              + '· ขึ้นพื้น<span class="ai-sbs-mark ai-sbs-in">เขียว</span>คือวรรคที่เพิ่งเพิ่มเข้ามา · ระบบเทียบข้อความเอง ไม่ได้ถามโมเดล'
             : '<i class="bi bi-signpost-split me-1"></i>สองฉบับนี้เป็น<strong>คนละหัวข้อ</strong> จึงไม่ได้ทำเครื่องหมายว่าเปลี่ยนตรงไหน '
               + 'วางไว้คู่กันให้อ่านเทียบสำนวนและวิธีเขียนของนักเรียนเอง'}
         </div>
@@ -441,7 +441,7 @@ function aiDraftCompareHTML(fb, opts) {
   // จึงต้องพูดถึง "พัฒนาการของความสามารถในการเขียน" ไม่ใช่ "แก้อะไรไปบ้าง"
   const newTopic = (d.kind || aiBaselineKind(fb.essay_phase || '')) === 'newtopic';
 
-  // มีคู่ให้เทียบ แต่ฉบับตั้งต้นยังไม่ถูก AI ตรวจ → บอกครูว่าต้องตรวจฉบับนั้นก่อนจึงจะเทียบได้
+  // มีคู่ให้เทียบ แต่ฉบับตั้งต้นยังไม่ถูกระบบตรวจ → บอกครูว่าต้องตรวจฉบับนั้นก่อนจึงจะเทียบได้
   // (โหมดย่อในหน้าเขียนเรียงความไม่ต้องขึ้น เพราะนักเรียนสั่งตรวจเองไม่ได้อยู่แล้ว)
   if (!d.has_baseline) {
     if (opts.compact) return '';
@@ -449,11 +449,11 @@ function aiDraftCompareHTML(fb, opts) {
       <div class="fw-bold text-dark"><i class="bi bi-arrow-left-right text-secondary me-2"></i>ยังเทียบกับ ${aiEsc(d.label || '')} ไม่ได้</div>
       <div class="small text-muted mt-1">
         รอบนี้ต้องเทียบกับ <strong>${aiEsc(d.label || '')}</strong> เสมอ
-        แต่ฉบับนั้นยังไม่มีผลตรวจของ AI — ให้ AI ตรวจฉบับตั้งต้นก่อน แล้วสั่งตรวจรอบนี้ใหม่อีกครั้ง
+        แต่ฉบับนั้นยังไม่มีผลตรวจของระบบ — ให้ระบบตรวจฉบับตั้งต้นก่อน แล้วสั่งตรวจรอบนี้ใหม่อีกครั้ง
         ระบบจะเทียบคะแนนรายข้อให้เอง
       </div>
       ${fb.draft_comment ? `<div class="ai-progress-comment mt-2">
-        <span class="fw-semibold">${newTopic ? 'AI สรุปพัฒนาการไว้ว่า' : 'AI เทียบจากตัวข้อความไว้ว่า'}:</span> ${aiEsc(fb.draft_comment)}</div>` : ''}
+        <span class="fw-semibold">${newTopic ? 'ระบบสรุปพัฒนาการไว้ว่า' : 'ระบบเทียบจากตัวข้อความไว้ว่า'}:</span> ${aiEsc(fb.draft_comment)}</div>` : ''}
       ${aiSideBySideHTML(fb, d)}
     </div>`;
   }
@@ -496,7 +496,7 @@ function aiDraftCompareHTML(fb, opts) {
     flags.push(`<div class="ai-draft-flag ai-draft-flag-warn"><i class="bi bi-graph-down me-1"></i>
       คะแนนรวมยัง<strong>${newTopic ? 'ไม่สูงขึ้น' : 'ไม่ดีขึ้น'}</strong>จาก ${aiEsc(d.short)} — มีข้อที่ดีขึ้น ${d.up} ข้อ แต่ถอยลง ${d.down} ข้อ</div>`);
   }
-  // คะแนนที่พุ่งขึ้นทีเดียวหลายระดับในข้อเดียว มักเป็นสัญญาณว่า AI ให้เกินจริง
+  // คะแนนที่พุ่งขึ้นทีเดียวหลายระดับในข้อเดียว มักเป็นสัญญาณว่าระบบให้เกินจริง
   // การแก้ร่างหนึ่งครั้งตามปกติควรขยับได้ทีละ 1 ระดับ (คะแนนดิบ 0-4) จึงติดธงให้ครูตรวจทานก่อน
   const bigUp = (d.criteria || []).filter(c => (Number(c.raw) - Number(c.base_raw)) >= 2);
   if (bigUp.length) {
@@ -504,12 +504,12 @@ function aiDraftCompareHTML(fb, opts) {
       <strong>คะแนนกระโดดขึ้นหลายระดับใน ${bigUp.length} ข้อ</strong>
       (${bigUp.map(c => aiEsc(c.id) + ' ' + aiEsc(c.name) + ' ' + aiFmt(c.base_raw) + '→' + aiFmt(c.raw)).join(' · ')})
       — ${newTopic ? 'ทักษะที่ขยับขึ้นทีเดียว 2 ระดับถือว่ามากผิดปกติ' : 'การแก้ร่างหนึ่งครั้งตามปกติจะขยับได้ทีละ 1 ระดับ'}
-      ลองอ่านเหตุผลของข้อนั้นในตารางด้านล่าง ถ้าฟังไม่ขึ้น ปรับคะแนนข้อนั้นเองหรือสั่งให้ AI ตรวจข้อนั้นใหม่ได้</div>`);
+      ลองอ่านเหตุผลของข้อนั้นในตารางด้านล่าง ถ้าฟังไม่ขึ้น ปรับคะแนนข้อนั้นเองหรือสั่งให้ระบบตรวจข้อนั้นใหม่ได้</div>`);
   }
 
   const chips = [
     `<span class="ai-progress-chip">
-       <span class="text-muted">คะแนน AI</span>
+       <span class="text-muted">คะแนนอัตโนมัติ</span>
        <span class="fw-bold">${aiFmt(d.base_total)} → ${aiFmt(d.total)}</span>
        <span class="text-muted">/ ${aiFmt(d.max_score)}</span>
        ${aiDeltaBadge(d.delta)}
@@ -537,14 +537,14 @@ function aiDraftCompareHTML(fb, opts) {
      อะไรเพิ่มเข้ามา/อะไรหายไป · เพราะอะไรคะแนนจึงขยับหรือไม่ขยับ */
   let table = '';
   if (!opts.compact && (d.criteria || []).length) {
-    // ผลตรวจเก่าที่ AI ยังไม่ได้อธิบายรายข้อ — บอกครั้งเดียวเหนือตาราง ไม่ต้องย้ำทุกแถว
+    // ผลตรวจเก่าที่ระบบยังไม่ได้อธิบายรายข้อ — บอกครั้งเดียวเหนือตาราง ไม่ต้องย้ำทุกแถว
     const hasWhy = (d.criteria || []).some(c => c.reason || c.change || c.added || c.removed || c.before || c.after);
     const noWhyNote = hasWhy ? '' : `<div class="ai-draft-note mb-2">
-      <i class="bi bi-info-circle me-1"></i><span class="fw-semibold">ยังไม่มีคำอธิบายรายข้อจาก AI ในรอบนี้</span>
-      — ตารางจึงบอกได้เฉพาะคะแนนที่ขยับ สั่งให้ AI ตรวจรอบนี้ใหม่
+      <i class="bi bi-info-circle me-1"></i><span class="fw-semibold">ยังไม่มีคำอธิบายรายข้อจากระบบในรอบนี้</span>
+      — ตารางจึงบอกได้เฉพาะคะแนนที่ขยับ สั่งให้ระบบตรวจรอบนี้ใหม่
       ${newTopic
-        ? 'เพื่อให้ AI บอกว่าแต่ละข้อนักเรียนทำได้ดีขึ้นตรงไหน ยังไม่ถึงตรงไหน และทำไมคะแนนจึงเปลี่ยน'
-        : 'เพื่อให้ AI บอกว่าแต่ละข้อมีอะไรเพิ่มเข้ามา อะไรหายไป และทำไมคะแนนจึงเปลี่ยน'}
+        ? 'เพื่อให้ระบบบอกว่าแต่ละข้อนักเรียนทำได้ดีขึ้นตรงไหน ยังไม่ถึงตรงไหน และทำไมคะแนนจึงเปลี่ยน'
+        : 'เพื่อให้ระบบบอกว่าแต่ละข้อมีอะไรเพิ่มเข้ามา อะไรหายไป และทำไมคะแนนจึงเปลี่ยน'}
     </div>`;
 
     const rows = d.criteria.map(c => {
@@ -630,28 +630,28 @@ function aiDraftCompareHTML(fb, opts) {
     ${opts.compact ? '' : aiSideBySideHTML(fb, d)}
     ${table}
     <div class="text-muted mt-2" style="font-size:0.75rem;">
-      <i class="bi bi-info-circle me-1"></i>ส่วนต่างคำนวณจากคะแนนที่ AI ให้จริงทั้งสองฉบับ
-      ไม่ได้เชื่อคำบรรยายของ AI อย่างเดียว
+      <i class="bi bi-info-circle me-1"></i>ส่วนต่างคำนวณจากคะแนนที่ระบบให้จริงทั้งสองฉบับ
+      ไม่ได้เชื่อคำบรรยายของระบบอย่างเดียว
       ${newTopic ? '<br><i class="bi bi-signpost-split me-1"></i>ก่อนเรียนกับหลังเรียนเป็น<strong>คนละหัวข้อ</strong> '
         + 'ระบบจึงเทียบที่คุณภาพเนื้อหาและความสามารถในการเขียนตามเกณฑ์แต่ละข้อ ไม่ได้เทียบว่าเนื้อเรื่องต่างกันอย่างไร '
         + 'และไม่มีรายการ &quot;ส่วนที่ถูกแก้&quot; เพราะไม่ใช่การแก้ร่างเดิม' : ''}
       ${d.estimated ? '<br><i class="bi bi-lightbulb me-1"></i>ผลตรวจฉบับนี้บันทึกไว้ก่อนระบบจะเทียบร่างให้อัตโนมัติ '
-        + 'จึงเทียบได้เฉพาะคะแนน — สั่งให้ AI ตรวจรอบนี้ใหม่ เพื่อให้ AI อธิบายผลเทียบรายข้อให้เห็น' : ''}
+        + 'จึงเทียบได้เฉพาะคะแนน — สั่งให้ระบบตรวจรอบนี้ใหม่ เพื่อให้ระบบอธิบายผลเทียบรายข้อให้เห็น' : ''}
     </div>
   </div>`;
 }
 
 /**
- * สร้าง HTML ของผลตรวจ AI
+ * สร้าง HTML ของผลตรวจอัตโนมัติ
  * opts.compact = true : แบบย่อ (ใช้ในหน้าเขียนเรียงความ — ไม่แสดงตารางคะแนนรายข้อ)
  * opts.deleteAction    : โค้ด onclick ของปุ่มลบ (ครูเท่านั้น) เว้นว่างไว้ = ไม่แสดงปุ่ม
  * opts.manualAction    : โค้ด onclick ของปุ่มบันทึกคะแนนที่ครูให้เอง (ครูเท่านั้น) เว้นว่าง = ดูอย่างเดียว
- * opts.recheckAction   : โค้ด onclick ของปุ่ม "ให้ AI ตรวจใหม่" ที่ขึ้นเมื่อต้นฉบับถูกแก้หลังตรวจ (ครูเท่านั้น)
+ * opts.recheckAction   : โค้ด onclick ของปุ่ม "ให้ระบบตรวจใหม่" ที่ขึ้นเมื่อต้นฉบับถูกแก้หลังตรวจ (ครูเท่านั้น)
  */
 function aiFeedbackHTML(fb, opts) {
   opts = opts || {};
 
-  // คะแนนแบ่งเป็น 2 ส่วน: ส่วนที่ AI ประเมินได้ (58) + ส่วนที่ครูต้องให้เอง (2) = เต็ม 60 ตามเกณฑ์จริงของครู
+  // คะแนนแบ่งเป็น 2 ส่วน: ส่วนที่ระบบประเมินได้ (58) + ส่วนที่ครูต้องให้เอง (2) = เต็ม 60 ตามเกณฑ์จริงของครู
   const manualItems   = fb.manual_items || [];
   const teacherScores = fb.teacher_scores || {};
   const manualMax     = Number(fb.manual_max || 0);
@@ -672,14 +672,14 @@ function aiFeedbackHTML(fb, opts) {
   ).join('') || '<div class="text-muted small mb-2">— ไม่มีข้อมูล —</div>';
 
   // จุดที่ควรปรับปรุง — แยกให้เห็นชัดเป็น 2 ช่อง "บกพร่องอะไร" กับ "แก้อย่างไร"
-  // พร้อมบอกว่าเป็นเกณฑ์ข้อไหน และข้อนั้น AI ให้กี่คะแนน เสียคะแนนไปเท่าไร
+  // พร้อมบอกว่าเป็นเกณฑ์ข้อไหน และข้อนั้นระบบให้กี่คะแนน เสียคะแนนไปเท่าไร
   const improvements = (fb.improvements || []).map((it, i) => {
     const c        = (fb.scores && fb.scores[it.criterion]) ? fb.scores[it.criterion] : null;
     const critName = c ? (c.name || '') : '';
     const lost     = c ? Math.round((c.max - c.weighted) * 100) / 100 : 0;
-    // ข้อที่คะแนนถูกปรับ (ครูปรับเอง / AI ตรวจข้อนั้นใหม่) ต้องไม่เขียนว่า "AI ให้" เพราะไม่ใช่คะแนนของรอบแรกแล้ว
+    // ข้อที่คะแนนถูกปรับ (ครูปรับเอง / ระบบตรวจข้อนั้นใหม่) ต้องไม่เขียนว่า "ระบบให้" เพราะไม่ใช่คะแนนของรอบแรกแล้ว
     const scoreTag = c
-      ? `${c.overridden ? 'คะแนนที่ใช้' : 'AI ให้'} ${c.weighted} / ${c.max} คะแนน${lost > 0 ? ' · เสียไป ' + lost + ' คะแนน' : ''}`
+      ? `${c.overridden ? 'คะแนนที่ใช้' : 'ระบบให้'} ${c.weighted} / ${c.max} คะแนน${lost > 0 ? ' · เสียไป ' + lost + ' คะแนน' : ''}`
       : '';
     const fromRecheck = it.from_recheck
       ? '<span class="badge ai-ov-badge ai-ov-recheck ms-1"><i class="bi bi-arrow-repeat me-1"></i>จากการตรวจข้อนี้ใหม่</span>'
@@ -695,11 +695,11 @@ function aiFeedbackHTML(fb, opts) {
       <div class="p-3">
         <div class="ai-fix-block ai-fix-issue mb-2">
           <div class="ai-fix-head text-danger-emphasis"><i class="bi bi-exclamation-octagon-fill me-1"></i>บกพร่องอะไร</div>
-          <div class="small">${it.issue ? aiEsc(it.issue) : '— AI ไม่ได้ระบุ —'}</div>
+          <div class="small">${it.issue ? aiEsc(it.issue) : '— ระบบไม่ได้ระบุ —'}</div>
         </div>
         <div class="ai-fix-block ai-fix-how">
           <div class="ai-fix-head text-success-emphasis"><i class="bi bi-wrench-adjustable me-1"></i>แก้อย่างไร</div>
-          <div class="small">${it.suggestion ? aiEsc(it.suggestion) : '— AI ไม่ได้ระบุ —'}</div>
+          <div class="small">${it.suggestion ? aiEsc(it.suggestion) : '— ระบบไม่ได้ระบุ —'}</div>
           ${it.example ? `<div class="ai-fix-example mt-2 small">
             <span class="fw-semibold"><i class="bi bi-quote me-1"></i>ตัวอย่างหลังแก้:</span>
             <span class="fst-italic">${aiEsc(it.example)}</span>
@@ -709,9 +709,9 @@ function aiFeedbackHTML(fb, opts) {
     </div>`;
   }).join('') || '<div class="text-muted small mb-2">— ไม่มีข้อมูล —</div>';
 
-  // แถบเตือนเมื่อนักเรียนแก้ไขต้นฉบับหลังจาก AI ตรวจไปแล้ว — ผลตรวจที่เห็นเป็นของฉบับก่อนแก้
+  // แถบเตือนเมื่อนักเรียนแก้ไขต้นฉบับหลังจากระบบตรวจไปแล้ว — ผลตรวจที่เห็นเป็นของฉบับก่อนแก้
   const markedAt = fb.recheck_marked_at ? String(fb.recheck_marked_at).replace('T', ' ').slice(0, 16) : '';
-  // ผลตรวจเก่าที่ AI ให้คะแนนไม่ครบ = การตรวจครั้งนั้น "ไม่ผ่าน" ต้องไม่ให้อ่านเหมือนผลตรวจปกติ
+  // ผลตรวจเก่าที่ระบบให้คะแนนไม่ครบ = การตรวจครั้งนั้น "ไม่ผ่าน" ต้องไม่ให้อ่านเหมือนผลตรวจปกติ
   // (ตอนนี้ระบบไม่บันทึกผลแบบนี้แล้ว กล่องนี้จึงขึ้นเฉพาะข้อมูลที่ค้างไว้จากก่อนหน้า)
   const incompleteBox = fb.incomplete
     ? `<div class="ai-recheck-alert rounded-3 p-3 mb-3 d-flex align-items-start gap-3 flex-wrap">
@@ -719,12 +719,12 @@ function aiFeedbackHTML(fb, opts) {
          <div class="flex-grow-1">
            <div class="fw-bold text-danger">การตรวจครั้งนั้นไม่สำเร็จ — ถือว่ายังไม่ได้ตรวจ</div>
            <div class="small text-muted">
-             AI ให้คะแนนมาไม่ครบทุกข้อ คะแนนที่แสดงจึงใช้ไม่ได้และไม่ถูกนำไปคิดในรายงาน
-             ${opts.recheckAction ? '' : ' · รอคุณครูสั่งให้ AI ตรวจใหม่อีกครั้ง'}
+             ระบบให้คะแนนมาไม่ครบทุกข้อ คะแนนที่แสดงจึงใช้ไม่ได้และไม่ถูกนำไปคิดในรายงาน
+             ${opts.recheckAction ? '' : ' · รอคุณครูสั่งให้ระบบตรวจใหม่อีกครั้ง'}
            </div>
          </div>
          ${opts.recheckAction ? `<button class="btn btn-danger fw-bold rounded-pill px-4" onclick="${opts.recheckAction}">
-           <i class="bi bi-stars me-1"></i>ให้ AI ตรวจใหม่ตอนนี้
+           <i class="bi bi-stars me-1"></i>ให้ระบบตรวจใหม่ตอนนี้
          </button>` : ''}
        </div>`
     : '';
@@ -733,15 +733,15 @@ function aiFeedbackHTML(fb, opts) {
     ? `<div class="ai-recheck-alert rounded-3 p-3 mb-3 d-flex align-items-start gap-3 flex-wrap">
          <i class="bi bi-arrow-repeat fs-4 text-warning-emphasis"></i>
          <div class="flex-grow-1">
-           <div class="fw-bold text-warning-emphasis">ต้นฉบับถูกแก้ไขหลังจาก AI ตรวจ — อยู่ในคิวรอตรวจใหม่</div>
+           <div class="fw-bold text-warning-emphasis">ต้นฉบับถูกแก้ไขหลังจากระบบตรวจ — อยู่ในคิวรอตรวจใหม่</div>
            <div class="small text-muted">
              ผลตรวจและคะแนนด้านล่างเป็นของฉบับ<strong>ก่อนแก้ไข</strong>
              ${markedAt ? ` · นักเรียนบันทึกฉบับแก้ไขเมื่อ ${aiEsc(markedAt)}` : ''}
-             ${opts.recheckAction ? '' : ' · รอคุณครูสั่งให้ AI ตรวจใหม่อีกครั้ง'}
+             ${opts.recheckAction ? '' : ' · รอคุณครูสั่งให้ระบบตรวจใหม่อีกครั้ง'}
            </div>
          </div>
          ${opts.recheckAction ? `<button class="btn btn-warning fw-bold rounded-pill px-4" onclick="${opts.recheckAction}">
-           <i class="bi bi-stars me-1"></i>ให้ AI ตรวจใหม่ตอนนี้
+           <i class="bi bi-stars me-1"></i>ให้ระบบตรวจใหม่ตอนนี้
          </button>` : ''}
        </div>`
     : '';
@@ -750,7 +750,7 @@ function aiFeedbackHTML(fb, opts) {
     `<div class="p-3 rounded-3 mb-2 ai-next-card"><i class="bi bi-arrow-right-circle-fill text-primary me-2"></i>${aiEsc(s)}</div>`
   ).join('');
 
-  // ---- ส่วนคะแนนที่ "ครูต้องให้เอง" (AI ตรวจจากไฟล์พิมพ์แทนไม่ได้ เช่น ข้อ 4.3 ลายมือ/ความเรียบร้อย) ----
+  // ---- ส่วนคะแนนที่ "ครูต้องให้เอง" (ระบบตรวจจากไฟล์พิมพ์แทนไม่ได้ เช่น ข้อ 4.3 ลายมือ/ความเรียบร้อย) ----
   // แถวต่อท้ายตารางคะแนนรายเกณฑ์ ให้เห็นคะแนนครบทุกข้อในตารางเดียว ส่วนช่องให้คะแนนอยู่ใต้ตาราง
   const manualRows = manualItems.map(it => {
     const cur  = teacherScores[it.id];
@@ -841,8 +841,8 @@ function aiFeedbackHTML(fb, opts) {
           <span class="text-muted fw-normal small">(เต็ม ${manualMax} คะแนน)</span>
         </h6>
         <div class="text-muted small mb-3">
-          ข้อนี้ AI ประเมินจากไฟล์ที่พิมพ์ไม่ได้ ต้องดูจากต้นฉบับที่นักเรียนเขียนด้วยมือ —
-          ${opts.manualAction ? 'เลือกระดับคะแนนแล้วกดบันทึก คะแนนจะไปรวมกับคะแนนของ AI ให้ครบเต็ม ' + fullMax
+          ข้อนี้ระบบประเมินจากไฟล์ที่พิมพ์ไม่ได้ ต้องดูจากต้นฉบับที่นักเรียนเขียนด้วยมือ —
+          ${opts.manualAction ? 'เลือกระดับคะแนนแล้วกดบันทึก คะแนนจะไปรวมกับคะแนนของระบบให้ครบเต็ม ' + fullMax
                               : 'คุณครูเป็นผู้ให้คะแนนข้อนี้'}
         </div>
         ${evalNote ? `<div class="alert border-0 rounded-3 small py-2 px-3 mb-3"
@@ -861,7 +861,7 @@ function aiFeedbackHTML(fb, opts) {
   }
 
   // ตารางคะแนนรายเกณฑ์ (ซ่อนในโหมดย่อ)
-  // ครูปรับคะแนนข้อที่ไม่เห็นด้วยได้ หรือสั่งให้ AI ตรวจเฉพาะข้อนั้นใหม่ได้จากปุ่มท้ายแถว
+  // ครูปรับคะแนนข้อที่ไม่เห็นด้วยได้ หรือสั่งให้ระบบตรวจเฉพาะข้อนั้นใหม่ได้จากปุ่มท้ายแถว
   let scoreTable = '';
   if (!opts.compact) {
     const canEditCrit = !!opts.critEditFn;
@@ -871,17 +871,17 @@ function aiFeedbackHTML(fb, opts) {
       const cpct = c.max > 0 ? Math.round((c.weighted / c.max) * 100) : 0;
       const ov   = c.overridden ? (c.override || {}) : null;
 
-      // แถวที่คะแนนถูกปรับ ต้องเห็นทั้งคะแนนเดิมของ AI และคะแนนที่ใช้จริง พร้อมเหตุผลกำกับ
+      // แถวที่คะแนนถูกปรับ ต้องเห็นทั้งคะแนนเดิมของระบบและคะแนนที่ใช้จริง พร้อมเหตุผลกำกับ
       const ovBadge = ov
         ? (ov.source === 'ai_recheck'
-            ? '<span class="badge ai-ov-badge ai-ov-recheck"><i class="bi bi-arrow-repeat me-1"></i>AI ตรวจข้อนี้ใหม่</span>'
+            ? '<span class="badge ai-ov-badge ai-ov-recheck"><i class="bi bi-arrow-repeat me-1"></i>ระบบตรวจข้อนี้ใหม่</span>'
             : '<span class="badge ai-ov-badge ai-ov-teacher"><i class="bi bi-person-check me-1"></i>ครูปรับคะแนน</span>')
         : '';
       const ovNote = ov
         ? `<div class="ai-ov-note mt-2 small">
-             <div><span class="fw-semibold">คะแนนเดิมที่ AI ให้:</span>
+             <div><span class="fw-semibold">คะแนนเดิมที่ระบบให้:</span>
                ${aiNum(c.ai_weighted)} / ${c.max}${c.ai_reason ? ' — ' + aiEsc(c.ai_reason) : ''}</div>
-             ${ov.instruction ? `<div class="mt-1"><span class="fw-semibold">คำสั่งที่ครูให้ AI:</span>
+             ${ov.instruction ? `<div class="mt-1"><span class="fw-semibold">คำสั่งที่ครูให้ระบบ:</span>
                <span class="fst-italic">${aiEsc(ov.instruction)}</span></div>` : ''}
              ${ov.by || ov.at ? `<div class="text-muted mt-1">โดย ${aiEsc(ov.by || '-')}${
                ov.at ? ' · ' + aiEsc(String(ov.at).replace('T', ' ').slice(0, 16)) : ''}</div>` : ''}
@@ -896,7 +896,7 @@ function aiFeedbackHTML(fb, opts) {
       const actionCell = canEditCrit
         ? `<td class="text-nowrap text-center">
              <button class="btn btn-outline-secondary btn-sm rounded-pill px-2 py-0"
-                     title="ปรับคะแนนข้อนี้เอง หรือให้ AI ตรวจข้อนี้ใหม่"
+                     title="ปรับคะแนนข้อนี้เอง หรือให้ระบบตรวจข้อนี้ใหม่"
                      onclick="${opts.critEditFn}('${aiEsc(k)}')">
                <i class="bi bi-sliders"></i>
              </button>
@@ -924,7 +924,7 @@ function aiFeedbackHTML(fb, opts) {
       ? `<div class="alert border-0 rounded-3 small py-2 px-3 mb-2"
               style="background:#f5f3ff; border-left:4px solid #6d28d9 !important;">
            <i class="bi bi-sliders me-1"></i>คะแนน ${ovCount} ข้อผ่านการตรวจทานของครูแล้ว —
-           คะแนนที่ AI ให้ครั้งแรกรวมได้ ${aiNum(fb.ai_total_score)} / ${aiNum(fb.max_score)}
+           คะแนนที่ระบบให้ครั้งแรกรวมได้ ${aiNum(fb.ai_total_score)} / ${aiNum(fb.max_score)}
            · หลังตรวจทานเป็น ${aiNum(fb.total_score)} / ${aiNum(fb.max_score)}
          </div>`
       : '';
@@ -934,8 +934,8 @@ function aiFeedbackHTML(fb, opts) {
       ${ovSummary}
       ${canEditCrit ? `<div class="text-muted small mb-2">
         <i class="bi bi-info-circle me-1"></i>ไม่เห็นด้วยกับคะแนนข้อไหน กดปุ่ม
-        <i class="bi bi-sliders"></i> ท้ายแถวเพื่อปรับคะแนนเอง หรือสั่งให้ AI ตรวจเฉพาะข้อนั้นใหม่
-        (คะแนนเดิมของ AI ถูกเก็บไว้เสมอ กดคืนค่าได้ตลอด)
+        <i class="bi bi-sliders"></i> ท้ายแถวเพื่อปรับคะแนนเอง หรือสั่งให้ระบบตรวจเฉพาะข้อนั้นใหม่
+        (คะแนนเดิมของระบบถูกเก็บไว้เสมอ กดคืนค่าได้ตลอด)
       </div>` : ''}
       <div class="table-responsive">
         <table class="table table-sm table-bordered align-middle mb-0">
@@ -967,7 +967,7 @@ function aiFeedbackHTML(fb, opts) {
   return `
     <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
       <div>
-        <h6 class="fw-bold text-dark mb-0"><i class="bi bi-clipboard2-check text-primary me-2"></i>ผลการตรวจโดย AI</h6>
+        <h6 class="fw-bold text-dark mb-0"><i class="bi bi-clipboard2-check text-primary me-2"></i>ผลการตรวจโดยระบบ</h6>
         <div class="text-muted small mt-1">
           ${aiEsc(fb.phase_label || aiPhaseLabel(fb.essay_phase))}${fb.student_name ? ' · ' + aiEsc(fb.student_name) : ''}
           ${Number(fb.review_round || 1) > 1
@@ -994,7 +994,7 @@ function aiFeedbackHTML(fb, opts) {
           </div>
           <div class="ai-score-bar mt-2"><span style="width:${pct}%"></span></div>
           <div class="d-flex justify-content-between small mt-2">
-            <span><i class="bi bi-robot me-1 text-primary"></i>AI ประเมิน</span>
+            <span><i class="bi bi-file-earmark-check me-1 text-primary"></i>ระบบประเมิน</span>
             <span class="fw-semibold">${fb.total_score} / ${fb.max_score}</span>
           </div>
           <div class="d-flex justify-content-between small">
@@ -1032,7 +1032,7 @@ function aiFeedbackHTML(fb, opts) {
     <div class="text-muted mt-3" style="font-size:0.75rem;">
       <i class="bi bi-cpu me-1"></i>ตรวจโดยโมเดล ${aiEsc(fb.model || '-')} (${aiEsc(fb.provider || '-')}) · เมื่อ ${aiEsc(when)}
       ${fb.requested_role === 'teacher' ? ' · สั่งตรวจโดยคุณครู' : ''}
-      <br><i class="bi bi-info-circle me-1"></i>ข้อเสนอแนะนี้เป็นแนวทางเพื่อพัฒนางานเขียน คะแนนรวมเต็ม ${fullMax} คิดจากคะแนนที่ AI ประเมิน (${fb.max_score}) บวกข้อที่คุณครูให้เอง (${manualMax})
+      <br><i class="bi bi-info-circle me-1"></i>ข้อเสนอแนะนี้เป็นแนวทางเพื่อพัฒนางานเขียน คะแนนรวมเต็ม ${fullMax} คิดจากคะแนนที่ระบบประเมิน (${fb.max_score}) บวกข้อที่คุณครูให้เอง (${manualMax})
       และไม่ถูกนำไปรวมกับคะแนนจริงของครู เพื่อน หรือการประเมินตนเองในระบบประเมิน
     </div>`;
 }

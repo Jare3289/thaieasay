@@ -5,7 +5,7 @@
  * รวมทุกอย่างที่ต้องใช้เขียนผลการวิจัยไว้ในหน้าเดียว
  *   1) ตรวจความพร้อมของข้อมูล — บอกตรง ๆ ว่ายังขาดอะไรก่อนจะเขียนบทที่ 4-5 ได้ครบ
  *   2) ตัวเลขสถิติทั้งหมด (ตาราง 12 และตาราง 14) คำนวณจากข้อมูลจริงในระบบ
- *   3) ปุ่มให้ AI วิเคราะห์ทีละหัวข้อ หรือสั่งรวดเดียวทั้ง 21 หัวข้อ
+ *   3) ปุ่มให้ระบบวิเคราะห์ทีละหัวข้อ หรือสั่งรวดเดียวทั้ง 21 หัวข้อ
  *   4) กล่องบันทึกหลังสอน — แหล่งข้อมูลของ "ข้อเสนอแนะ" ในบทที่ 5
  *   5) ปุ่มเปิดร่างบทที่ 4-5 ฉบับประกอบเสร็จ พร้อมพิมพ์หรือคัดลอกไปวางในวิทยานิพนธ์
  *
@@ -18,7 +18,7 @@ if (!in_array($_SESSION['user']['role'], ['teacher', 'expert'], true)) {
     header('Location: index.php');
     exit;
 }
-require_once 'chapter45_ai.php';
+require_once 'chapter45_engine.php';
 require_once 'header.php';
 
 $c45IsTeacher = ($sessionUser['role'] === 'teacher');
@@ -39,7 +39,7 @@ $c45IsTeacher = ($sessionUser['role'] === 'teacher');
           <h4 class="fw-bold mb-1"><i class="bi bi-journal-richtext me-2"></i>วิเคราะห์บทที่ 4 และบทที่ 5</h4>
           <p class="text-white-50 mb-0 small">
             รวบรวมข้อมูลจริงในระบบ คำนวณสถิติทุกตัวที่โครงวิทยานิพนธ์ต้องใช้
-            แล้วให้ AI เรียบเรียงเป็นเนื้อหาบทที่ 4 และบทที่ 5 ทีละหัวข้อ
+            แล้วให้ระบบเรียบเรียงเป็นเนื้อหาบทที่ 4 และบทที่ 5 ทีละหัวข้อ
           </p>
         </div>
         <div class="text-end">
@@ -54,8 +54,8 @@ $c45IsTeacher = ($sessionUser['role'] === 'teacher');
     </div>
     <div class="bg-light border-top px-4 py-2 small text-muted">
       <i class="bi bi-shield-check me-1"></i>
-      <strong>ตัวเลขทุกตัวคำนวณด้วยระบบ ไม่ได้ให้ AI คิด</strong> —
-      AI ทำหน้าที่เรียบเรียงเป็นภาษาวิชาการเท่านั้น และข้อความที่ยกเป็นตัวอย่างจะถูกตรวจซ้ำว่า
+      <strong>ตัวเลขทุกตัวคำนวณด้วยระบบ ไม่ได้ให้ระบบคิด</strong> —
+      ระบบทำหน้าที่เรียบเรียงเป็นภาษาวิชาการเท่านั้น และข้อความที่ยกเป็นตัวอย่างจะถูกตรวจซ้ำว่า
       <strong>ปรากฏอยู่ในผลงานจริงของนักเรียน</strong> ถ้าไม่ตรงระบบจะขึ้นเตือนเป็นสีแดงให้ตรวจก่อนนำไปใช้
     </div>
   </div>
@@ -99,12 +99,12 @@ $c45IsTeacher = ($sessionUser['role'] === 'teacher');
   </div>
 
 <?php if ($c45IsTeacher): ?>
-  <!-- 4) สั่งให้ AI วิเคราะห์ -->
+  <!-- 4) สั่งให้ระบบวิเคราะห์ -->
   <div class="card border-0 shadow-sm rounded-4 mb-4" style="border-top:4px solid #6d28d9 !important;">
     <div class="card-body p-4">
       <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
         <div>
-          <h5 class="fw-bold mb-1"><i class="bi bi-robot me-2" style="color:#6d28d9"></i>ให้ AI วิเคราะห์และเรียบเรียง</h5>
+          <h5 class="fw-bold mb-1"><i class="bi bi-file-earmark-check me-2" style="color:#6d28d9"></i>ให้ระบบวิเคราะห์และเรียบเรียง</h5>
           <p class="text-muted small mb-0">
             ระบบจะสั่งทีละหัวข้อตามลำดับที่ถูกต้อง (ตัวบ่งชี้ → องค์ประกอบ → ภาพรวม → บทที่ 5)
             เพราะหัวข้อสรุปต้องอ่านผลของหัวข้อย่อยก่อน
@@ -145,7 +145,7 @@ $c45IsTeacher = ($sessionUser['role'] === 'teacher');
       <h5 class="fw-bold mb-1"><i class="bi bi-journal-bookmark me-2 text-warning"></i>บันทึกหลังสอน</h5>
       <p class="text-muted small mb-3">
         โครงบทที่ 5 กำหนดว่า <strong>ข้อเสนอแนะสำหรับการนำผลวิจัยไปใช้ต้องเขียนจากปัญหาที่พบจริง</strong>
-        ไม่ใช่จากตัวเลข — บันทึกไว้ที่นี่แล้ว AI จะเรียบเรียงให้เป็นข้อเสนอแนะตามรูปแบบของวิทยานิพนธ์
+        ไม่ใช่จากตัวเลข — บันทึกไว้ที่นี่แล้ว ระบบจะเรียบเรียงให้เป็นข้อเสนอแนะตามรูปแบบของวิทยานิพนธ์
       </p>
       <div class="row g-2 align-items-end mb-3">
         <div class="col-md-3">
@@ -584,7 +584,7 @@ function c45PaintResults() {
                        + '<i class="bi bi-trash3"></i> ลบผล</button>' : '')
               + (job.indicator ? '<button class="btn btn-sm btn-outline-secondary rounded-pill px-3" '
                        + 'onclick="c45ShowEvidence(\'' + job.indicator + '\')">'
-                       + '<i class="bi bi-search"></i> ดูผลงานที่ระบบคัดให้ AI</button>' : '')
+                       + '<i class="bi bi-search"></i> ดูผลงานที่ระบบคัดให้ระบบ</button>' : '')
               + '</div>'
             : '')
         + '<div id="out-' + k + '">'
@@ -637,7 +637,7 @@ async function c45RunOne(jobKey) {
   c45Running = true;
   const out = document.getElementById('out-' + jobKey);
   if (out) out.innerHTML = '<div class="text-primary small"><span class="spinner-border spinner-border-sm me-2"></span>'
-    + 'กำลังให้ AI วิเคราะห์… (ปกติใช้เวลา 15-40 วินาทีต่อหัวข้อ)</div>';
+    + 'กำลังให้ระบบวิเคราะห์… (ปกติใช้เวลา 15-40 วินาทีต่อหัวข้อ)</div>';
   const r = await c45RunJob(jobKey, false);
   c45Running = false;
   if (r.ok) {
@@ -655,7 +655,7 @@ async function c45RunOne(jobKey) {
 
 async function c45RunAll() {
   if (c45Running) return;
-  if (!confirm('ระบบจะสั่งให้ AI วิเคราะห์ทั้ง ' + Object.keys(c45Data.jobs).length
+  if (!confirm('ระบบจะสั่งให้ระบบวิเคราะห์ทั้ง ' + Object.keys(c45Data.jobs).length
       + ' หัวข้อตามลำดับ ใช้เวลาประมาณ 5-15 นาที ผลเดิมจะถูกทับ ยืนยันหรือไม่?')) return;
 
   c45Running = true;
@@ -720,8 +720,8 @@ async function c45ShowEvidence(indicatorId) {
   if (!d.success) { c45Alert(c45Esc(d.error || 'ดึงข้อมูลไม่สำเร็จ'), 'danger'); return; }
   const ev = d.evidence;
   const meta = c45Data.meta;
-  let h = '<div class="small text-muted mb-2">นี่คือผลงานจริงที่ระบบคัดส่งให้ AI เลือกยกเป็นตัวอย่าง — '
-    + 'AI ยกข้อความได้จากผลงานเหล่านี้เท่านั้น</div>';
+  let h = '<div class="small text-muted mb-2">นี่คือผลงานจริงที่ระบบคัดส่งให้ระบบเลือกยกเป็นตัวอย่าง — '
+    + 'ระบบยกข้อความได้จากผลงานเหล่านี้เท่านั้น</div>';
   [['work1', meta.work1_label], ['work2', meta.work2_label]].forEach(function (p) {
     h += '<h6 class="fw-bold mt-3">' + c45Esc(p[1]) + '</h6>';
     if (!ev[p[0]] || !ev[p[0]].length) { h += '<div class="text-muted small">ไม่พบผลงานในรอบนี้</div>'; return; }
@@ -731,7 +731,7 @@ async function c45ShowEvidence(indicatorId) {
         + '<div class="small" style="line-height:1.8;">' + c45Esc(c.text) + '</div></div>';
     });
   });
-  c45Modal('ผลงานที่ระบบคัดให้ AI — ตัวบ่งชี้ ' + indicatorId, h);
+  c45Modal('ผลงานที่ระบบคัดให้ระบบ — ตัวบ่งชี้ ' + indicatorId, h);
 }
 
 function c45Modal(title, bodyHtml) {

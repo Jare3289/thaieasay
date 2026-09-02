@@ -13,7 +13,7 @@
 |---|---|---|---|
 | 1 | `api.php` | สูงมาก | 3,969 บรรทัด, 72 actions และตอบ JSON โดยตรงราว 250 จุด ทำให้สิทธิ์, validation และ transaction ไม่สม่ำเสมอ |
 | 2 | `db_config.php` | สูง | การเปิดทุกหน้าจะโหลดไฟล์นี้ และไฟล์มีทั้งการเชื่อมต่อ, สร้างตาราง, ตรวจ schema และ migration แบบ runtime |
-| 3 | `ai_config.php` / `chapter45_ai.php` | สูง | รวม config, prompt, HTTP client, parsing, scoring และ persistence ไว้ในไฟล์ใหญ่เดียว ฟังก์ชันสร้าง prompt บางตัวเกิน 290 บรรทัด |
+| 3 | `writing_check_config.php` / `chapter45_engine.php` | สูง | รวม config, prompt, HTTP client, parsing, scoring และ persistence ไว้ในไฟล์ใหญ่เดียว ฟังก์ชันสร้าง prompt บางตัวเกิน 290 บรรทัด |
 | 4 | JavaScript ที่ฝังในหน้า PHP | กลาง-สูง | `research_analysis.php`, `dashboard.php`, `evaluation.php` และ `reflection_tools.php` รวม view, state, fetch, คำนวณ และ render ไว้ในไฟล์เดียว |
 
 ไม่พบ syntax error ใน PHP หรือ JavaScript จากการตรวจรอบนี้ แต่ยังไม่มี test suite อัตโนมัติ
@@ -33,7 +33,7 @@ HTML ที่ทำงานใน browser ของครูได้ รอ�
 ### 1. API เป็น “ไฟล์ศูนย์กลาง” ขนาดใหญ่
 
 `api.php` รับทุกคำสั่งผ่าน switch เดียว ตั้งแต่ login, นักเรียน, แบบประเมิน,
-งานสะท้อนคิด, เรียงความ, AI และบทที่ 4-5 ผลกระทบคือ:
+งานสะท้อนคิด, เรียงความ, ระบบและบทที่ 4-5 ผลกระทบคือ:
 
 - เปลี่ยนฟีเจอร์หนึ่งมีโอกาสกระทบฟีเจอร์อื่นและเกิด merge conflict สูง
 - การตรวจ role เขียนซ้ำในแต่ละ case จึงมีโอกาสลืมตรวจสิทธิ์
@@ -43,7 +43,7 @@ HTML ที่ทำงานใน browser ของครูได้ รอ�
 **แนวทาง:** แยกทีละกลุ่มเป็น `api/auth.php`, `api/students.php`,
 `api/reflections.php`, `api/essays.php`, `api/ai.php` และมี dispatcher บาง ๆ
 ร่วมกับ helper `json_response()`, `require_api_role()` และ request validator กลาง
-โดยเริ่มจากกลุ่ม reflection ซึ่งขนาดเล็กกว่ากลุ่ม AI
+โดยเริ่มจากกลุ่ม reflection ซึ่งขนาดเล็กกว่ากลุ่มตรวจอัตโนมัติ
 
 ### 2. Migration ทำงานปะปนกับทุก request
 
@@ -55,14 +55,14 @@ HTML ที่ทำงานใน browser ของครูได้ รอ�
 **แนวทาง:** ย้าย DDL ไป migration command ที่รันตอน deploy, เก็บเฉพาะการสร้าง PDO
 ใน `db_config.php`, บันทึก schema version และให้ startup ตรวจเพียง version เดียว
 
-### 3. ชั้น AI มีหลายหน้าที่ในโมดูลเดียว
+### 3. ชั้นระบบมีหลายหน้าที่ในโมดูลเดียว
 
-`ai_config.php` มีทั้ง provider settings, rubric, prompt generation, การเรียก HTTP,
-การ parse/normalize ผล และ mapping แถวฐานข้อมูล ส่วน `chapter45_ai.php` ทำรูปแบบเดียวกัน
+`writing_check_config.php` มีทั้ง provider settings, rubric, prompt generation, การเรียก HTTP,
+การ parse/normalize ผล และ mapping แถวฐานข้อมูล ส่วน `chapter45_engine.php` ทำรูปแบบเดียวกัน
 สำหรับรายงานอีกชุด การแก้ prompt จึงเสี่ยงแตะ logic คะแนนหรือ persistence โดยไม่ตั้งใจ
 
 **แนวทาง:** แยก provider client, prompt builder, parser และ repository พร้อม fixture
-ผลตอบกลับของ AI เพื่อทดสอบ parser โดยไม่เรียกเครือข่าย ก่อนแยกควรล็อกผลลัพธ์เดิมด้วย
+ผลตอบกลับของระบบเพื่อทดสอบ parser โดยไม่เรียกเครือข่าย ก่อนแยกควรล็อกผลลัพธ์เดิมด้วย
 characterization tests
 
 ### 4. หน้าใหญ่รวม presentation กับ business logic
@@ -91,7 +91,7 @@ characterization tests
 ### ระยะ 1 — ป้องกันและวัดผล
 
 - เพิ่ม integration tests สำหรับ login/role, บันทึกคะแนน, บันทึก reflection และ essay
-- เพิ่ม fixture test สำหรับสูตรสถิติและ AI parser
+- เพิ่ม fixture test สำหรับสูตรสถิติและ parser ของผลตรวจ
 - เพิ่ม JSON/authorization/CSRF helpers กลางโดยยังไม่ย้าย route
 
 ### ระยะ 2 — แยกส่วนที่เปลี่ยนบ่อย
@@ -102,7 +102,7 @@ characterization tests
 
 ### ระยะ 3 — แยกโดเมนใหญ่
 
-- แยก essay/AI/report services หลังมี characterization tests
+- แยก essay/ระบบ/report services หลังมี characterization tests
 - รวมสูตรสถิติให้มี implementation หลักและทดสอบค่าขอบเขต/ข้อมูลว่าง
 - ตั้งเกณฑ์ review เช่นไฟล์ใหม่ไม่เกินประมาณ 500 บรรทัด และฟังก์ชันใหม่ไม่เกิน
   ประมาณ 50 บรรทัด เว้นแต่มีเหตุผลบันทึกไว้
@@ -110,5 +110,5 @@ characterization tests
 ## ขอบเขตของผลตรวจ
 
 รอบนี้เป็น static review และ syntax check ใน environment ของ repository ยังไม่ได้ต่อ
-MySQL จริง, เรียกผู้ให้บริการ AI/Google หรือทดสอบ flow ผ่าน browser ครบทุกบทบาท
+MySQL จริง, เรียกผู้ให้บริการโมเดลภาษา/Google หรือทดสอบ flow ผ่าน browser ครบทุกบทบาท
 จึงควรทดสอบ staging ด้วยข้อมูลสำรองก่อนเปลี่ยน authentication หรือ migration

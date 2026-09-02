@@ -12,12 +12,12 @@
  * แหล่งข้อมูล:
  *   students / evaluations           → ผลสัมฤทธิ์ (คะแนนครู เพื่อน ตนเอง ผู้เชี่ยวชาญ)
  *   student_essays                   → ผลงาน (เรียงความแต่ละรอบ)
- *   essay_ai_feedback                → ผลตรวจของ AI และพัฒนาการระหว่างรอบตรวจ
+ *   essay_ai_feedback                → ผลตรวจของระบบและพัฒนาการระหว่างรอบตรวจ
  *   writing_problems / self_checklists / learning_reflections → เครื่องมือสะท้อนคิด
  *   peer_reviews                     → ข้อคิดเห็นเชิงคุณภาพจากเพื่อน
  */
 
-require_once 'ai_config.php';
+require_once 'writing_check_config.php';
 
 /** เกณฑ์การประเมิน 11 ข้อ พร้อมชื่อคอลัมน์ในตาราง evaluations (score_1_1 …) */
 function report_criteria() {
@@ -242,7 +242,7 @@ function report_dataset(PDO $pdo, array $opt = []) {
         }
     } catch (Exception $e) { /* ยังไม่มีตารางเรียงความ */ }
 
-    // ---- 4) ผลตรวจของ AI (รวมข้อมูลเทียบกับฉบับตั้งต้นตามคู่ที่ครูกำหนด) ----
+    // ---- 4) ผลตรวจของระบบ (รวมข้อมูลเทียบกับฉบับตั้งต้นตามคู่ที่ครูกำหนด) ----
     $ai = [];
     try {
         $q = $pdo->query('SELECT f.*, s.student_name, s.classroom
@@ -251,12 +251,12 @@ function report_dataset(PDO $pdo, array $opt = []) {
         while ($r = $q->fetch()) {
             if (!isset($students[$r['student_id']])) continue;
             $row = ai_feedback_row_to_array($r);
-            // ผลตรวจที่ AI ให้คะแนนไม่ครบ = การตรวจครั้งนั้นไม่ผ่าน ถือว่ายังไม่ได้ตรวจ
+            // ผลตรวจที่ระบบให้คะแนนไม่ครบ = การตรวจครั้งนั้นไม่ผ่าน ถือว่ายังไม่ได้ตรวจ
             // ต้องไม่นำคะแนนไปคิดในรายงาน มิฉะนั้นค่าเฉลี่ยจะถูกดึงลงด้วยคะแนนที่ไม่มีจริง
             if (!empty($row['incomplete'])) continue;
             $ai[$r['student_id']][$r['essay_phase']] = $row;
         }
-    } catch (Exception $e) { /* ยังไม่ได้ใช้ระบบ AI */ }
+    } catch (Exception $e) { /* ยังไม่ได้ใช้ระบบตรวจอัตโนมัติ */ }
 
     // ---- 5) เครื่องมือสะท้อนคิด (แยกตามหน่วยการเรียน) ----
     $tools = [];
@@ -430,7 +430,7 @@ function report_class_stats(array $data) {
     }
     $out['submission']['mean_done'] = report_mean($doneCounts);
 
-    // ---- ผลตรวจของ AI รายรอบงาน ----
+    // ---- ผลตรวจของระบบรายรอบงาน ----
     foreach (report_essay_phases() as $ph => $label) {
         $totals = [];
         $rounds = 0;
@@ -559,7 +559,7 @@ function report_student_summary(array $data, $sid) {
     $strong = array_slice($ranked, 0, 3);
     $weak   = array_slice(array_reverse($ranked), 0, 3);
 
-    // ---- ผลงาน: เรียงความทุกรอบ + ผลตรวจของ AI ----
+    // ---- ผลงาน: เรียงความทุกรอบ + ผลตรวจของระบบ ----
     $works = [];
     foreach (report_essay_phases() as $ph => $label) {
         $es = $data['essays'][$sid][$ph] ?? null;
@@ -611,7 +611,7 @@ function report_student_summary(array $data, $sid) {
         $allGrowth[] = ($p === null || $q === null) ? null : (float)$q - (float)$p;
     }
 
-    // ---- ผลตรวจของ AI ฉบับล่าสุดที่มี (ใช้เป็นข้อเสนอแนะปิดท้ายรายงาน) ----
+    // ---- ผลตรวจของระบบฉบับล่าสุดที่มี (ใช้เป็นข้อเสนอแนะปิดท้ายรายงาน) ----
     $latestAi = null;
     foreach (array_reverse(array_keys(report_essay_phases())) as $ph) {
         if (!empty($data['ai'][$sid][$ph])) { $latestAi = $data['ai'][$sid][$ph]; break; }
@@ -639,7 +639,7 @@ function report_student_summary(array $data, $sid) {
 /* ==========================================================================
  * ข้อมูล "ทั้งหมด" ของนักเรียนรายบุคคล — ใช้ทำรายงานฉบับเต็มและหน้าเว็บรายบุคคล
  * ทุกอย่างที่นักเรียนทำไว้ในระบบ: เรียงความฉบับเต็มทุกรอบ คะแนนรายเกณฑ์จากผู้ประเมินทุกฝ่าย
- * ผลตรวจของ AI ทุกรอบ เครื่องมือสะท้อนคิดทุกหน่วย และข้อคิดเห็นจากเพื่อน
+ * ผลตรวจของระบบทุกรอบ เครื่องมือสะท้อนคิดทุกหน่วย และข้อคิดเห็นจากเพื่อน
  * ========================================================================== */
 
 /** ป้ายชื่อเกณฑ์ 11 ข้อ แบบคีย์ขีดล่าง (ตรงกับชื่อคอลัมน์ในตารางเครื่องมือสะท้อนคิด) */
@@ -768,7 +768,7 @@ function report_full_data(PDO $pdo, array $sids) {
         }
     } catch (Exception $e) { /* ยังไม่มีผลประเมิน */ }
 
-    // ---- ผลตรวจของ AI ทุกรอบงาน ----
+    // ---- ผลตรวจของระบบทุกรอบงาน ----
     // ข้อความเรียงความรายส่วน ไว้เทียบว่าร่างที่ 2 แก้อะไรไปจากร่างที่ 1 บ้าง
     // (ผลตรวจที่บันทึกไว้ก่อนระบบจะเก็บผลเทียบให้ ก็ยังเห็นผลเทียบในรายงานได้)
     $aiParts = [];
@@ -795,7 +795,7 @@ function report_full_data(PDO $pdo, array $sids) {
             $out[$r['student_id']]['ai'][$r['essay_phase']] =
                 ai_feedback_row_to_array($r, null, $aiParts[$r['student_id']] ?? null);
         }
-    } catch (Exception $e) { /* ยังไม่ได้ใช้ระบบ AI */ }
+    } catch (Exception $e) { /* ยังไม่ได้ใช้ระบบตรวจอัตโนมัติ */ }
 
     // ---- บันทึกปัญหาการเขียนและแนวทางแก้ (แยกตามหน่วย) ----
     $critU = report_criteria_underscore();

@@ -216,19 +216,19 @@ require_once 'header.php';
         <div id="spellCheckPreview" class="essay-view-doc d-none"></div>
       </div>
 
-      <!-- ข้อเสนอแนะจาก AI ของรอบที่กำลังเปิดอยู่ (คุณครูเป็นผู้สั่งตรวจ นักเรียนดูผลได้อย่างเดียว) -->
+      <!-- ข้อเสนอแนะจากระบบของรอบที่กำลังเปิดอยู่ (คุณครูเป็นผู้สั่งตรวจ นักเรียนดูผลได้อย่างเดียว) -->
       <div class="mb-4 p-3 rounded-3 border d-none" id="aiWriterBox"
            style="border-color:#ddd6fe !important; background:#faf5ff;">
         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
           <div>
             <span class="fw-bold text-dark">
-              <i class="bi bi-robot me-1" style="color:#6d28d9;"></i>ข้อเสนอแนะจากผู้ช่วย AI
+              <i class="bi bi-file-earmark-check me-1" style="color:#6d28d9;"></i>ข้อเสนอแนะจากระบบตรวจอัตโนมัติ
             </span>
             <div class="text-muted small mt-1" id="aiWriterHint">
-              คุณครูจะเป็นผู้ให้ AI ตรวจเรียงความ เมื่อตรวจแล้วผลจะมาแสดงตรงนี้
+              คุณครูจะเป็นผู้ให้ระบบตรวจเรียงความ เมื่อตรวจแล้วผลจะมาแสดงตรงนี้
             </div>
           </div>
-          <a href="ai_feedback.php" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+          <a href="writing_feedback.php" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
             <i class="bi bi-collection me-1"></i>ดูผลตรวจทุกรอบ
           </a>
         </div>
@@ -332,7 +332,7 @@ require_once 'header.php';
 </style>
 
 <script src="thai_review.js"></script>
-<script src="ai_review.js"></script>
+<script src="writing_check.js"></script>
 <script>
 const phaseLabels = {
   pretest:  'ก่อนเรียน (Pretest)',
@@ -1160,22 +1160,22 @@ document.getElementById('savedEssayList').addEventListener('click', (ev) => {
 });
 
 // ---------------------------------------------------------------------------
-// แผงข้อเสนอแนะจาก AI ในหน้าเขียนเรียงความ (ดูตัวช่วยกลางใน ai_review.js)
-// คุณครูเป็นผู้สั่งให้ AI ตรวจ — หน้านี้ทำหน้าที่แสดงผลที่ตรวจแล้วเท่านั้น
+// แผงข้อเสนอแนะจากระบบในหน้าเขียนเรียงความ (ดูตัวช่วยกลางใน writing_check.js)
+// คุณครูเป็นผู้สั่งให้ระบบตรวจ — หน้านี้ทำหน้าที่แสดงผลที่ตรวจแล้วเท่านั้น
 // ---------------------------------------------------------------------------
-let writerAiStatus = null;   // สถานะฟีเจอร์ AI (โหลดครั้งเดียวตอนเปิดหน้า)
+let writerAiStatus = null;   // สถานะฟีเจอร์ตรวจอัตโนมัติ (โหลดครั้งเดียวตอนเปิดหน้า)
 
 async function initWriterAi() {
   writerAiStatus = await aiGetStatus();
   refreshWriterAiPanel();
 }
 
-// เรียงความฉบับนี้เคยให้ AI ตรวจไว้แล้วและเพิ่งถูกแก้ไข → ระบบจัดเข้าคิวให้คุณครูสั่งตรวจใหม่
+// เรียงความฉบับนี้เคยให้ระบบตรวจไว้แล้วและเพิ่งถูกแก้ไข → ระบบจัดเข้าคิวให้คุณครูสั่งตรวจใหม่
 // บอกนักเรียนให้รู้ตัว และรีเฟรชแผงผลตรวจให้ขึ้นป้าย "รอตรวจใหม่" ทันที
 function notifyAiRequeue(data) {
   if (!data || !data.ai_requeued) return;
   showToast(data.ai_requeue_message
-    || 'ต้นฉบับนี้เคยให้ AI ตรวจไว้แล้ว ระบบได้จัดเข้าคิวให้คุณครูสั่ง AI ตรวจใหม่อีกครั้ง', 'success');
+    || 'ต้นฉบับนี้เคยให้ระบบตรวจไว้แล้ว ระบบได้จัดเข้าคิวให้คุณครูสั่งระบบตรวจใหม่อีกครั้ง', 'success');
   refreshWriterAiPanel();
 }
 
@@ -1215,7 +1215,7 @@ async function refreshWriterAiPanel() {
     setEssayUnit('task1');
   }
   await loadSavedList();
-  await initWriterAi();             // แผงผู้ช่วย AI (ซ่อนไว้ถ้าครูยังไม่เปิดใช้)
+  await initWriterAi();             // แผงระบบตรวจอัตโนมัติ (ซ่อนไว้ถ้าครูยังไม่เปิดใช้)
 })();
 </script>
 

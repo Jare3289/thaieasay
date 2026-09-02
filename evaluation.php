@@ -329,7 +329,7 @@ require_once 'header.php';
           </div>
         </div>
 
-        <!-- สรุปคะแนนที่คำนวณอัตโนมัติ (แสดงสด), คะแนน/ระดับเดิมที่เคยประเมินไว้, คะแนนรอบคู่เทียบ (ก่อน-หลังเรียน / หน่วย 1-2) และคะแนนรวมจากผู้ช่วย AI -->
+        <!-- สรุปคะแนนที่คำนวณอัตโนมัติ (แสดงสด), คะแนน/ระดับเดิมที่เคยประเมินไว้, คะแนนรอบคู่เทียบ (ก่อน-หลังเรียน / หน่วย 1-2) และคะแนนรวมจากระบบตรวจอัตโนมัติ -->
         <div class="row g-3 mt-1">
           <!-- คะแนนที่ระบบคำนวณอัตโนมัติจากตัวเลือกปัจจุบัน -->
           <div class="col-xl-3 col-lg-6 col-md-6 col-12">
@@ -373,12 +373,12 @@ require_once 'header.php';
               </div>
             </div>
           </div>
-          <!-- คะแนนรวมที่ผู้ช่วย AI ตรวจให้ในรอบเดียวกัน (ข้อมูลประกอบการพิจารณา ไม่ใช่คะแนนที่บันทึก) -->
+          <!-- คะแนนรวมที่ระบบตรวจอัตโนมัติตรวจให้ในรอบเดียวกัน (ข้อมูลประกอบการพิจารณา ไม่ใช่คะแนนที่บันทึก) -->
           <div class="col-xl-3 col-lg-6 col-md-6 col-12">
             <div id="aiScoreBox" class="d-none d-flex align-items-center justify-content-between rounded-3 px-3 py-2 h-100" style="background:#f5f3ff; border:1px solid #ddd6fe;">
               <div class="d-flex align-items-center gap-2">
-                <i class="bi bi-robot fs-5" style="color:#7c3aed;"></i>
-                <span class="fw-bold small" id="aiScoreLabel" style="color:#5b21b6;">คะแนนรวมจาก AI</span>
+                <i class="bi bi-file-earmark-check fs-5" style="color:#7c3aed;"></i>
+                <span class="fw-bold small" id="aiScoreLabel" style="color:#5b21b6;">คะแนนรวมอัตโนมัติ</span>
               </div>
               <div class="text-end">
                 <span id="aiScoreValue" class="fw-bold fs-5" style="color:#6d28d9;">0</span>
@@ -1064,7 +1064,7 @@ require_once 'header.php';
                 <i class="bi bi-clock-history me-1"></i><span class="prev-score-text"></span>
               </span>
               <span id="aiScore_${item.id}" class="badge d-none rounded-pill px-3 py-2" style="background:#ede9fe; color:#5b21b6; border:1px solid #ddd6fe;">
-                <i class="bi bi-robot me-1"></i><span class="ai-score-text"></span>
+                <i class="bi bi-file-earmark-check me-1"></i><span class="ai-score-text"></span>
               </span>
             </div>
           </div>
@@ -1160,7 +1160,7 @@ require_once 'header.php';
     const cmpBox = document.getElementById('comparisonScoreBox');
     if (cmpBox) cmpBox.classList.add('d-none');
     document.querySelectorAll('[id^="compareScore_"]').forEach(el => el.classList.add('d-none'));
-    // ซ่อนป้าย/หมายเหตุจาก AI ของทุกข้อไว้ก่อน (ผลตรวจเป็นของนักเรียนคนเดิม/รอบเดิม)
+    // ซ่อนป้าย/หมายเหตุจากระบบตรวจของทุกข้อไว้ก่อน (ผลตรวจเป็นของนักเรียนคนเดิม/รอบเดิม)
     clearAiNotes();
     calculateRealTimeFormScore(); // รีเซ็ต
 
@@ -1250,7 +1250,7 @@ require_once 'header.php';
       fetchStudentEssayForEvaluation(studentId, testPhase);
       // โหลดคะแนนของรอบคู่เทียบ (ก่อนเรียน↔หลังเรียน, หน่วย 1↔หน่วย 2) มาแสดงเทียบพัฒนาการ
       fetchComparisonPhaseScores(studentId, testPhase);
-      // โหลดผลตรวจของ AI มาแปะเป็น "หมายเหตุจาก AI" ในแต่ละข้อย่อย (ไว้ประกอบการตัดสินใจ ไม่ใช่คะแนนจริง)
+      // โหลดผลตรวจของระบบมาแปะเป็น "หมายเหตุจากระบบตรวจ" ในแต่ละข้อย่อย (ไว้ประกอบการตัดสินใจ ไม่ใช่คะแนนจริง)
       fetchAiNotesForEvaluation(studentId, testPhase);
       return !!(res.success && res.found);
     } catch (err) {
@@ -1476,13 +1476,13 @@ require_once 'header.php';
   }
 
   /* ============================================================
-     หมายเหตุจาก AI รายข้อ (ครู/ผู้เชี่ยวชาญเท่านั้น)
-     ดึงผลตรวจของผู้ช่วย AI ในรอบเดียวกันมาแปะไว้ใต้ข้อย่อยแต่ละข้อ ให้เห็นว่า
-     AI ให้ข้อนี้ไว้กี่คะแนน เพราะอะไร พบข้อบกพร่องอะไร และเสนอให้แก้อย่างไร
+     หมายเหตุจากระบบตรวจรายข้อ (ครู/ผู้เชี่ยวชาญเท่านั้น)
+     ดึงผลตรวจของระบบตรวจอัตโนมัติในรอบเดียวกันมาแปะไว้ใต้ข้อย่อยแต่ละข้อ ให้เห็นว่า
+     ระบบให้ข้อนี้ไว้กี่คะแนน เพราะอะไร พบข้อบกพร่องอะไร และเสนอให้แก้อย่างไร
      เป็นเพียงข้อมูลประกอบ ไม่ถูกกรอกลงฟอร์มและไม่นับเป็นคะแนนจริงของผู้ประเมิน
      ============================================================ */
 
-  // ล้างป้ายและกล่องหมายเหตุจาก AI ของทุกข้อ (รวมทั้งกล่องคะแนนรวมจาก AI ด้านบน)
+  // ล้างป้ายและกล่องหมายเหตุจากระบบตรวจของทุกข้อ (รวมทั้งกล่องคะแนนรวมอัตโนมัติด้านบน)
   function clearAiNotes() {
     const aiBox = document.getElementById('aiScoreBox');
     if (aiBox) {
@@ -1507,17 +1507,17 @@ require_once 'header.php';
         + '&student_id=' + encodeURIComponent(studentId)
         + '&essay_phase=' + encodeURIComponent(phase));
       const data = await res.json();
-      if (!data.success || !data.feedback) return;   // ยังไม่เคยให้ AI ตรวจรอบนี้ — ไม่ต้องแสดงอะไร
+      if (!data.success || !data.feedback) return;   // ยังไม่เคยให้ระบบตรวจรอบนี้ — ไม่ต้องแสดงอะไร
       renderAiNotes(data.feedback);
     } catch (err) {
-      console.error('Error fetching AI notes:', err);
+      console.error('Error fetching auto-check notes:', err);
     }
   }
 
-  /* กล่อง "คะแนนรวมจาก AI" ด้านบน — วางคู่กับคะแนนที่คำนวณอัตโนมัติ/คะแนนเดิม/รอบคู่เทียบ
-     ให้ผู้ประเมินเห็นยอดรวมที่ AI ให้ไว้ทั้งฉบับ ไม่ต้องไล่อ่านทีละข้อหรือเปิดหน้าผู้ช่วย AI
-     - ครูให้คะแนนข้อที่ AI ตรวจแทนไม่ได้ครบแล้ว → แสดงคะแนนรวมเต็ม 60 พร้อมระดับคุณภาพจริง
-     - ยังไม่ครบ → แสดงเฉพาะส่วนที่ AI ตรวจ (เต็มตาม max_score) และกำกับว่าเป็นระดับโดยประมาณ
+  /* กล่อง "คะแนนรวมอัตโนมัติ" ด้านบน — วางคู่กับคะแนนที่คำนวณอัตโนมัติ/คะแนนเดิม/รอบคู่เทียบ
+     ให้ผู้ประเมินเห็นยอดรวมที่ระบบให้ไว้ทั้งฉบับ ไม่ต้องไล่อ่านทีละข้อหรือเปิดหน้าระบบตรวจอัตโนมัติ
+     - ครูให้คะแนนข้อที่ระบบตรวจแทนไม่ได้ครบแล้ว → แสดงคะแนนรวมเต็ม 60 พร้อมระดับคุณภาพจริง
+     - ยังไม่ครบ → แสดงเฉพาะส่วนที่ระบบตรวจ (เต็มตาม max_score) และกำกับว่าเป็นระดับโดยประมาณ
      เป็นข้อมูลประกอบเท่านั้น ไม่ถูกนำไปบันทึกเป็นคะแนนของผู้ประเมิน */
   function renderAiTotalScore(fb) {
     const box = document.getElementById('aiScoreBox');
@@ -1538,17 +1538,17 @@ require_once 'header.php';
     const valEl   = document.getElementById('aiScoreValue');
     const maxEl   = document.getElementById('aiScoreMax');
     const lvlEl   = document.getElementById('aiScoreLevel');
-    if (labelEl) labelEl.textContent = manualDone ? 'คะแนนรวมจาก AI' : 'คะแนนจาก AI (เฉพาะข้อที่ AI ตรวจ)';
+    if (labelEl) labelEl.textContent = manualDone ? 'คะแนนรวมอัตโนมัติ' : 'คะแนนอัตโนมัติ (เฉพาะข้อที่ระบบตรวจ)';
     if (valEl)   valEl.textContent = Math.round(shownValue * 100) / 100;
     if (maxEl)   maxEl.textContent = Math.round(shownMax * 100) / 100;
     if (lvlEl)   lvlEl.textContent = manualDone ? level : (level !== '—' ? level + ' (โดยประมาณ)' : '—');
 
-    // รายละเอียดการรวมคะแนน (ชี้ค้างไว้เพื่อดู) — AI ตรวจได้กี่คะแนน ครูให้ข้อที่ AI ตรวจแทนไม่ได้กี่คะแนน
-    const tips = [`AI ${Math.round(aiTotal * 100) / 100} / ${Math.round(aiMax * 100) / 100} คะแนน`];
+    // รายละเอียดการรวมคะแนน (ชี้ค้างไว้เพื่อดู) — ระบบตรวจได้กี่คะแนน ครูให้ข้อที่ระบบตรวจแทนไม่ได้กี่คะแนน
+    const tips = [`ระบบ ${Math.round(aiTotal * 100) / 100} / ${Math.round(aiMax * 100) / 100} คะแนน`];
     if (manualMax > 0) {
-      tips.push(`ข้อที่ AI ตรวจแทนไม่ได้ (คุณครูให้) ${manualDone ? Math.round(Number(fb.teacher_total || 0) * 100) / 100 : 'ยังไม่ครบ'} / ${Math.round(manualMax * 100) / 100} คะแนน`);
+      tips.push(`ข้อที่ระบบตรวจแทนไม่ได้ (คุณครูให้) ${manualDone ? Math.round(Number(fb.teacher_total || 0) * 100) / 100 : 'ยังไม่ครบ'} / ${Math.round(manualMax * 100) / 100} คะแนน`);
     }
-    if (fb.needs_recheck) tips.push('ต้นฉบับถูกแก้หลัง AI ตรวจ — รอตรวจใหม่');
+    if (fb.needs_recheck) tips.push('ต้นฉบับถูกแก้หลังระบบตรวจ — รอตรวจใหม่');
     tips.push('เป็นข้อมูลประกอบการพิจารณาเท่านั้น ไม่ใช่คะแนนที่บันทึก');
     box.setAttribute('title', tips.join(' · '));
 
@@ -1559,7 +1559,7 @@ require_once 'header.php';
     const scores = fb.scores || {};
     renderAiTotalScore(fb);
 
-    // รวมข้อเสนอแนะของ AI ตามรหัสเกณฑ์ เพื่อแปะไว้ใต้ข้อนั้น ๆ
+    // รวมข้อเสนอแนะของระบบตามรหัสเกณฑ์ เพื่อแปะไว้ใต้ข้อนั้น ๆ
     const fixesByItem = {};
     (fb.improvements || []).forEach(it => {
       const key = (it && it.criterion) ? String(it.criterion).trim() : '';
@@ -1568,7 +1568,7 @@ require_once 'header.php';
       fixesByItem[key].push(it);
     });
 
-    // คะแนนที่คุณครูกรอกเองในหน้าผู้ช่วย AI (ข้อที่ AI ตรวจแทนไม่ได้ เช่น 4.3 ความเรียบร้อย)
+    // คะแนนที่คุณครูกรอกเองในหน้าระบบตรวจอัตโนมัติ (ข้อที่ระบบตรวจแทนไม่ได้ เช่น 4.3 ความเรียบร้อย)
     const teacherScores = fb.teacher_scores || {};
     const manualIds = (fb.manual_items || []).map(m => m.id);
 
@@ -1588,28 +1588,28 @@ require_once 'header.php';
         if (sc) {
           const levelInfo = item.levels.find(l => Number(l.score) === Number(sc.raw));
           const weighted  = Math.round(parseFloat(sc.weighted) * 100) / 100;
-          badgeText = `AI ให้: ${levelInfo ? levelInfo.label + ' · ' : ''}${weighted} คะแนน`;
-          headText  = `หมายเหตุจาก AI · ข้อ ${item.id} — AI ให้ ${weighted} / ${sc.max} คะแนน`
+          badgeText = `ระบบให้: ${levelInfo ? levelInfo.label + ' · ' : ''}${weighted} คะแนน`;
+          headText  = `หมายเหตุจากระบบตรวจ · ข้อ ${item.id} — ระบบให้ ${weighted} / ${sc.max} คะแนน`
                     + (levelInfo ? ` (ระดับ ${levelInfo.label})` : '');
           if (sc.reason) {
-            rows.push(`<div class="ai-eval-note-row"><span class="ai-eval-note-label text-primary-emphasis">เหตุผลของ AI:</span> ${escapeHTML(sc.reason)}</div>`);
+            rows.push(`<div class="ai-eval-note-row"><span class="ai-eval-note-label text-primary-emphasis">เหตุผลประกอบ:</span> ${escapeHTML(sc.reason)}</div>`);
           }
         } else if (isManualItem) {
-          // ข้อที่ AI ตรวจแทนไม่ได้ — แสดงคะแนนที่คุณครูกรอกไว้ในหน้าผู้ช่วย AI (ถ้ามี)
+          // ข้อที่ระบบตรวจแทนไม่ได้ — แสดงคะแนนที่คุณครูกรอกไว้ในหน้าระบบตรวจอัตโนมัติ (ถ้ามี)
           if (manual) {
             const levelInfo = item.levels.find(l => Number(l.score) === Number(manual.raw));
             const weighted  = Math.round(parseFloat(manual.weighted) * 100) / 100;
-            // คะแนนข้อนี้อาจมาจากแบบประเมินหน้านี้เอง (ดึงไปแสดงในหน้า AI) หรือครูกรอกไว้ในหน้าผู้ช่วย AI
+            // คะแนนข้อนี้อาจมาจากแบบประเมินหน้านี้เอง (ดึงไปแสดงในหน้าตรวจอัตโนมัติ) หรือครูกรอกไว้ในหน้าระบบตรวจอัตโนมัติ
             const fromEval  = (fb.teacher_source === 'evaluation');
-            badgeText = `${fromEval ? 'คะแนนที่บันทึกไว้' : 'คุณครูให้ไว้ในหน้า AI'}: ${levelInfo ? levelInfo.label + ' · ' : ''}${weighted} คะแนน`;
+            badgeText = `${fromEval ? 'คะแนนที่บันทึกไว้' : 'คุณครูให้ไว้ในหน้าตรวจอัตโนมัติ'}: ${levelInfo ? levelInfo.label + ' · ' : ''}${weighted} คะแนน`;
             headText  = `หมายเหตุ · ข้อ ${item.id}`;
-            rows.push(`<div class="ai-eval-note-row">ข้อนี้ AI ประเมินจากไฟล์ที่พิมพ์ไม่ได้ — ${fromEval
-              ? 'คะแนนข้างต้นคือคะแนนที่บันทึกไว้ในแบบประเมินนี้ และถูกนำไปรวมเป็นคะแนนเต็ม 60 ในหน้าผู้ช่วย AI ให้แล้ว'
-              : 'คะแนนข้างต้นเป็นคะแนนที่คุณครูกรอกไว้เองในหน้าผู้ช่วย AI'}</div>`);
+            rows.push(`<div class="ai-eval-note-row">ข้อนี้ระบบประเมินจากไฟล์ที่พิมพ์ไม่ได้ — ${fromEval
+              ? 'คะแนนข้างต้นคือคะแนนที่บันทึกไว้ในแบบประเมินนี้ และถูกนำไปรวมเป็นคะแนนเต็ม 60 ในหน้าระบบตรวจอัตโนมัติให้แล้ว'
+              : 'คะแนนข้างต้นเป็นคะแนนที่คุณครูกรอกไว้เองในหน้าระบบตรวจอัตโนมัติ'}</div>`);
           } else {
-            badgeText = 'AI ตรวจข้อนี้แทนไม่ได้';
-            headText  = `หมายเหตุจาก AI · ข้อ ${item.id}`;
-            rows.push(`<div class="ai-eval-note-row">ข้อนี้ต้องดูจากต้นฉบับลายมือ AI จึงไม่ได้ให้คะแนนไว้</div>`);
+            badgeText = 'ระบบตรวจข้อนี้แทนไม่ได้';
+            headText  = `หมายเหตุจากระบบตรวจ · ข้อ ${item.id}`;
+            rows.push(`<div class="ai-eval-note-row">ข้อนี้ต้องดูจากต้นฉบับลายมือ ระบบจึงไม่ได้ให้คะแนนไว้</div>`);
           }
         }
 
@@ -1625,7 +1625,7 @@ require_once 'header.php';
           }
         });
 
-        if (!headText && !rows.length) return;   // ข้อนี้ AI ไม่ได้พูดถึงเลย
+        if (!headText && !rows.length) return;   // ข้อนี้ระบบไม่ได้พูดถึงเลย
 
         if (badge && badgeText) {
           const textEl = badge.querySelector('.ai-score-text');
@@ -1633,10 +1633,10 @@ require_once 'header.php';
           badge.classList.remove('d-none');
         }
         noteEl.innerHTML =
-          `<div class="ai-eval-note-head"><i class="bi bi-robot me-1"></i>${escapeHTML(headText || ('หมายเหตุจาก AI · ข้อ ' + item.id))}</div>`
+          `<div class="ai-eval-note-head"><i class="bi bi-file-earmark-check me-1"></i>${escapeHTML(headText || ('หมายเหตุจากระบบตรวจ · ข้อ ' + item.id))}</div>`
           + rows.join('')
           + `<div class="text-muted mt-2" style="font-size:0.75rem;">
-               <i class="bi bi-info-circle me-1"></i>เป็นข้อมูลจากผู้ช่วย AI เพื่อประกอบการพิจารณาเท่านั้น คะแนนที่บันทึกจริงคือคะแนนที่ท่านเลือกด้านบน
+               <i class="bi bi-info-circle me-1"></i>เป็นข้อมูลจากระบบตรวจอัตโนมัติเพื่อประกอบการพิจารณาเท่านั้น คะแนนที่บันทึกจริงคือคะแนนที่ท่านเลือกด้านบน
              </div>`;
         noteEl.classList.remove('d-none');
       });

@@ -1,16 +1,16 @@
 <?php
 /**
- * ai_feedback.php — หน้า "ผู้ช่วย AI ตรวจเรียงความ"
+ * writing_feedback.php — หน้า "ระบบตรวจเรียงความอัตโนมัติ"
  * ---------------------------------------------------------------------------
  * ใช้ได้ทั้งนักเรียน ครู และผู้เชี่ยวชาญ (เห็นข้อมูลต่างกันตามบทบาท)
- *   - นักเรียน  : กดให้ AI ตรวจเรียงความของตนเอง และดูข้อเสนอแนะย้อนหลังทุกรอบ
- *   - ครู       : ตรวจแทนนักเรียนคนใดก็ได้ ดูภาพรวมทั้งชั้น ลบผลที่ไม่เหมาะสม และตั้งค่า AI
+ *   - นักเรียน  : กดให้ระบบตรวจเรียงความของตนเอง และดูข้อเสนอแนะย้อนหลังทุกรอบ
+ *   - ครู       : ตรวจแทนนักเรียนคนใดก็ได้ ดูภาพรวมทั้งชั้น ลบผลที่ไม่เหมาะสม และตั้งค่าระบบตรวจอัตโนมัติ
  *   - ผู้เชี่ยวชาญ: ดูผลตรวจของนักเรียนได้อย่างเดียว (ไม่สั่งตรวจ ไม่ตั้งค่า)
  */
-$page_title = 'ผู้ช่วย AI ตรวจเรียงความ - ระบบประเมินเรียงความ';
+$page_title = 'ระบบตรวจเรียงความอัตโนมัติ - ระบบประเมินเรียงความ';
 require_once 'auth_helper.php';
 require_login();
-require_once 'ai_config.php';
+require_once 'writing_check_config.php';
 require_once 'header.php';
 
 $aiRole      = $sessionUser['role'];
@@ -31,9 +31,9 @@ $aiPhases    = ai_all_phases();
     <div class="p-4 text-white" style="background: linear-gradient(135deg, #4c1d95 0%, #6d28d9 50%, #0d7377 100%);">
       <div class="d-flex align-items-start justify-content-between flex-wrap gap-3">
         <div>
-          <h4 class="fw-bold mb-1"><i class="bi bi-robot me-2"></i>ผู้ช่วย AI ตรวจเรียงความ</h4>
+          <h4 class="fw-bold mb-1"><i class="bi bi-file-earmark-check me-2"></i>ระบบตรวจเรียงความอัตโนมัติ</h4>
           <p class="text-white-50 mb-0 small">
-            ให้ AI อ่านเรียงความแล้วชี้จุดแข็ง จุดที่ควรปรับปรุง และแนวทางแก้ไขตามเกณฑ์การประเมินของคุณครู
+            ให้ระบบอ่านเรียงความแล้วชี้จุดแข็ง จุดที่ควรปรับปรุง และแนวทางแก้ไขตามเกณฑ์การประเมินของคุณครู
           </p>
         </div>
         <span class="badge bg-white text-dark px-3 py-2 fs-7 fw-bold">
@@ -43,20 +43,20 @@ $aiPhases    = ai_all_phases();
     </div>
     <div class="bg-light border-top px-4 py-2 small text-muted">
       <i class="bi bi-info-circle me-1"></i>
-      ข้อเสนอแนะและคะแนนจาก AI เป็นเพียง<strong>แนวทางเพื่อพัฒนางานเขียน</strong>
+      ข้อเสนอแนะและคะแนนอัตโนมัติเป็นเพียง<strong>แนวทางเพื่อพัฒนางานเขียน</strong>
       ไม่ถูกนำไปรวมกับคะแนนจริงของครู เพื่อน หรือการประเมินตนเองในระบบประเมิน —
-      ข้อที่ AI ตรวจจากไฟล์พิมพ์แทนไม่ได้ (ความเรียบร้อย/ลายมือ) คุณครูเลือกระดับคะแนนเองได้ที่
+      ข้อที่ระบบตรวจจากไฟล์พิมพ์แทนไม่ได้ (ความเรียบร้อย/ลายมือ) คุณครูเลือกระดับคะแนนเองได้ที่
       <strong>ท้ายตาราง &quot;คะแนนรายเกณฑ์ (ประมาณการ)&quot;</strong> ของผลตรวจแต่ละฉบับ
       เพื่อให้เห็นคะแนนรวม<strong>เต็ม 60 ตามเกณฑ์จริง</strong> —
       หากนักเรียนแก้ไขต้นฉบับหลังตรวจ ระบบจะจัดเข้า<strong>คิวรอตรวจใหม่</strong>ให้อัตโนมัติ
     </div>
   </div>
 
-  <!-- แถบสถานะระบบ AI -->
+  <!-- แถบสถานะระบบตรวจอัตโนมัติ -->
   <div id="aiStatusBar" class="alert border-0 rounded-3 small d-none" role="alert"></div>
 
 <?php if (!$aiIsStudent): ?>
-  <!-- คิวรอตรวจใหม่: นักเรียนแก้ไขต้นฉบับหลังจาก AI ตรวจไปแล้ว (ซ่อนไว้เมื่อคิวว่าง) -->
+  <!-- คิวรอตรวจใหม่: นักเรียนแก้ไขต้นฉบับหลังจากระบบตรวจไปแล้ว (ซ่อนไว้เมื่อคิวว่าง) -->
   <div id="aiRecheckCard" class="card border-0 shadow-sm rounded-4 mb-4 d-none" style="border-top:4px solid #f59e0b !important;">
     <div class="card-header bg-white border-bottom py-3 px-4 rounded-top-4">
       <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
@@ -66,7 +66,7 @@ $aiPhases    = ai_all_phases();
             <span id="aiRecheckCount" class="badge bg-warning text-dark ms-1">0</span>
           </h6>
           <div class="text-muted small mt-1">
-            เรียงความที่นักเรียนแก้ไขต้นฉบับหลังจาก AI ตรวจไปแล้ว — ผลตรวจเดิมยังเป็นของฉบับก่อนแก้
+            เรียงความที่นักเรียนแก้ไขต้นฉบับหลังจากระบบตรวจไปแล้ว — ผลตรวจเดิมยังเป็นของฉบับก่อนแก้
           </div>
         </div>
         <div class="d-flex gap-2">
@@ -75,7 +75,7 @@ $aiPhases    = ai_all_phases();
           </button>
 <?php if ($aiIsTeacher): ?>
           <button id="rcStartBtn" class="btn btn-warning btn-sm rounded-pill px-3 fw-bold" onclick="startRecheckQueue()">
-            <i class="bi bi-stars me-1"></i>ให้ AI ตรวจใหม่ทั้งคิว
+            <i class="bi bi-stars me-1"></i>ให้ระบบตรวจใหม่ทั้งคิว
           </button>
           <button id="rcStopBtn" class="btn btn-outline-danger btn-sm rounded-pill px-3 d-none" onclick="stopBatchReview()">
             <i class="bi bi-stop-fill me-1"></i>หยุด
@@ -111,7 +111,7 @@ $aiPhases    = ai_all_phases();
     </li>
     <li class="nav-item" role="presentation">
       <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-class" type="button" role="tab">
-        <i class="bi bi-people-fill me-1"></i>ภาพรวมผลตรวจ AI ทั้งชั้น
+        <i class="bi bi-people-fill me-1"></i>ภาพรวมผลตรวจอัตโนมัติทั้งชั้น
       </button>
     </li>
   </ul>
@@ -138,13 +138,13 @@ $aiPhases    = ai_all_phases();
 <?php endif; ?>
 
   <!-- แถบสรุปย่อของนักเรียนคนที่เลือก — เห็นตัวเลขสำคัญในบรรทัดเดียว
-       ส่วนสรุปฉบับเต็มย้ายไปอยู่หน้า ai_student_summary.php แล้ว จะได้ไม่บังผลตรวจรายฉบับในหน้านี้ -->
+       ส่วนสรุปฉบับเต็มย้ายไปอยู่หน้า writing_summary.php แล้ว จะได้ไม่บังผลตรวจรายฉบับในหน้านี้ -->
   <div id="aiPersonStrip" class="mb-3"></div>
 
   <!-- ผลตรวจทุกรอบงานในหน้าเดียว — คลิกการ์ดเพื่อดูรายละเอียดการให้คะแนนและข้อเสนอแนะ -->
   <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
     <h6 class="fw-bold text-dark mb-0">
-      <i class="bi bi-grid-3x2-gap-fill text-primary me-2"></i>ผลตรวจของ AI ทุกรอบงาน
+      <i class="bi bi-grid-3x2-gap-fill text-primary me-2"></i>ผลตรวจของระบบทุกรอบงาน
     </h6>
     <span class="text-muted small"><i class="bi bi-hand-index-thumb me-1"></i>คลิกการ์ดคะแนนเพื่อดูรายละเอียด</span>
   </div>
@@ -160,7 +160,7 @@ $aiPhases    = ai_all_phases();
   </div><!-- /tab-person -->
 
 <?php if (!$aiIsStudent): ?>
-  <!-- ======================= แท็บที่ 2: ภาพรวมผลตรวจ AI ทั้งชั้น ======================= -->
+  <!-- ======================= แท็บที่ 2: ภาพรวมผลตรวจอัตโนมัติทั้งชั้น ======================= -->
   <div class="tab-pane fade" id="tab-class" role="tabpanel">
 
     <!-- ตัวเลขเด่น ๆ ของทั้งชั้น — ตอบคำถามที่ครูถามบ่อยที่สุดก่อน ไม่ต้องไล่อ่านทั้งตาราง -->
@@ -171,7 +171,7 @@ $aiPhases    = ai_all_phases();
     <!-- ค่าเฉลี่ยทั้งชั้นรายรอบงาน (ย้ายมาจากแท็บรายบุคคล) -->
     <div id="aiClassAvgCards" class="mb-4"></div>
 
-    <!-- ภาพรวมการนำเสนอรายรอบงาน — ใช้เมื่อ AI ตรวจครบทั้งรอบแล้ว -->
+    <!-- ภาพรวมการนำเสนอรายรอบงาน — ใช้เมื่อระบบตรวจครบทั้งรอบแล้ว -->
     <div class="card border-0 shadow-sm rounded-4 mb-4" style="border-top:4px solid #b45309 !important;">
       <div class="card-header bg-white border-bottom py-3 px-4 rounded-top-4">
         <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
@@ -180,7 +180,7 @@ $aiPhases    = ai_all_phases();
               <i class="bi bi-journal-richtext text-warning me-2"></i>ภาพรวมการนำเสนอรายรอบงาน
             </h6>
             <div class="text-muted small mt-1">
-              เมื่อ AI ตรวจครบทั้งรอบแล้ว ให้ AI อ่านงานทั้งชั้นรวดเดียว แล้วสรุปว่านักเรียนนำเสนอไปทางใด
+              เมื่อระบบตรวจครบทั้งรอบแล้ว ให้ระบบอ่านงานทั้งชั้นรวดเดียว แล้วสรุปว่านักเรียนนำเสนอไปทางใด
               มีประเด็นใดน่าสนใจ และมีข้อสังเกตอะไรที่เป็นประโยชน์ต่อการอ่านผลวิจัย
             </div>
           </div>
@@ -197,7 +197,7 @@ $aiPhases    = ai_all_phases();
           <div class="col-md-7 d-flex gap-2">
             <button id="ovRunBtn" class="btn btn-sm fw-bold rounded-pill px-4 text-white"
                     style="background:linear-gradient(135deg,#b45309,#6d28d9);" onclick="runPhaseOverview()">
-              <i class="bi bi-stars me-1"></i>ให้ AI เขียนภาพรวมรอบนี้
+              <i class="bi bi-stars me-1"></i>ให้ระบบเขียนภาพรวมรอบนี้
             </button>
             <span id="ovHint" class="small text-muted align-self-center"></span>
           </div>
@@ -225,7 +225,7 @@ $aiPhases    = ai_all_phases();
     </button>
     <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" type="button"
             data-bs-toggle="collapse" data-bs-target="#aiSettingsCard">
-      <i class="bi bi-sliders me-1"></i>ตั้งค่าผู้ช่วย AI
+      <i class="bi bi-sliders me-1"></i>ตั้งค่าระบบตรวจอัตโนมัติ
     </button>
   </div>
   <div class="collapse" id="aiBatchCard">
@@ -352,22 +352,22 @@ $aiPhases    = ai_all_phases();
   </div>
   </div>
   <div class="collapse" id="aiSettingsCard">
-  <!-- ตั้งค่า AI (เฉพาะครู) -->
+  <!-- ตั้งค่าระบบตรวจอัตโนมัติ (เฉพาะครู) -->
   <div class="card border-0 shadow-sm rounded-4 mb-4">
     <div class="card-header bg-white border-bottom py-3 px-4 rounded-top-4">
-      <h6 class="fw-bold text-dark mb-0"><i class="bi bi-sliders text-primary me-2"></i>ตั้งค่าผู้ช่วย AI</h6>
+      <h6 class="fw-bold text-dark mb-0"><i class="bi bi-sliders text-primary me-2"></i>ตั้งค่าระบบตรวจอัตโนมัติ</h6>
     </div>
     <div id="aiSettingsBody">
       <div class="card-body p-4">
         <div class="alert alert-primary border-0 rounded-3 small">
           <i class="bi bi-key-fill me-1"></i>
-          ต้องมี <strong>API key</strong> ของผู้ให้บริการ AI ก่อนจึงจะใช้งานได้ —
-          มีหลายเจ้าที่<strong>ให้ใช้ฟรี</strong> ดูวิธีขอทีละขั้นได้ในไฟล์ <code>AI_SETUP.md</code>
+          ต้องมี <strong>API key</strong> ของผู้ให้บริการโมเดลภาษาก่อนจึงจะใช้งานได้ —
+          มีหลายเจ้าที่<strong>ให้ใช้ฟรี</strong> ดูวิธีขอทีละขั้นได้ในไฟล์ <code>AUTOCHECK_SETUP.md</code>
         </div>
 
         <div class="row g-3">
           <div class="col-md-6">
-            <label class="form-label fw-bold small">ผู้ให้บริการ AI</label>
+            <label class="form-label fw-bold small">ผู้ให้บริการโมเดลภาษา</label>
             <select id="aiProvider" class="form-select border-2 rounded-3" onchange="onProviderChange()"></select>
             <div class="form-text small" id="aiProviderHint"></div>
           </div>
@@ -400,7 +400,7 @@ $aiPhases    = ai_all_phases();
 
         <div class="form-check form-switch">
           <input class="form-check-input" type="checkbox" id="aiEnabled">
-          <label class="form-check-label fw-bold small" for="aiEnabled">เปิดใช้งานผู้ช่วย AI</label>
+          <label class="form-check-label fw-bold small" for="aiEnabled">เปิดใช้งานระบบตรวจอัตโนมัติ</label>
         </div>
         <div class="form-text small">
           ปิดสวิตช์นี้เมื่อไม่ต้องการให้สั่งตรวจเพิ่ม — ผลตรวจที่บันทึกไว้แล้วยังแสดงให้นักเรียนดูได้ตามปกติ
@@ -419,13 +419,13 @@ $aiPhases    = ai_all_phases();
               เพดานนี้เป็นของ<strong>ระบบเรา</strong> ไว้กันเผลอสั่งตรวจรัวจนโควตาฟรีของผู้ให้บริการหมด
               — นับเฉพาะ<strong>ครั้งที่ตรวจสำเร็จ</strong> และรีเซ็ตทุกเที่ยงคืน
               ถ้าตรวจทั้งชั้นหลายรอบในวันเดียวแล้วโควตาไม่พอ ปรับเพิ่มตรงนี้ได้เลย
-              แต่ผู้ให้บริการ AI ยังมีเพดานของตัวเองอีกชั้นหนึ่ง (ปรับตรงนี้ไม่ได้ช่วยให้เกินเพดานของเขา)
+              แต่ผู้ให้บริการโมเดลภาษายังมีเพดานของตัวเองอีกชั้นหนึ่ง (ปรับตรงนี้ไม่ได้ช่วยให้เกินเพดานของเขา)
             </div>
           </div>
         </div>
         <div class="alert alert-secondary border-0 rounded-3 small mt-3 mb-0">
           <i class="bi bi-person-lock me-1"></i>
-          <strong>คุณครูเป็นผู้สั่งตรวจเพียงผู้เดียว</strong> — นักเรียนกดให้ AI ตรวจเองไม่ได้
+          <strong>คุณครูเป็นผู้สั่งตรวจเพียงผู้เดียว</strong> — นักเรียนกดให้ระบบตรวจเองไม่ได้
           เห็นได้เฉพาะผลที่คุณครูตรวจให้แล้วเท่านั้น
         </div>
 
@@ -450,7 +450,7 @@ $aiPhases    = ai_all_phases();
     <div class="card-header bg-white border-bottom py-3 px-4 rounded-top-4">
       <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
         <div>
-          <h6 class="fw-bold text-dark mb-0"><i class="bi bi-table text-secondary me-2"></i>ภาพรวมผลตรวจ AI ทั้งชั้น</h6>
+          <h6 class="fw-bold text-dark mb-0"><i class="bi bi-table text-secondary me-2"></i>ภาพรวมผลตรวจอัตโนมัติทั้งชั้น</h6>
           <div class="text-muted small mt-1">คะแนนรวมของนักเรียนแต่ละคนทุกรอบงาน พร้อมค่าเฉลี่ยรายบุคคลและค่าเฉลี่ยทั้งชั้น
             · ใช้ช่องกรองเพื่อดูเฉพาะกลุ่ม เช่น คนที่คะแนนต่ำลงในร่างที่ 2</div>
         </div>
@@ -509,7 +509,7 @@ $aiPhases    = ai_all_phases();
 </div>
 
 <?php if ($aiIsTeacher): ?>
-<!-- หน้าต่างปรับคะแนนรายข้อ: ครูปรับคะแนนเอง หรือสั่งให้ AI ตรวจเฉพาะข้อนั้นใหม่ -->
+<!-- หน้าต่างปรับคะแนนรายข้อ: ครูปรับคะแนนเอง หรือสั่งให้ระบบตรวจเฉพาะข้อนั้นใหม่ -->
 <div class="modal fade" id="aiCritModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content border-0 rounded-4">
@@ -581,7 +581,7 @@ $aiPhases    = ai_all_phases();
   .ai-class-avg-wrap { background: #f0fdfa; border: 1px dashed #99f6e4; }
   .ai-phase-card .ai-score-bar { height: 8px; }
 
-  /* ตารางภาพรวมผลตรวจ AI — ใช้รูปแบบหัวตารางเดียวกับ "รายงานการส่งงานรายบุคคล" (submission_report.php) */
+  /* ตารางภาพรวมผลตรวจอัตโนมัติ — ใช้รูปแบบหัวตารางเดียวกับ "รายงานการส่งงานรายบุคคล" (submission_report.php) */
   .ai-report-table { min-width: 760px; }
   .ai-report-table th, .ai-report-table td { white-space: nowrap; text-align: center; font-size: 0.86rem; }
   .ai-report-table thead th {
@@ -614,7 +614,7 @@ $aiPhases    = ai_all_phases();
   .ai-cell-pair-up   { color: #0d9488; margin-left: 3px; font-size: 0.72rem; }
   .ai-cell-pair-flat { color: #d97706; margin-left: 3px; font-size: 0.72rem; }
   .ai-cell-pair-down { color: #dc2626; margin-left: 3px; font-size: 0.72rem; }
-  /* ฉบับที่ครูตรวจทานคะแนนของ AI ไว้รายข้อ */
+  /* ฉบับที่ครูตรวจทานคะแนนของระบบไว้รายข้อ */
   .ai-cell-ov { color: #6d28d9; margin-left: 3px; font-size: 0.72rem; }
   .ai-recheck-row { cursor: pointer; }
   .ai-recheck-row:hover { background: #fffbeb; }
@@ -628,7 +628,7 @@ $aiPhases    = ai_all_phases();
   }
 </style>
 
-<script src="ai_review.js"></script>
+<script src="writing_check.js"></script>
 <script>
 const AI_ROLE       = <?php echo json_encode($aiRole); ?>;
 const AI_IS_STUDENT = <?php echo $aiIsStudent ? 'true' : 'false'; ?>;
@@ -636,7 +636,7 @@ const AI_IS_TEACHER = <?php echo $aiIsTeacher ? 'true' : 'false'; ?>;
 const AI_MY_ID      = <?php echo json_encode($sessionUser['id']); ?>;
 const AI_PHASES     = <?php echo json_encode($aiPhases); ?>;
 // ลักษณะงานเขียนของแต่ละรอบ (เชิงบรรยาย/เชิงวิจารณ์ + คำสำคัญที่ครูกำหนด)
-// ใช้บอกบนการ์ดว่ารอบนั้นเป็นงานชนิดใด ครูจะได้รู้ว่า AI ตรวจด้วยหลักอะไร
+// ใช้บอกบนการ์ดว่ารอบนั้นเป็นงานชนิดใด ครูจะได้รู้ว่าระบบตรวจด้วยหลักอะไร
 const AI_PHASE_STYLE = <?php
     $aiStyleMap = [];
     foreach ($aiPhases as $aiPh) {
@@ -650,16 +650,16 @@ const AI_PHASE_STYLE = <?php
     }
     echo json_encode($aiStyleMap, JSON_UNESCAPED_UNICODE);
 ?>;
-// เกณฑ์ของข้อที่ AI เป็นผู้ตรวจ — ใช้แสดงคำอธิบายระดับคะแนนตอนคุณครูปรับคะแนนรายข้อ
+// เกณฑ์ของข้อที่ระบบเป็นผู้ตรวจ — ใช้แสดงคำอธิบายระดับคะแนนตอนคุณครูปรับคะแนนรายข้อ
 const AI_RUBRIC_ITEMS = <?php
     echo json_encode(array_values(array_filter(ai_rubric(), function ($it) { return $it['ai']; })),
                      JSON_UNESCAPED_UNICODE);
 ?>;
 
-let aiStatus    = null;   // สถานะฟีเจอร์ AI ของผู้ใช้คนนี้
+let aiStatus    = null;   // สถานะฟีเจอร์ตรวจอัตโนมัติของผู้ใช้คนนี้
 let aiProviders = [];     // รายชื่อผู้ให้บริการ (เฉพาะครู)
 
-// ป้ายชื่อรอบงานและตัวหนีอักขระ ใช้ของกลางจาก ai_review.js
+// ป้ายชื่อรอบงานและตัวหนีอักขระ ใช้ของกลางจาก writing_check.js
 const AI_PHASE_LABELS = AI_PHASE_LABEL_MAP;
 const esc = aiEsc;
 
@@ -693,17 +693,17 @@ function paintStatusBar() {
   let cls = 'alert-success', html = '';
   if (!aiStatus.enabled) {
     cls = 'alert-secondary';
-    html = '<i class="bi bi-pause-circle me-1"></i>คุณครูปิดการใช้งานผู้ช่วย AI ไว้ชั่วคราว — ยังดูผลตรวจเดิมที่เคยบันทึกไว้ได้';
+    html = '<i class="bi bi-pause-circle me-1"></i>คุณครูปิดการใช้งานระบบตรวจอัตโนมัติไว้ชั่วคราว — ยังดูผลตรวจเดิมที่เคยบันทึกไว้ได้';
   } else if (!aiStatus.configured) {
     cls = 'alert-warning';
     html = AI_IS_TEACHER
-      ? '<i class="bi bi-exclamation-triangle me-1"></i>ยังไม่ได้ตั้งค่า API key — กดปุ่ม "ตั้งค่าผู้ช่วย AI" ด้านล่างเพื่อใส่คีย์ก่อนใช้งาน'
-      : '<i class="bi bi-exclamation-triangle me-1"></i>ระบบ AI ยังไม่พร้อมใช้งาน กรุณาแจ้งคุณครูให้ตั้งค่าก่อน';
+      ? '<i class="bi bi-exclamation-triangle me-1"></i>ยังไม่ได้ตั้งค่า API key — กดปุ่ม "ตั้งค่าระบบตรวจอัตโนมัติ" ด้านล่างเพื่อใส่คีย์ก่อนใช้งาน'
+      : '<i class="bi bi-exclamation-triangle me-1"></i>ระบบตรวจอัตโนมัติยังไม่พร้อมใช้งาน กรุณาแจ้งคุณครูให้ตั้งค่าก่อน';
   } else if (!AI_IS_TEACHER) {
     cls = 'alert-info';
-    html = '<i class="bi bi-eye me-1"></i>หน้านี้แสดงผลตรวจที่คุณครูให้ AI ตรวจไว้แล้วครบทุกรอบงาน — คลิกการ์ดคะแนนเพื่อดูรายละเอียด';
+    html = '<i class="bi bi-eye me-1"></i>หน้านี้แสดงผลตรวจที่คุณครูให้ระบบตรวจไว้แล้วครบทุกรอบงาน — คลิกการ์ดคะแนนเพื่อดูรายละเอียด';
   } else {
-    html = '<i class="bi bi-check-circle me-1"></i>ผู้ช่วย AI พร้อมใช้งาน';
+    html = '<i class="bi bi-check-circle me-1"></i>ระบบตรวจอัตโนมัติพร้อมใช้งาน';
   }
   bar.className = 'alert border-0 rounded-3 small ' + cls;
   bar.innerHTML = html;
@@ -712,9 +712,9 @@ function paintStatusBar() {
 
 // ข้อความโควตา/เหตุผลที่ยังสั่งตรวจไม่ได้ (ปุ่มสั่งตรวจย้ายไปอยู่บนการ์ดแต่ละใบแล้ว)
 function reviewBlockReason() {
-  if (!AI_IS_TEACHER) return 'เฉพาะคุณครูเท่านั้นที่สั่งให้ AI ตรวจได้';
-  if (!aiStatus) return 'กำลังตรวจสอบสถานะระบบ AI';
-  if (!aiStatus.can_review) return aiStatus.enabled ? 'ยังไม่ได้ตั้งค่า API key' : 'ผู้ช่วย AI ถูกปิดใช้งานอยู่';
+  if (!AI_IS_TEACHER) return 'เฉพาะคุณครูเท่านั้นที่สั่งให้ระบบตรวจได้';
+  if (!aiStatus) return 'กำลังตรวจสอบสถานะระบบตรวจอัตโนมัติ';
+  if (!aiStatus.can_review) return aiStatus.enabled ? 'ยังไม่ได้ตั้งค่า API key' : 'ระบบตรวจอัตโนมัติถูกปิดใช้งานอยู่';
   if (aiStatus.quota_left <= 0) return 'วันนี้ใช้โควตาครบแล้ว (' + aiStatus.quota_limit + ' ครั้ง/วัน)';
   if (!currentStudentId()) return 'กรุณาเลือกนักเรียนก่อน';
   return '';
@@ -781,7 +781,7 @@ async function loadFeedback() {
 /* ============================================================
    แถบสรุปย่อของนักเรียนที่กำลังเปิดดู
    ตัวเลขสำคัญไม่กี่ตัว + ปุ่มเปิด "สรุปภาพรวมผลงานเขียน" ซึ่งแยกไปเป็นอีกหน้าหนึ่งแล้ว
-   (ai_student_summary.php) หน้านี้จึงเหลือแต่การ์ดคะแนนกับรายละเอียดรายฉบับ อ่านง่ายขึ้น
+   (writing_summary.php) หน้านี้จึงเหลือแต่การ์ดคะแนนกับรายละเอียดรายฉบับ อ่านง่ายขึ้น
    ============================================================ */
 
 // รอบที่มีผลตรวจแล้ว เรียงตามลำดับการเรียน
@@ -810,7 +810,7 @@ function paintPersonStrip() {
   if (!sid) { box.innerHTML = ''; return; }
   if (!aiCardsReady) return;
 
-  const summaryUrl = 'ai_student_summary.php?student_id=' + encodeURIComponent(sid);
+  const summaryUrl = 'writing_summary.php?student_id=' + encodeURIComponent(sid);
   const openBtn = `<a href="${summaryUrl}" target="_blank" rel="noopener"
        class="btn fw-bold rounded-pill px-4 text-white text-nowrap"
        style="background:linear-gradient(135deg,#6d28d9,#0d7377);">
@@ -820,7 +820,7 @@ function paintPersonStrip() {
   if (!phases.length) {
     box.innerHTML = `<div class="ai-person-strip rounded-4 p-3 d-flex align-items-center
                                 justify-content-between flex-wrap gap-3">
-      <div class="text-muted small"><i class="bi bi-inbox me-1"></i>นักเรียนคนนี้ยังไม่มีผลตรวจของ AI สักฉบับ</div>
+      <div class="text-muted small"><i class="bi bi-inbox me-1"></i>นักเรียนคนนี้ยังไม่มีผลตรวจของระบบสักฉบับ</div>
       ${openBtn}
     </div>`;
     return;
@@ -934,7 +934,7 @@ function classPhaseCardHTML(ph, stat) {
   </div>`;
 }
 
-// กลุ่มการ์ด "ค่าเฉลี่ยทั้งชั้นรายรอบงาน" — อยู่ในแท็บ "ภาพรวมผลตรวจ AI ทั้งชั้น"
+// กลุ่มการ์ด "ค่าเฉลี่ยทั้งชั้นรายรอบงาน" — อยู่ในแท็บ "ภาพรวมผลตรวจอัตโนมัติทั้งชั้น"
 function classAverageGroupsHTML() {
   if (AI_IS_STUDENT) return '';
   const stats = aiClassAverages();
@@ -956,7 +956,7 @@ function classAverageGroupsHTML() {
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
       <div>
         <h6 class="fw-bold text-dark mb-0"><i class="bi bi-people-fill text-info me-2"></i>ค่าเฉลี่ยทั้งชั้นรายรอบงาน</h6>
-        <div class="text-muted small mt-1">คิดจากผลตรวจของ AI ทั้งหมด ${total} ฉบับที่บันทึกไว้ในระบบ</div>
+        <div class="text-muted small mt-1">คิดจากผลตรวจของระบบทั้งหมด ${total} ฉบับที่บันทึกไว้ในระบบ</div>
       </div>
     </div>
     ${groups}
@@ -981,7 +981,7 @@ function paintClassHighlights() {
   const list = aiOverviewList || [];
   if (!list.length) {
     box.innerHTML = '<div class="text-center text-muted py-4">'
-      + '<i class="bi bi-inbox fs-3 d-block mb-2"></i>ยังไม่มีผลตรวจของ AI ในระบบ</div>';
+      + '<i class="bi bi-inbox fs-3 d-block mb-2"></i>ยังไม่มีผลตรวจของระบบในระบบ</div>';
     return;
   }
 
@@ -1027,15 +1027,15 @@ function paintClassHighlights() {
     <div class="text-muted mt-2" style="font-size:0.78rem;">
       <i class="bi bi-info-circle me-1"></i>&quot;ร่างหลังดีขึ้นจริง&quot; นับเฉพาะคู่ที่ครูกำหนดให้เทียบกัน
       (D1.2 เทียบ D1.1 · D2.2 เทียบ D2.1 · หลังเรียน เทียบ ก่อนเรียน)
-      <br><i class="bi bi-shield-check me-1"></i>ตอนตรวจร่างหลัง AI จะยึดคะแนนรายข้อของฉบับตั้งต้นเป็นจุดตั้งต้น
+      <br><i class="bi bi-shield-check me-1"></i>ตอนตรวจร่างหลังระบบจะยึดคะแนนรายข้อของฉบับตั้งต้นเป็นจุดตั้งต้น
       มองหาสิ่งที่นักเรียนแก้จนดีขึ้นก่อนเสมอ และจะลดคะแนนข้อใดได้ก็ต่อเมื่อยกข้อความจริงมายืนยันได้ว่าร่างหลังทำได้แย่ลง
     </div>`;
 }
 
 /* ============================================================
    ภาพรวมการนำเสนอรายรอบงาน (ทั้งชั้น)
-   AI อ่านผลตรวจของทุกคนในรอบนั้นรวดเดียว แล้วสรุปว่านำเสนอไปทางใด มีอะไรน่าสนใจ
-   ตัวเลขทั้งหมดในกล่องนี้ระบบคำนวณเอง ไม่ได้ให้ AI นับ
+   ระบบอ่านผลตรวจของทุกคนในรอบนั้นรวดเดียว แล้วสรุปว่านำเสนอไปทางใด มีอะไรน่าสนใจ
+   ตัวเลขทั้งหมดในกล่องนี้ระบบคำนวณเอง ไม่ได้ให้ระบบนับ
    ============================================================ */
 let aiOverviews = {};      // รหัสรอบงาน => ภาพรวมที่เคยสร้างไว้
 let ovRunning   = false;
@@ -1075,18 +1075,18 @@ function paintPhaseOverview() {
   const btn = document.getElementById('ovRunBtn');
   if (btn && !ovRunning) {
     btn.disabled = (done < 2);
-    btn.innerHTML = '<i class="bi bi-stars me-1"></i>' + (ov ? 'เขียนภาพรวมรอบนี้ใหม่' : 'ให้ AI เขียนภาพรวมรอบนี้');
+    btn.innerHTML = '<i class="bi bi-stars me-1"></i>' + (ov ? 'เขียนภาพรวมรอบนี้ใหม่' : 'ให้ระบบเขียนภาพรวมรอบนี้');
   }
 
   if (!ov) {
     box.innerHTML = `<div class="text-center text-muted py-4">
       <i class="bi bi-journal-text fs-3 d-block mb-2 opacity-50"></i>
-      ยังไม่เคยให้ AI เขียนภาพรวมของรอบนี้
+      ยังไม่เคยให้ระบบเขียนภาพรวมของรอบนี้
       ${AI_IS_TEACHER
         ? (done < 2
-            ? '<div class="small mt-2">ให้ AI ตรวจเรียงความในรอบนี้อย่างน้อย 2 ฉบับก่อน</div>'
-            : '<div class="small mt-2">กดปุ่ม &quot;ให้ AI เขียนภาพรวมรอบนี้&quot; ด้านบนได้เลย</div>')
-        : '<div class="small mt-2">รอคุณครูสั่งให้ AI เขียนภาพรวมของรอบนี้</div>'}
+            ? '<div class="small mt-2">ให้ระบบตรวจเรียงความในรอบนี้อย่างน้อย 2 ฉบับก่อน</div>'
+            : '<div class="small mt-2">กดปุ่ม &quot;ให้ระบบเขียนภาพรวมรอบนี้&quot; ด้านบนได้เลย</div>')
+        : '<div class="small mt-2">รอคุณครูสั่งให้ระบบเขียนภาพรวมของรอบนี้</div>'}
     </div>`;
     return;
   }
@@ -1106,7 +1106,7 @@ function overviewHTML(ov) {
   const st = ov.stats || {};
   const when = ov.updated_at ? String(ov.updated_at).replace('T', ' ').slice(0, 16) : '';
 
-  // แถบตัวเลขของรอบนั้น — ระบบคำนวณเอง ไม่ได้มาจาก AI
+  // แถบตัวเลขของรอบนั้น — ระบบคำนวณเอง ไม่ได้มาจากระบบ
   const pair = st.pair;
   const chips = [
     `<span class="ai-progress-chip"><span class="text-muted">ตรวจแล้ว</span>
@@ -1197,7 +1197,7 @@ async function runPhaseOverview() {
   const btn = document.getElementById('ovRunBtn');
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>กำลังเขียน...'; }
   document.getElementById('ovBox').innerHTML =
-    aiLoadingHTML('AI กำลังอ่านงานทั้งชั้นแล้วเขียนภาพรวม', 'ปกติใช้เวลาประมาณ 20-60 วินาที กรุณาอย่าปิดหน้านี้');
+    aiLoadingHTML('ระบบกำลังอ่านงานทั้งชั้นแล้วเขียนภาพรวม', 'ปกติใช้เวลาประมาณ 20-60 วินาที กรุณาอย่าปิดหน้านี้');
 
   try {
     const res = await fetch('api.php', {
@@ -1268,7 +1268,7 @@ function paintPhaseCards() {
       <div class="row ${g.cols} g-3">${cards}</div>
     </div>`;
   }).join('')
-  : `<div class="mb-4">${emptyBox('เลือกนักเรียนด้านบนเพื่อดูผลตรวจของ AI ทุกรอบงาน')}</div>`;
+  : `<div class="mb-4">${emptyBox('เลือกนักเรียนด้านบนเพื่อดูผลตรวจของระบบทุกรอบงาน')}</div>`;
 
   box.innerHTML = studentCards;
 
@@ -1326,7 +1326,7 @@ function phaseCardHTML(ph, blocked) {
       <div class="ai-score-bar mt-2"><span style="width:${pct}%"></span></div>
       <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-1">
         <span class="badge bg-primary-subtle text-primary-emphasis">ระดับ${fb.manual_done ? '' : 'โดยประมาณ'}: ${esc(level)}</span>
-        <span class="text-muted small">AI ${aiNum(fb.total_score)}/${aiNum(fb.max_score)}
+        <span class="text-muted small">ระบบ ${aiNum(fb.total_score)}/${aiNum(fb.max_score)}
           · ครู ${fb.manual_done ? aiNum(fb.teacher_total) : '—'}/${aiNum(fb.manual_max)}</span>
       </div>
       ${draftLine}`;
@@ -1335,7 +1335,7 @@ function phaseCardHTML(ph, blocked) {
     cls += ' ai-phase-card-empty';
     body = `<div class="text-muted"><i class="bi bi-hourglass-split me-1"></i>เขียนแล้ว ${essay.word_count} คำ · ยังไม่มีผลตรวจ</div>`
          + (essay.too_short ? `<div class="small text-warning-emphasis mt-1">
-              <i class="bi bi-exclamation-triangle me-1"></i>สั้นกว่าเกณฑ์ ยังส่งให้ AI ตรวจไม่ได้</div>` : '');
+              <i class="bi bi-exclamation-triangle me-1"></i>สั้นกว่าเกณฑ์ ยังส่งให้ระบบตรวจไม่ได้</div>` : '');
   } else {
     cls += ' ai-phase-card-empty';
     body = '<div class="text-muted"><i class="bi bi-file-earmark-x me-1"></i>ยังไม่ได้เขียนเรียงความรอบนี้</div>';
@@ -1347,9 +1347,9 @@ function phaseCardHTML(ph, blocked) {
     const dis = blocked ? ' disabled' : '';
     reviewBtn = `<button class="btn btn-sm rounded-pill px-3 fw-bold text-white ai-phase-review-btn"
             style="background:linear-gradient(135deg,#6d28d9,#0d7377);"${dis}
-            title="${esc(blocked || 'ส่งเรียงความรอบนี้ให้ AI ตรวจ')}"
+            title="${esc(blocked || 'ส่งเรียงความรอบนี้ให้ระบบตรวจ')}"
             onclick="event.stopPropagation(); runAiReview('${esc(ph)}')">
-      <i class="bi bi-stars me-1"></i>${fb ? 'ตรวจใหม่' : 'ให้ AI ตรวจ'}</button>`;
+      <i class="bi bi-stars me-1"></i>${fb ? 'ตรวจใหม่' : 'ให้ระบบตรวจ'}</button>`;
   }
 
   return `<div class="col">
@@ -1441,24 +1441,24 @@ async function runAiReview(phase) {
   if (aiReviewRunning) return;
 
   // รอบที่ต้องเทียบกับฉบับตั้งต้น (D1.2 / D2.2 / หลังเรียน) — ถ้าฉบับตั้งต้นยังไม่ถูกตรวจ
-  // ระบบจะเทียบคะแนนรายข้อให้ไม่ได้ และ AI ก็ไม่มีคะแนนของฉบับตั้งต้นไว้ยึดเป็นจุดตั้งต้นด้วย
+  // ระบบจะเทียบคะแนนรายข้อให้ไม่ได้ และระบบก็ไม่มีคะแนนของฉบับตั้งต้นไว้ยึดเป็นจุดตั้งต้นด้วย
   // ร่างหลังจึงอาจได้คะแนนต่ำกว่าร่างแรกทั้งที่นักเรียนแก้งานมาแล้ว — เตือนให้ตรวจฉบับตั้งต้นก่อน
   const basePh = AI_BASELINE_PAIRS[phase];
   if (basePh && !aiAllFeedback[basePh]) {
     const ok = confirm(`รอบ "${AI_PHASE_LABELS[phase]}" ต้องเทียบกับ "${AI_PHASE_LABELS[basePh]}" เสมอ\n`
-      + `แต่ ${AI_PHASE_SHORT_MAP[basePh]} ยังไม่มีผลตรวจของ AI\n\n`
-      + `ถ้าตรวจตอนนี้ AI จะไม่มีคะแนนของฉบับตั้งต้นไว้ยึดเป็นจุดตั้งต้น คะแนนของร่างหลัง\n`
+      + `แต่ ${AI_PHASE_SHORT_MAP[basePh]} ยังไม่มีผลตรวจของระบบ\n\n`
+      + `ถ้าตรวจตอนนี้ระบบจะไม่มีคะแนนของฉบับตั้งต้นไว้ยึดเป็นจุดตั้งต้น คะแนนของร่างหลัง\n`
       + `จึงอาจออกมาต่ำกว่าร่างแรกทั้งที่นักเรียนแก้งานมาแล้ว และจะไม่มีผลเทียบรายข้อให้ดูด้วย\n\n`
       + `แนะนำให้กด "ยกเลิก" แล้วสั่งตรวจ ${AI_PHASE_SHORT_MAP[basePh]} ก่อน `
       + `หรือกด "ตกลง" ถ้าต้องการตรวจรอบนี้ต่อไป`);
     if (!ok) return;
   }
 
-  // ตรวจใหม่ทั้งฉบับ = AI อ่านงานใหม่หมดทุกข้อ คะแนนที่ครูปรับไว้รายข้อจึงถูกล้างทิ้ง
+  // ตรวจใหม่ทั้งฉบับ = ระบบอ่านงานใหม่หมดทุกข้อ คะแนนที่ครูปรับไว้รายข้อจึงถูกล้างทิ้ง
   const ovCount = Number((aiAllFeedback[phase] || {}).override_count || 0);
   if (ovCount > 0) {
     const ok = confirm(`ฉบับนี้มีคะแนนที่ผ่านการตรวจทานของครูไว้แล้ว ${ovCount} ข้อ\n`
-      + `การให้ AI ตรวจใหม่ทั้งฉบับจะล้างคะแนนที่ปรับไว้ทั้งหมด แล้วใช้คะแนนชุดใหม่ของ AI แทน\n\n`
+      + `การให้ระบบตรวจใหม่ทั้งฉบับจะล้างคะแนนที่ปรับไว้ทั้งหมด แล้วใช้คะแนนชุดใหม่ของระบบแทน\n\n`
       + `ถ้าต้องการแก้เฉพาะบางข้อ ให้กด "ยกเลิก" แล้วใช้ปุ่มปรับคะแนนท้ายแถวในตารางคะแนนรายเกณฑ์แทน`);
     if (!ok) return;
   }
@@ -1468,7 +1468,7 @@ async function runAiReview(phase) {
   document.querySelectorAll('.ai-phase-review-btn').forEach(b => { b.disabled = true; });
   document.getElementById('aiFeedbackPanel').innerHTML =
     `<div class="card border-0 shadow-sm rounded-4 mb-4"><div class="card-body">`
-    + aiLoadingHTML('AI กำลังอ่านเรียงความและเขียนข้อเสนอแนะ', 'ปกติใช้เวลาประมาณ 15-40 วินาที กรุณาอย่าปิดหน้านี้')
+    + aiLoadingHTML('ระบบกำลังอ่านเรียงความและเขียนข้อเสนอแนะ', 'ปกติใช้เวลาประมาณ 15-40 วินาที กรุณาอย่าปิดหน้านี้')
     + `</div></div>`;
 
   try {
@@ -1486,7 +1486,7 @@ async function runAiReview(phase) {
     aiAttachDraftCompare(aiAllFeedback);
     paintPhaseCards();
     renderFeedback(data.feedback);
-    showToast('AI ตรวจเรียงความเรียบร้อยแล้ว');
+    showToast('ระบบตรวจเรียงความเรียบร้อยแล้ว');
     if (!AI_IS_STUDENT) { loadAiOverview(); loadRecheckQueue(); }
   } finally {
     aiReviewRunning = false;
@@ -1494,7 +1494,7 @@ async function runAiReview(phase) {
   }
 }
 
-// ครูบันทึกคะแนนข้อที่ AI ตรวจแทนไม่ได้ (เช่น 4.3 ความเรียบร้อย/ลายมือ) — รวมกับคะแนน AI ให้ครบเต็ม 60
+// ครูบันทึกคะแนนข้อที่ระบบตรวจแทนไม่ได้ (เช่น 4.3 ความเรียบร้อย/ลายมือ) — รวมกับคะแนนอัตโนมัติให้ครบเต็ม 60
 async function saveManualScores() {
   // การ์ดเกณฑ์เป็นปุ่มวิทยุแบบเดียวกับหน้า evaluation.php — เก็บเฉพาะข้อที่คุณครูเลือกไว้จริง
   const scores = {};
@@ -1530,7 +1530,7 @@ async function saveManualScores() {
 }
 
 async function deleteFeedback() {
-  if (!confirm('ยืนยันลบผลตรวจของ AI สำหรับเรียงความฉบับนี้?')) return;
+  if (!confirm('ยืนยันลบผลตรวจของระบบสำหรับเรียงความฉบับนี้?')) return;
   try {
     const res = await fetch('api.php', {
       method: 'POST',
@@ -1550,11 +1550,11 @@ async function deleteFeedback() {
 }
 
 // ------------------------------------------------- ปรับคะแนนรายข้อ (เฉพาะครู)
-// คุณครูไม่เห็นด้วยกับคะแนนที่ AI ให้ข้อไหน เปิดหน้าต่างนี้จากปุ่มท้ายแถวในตารางคะแนนรายเกณฑ์
-// ทำได้ 2 ทาง: ปรับคะแนนเองพร้อมเหตุผล หรือสั่งให้ AI ตรวจเฉพาะข้อนั้นใหม่ (ใส่คำสั่งเพิ่มเติมได้)
-// ไม่ว่าทางไหน คะแนนที่ AI ให้ครั้งแรกยังถูกเก็บไว้เสมอ กดคืนค่าได้ตลอด
+// คุณครูไม่เห็นด้วยกับคะแนนที่ระบบให้ข้อไหน เปิดหน้าต่างนี้จากปุ่มท้ายแถวในตารางคะแนนรายเกณฑ์
+// ทำได้ 2 ทาง: ปรับคะแนนเองพร้อมเหตุผล หรือสั่งให้ระบบตรวจเฉพาะข้อนั้นใหม่ (ใส่คำสั่งเพิ่มเติมได้)
+// ไม่ว่าทางไหน คะแนนที่ระบบให้ครั้งแรกยังถูกเก็บไว้เสมอ กดคืนค่าได้ตลอด
 let aiCritId      = '';    // รหัสข้อที่กำลังเปิดหน้าต่างอยู่
-let aiCritBusy    = false; // กันกดซ้ำระหว่างรอผลจาก AI
+let aiCritBusy    = false; // กันกดซ้ำระหว่างรอผลจากระบบ
 
 function aiCritItem(id) {
   return (AI_RUBRIC_ITEMS || []).find(it => String(it.id) === String(id)) || null;
@@ -1610,16 +1610,16 @@ function aiOpenCritPanel(critId) {
 
   document.getElementById('aiCritBody').innerHTML = `
     <div class="p-3 rounded-3 mb-4" style="background:#f8fafc; border-left:4px solid #6d28d9;">
-      <div class="fw-bold text-dark mb-1"><i class="bi bi-robot me-2 text-primary"></i>คะแนนที่ AI ให้ไว้ครั้งแรก</div>
+      <div class="fw-bold text-dark mb-1"><i class="bi bi-file-earmark-check me-2 text-primary"></i>คะแนนที่ระบบให้ไว้ครั้งแรก</div>
       <div class="fs-5 fw-bold text-primary">${aiNum1(aiRaw)} <span class="text-muted fs-6 fw-normal">(= ${aiNum(aiWeighted)} / ${it.max} คะแนน)</span></div>
       ${aiReason ? `<div class="text-muted small mt-2">${esc(aiReason)}</div>` : ''}
       ${ov ? `<hr class="my-2">
         <div class="small">
           <span class="badge ai-ov-badge ${ov.source === 'ai_recheck' ? 'ai-ov-recheck' : 'ai-ov-teacher'}">
-            ${ov.source === 'ai_recheck' ? 'AI ตรวจข้อนี้ใหม่' : 'ครูปรับคะแนน'}</span>
+            ${ov.source === 'ai_recheck' ? 'ระบบตรวจข้อนี้ใหม่' : 'ครูปรับคะแนน'}</span>
           <span class="fw-bold ms-2">คะแนนที่ใช้อยู่ตอนนี้: ${aiNum1(ov.raw)} (= ${aiNum(ov.weighted)} / ${it.max})</span>
           ${ov.reason ? `<div class="text-muted mt-1">${esc(ov.reason)}</div>` : ''}
-          ${ov.instruction ? `<div class="text-muted mt-1"><span class="fw-semibold">คำสั่งที่ครูให้ AI:</span> <span class="fst-italic">${esc(ov.instruction)}</span></div>` : ''}
+          ${ov.instruction ? `<div class="text-muted mt-1"><span class="fw-semibold">คำสั่งที่ครูให้ระบบ:</span> <span class="fst-italic">${esc(ov.instruction)}</span></div>` : ''}
         </div>` : ''}
     </div>
 
@@ -1629,11 +1629,11 @@ function aiOpenCritPanel(critId) {
     <div class="mb-3">
       <label class="form-label small fw-semibold text-dark" for="aiCritReason">เหตุผลที่ปรับคะแนน</label>
       <textarea id="aiCritReason" class="form-control rounded-3" rows="2" maxlength="800"
-                placeholder="เช่น ย่อหน้าที่ 2 ยังอยู่ในขอบเขตของหัวข้อ AI ตัดคะแนนแรงเกินไป">${ov && ov.source !== 'ai_recheck' ? esc(ov.reason || '') : ''}</textarea>
+                placeholder="เช่น ย่อหน้าที่ 2 ยังอยู่ในขอบเขตของหัวข้อ ระบบตัดคะแนนแรงเกินไป">${ov && ov.source !== 'ai_recheck' ? esc(ov.reason || '') : ''}</textarea>
     </div>
     <div class="d-flex justify-content-end gap-2 flex-wrap mb-4">
       ${ov ? `<button class="btn btn-outline-secondary rounded-pill px-3" onclick="aiClearCritOverride()">
-        <i class="bi bi-arrow-counterclockwise me-1"></i>คืนค่าคะแนนของ AI
+        <i class="bi bi-arrow-counterclockwise me-1"></i>คืนค่าคะแนนของระบบ
       </button>` : ''}
       <button class="btn btn-primary rounded-pill px-4 fw-bold" onclick="aiSaveCritOverride()">
         <i class="bi bi-check2-circle me-1"></i>บันทึกคะแนนที่ปรับ
@@ -1642,20 +1642,20 @@ function aiOpenCritPanel(critId) {
 
     <hr class="my-4">
 
-    <h6 class="fw-bold text-dark mb-1"><i class="bi bi-arrow-repeat me-2"></i>2. ให้ AI ตรวจเฉพาะข้อนี้ใหม่</h6>
+    <h6 class="fw-bold text-dark mb-1"><i class="bi bi-arrow-repeat me-2"></i>2. ให้ระบบตรวจเฉพาะข้อนี้ใหม่</h6>
     <div class="text-muted small mb-3">
-      AI จะอ่านเรียงความทั้งฉบับอีกครั้งแต่ให้คะแนน<strong>เฉพาะข้อ ${esc(it.id)}</strong> ข้ออื่นไม่ขยับ
-      · ระบบไม่บอกคะแนนเดิมให้ AI รู้ เพื่อให้ตรวจใหม่แบบสด ๆ · ใช้โควตา 1 ครั้ง
+      ระบบจะอ่านเรียงความทั้งฉบับอีกครั้งแต่ให้คะแนน<strong>เฉพาะข้อ ${esc(it.id)}</strong> ข้ออื่นไม่ขยับ
+      · ระบบไม่บอกคะแนนเดิมให้โมเดลรู้ เพื่อให้ตรวจใหม่แบบสด ๆ · ใช้โควตา 1 ครั้ง
     </div>
     <div class="mb-3">
-      <label class="form-label small fw-semibold text-dark" for="aiCritInstr">คำสั่งเพิ่มเติมถึง AI (ไม่ใส่ก็ได้)</label>
+      <label class="form-label small fw-semibold text-dark" for="aiCritInstr">คำสั่งเพิ่มเติมถึงระบบ (ไม่ใส่ก็ได้)</label>
       <textarea id="aiCritInstr" class="form-control rounded-3" rows="3" maxlength="800"
                 placeholder="เช่น ให้ดูย่อหน้าที่ 3 ด้วย นักเรียนยกตัวอย่างไว้แล้ว / ข้อนี้ให้นับเฉพาะคำเชื่อมที่ใช้ผิด ไม่ต้องนับคำซ้ำ"></textarea>
       <div class="form-text">คำสั่งนี้ใช้กับการตรวจข้อนี้ครั้งนี้เท่านั้น และถูกบันทึกไว้ให้ตรวจสอบย้อนหลังได้</div>
     </div>
     <div class="d-flex justify-content-end">
       <button class="btn btn-success rounded-pill px-4 fw-bold" id="aiCritRecheckBtn" onclick="aiRecheckCriterion()">
-        <i class="bi bi-stars me-1"></i>ให้ AI ตรวจข้อนี้ใหม่
+        <i class="bi bi-stars me-1"></i>ให้ระบบตรวจข้อนี้ใหม่
       </button>
     </div>`;
 
@@ -1682,13 +1682,13 @@ async function aiSaveCritOverride() {
   if (!picked) { showToast('กรุณาเลือกระดับคะแนนก่อน', 'error'); return; }
   const reason = (document.getElementById('aiCritReason').value || '').trim();
   if (!reason) {
-    if (!confirm('ยังไม่ได้เขียนเหตุผลที่ปรับคะแนน\n\nเหตุผลช่วยให้ย้อนกลับมาอธิบายได้ว่าทำไมคะแนนข้อนี้จึงต่างจากที่ AI ให้\nต้องการบันทึกโดยไม่ใส่เหตุผลหรือไม่?')) return;
+    if (!confirm('ยังไม่ได้เขียนเหตุผลที่ปรับคะแนน\n\nเหตุผลช่วยให้ย้อนกลับมาอธิบายได้ว่าทำไมคะแนนข้อนี้จึงต่างจากที่ระบบให้\nต้องการบันทึกโดยไม่ใส่เหตุผลหรือไม่?')) return;
   }
   await aiPostCritOverride({ raw: Number(picked.value), reason });
 }
 
 async function aiClearCritOverride() {
-  if (!confirm('คืนค่าคะแนนข้อนี้กลับไปใช้คะแนนที่ AI ให้ไว้เดิมหรือไม่?')) return;
+  if (!confirm('คืนค่าคะแนนข้อนี้กลับไปใช้คะแนนที่ระบบให้ไว้เดิมหรือไม่?')) return;
   await aiPostCritOverride({ raw: '', reason: '' });
 }
 
@@ -1710,7 +1710,7 @@ async function aiPostCritOverride(payload) {
     if (!data.success) { showToast(data.error || 'บันทึกไม่สำเร็จ', 'error'); return; }
     aiApplyCritResult(data.feedback);
     aiCloseCritPanel();
-    showToast(data.cleared ? 'คืนค่าคะแนนของ AI เรียบร้อยแล้ว' : 'บันทึกคะแนนที่ปรับเรียบร้อยแล้ว');
+    showToast(data.cleared ? 'คืนค่าคะแนนของระบบเรียบร้อยแล้ว' : 'บันทึกคะแนนที่ปรับเรียบร้อยแล้ว');
   } catch (err) {
     showToast('เชื่อมต่อไม่สำเร็จ', 'error');
   } finally {
@@ -1726,7 +1726,7 @@ async function aiRecheckCriterion() {
   aiCritBusy = true;
   if (btn) {
     btn.disabled  = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>AI กำลังตรวจข้อนี้...';
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>ระบบกำลังตรวจข้อนี้...';
   }
   try {
     const res = await fetch('api.php', {
@@ -1749,14 +1749,14 @@ async function aiRecheckCriterion() {
     }
     aiApplyCritResult(data.feedback);
     aiCloseCritPanel();
-    showToast(`AI ตรวจข้อ ${aiCritId} ใหม่เรียบร้อยแล้ว`);
+    showToast(`ระบบตรวจข้อ ${aiCritId} ใหม่เรียบร้อยแล้ว`);
   } catch (err) {
     showToast('เชื่อมต่อไม่สำเร็จ', 'error');
   } finally {
     aiCritBusy = false;
     if (btn) {
       btn.disabled  = false;
-      btn.innerHTML = '<i class="bi bi-stars me-1"></i>ให้ AI ตรวจข้อนี้ใหม่';
+      btn.innerHTML = '<i class="bi bi-stars me-1"></i>ให้ระบบตรวจข้อนี้ใหม่';
     }
   }
 }
@@ -1774,7 +1774,7 @@ function onSelectionChange() {
 }
 
 // ------------------------------------------ คิวรอตรวจใหม่ (ครู/ผชช.)
-// นักเรียนกดบันทึกเรียงความที่เคยให้ AI ตรวจไปแล้ว → ฝั่งเซิร์ฟเวอร์ทำเครื่องหมายไว้ให้เอง
+// นักเรียนกดบันทึกเรียงความที่เคยให้ระบบตรวจไปแล้ว → ฝั่งเซิร์ฟเวอร์ทำเครื่องหมายไว้ให้เอง
 // หน้านี้จึงแค่ดึงรายการมาแสดง และให้คุณครูสั่งตรวจใหม่ทั้งคิวได้ในคลิกเดียว
 let aiRecheckList = [];
 
@@ -1809,7 +1809,7 @@ function paintRecheckQueue() {
   const btn = document.getElementById('rcStartBtn');
   if (btn) {
     btn.disabled = (ready === 0);
-    btn.innerHTML = `<i class="bi bi-stars me-1"></i>ให้ AI ตรวจใหม่ทั้งคิว (${ready})`;
+    btn.innerHTML = `<i class="bi bi-stars me-1"></i>ให้ระบบตรวจใหม่ทั้งคิว (${ready})`;
   }
 
   list.innerHTML = aiRecheckList.map(r => {
@@ -1881,7 +1881,7 @@ function paintAiOverview() {
   const box = document.getElementById('aiOverviewBox');
   if (!box) return;
   if (!aiOverviewList.length) {
-    box.innerHTML = '<div class="text-center text-muted py-5"><i class="bi bi-inbox fs-3 d-block mb-2"></i>ยังไม่มีผลตรวจของ AI</div>';
+    box.innerHTML = '<div class="text-center text-muted py-5"><i class="bi bi-inbox fs-3 d-block mb-2"></i>ยังไม่มีผลตรวจของระบบ</div>';
     return;
   }
 
@@ -1931,14 +1931,14 @@ function paintAiOverview() {
     const cells = cols.map(c => {
       const r = stu.cells[c.key];
       if (!r) {
-        return '<td class="ai-cell-empty"><i class="bi bi-dash-circle" title="ยังไม่ได้ให้ AI ตรวจรอบนี้"></i></td>';
+        return '<td class="ai-cell-empty"><i class="bi bi-dash-circle" title="ยังไม่ได้ให้ระบบตรวจรอบนี้"></i></td>';
       }
       sum += r.combined_total; cnt++;
       colSum[c.key] += r.combined_total; colCount[c.key]++;
       gradedCells++;
       if (!r.manual_done) waiting++;
       if (r.needs_recheck) stale++;
-      const tip = `${aiEsc(r.phase_label)} · AI ${aiNum(r.total_score)}/${aiNum(r.max_score)}`
+      const tip = `${aiEsc(r.phase_label)} · ระบบ ${aiNum(r.total_score)}/${aiNum(r.max_score)}`
                 + ` · ครู ${r.manual_done ? aiNum(r.teacher_total) : 'ยังไม่ให้'}/${aiNum(r.full_max - r.max_score)}`
                 + (r.teacher_source === 'evaluation' ? ' (จากแบบประเมิน)' : '')
                 + ` · รวม ${aiNum(r.combined_total)}/${aiNum(r.full_max)}`
@@ -1975,7 +1975,7 @@ function paintAiOverview() {
     return `<tr>
       <td class="stu-id text-start">${esc(stu.student_id)}</td>
       <td class="stu-name">
-        <a href="ai_student_summary.php?student_id=${encodeURIComponent(stu.student_id)}" target="_blank" rel="noopener"
+        <a href="writing_summary.php?student_id=${encodeURIComponent(stu.student_id)}" target="_blank" rel="noopener"
            class="ai-stu-link" title="เปิดสรุปภาพรวมผลงานเขียนของนักเรียนคนนี้ในหน้าใหม่">
           ${esc(stu.student_name || '-')}<i class="bi bi-box-arrow-up-right ms-1 small text-muted"></i>
         </a>${stu.classroom
@@ -2036,14 +2036,14 @@ function paintAiOverview() {
       </tfoot>
     </table>
     <div class="px-3 py-2 small text-muted border-top bg-light">
-      คะแนนในตารางคือคะแนนรวมเต็ม ${aiNum(fullMax)} (AI ประเมิน + ข้อที่คุณครูให้เอง) · คลิกที่ช่องคะแนนเพื่อเปิดผลตรวจฉบับนั้น
+      คะแนนในตารางคือคะแนนรวมเต็ม ${aiNum(fullMax)} (ระบบประเมิน + ข้อที่คุณครูให้เอง) · คลิกที่ช่องคะแนนเพื่อเปิดผลตรวจฉบับนั้น
       · แสดง ${students.length} คน จากผลตรวจ ${gradedCells} ฉบับ
       <br>คอลัมน์ <strong>ระดับ</strong> คิดจากคะแนน<strong>เฉลี่ย</strong>ของช่องที่แสดงอยู่ ตามเกณฑ์เดียวกับหน้าประเมิน
       (ดีมาก 49 ขึ้นไป · ดี 37-48 · ปานกลาง 25-36 · พอใช้ 13-24 · ต้องปรับปรุง ต่ำกว่า 13)
       ${waiting > 0 ? `<br><span class="text-warning-emphasis fw-semibold">
-          <i class="bi bi-asterisk me-1"></i>ช่องที่มีเครื่องหมาย * ยังรอคุณครูให้คะแนนข้อที่ AI ตรวจแทนไม่ได้ อีก ${waiting} ฉบับ</span>` : ''}
+          <i class="bi bi-asterisk me-1"></i>ช่องที่มีเครื่องหมาย * ยังรอคุณครูให้คะแนนข้อที่ระบบตรวจแทนไม่ได้ อีก ${waiting} ฉบับ</span>` : ''}
       ${stale > 0 ? `<br><span class="text-warning-emphasis fw-semibold">
-          <i class="bi bi-arrow-repeat me-1"></i>ช่องที่มีสัญลักษณ์วนซ้ำ คือฉบับที่นักเรียนแก้ไขต้นฉบับหลัง AI ตรวจ รอตรวจใหม่ ${stale} ฉบับ</span>` : ''}
+          <i class="bi bi-arrow-repeat me-1"></i>ช่องที่มีสัญลักษณ์วนซ้ำ คือฉบับที่นักเรียนแก้ไขต้นฉบับหลังระบบตรวจ รอตรวจใหม่ ${stale} ฉบับ</span>` : ''}
       <br><i class="bi bi-arrow-up-right-circle-fill ai-cell-pair-up"></i> = ร่างหลังได้คะแนนสูงกว่าฉบับตั้งต้น ·
       <i class="bi bi-exclamation-circle-fill ai-cell-pair-flat"></i> = ยังไม่สูงกว่าฉบับตั้งต้น
       (D1.2 เทียบ D1.1 · D2.2 เทียบ D2.1 · หลังเรียน เทียบ ก่อนเรียน) ·
@@ -2152,17 +2152,17 @@ function paintBatchSummary() {
   const done  = batchTargets.filter(t => t.reviewed).length;
   const tooShort = batchTargets.__tooShort || 0;
   const reQueued = batchTargets.filter(t => t.needs_recheck).length;
-  // เคยสั่งตรวจแล้วแต่ผลไม่สมบูรณ์ (AI ให้คะแนนไม่ครบ) — นับเป็นยังไม่ตรวจ ต้องตรวจใหม่
+  // เคยสั่งตรวจแล้วแต่ผลไม่สมบูรณ์ (ระบบให้คะแนนไม่ครบ) — นับเป็นยังไม่ตรวจ ต้องตรวจใหม่
   const failedBefore = batchTargets.filter(t => t.failed_before).length;
 
-  // ประเมินเวลาคร่าว ๆ: AI ใช้เวลาราว 25 วินาทีต่อฉบับ บวกจังหวะพักระหว่างฉบับ
+  // ประเมินเวลาคร่าว ๆ: ระบบใช้เวลาราว 25 วินาทีต่อฉบับ บวกจังหวะพักระหว่างฉบับ
   const mins = Math.max(1, Math.round(queue.length * (25000 + BATCH_GAP_MS) / 60000));
 
   let html = `<i class="bi bi-list-check me-1"></i>ส่งแล้ว <strong>${batchTargets.length}</strong> ฉบับ`
     + ` · ตรวจไปแล้ว <strong>${done}</strong> · <strong class="text-primary">จะตรวจรอบนี้ ${queue.length} ฉบับ</strong>`;
   if (reQueued > 0) {
     html += `<br><i class="bi bi-arrow-repeat text-warning me-1"></i>`
-      + `<strong class="text-warning-emphasis">รอตรวจใหม่ ${reQueued} ฉบับ</strong> (นักเรียนแก้ไขต้นฉบับหลัง AI ตรวจไปแล้ว)`;
+      + `<strong class="text-warning-emphasis">รอตรวจใหม่ ${reQueued} ฉบับ</strong> (นักเรียนแก้ไขต้นฉบับหลังระบบตรวจไปแล้ว)`;
   }
   if (failedBefore > 0) {
     html += `<br><i class="bi bi-exclamation-octagon text-danger me-1"></i>`
@@ -2171,7 +2171,7 @@ function paintBatchSummary() {
   }
   if (tooShort > 0) {
     html += `<br><i class="bi bi-exclamation-triangle text-warning me-1"></i>`
-      + `ข้าม ${tooShort} ฉบับที่สั้นกว่า ${batchTargets.__minWords} คำ (ระบบไม่ส่งให้ AI ตรวจ)`;
+      + `ข้าม ${tooShort} ฉบับที่สั้นกว่า ${batchTargets.__minWords} คำ (ระบบไม่ส่งให้ตรวจ)`;
   }
   if (queue.length > 0) {
     html += `<br><i class="bi bi-clock me-1"></i>ใช้เวลาประมาณ ${mins} นาที — เปิดหน้านี้ค้างไว้จนกว่าจะเสร็จ`;
@@ -2288,7 +2288,7 @@ function paintBatchResume(autoOpen) {
     html += aiStatus.quota_left > 0
       ? `<br><i class="bi bi-battery-half me-1"></i>วันนี้โควตาเหลือ ${aiStatus.quota_left} ครั้ง — กดตรวจต่อได้เลย`
       : `<br><i class="bi bi-battery text-danger me-1"></i>วันนี้โควตาหมดแล้ว กลับมากด "ตรวจต่อ" พรุ่งนี้ `
-        + `หรือเพิ่มโควตาต่อวันได้ในการ์ด "ตั้งค่าผู้ช่วย AI"`;
+        + `หรือเพิ่มโควตาต่อวันได้ในการ์ด "ตั้งค่าระบบตรวจอัตโนมัติ"`;
   }
   document.getElementById('batchResumeDetail').innerHTML = html;
   wrap.classList.remove('d-none');
@@ -2525,7 +2525,7 @@ function stopBatchReview() {
 }
 
 /**
- * ไล่ให้ AI ตรวจตามรายการที่ส่งมาทีละฉบับ
+ * ไล่ให้ระบบตรวจตามรายการที่ส่งมาทีละฉบับ
  * items = [{ student_id, student_name, essay_phase, note }]
  * คืนค่า { ok, failed, failedItems } — ผู้เรียกเป็นคนจัดการปุ่ม/ข้อความสรุปเอง
  *
@@ -2608,7 +2608,7 @@ async function runReviewQueue(items, ui, resume = null) {
         (data.error || 'ตรวจไม่สำเร็จ') + ' — ถือว่ายังไม่ได้ตรวจ ตรวจซ้ำได้');
       // โควตารายวันหมด = ตรวจต่อไปก็ไม่ผ่าน หยุดทั้งชุดเลยดีกว่าปล่อยให้พังทีละฉบับ
       // ฉบับที่เพิ่งโดนปฏิเสธเพราะโควตายังไม่ได้ตรวจจริง จึงเอากลับเข้าคิวที่ค้างไว้ด้วย
-      if (/ใช้ AI ตรวจครบ/.test(data.error || '')) {
+      if (/ใช้ระบบตรวจครบ/.test(data.error || '')) {
         reviewLogLine(ui, 'bi-battery', 'text-danger', 'หยุดอัตโนมัติ',
           'โควตารายวันหมดแล้ว — จำคิวที่เหลือไว้ให้ กดปุ่ม "ตรวจต่อจากที่ค้างไว้" ได้เลยเมื่อโควตากลับมา');
         stopReason = 'quota';
@@ -2640,7 +2640,7 @@ async function retryFailedBatch() {
   if (batchRunning) { showToast('กำลังตรวจชุดอื่นอยู่ กรุณารอให้เสร็จก่อน', 'error'); return; }
   const items = batchFailedItems.slice();
   if (!items.length) return;
-  if (!confirm(`ให้ AI ตรวจซ้ำ ${items.length} ฉบับที่ตรวจไม่สำเร็จ ใช่ไหม?\n\n`
+  if (!confirm(`ให้ระบบตรวจซ้ำ ${items.length} ฉบับที่ตรวจไม่สำเร็จ ใช่ไหม?\n\n`
       + `ฉบับเหล่านี้ยังไม่มีผลตรวจในระบบ (ระบบไม่บันทึกผลที่ไม่สมบูรณ์)`)) return;
 
   batchRunning = true;
@@ -2684,9 +2684,9 @@ async function startBatchReview() {
   const phase      = document.getElementById('batchPhase').value;
   const phaseLabel = AI_PHASE_LABELS[phase] || '';
   const reQueued   = queue.filter(t => t.needs_recheck).length;
-  // ฉบับที่เคยตรวจแล้วอาจมีคะแนนที่ครูปรับไว้รายข้อ ซึ่งจะถูกล้างเมื่อ AI ตรวจใหม่ทั้งฉบับ
+  // ฉบับที่เคยตรวจแล้วอาจมีคะแนนที่ครูปรับไว้รายข้อ ซึ่งจะถูกล้างเมื่อระบบตรวจใหม่ทั้งฉบับ
   const doneAgain  = queue.filter(t => t.reviewed).length;
-  if (!confirm(`เริ่มให้ AI ตรวจ ${queue.length} ฉบับของ "${phaseLabel}" ใช่ไหม?\n`
+  if (!confirm(`เริ่มให้ระบบตรวจ ${queue.length} ฉบับของ "${phaseLabel}" ใช่ไหม?\n`
       + (reQueued ? `(ในจำนวนนี้เป็นฉบับที่แก้ไขต้นฉบับแล้วรอตรวจใหม่ ${reQueued} ฉบับ)\n` : '')
       + (doneAgain ? `(มีฉบับที่เคยตรวจไปแล้ว ${doneAgain} ฉบับ — ถ้าฉบับใดมีคะแนนที่ครูปรับไว้รายข้อ จะถูกล้างและใช้คะแนนชุดใหม่แทน)\n` : '')
       + `\nใช้เวลาประมาณ ${Math.max(1, Math.round(queue.length * 27000 / 60000))} นาที `
@@ -2792,7 +2792,7 @@ async function startBatchReviewAllPhases() {
       + (room ? ` (เฉพาะห้อง ${room})` : ' (ทุกห้องเรียน)') + ` ใช่ไหม?\n\n`
       + `• ตรวจซ้ำทุกฉบับ รวมฉบับที่เคยตรวจแล้ว — คะแนนที่คุณครูปรับไว้รายข้อจะถูกล้างทั้งหมด\n`
       + `• ไล่ตามลำดับการเรียน ฉบับตั้งต้นจะถูกตรวจก่อนร่างหลังเสมอ\n`
-      + (tooShort ? `• ข้าม ${tooShort} ฉบับที่สั้นกว่าเกณฑ์ ระบบไม่ส่งให้ AI ตรวจ\n` : '')
+      + (tooShort ? `• ข้าม ${tooShort} ฉบับที่สั้นกว่าเกณฑ์ ระบบไม่ส่งให้ตรวจ\n` : '')
       + (quota !== null && quota < items.length
           ? `• โควตาวันนี้เหลือ ${quota} ครั้ง ไม่พอตรวจครบ ระบบจะตรวจเท่าที่เหลือ `
             + `แล้วจำคิวที่ค้างไว้ให้กด "ตรวจต่อจากที่ค้างไว้" ภายหลัง\n` : '')
@@ -2843,7 +2843,7 @@ async function startRecheckQueue() {
   if (batchRunning) { showToast('กำลังตรวจชุดอื่นอยู่ กรุณารอให้เสร็จก่อน', 'error'); return; }
   const items = aiRecheckList.filter(r => !r.too_short);
   if (!items.length) { showToast('ไม่มีฉบับที่พร้อมตรวจใหม่', 'error'); return; }
-  if (!confirm(`ให้ AI ตรวจใหม่ ${items.length} ฉบับที่นักเรียนแก้ไขต้นฉบับแล้ว ใช่ไหม?\n\n`
+  if (!confirm(`ให้ระบบตรวจใหม่ ${items.length} ฉบับที่นักเรียนแก้ไขต้นฉบับแล้ว ใช่ไหม?\n\n`
       + `ใช้เวลาประมาณ ${Math.max(1, Math.round(items.length * 27000 / 60000))} นาที `
       + `กรุณาเปิดหน้านี้ค้างไว้จนกว่าจะเสร็จ`)) return;
 
@@ -2863,7 +2863,7 @@ async function startRecheckQueue() {
       essay_phase:  r.essay_phase,
       note:         r.phase_label,
     })), REVIEW_UI_RECHECK, {
-      kind: 'recheck', label: 'ตรวจใหม่ทั้งคิว (นักเรียนแก้ต้นฉบับหลัง AI ตรวจ)', room: '',
+      kind: 'recheck', label: 'ตรวจใหม่ทั้งคิว (นักเรียนแก้ต้นฉบับหลังระบบตรวจ)', room: '',
     });
   } finally {
     batchRunning = false;
@@ -2883,7 +2883,7 @@ async function startRecheckQueue() {
   }
 }
 
-// ------------------------------------------------------- ตั้งค่า AI (ครู)
+// ------------------------------------------------------- ตั้งค่าระบบตรวจอัตโนมัติ (ครู)
 async function loadAiSettings() {
   try {
     const res  = await fetch('api.php?action=get_ai_settings');
@@ -2912,7 +2912,7 @@ async function loadAiSettings() {
 
     const hint = document.getElementById('aiKeyHint');
     if (data.settings.locked_by_file) {
-      hint.innerHTML = '<span class="text-success"><i class="bi bi-shield-lock me-1"></i>ใช้คีย์จากไฟล์ ai_secrets.php บนเซิร์ฟเวอร์ '
+      hint.innerHTML = '<span class="text-success"><i class="bi bi-shield-lock me-1"></i>ใช้คีย์จากไฟล์ writing_check_secrets.php บนเซิร์ฟเวอร์ '
         + '(' + esc(data.settings.api_key_masked) + ') — ค่าที่กรอกในหน้านี้จะไม่ถูกใช้</span>';
     } else if (data.settings.has_key) {
       hint.innerHTML = 'มีคีย์บันทึกไว้แล้ว: <code>' + esc(data.settings.api_key_masked) + '</code> · เว้นว่างไว้ = ใช้คีย์เดิม';
@@ -2951,11 +2951,11 @@ function useDefaultModel() {
 
 function renderUsage(usage) {
   const box = document.getElementById('aiUsageBox');
-  if (!usage || !usage.length) { box.innerHTML = '<i class="bi bi-graph-up me-1"></i>ยังไม่มีการเรียกใช้ AI'; return; }
+  if (!usage || !usage.length) { box.innerHTML = '<i class="bi bi-graph-up me-1"></i>ยังไม่มีการเรียกใช้ระบบ'; return; }
   const rows = usage.map(u =>
     `<tr><td>${esc(u.d)}</td><td class="text-center">${u.total}</td><td class="text-center text-success">${u.ok}</td>
      <td class="text-center text-danger">${u.total - u.ok}</td></tr>`).join('');
-  box.innerHTML = `<div class="fw-bold mb-2"><i class="bi bi-graph-up me-1"></i>การเรียกใช้ AI ย้อนหลัง 7 วัน</div>
+  box.innerHTML = `<div class="fw-bold mb-2"><i class="bi bi-graph-up me-1"></i>การเรียกใช้ระบบย้อนหลัง 7 วัน</div>
     <table class="table table-sm table-bordered mb-0" style="max-width:420px;">
       <thead class="table-light"><tr><th>วันที่</th><th class="text-center">รวม</th><th class="text-center">สำเร็จ</th><th class="text-center">ไม่สำเร็จ</th></tr></thead>
       <tbody>${rows}</tbody></table>`;
@@ -2992,7 +2992,7 @@ async function saveAiSettings() {
 }
 
 async function clearApiKey() {
-  if (!confirm('ยืนยันลบ API key ออกจากระบบ? ผู้ช่วย AI จะใช้งานไม่ได้จนกว่าจะใส่คีย์ใหม่')) return;
+  if (!confirm('ยืนยันลบ API key ออกจากระบบ? ระบบตรวจอัตโนมัติจะใช้งานไม่ได้จนกว่าจะใส่คีย์ใหม่')) return;
   try {
     const res = await fetch('api.php', {
       method: 'POST',

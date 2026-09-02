@@ -63,7 +63,7 @@
 
 > ไม่ต้องอัปโหลด `db_secrets.php` (ยังไม่มี จะสร้างในขั้นถัดไป)
 > `google_secrets.php` (สร้างเฉพาะถ้าใช้ Google)
-> และ `ai_secrets.php` (สร้างเฉพาะถ้าตั้งค่าผู้ช่วย AI จากไฟล์ — ดู `AI_SETUP.md`)
+> และ `writing_check_secrets.php` (สร้างเฉพาะถ้าตั้งค่าระบบตรวจอัตโนมัติจากไฟล์ — ดู `AUTOCHECK_SETUP.md`)
 
 ---
 

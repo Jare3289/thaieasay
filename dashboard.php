@@ -372,7 +372,7 @@ require_once 'header.php';
       </div>
     </div>
 
-    <!-- ความคิดเห็นคำแนะนำ AI -->
+    <!-- ความคิดเห็นและคำแนะนำจากระบบ -->
     <div class="card border-0 shadow-sm p-4 bg-white rounded-4 text-start mb-4">
       <h5 class="fw-bold text-dark mb-4"><i class="bi bi-lightbulb-fill text-warning"></i> ผลวิเคราะห์และข้อเสนอแนะเชิงลึกเพื่อการพัฒนา</h5>
       <div class="row g-4" id="feedbackContainer">
