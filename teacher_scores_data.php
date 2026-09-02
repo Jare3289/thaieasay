@@ -82,7 +82,7 @@ function ts_full_max() {
     return $sum;   // 60
 }
 
-/** ตัวบ่งชี้ที่ AI ตรวจได้ (ใช้ทำสเกลเทียบ AI กับครูให้เป็นสเกลเดียวกัน) */
+/** ตัวบ่งชี้ที่ระบบตรวจได้ (ใช้ทำสเกลเทียบระบบกับครูให้เป็นสเกลเดียวกัน) */
 function ts_ai_indicator_ids() {
     $out = [];
     foreach (ch45_indicators() as $id => $ind) {
@@ -91,7 +91,7 @@ function ts_ai_indicator_ids() {
     return $out;
 }
 
-/** คะแนนเต็มเฉพาะข้อที่ AI ตรวจได้ */
+/** คะแนนเต็มเฉพาะข้อที่ระบบตรวจได้ */
 function ts_ai_max() {
     $sum = 0.0;
     foreach (ch45_indicators() as $ind) {
@@ -112,7 +112,7 @@ function ts_teacher_score(array $ds, $sid, $round) {
     $sc = ch45_scores_of($ds, $sid, $round, 'teacher');
     if (!$sc) return null;
 
-    // คะแนนเฉพาะข้อที่ AI ตรวจได้ ไว้เทียบกับคะแนน AI บนสเกลเดียวกัน
+    // คะแนนเฉพาะข้อที่ระบบตรวจได้ ไว้เทียบกับคะแนนอัตโนมัติบนสเกลเดียวกัน
     $aiScale = 0.0; $aiScaleOk = true;
     foreach (ts_ai_indicator_ids() as $id) {
         if (!isset($sc['weighted'][$id]) || $sc['weighted'][$id] === null) { $aiScaleOk = false; break; }
@@ -137,8 +137,8 @@ function ts_teacher_score(array $ds, $sid, $round) {
 }
 
 /**
- * คะแนนที่ AI ให้กับเรียงความของรอบนั้น (คะแนนหลังครูปรับรายข้อแล้ว ถ้ามีการปรับ)
- * คืน null เมื่อ AI ยังไม่ได้ตรวจฉบับนี้
+ * คะแนนที่ระบบให้กับเรียงความของรอบนั้น (คะแนนหลังครูปรับรายข้อแล้ว ถ้ามีการปรับ)
+ * คืน null เมื่อระบบยังไม่ได้ตรวจฉบับนี้
  */
 function ts_ai_score(array $ds, $sid, $round) {
     $rounds = ts_rounds();
@@ -153,7 +153,7 @@ function ts_ai_score(array $ds, $sid, $round) {
         'total'    => round((float)$row['total'], 2),
         'max'      => $max,
         'level'    => (string)($row['level'] ?? ''),
-        // คะแนนดั้งเดิมของ AI ก่อนครูปรับรายข้อ และจำนวนข้อที่ถูกปรับ
+        // คะแนนดั้งเดิมของระบบก่อนครูปรับรายข้อ และจำนวนข้อที่ถูกปรับ
         'ai_total' => isset($row['ai_total']) ? round((float)$row['ai_total'], 2) : null,
         'override' => (int)($row['override_count'] ?? 0),
     ];
@@ -240,7 +240,7 @@ function ts_teacher_pair(array $ds, array $pair, array $scores) {
     ];
 }
 
-/** สถิติของคู่หนึ่งจากคะแนน AI (ภาพรวมอย่างเดียว — AI ตรวจได้ 10 ข้อ เต็ม 58) */
+/** สถิติของคู่หนึ่งจากคะแนนอัตโนมัติ (ภาพรวมอย่างเดียว — ระบบตรวจได้ 10 ข้อ เต็ม 58) */
 function ts_ai_pair(array $ds, array $pair, array $aiScores) {
     $a = $pair['a']; $b = $pair['b'];
     $ids = []; $va = []; $vb = [];
@@ -252,7 +252,7 @@ function ts_ai_pair(array $ds, array $pair, array $aiScores) {
         $va[]  = $sa['total'];
         $vb[]  = $sb['total'];
     }
-    $row = ts_compare_row('overall', 'ภาพรวม (เฉพาะข้อที่ AI ตรวจได้)', ts_ai_max(), $va, $vb);
+    $row = ts_compare_row('overall', 'ภาพรวม (เฉพาะข้อที่ระบบตรวจได้)', ts_ai_max(), $va, $vb);
     return [
         'key'   => $pair['key'],
         'label' => $pair['label'],
@@ -266,8 +266,8 @@ function ts_ai_pair(array $ds, array $pair, array $aiScores) {
 }
 
 /**
- * เทียบคะแนน AI กับคะแนนครูในรอบเดียวกัน บนสเกลเดียวกัน (เฉพาะ 10 ข้อที่ AI ตรวจได้ เต็ม 58)
- * ใช้เฉพาะนักเรียนที่ "มีทั้งคะแนนครูและคะแนน AI" ของรอบนั้น
+ * เทียบคะแนนอัตโนมัติกับคะแนนครูในรอบเดียวกัน บนสเกลเดียวกัน (เฉพาะ 10 ข้อที่ระบบตรวจได้ เต็ม 58)
+ * ใช้เฉพาะนักเรียนที่ "มีทั้งคะแนนครูและคะแนนอัตโนมัติ" ของรอบนั้น
  */
 function ts_ai_vs_teacher(array $ds, $round, array $scores, array $aiScores) {
     $t = []; $a = [];
@@ -294,13 +294,13 @@ function ts_ai_vs_teacher(array $ds, $round, array $scores, array $aiScores) {
  * คืนค่า:
  *   meta        ขอบเขตข้อมูล คะแนนเต็ม และเวลาที่ออกรายงาน
  *   rounds      นิยาม 4 รอบ
- *   students[]  คะแนนครู + คะแนน AI + สถานะการส่งงาน รายคนรายรอบ
+ *   students[]  คะแนนครู + คะแนนอัตโนมัติ + สถานะการส่งงาน รายคนรายรอบ
  *   columns     n, M, SD, ต่ำสุด-สูงสุด ของคะแนนครูแต่ละรอบ (ทุกคนที่ตรวจแล้ว)
- *   ai_columns  เช่นเดียวกันของคะแนน AI
+ *   ai_columns  เช่นเดียวกันของคะแนนอัตโนมัติ
  *   pairs       สถิติจับคู่ของคะแนนครู 2 คู่ (ภาพรวม + 4 ด้าน)
- *   ai_pairs    สถิติจับคู่ของคะแนน AI 2 คู่ (ภาพรวม)
- *   agreement   เทียบ AI กับครูรายรอบบนสเกล 58
- *   pending     รายการที่ครูยังไม่ได้ตรวจ และรายการที่ AI ยังไม่ได้ตรวจ
+ *   ai_pairs    สถิติจับคู่ของคะแนนอัตโนมัติ 2 คู่ (ภาพรวม)
+ *   agreement   เทียบระบบกับครูรายรอบบนสเกล 58
+ *   pending     รายการที่ครูยังไม่ได้ตรวจ และรายการที่ระบบยังไม่ได้ตรวจ
  */
 function ts_report(PDO $pdo, array $opt = []) {
     return ts_build_report(ch45_dataset($pdo, $opt), $opt);
@@ -314,7 +314,7 @@ function ts_build_report(array $ds, array $opt = []) {
     $rounds = ts_rounds();
 
     $scores   = [];   // [sid][round] = คะแนนครู
-    $aiScores = [];   // [sid][round] = คะแนน AI
+    $aiScores = [];   // [sid][round] = คะแนนอัตโนมัติ
     $students = [];
 
     foreach ($ds['sids'] as $sid) {
@@ -368,7 +368,7 @@ function ts_build_report(array $ds, array $opt = []) {
         $aiPairs[$pk] = ts_ai_pair($ds, $pair, $aiScores);
     }
 
-    // ---- เทียบ AI กับครูรายรอบ ----
+    // ---- เทียบระบบกับครูรายรอบ ----
     $agreement = [];
     foreach ($rounds as $rk => $r) {
         $agreement[$rk] = ts_ai_vs_teacher($ds, $rk, $scores, $aiScores);
@@ -406,7 +406,7 @@ function ts_build_report(array $ds, array $opt = []) {
  *
  *   teacher.ready   นักเรียนส่งเรียงความแล้ว แต่ครูยังไม่ได้ให้คะแนน → กดลิงก์ไปตรวจได้ทันที
  *   teacher.no_work นักเรียนยังไม่ส่งเรียงความรอบนั้น → ยังตรวจไม่ได้ ต้องตามงานก่อน
- *   ai.ready        มีเรียงความแล้วแต่ AI ยังไม่ได้ตรวจ
+ *   ai.ready        มีเรียงความแล้วแต่ระบบยังไม่ได้ตรวจ
  */
 function ts_pending(array $ds, array $students) {
     $rounds = ts_rounds();

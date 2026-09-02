@@ -70,20 +70,20 @@ require_once 'header.php';
         </div>
       </div>
 
-      <!-- ผู้ช่วย AI ตรวจเรียงความ -->
+      <!-- ระบบตรวจเรียงความอัตโนมัติ -->
       <div class="col-md-6 col-12">
         <div class="card border-0 shadow-sm rounded-4 h-100 bg-white menu-action-card" style="border-top: 4px solid #6d28d9 !important; transition: transform 0.2s, box-shadow 0.2s;">
           <div class="card-body p-4 d-flex align-items-start gap-3">
             <div class="flex-shrink-0 p-3 rounded-3 fs-2 line-height-1" style="background:rgba(109,40,217,.1); color:#6d28d9;">
-              🤖
+              ✅
             </div>
             <div class="flex-grow-1">
-              <h5 class="fw-bold text-dark mb-1">ให้ AI ช่วยตรวจเรียงความ</h5>
+              <h5 class="fw-bold text-dark mb-1">ให้ระบบช่วยตรวจเรียงความ</h5>
               <p class="text-muted small mb-3" style="line-height:1.5; font-size:0.82rem;">
-                ให้ AI อ่านเรียงความที่บันทึกไว้ แล้วบอกจุดแข็ง จุดที่ควรปรับปรุง และวิธีแก้ตามเกณฑ์ของคุณครู เพื่อนำไปพัฒนางานเขียนในร่างถัดไป
+                ให้ระบบอ่านเรียงความที่บันทึกไว้ แล้วบอกจุดแข็ง จุดที่ควรปรับปรุง และวิธีแก้ตามเกณฑ์ของคุณครู เพื่อนำไปพัฒนางานเขียนในร่างถัดไป
               </p>
-              <a href="ai_feedback.php" class="btn btn-sm rounded-pill px-4 fw-bold shadow-sm text-white" style="background:linear-gradient(135deg,#6d28d9,#0d7377);">
-                เปิดผู้ช่วย AI &rarr;
+              <a href="writing_feedback.php" class="btn btn-sm rounded-pill px-4 fw-bold shadow-sm text-white" style="background:linear-gradient(135deg,#6d28d9,#0d7377);">
+                เปิดระบบตรวจอัตโนมัติ &rarr;
               </a>
             </div>
           </div>
@@ -215,13 +215,13 @@ require_once 'header.php';
       </a>
     </div>
     <div class="col-md-5 col-sm-12">
-      <a href="ai_feedback.php" class="btn menu-card w-100 py-5 text-decoration-none">
+      <a href="writing_feedback.php" class="btn menu-card w-100 py-5 text-decoration-none">
         <div class="text-center w-100">
-          <div class="fs-1 mb-3">🤖</div>
-          <h4 class="fw-bold text-dark mb-2">ผลตรวจจาก AI</h4>
-          <p class="text-muted small font-light">ดูข้อเสนอแนะและคะแนนโดยประมาณที่ AI ให้ไว้กับเรียงความของนักเรียน (เป็นข้อมูลประกอบ ไม่ใช่คะแนนจริง)</p>
+          <div class="fs-1 mb-3">✅</div>
+          <h4 class="fw-bold text-dark mb-2">ผลตรวจอัตโนมัติ</h4>
+          <p class="text-muted small font-light">ดูข้อเสนอแนะและคะแนนโดยประมาณที่ระบบให้ไว้กับเรียงความของนักเรียน (เป็นข้อมูลประกอบ ไม่ใช่คะแนนจริง)</p>
         </div>
-        <span class="text-primary text-center fw-bold small mt-3 d-block">เปิดหน้าผลตรวจ AI &rarr;</span>
+        <span class="text-primary text-center fw-bold small mt-3 d-block">เปิดหน้าผลตรวจอัตโนมัติ &rarr;</span>
       </a>
     </div>
   </div>
@@ -286,9 +286,9 @@ require_once 'header.php';
                 ['manage_students.php',         '👨‍👩‍👧‍👦', 'จัดการนักเรียน & จับคู่', 'รายชื่อ กลุ่ม และคู่ประเมิน'],
                 ['reflection_tools.php',        '💡', 'รายงานสะท้อนคิด', 'ปัญหาการเขียน/เช็คลิสต์/สะท้อนคิด'],
                 ['essay_viewer.php',            '📝', 'เรียงความนักเรียน', 'อ่านงานเขียนทุกคนทุกรอบ'],
-                ['ai_feedback.php',             '🤖', 'ผู้ช่วย AI ตรวจเรียงความ', 'ให้ข้อเสนอแนะอัตโนมัติ + ตั้งค่า AI'],
+                ['writing_feedback.php',             '✅', 'ระบบตรวจเรียงความอัตโนมัติ', 'ให้ข้อเสนอแนะอัตโนมัติ + ตั้งค่าระบบตรวจอัตโนมัติ'],
                 ['research_analysis.php',       '🔬', 'วิเคราะห์สถิติวิจัย', 'ICC, Paired t-test, เชิงคุณภาพ'],
-                ['chapter45.php',              '📘', 'วิเคราะห์บทที่ 4-5', 'สถิติ + ให้ AI เรียบเรียงผลการวิจัย'],
+                ['chapter45.php',              '📘', 'วิเคราะห์บทที่ 4-5', 'สถิติ + ให้ระบบเรียบเรียงผลการวิจัย'],
                 ['class_report_print.php',      '📋', 'รายงานภาพรวมชั้นเรียน', 'สรุปผลสัมฤทธิ์ทั้งห้อง พร้อมพิมพ์เป็น PDF'],
                 ['student_report.php',          '🧑‍🎓', 'รายงานรายบุคคล', 'ข้อมูลทั้งหมดของนักเรียนรายคน พร้อมบทวิเคราะห์'],
               ];

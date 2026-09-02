@@ -1,7 +1,7 @@
-/* ai_summary.js — "สรุปภาพรวมผลงานเขียนรายบุคคล" ของระบบผู้ช่วย AI
-   ใช้ในหน้า ai_student_summary.php (หน้าสรุปแยกที่เด้งขึ้นมาเมื่อคลิกดูนักเรียนรายคน)
-   คิดจากผลตรวจที่บันทึกไว้แล้วทุกรอบ ไม่เรียก AI ใหม่ จึงไม่เปลืองโควตา
-   ต้องโหลด ai_review.js ก่อนไฟล์นี้ (ใช้ aiEsc / aiNum / aiLevelFromScore / AI_BASELINE_PAIRS ร่วมกัน) */
+/* writing_summary.js — "สรุปภาพรวมผลงานเขียนรายบุคคล" ของระบบระบบตรวจอัตโนมัติ
+   ใช้ในหน้า writing_summary.php (หน้าสรุปแยกที่เด้งขึ้นมาเมื่อคลิกดูนักเรียนรายคน)
+   คิดจากผลตรวจที่บันทึกไว้แล้วทุกรอบ ไม่เรียกระบบใหม่ จึงไม่เปลืองโควตา
+   ต้องโหลด writing_check.js ก่อนไฟล์นี้ (ใช้ aiEsc / aiNum / aiLevelFromScore / AI_BASELINE_PAIRS ร่วมกัน) */
 
 /* ---- ตัวช่วยพื้นฐาน ---- */
 
@@ -40,7 +40,7 @@ function aiSumCriteria(all, phases) {
       const a = touch(id, c.name, c.max);
       a.sum += Number(c.weighted); a.cnt++;
     });
-    // นับว่าเกณฑ์ข้อไหนถูก AI ชี้ว่าควรปรับปรุงกี่รอบ
+    // นับว่าเกณฑ์ข้อไหนถูกระบบชี้ว่าควรปรับปรุงกี่รอบ
     (fb.improvements || []).forEach(it => {
       const id = (it.criterion || '').trim();
       if (id && acc[id]) acc[id].times++;
@@ -218,7 +218,7 @@ function aiSumPairsHTML(all) {
 
   const done = targets.filter(ph => all[ph] && all[ph].draft_compare && all[ph].draft_compare.has_baseline);
   const ok   = done.filter(ph => all[ph].draft_compare.delta > 0).length;
-  let line = 'ยังไม่มีคู่ไหนที่เทียบได้ครบทั้งสองฉบับ — ให้ AI ตรวจฉบับตั้งต้นก่อน แล้วจึงตรวจร่างถัดไป';
+  let line = 'ยังไม่มีคู่ไหนที่เทียบได้ครบทั้งสองฉบับ — ให้ระบบตรวจฉบับตั้งต้นก่อน แล้วจึงตรวจร่างถัดไป';
   let lineCls = 'ai-pair-summary-wait';
   if (done.length) {
     if (ok === done.length) {
@@ -252,7 +252,7 @@ function aiStudentSummaryHTML(all, phases) {
   const reviewed = aiSumReviewedPhases(all, phases);
   if (!reviewed.length) {
     return `<div class="card border-0 shadow-sm rounded-4"><div class="card-body">
-      ${aiEmptyHTML('ยังไม่มีผลตรวจของ AI สำหรับนักเรียนคนนี้')}</div></div>`;
+      ${aiEmptyHTML('ยังไม่มีผลตรวจของระบบสำหรับนักเรียนคนนี้')}</div></div>`;
   }
 
   const first   = all[reviewed[0]];
@@ -299,7 +299,7 @@ function aiStudentSummaryHTML(all, phases) {
       <div class="ai-crit-bar mt-1"><span style="width:${c.pct}%; background:${aiSumPctColor(c.pct)};"></span></div>
     </div>`).join('');
 
-  // ---- จุดแข็ง: เกณฑ์ที่ทำได้ดีสม่ำเสมอ + ข้อความชมจาก AI ----
+  // ---- จุดแข็ง: เกณฑ์ที่ทำได้ดีสม่ำเสมอ + ข้อความชมจากระบบ ----
   const strongCrits = crits.filter(c => c.pct >= 75).sort((a, b) => b.pct - a.pct).slice(0, 4);
   const strongList = strongCrits.length
     ? strongCrits.map(c => `<div class="d-flex align-items-start gap-2 mb-2">
@@ -309,7 +309,7 @@ function aiStudentSummaryHTML(all, phases) {
       </div>`).join('')
     : '<div class="text-muted small mb-2">ยังไม่มีเกณฑ์ข้อไหนที่ทำได้ถึง 75% — ลองไล่แก้จากรายการทางขวาทีละข้อ</div>';
 
-  // ข้อความชมจาก AI (เอาของรอบล่าสุดที่มี ไม่ให้ซ้ำกัน)
+  // ข้อความชมจากระบบ (เอาของรอบล่าสุดที่มี ไม่ให้ซ้ำกัน)
   const seenStr = new Set();
   const praise = [];
   [...reviewed].reverse().forEach(ph => {
@@ -325,7 +325,7 @@ function aiStudentSummaryHTML(all, phases) {
   // ---- จุดที่ต้องแก้: เรียงจากเกณฑ์ที่เสียคะแนนมากที่สุด ----
   const weak = crits.filter(c => c.pct < 100).sort((a, b) => (b.lost - a.lost) || (b.times - a.times)).slice(0, 3);
   const weakList = weak.length ? weak.map((c, i) => {
-    // หยิบคำแนะนำของเกณฑ์ข้อนี้จากรอบล่าสุดที่ AI พูดถึง
+    // หยิบคำแนะนำของเกณฑ์ข้อนี้จากรอบล่าสุดที่ระบบพูดถึง
     let tip = null, tipPhase = '';
     [...reviewed].reverse().some(ph => {
       const hit = (all[ph].improvements || []).find(it => (it.criterion || '').trim() === c.id);
@@ -339,7 +339,7 @@ function aiStudentSummaryHTML(all, phases) {
           ข้อ ${aiEsc(c.id)} ${aiEsc(c.name)}
         </span>
         <span class="small fw-semibold text-danger-emphasis text-nowrap">
-          เสียเฉลี่ย ${aiNum(c.lost)} คะแนน/รอบ${c.times ? ' · AI ทัก ' + c.times + ' รอบ' : ''}
+          เสียเฉลี่ย ${aiNum(c.lost)} คะแนน/รอบ${c.times ? ' · ระบบทัก ' + c.times + ' รอบ' : ''}
         </span>
       </div>
       ${tip && tip.issue ? `<div class="small mb-1"><span class="fw-semibold text-danger-emphasis">บกพร่องอะไร:</span> ${aiEsc(tip.issue)}</div>` : ''}
@@ -433,7 +433,7 @@ function aiStudentSummaryHTML(all, phases) {
 
         <div class="text-muted mt-3" style="font-size:0.75rem;">
           <i class="bi bi-info-circle me-1"></i>สรุปนี้คำนวณจากผลตรวจที่บันทึกไว้แล้วทุกรอบ
-          ไม่ได้เรียก AI ใหม่ และไม่ถูกนำไปรวมกับคะแนนจริงในระบบประเมิน
+          ไม่ได้เรียกระบบใหม่ และไม่ถูกนำไปรวมกับคะแนนจริงในระบบประเมิน
         </div>
       </div>
     </div>`;

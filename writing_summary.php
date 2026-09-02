@@ -1,18 +1,18 @@
 <?php
 /**
- * ai_student_summary.php — หน้า "สรุปภาพรวมผลงานเขียนรายบุคคล" (แยกออกมาเป็นหน้าของตัวเอง)
+ * writing_summary.php — หน้า "สรุปภาพรวมผลงานเขียนรายบุคคล" (แยกออกมาเป็นหน้าของตัวเอง)
  * ---------------------------------------------------------------------------
- * เปิดจากหน้า "ผู้ช่วย AI ตรวจเรียงความ" (ai_feedback.php) โดยคลิกที่นักเรียนรายคน
+ * เปิดจากหน้า "ระบบตรวจเรียงความอัตโนมัติ" (writing_feedback.php) โดยคลิกที่นักเรียนรายคน
  * แยกออกมาเพื่อให้หน้าตรวจเหลือแต่ของที่ใช้บ่อย และหน้าสรุปนี้อ่านได้เต็มจอโดยไม่ต้องเลื่อนผ่านอย่างอื่น
  *
- * เนื้อหาทั้งหมดคิดจากผลตรวจที่บันทึกไว้แล้วทุกรอบ ไม่ได้เรียก AI ใหม่ จึงไม่เปลืองโควตา
+ * เนื้อหาทั้งหมดคิดจากผลตรวจที่บันทึกไว้แล้วทุกรอบ ไม่ได้เรียกระบบใหม่ จึงไม่เปลืองโควตา
  *   - ครู/ผู้เชี่ยวชาญ : เลือกดูนักเรียนคนใดก็ได้ผ่าน ?student_id=
  *   - นักเรียน        : เห็นของตนเองเท่านั้น
  */
-$page_title = 'สรุปภาพรวมผลงานเขียน - ผู้ช่วย AI ตรวจเรียงความ';
+$page_title = 'สรุปภาพรวมผลงานเขียน - ระบบตรวจเรียงความอัตโนมัติ';
 require_once 'auth_helper.php';
 require_login();
-require_once 'ai_config.php';
+require_once 'writing_check_config.php';
 require_once 'header.php';
 
 $aiRole      = $sessionUser['role'];
@@ -25,9 +25,9 @@ $aiViewId    = $aiIsStudent
 
 <div id="view-ai-summary" class="text-start">
   <div class="mb-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
-    <a href="ai_feedback.php<?php echo $aiViewId !== '' ? '?student_id=' . urlencode($aiViewId) : ''; ?>"
+    <a href="writing_feedback.php<?php echo $aiViewId !== '' ? '?student_id=' . urlencode($aiViewId) : ''; ?>"
        class="btn btn-link text-decoration-none text-secondary fw-bold p-0">
-      <i class="bi bi-arrow-left-short"></i> กลับหน้าผู้ช่วย AI ตรวจเรียงความ
+      <i class="bi bi-arrow-left-short"></i> กลับหน้าระบบตรวจเรียงความอัตโนมัติ
     </a>
     <button class="btn btn-outline-secondary btn-sm rounded-pill px-3 d-print-none" onclick="window.print()">
       <i class="bi bi-printer me-1"></i>พิมพ์หน้านี้
@@ -41,7 +41,7 @@ $aiViewId    = $aiIsStudent
         <div>
           <h4 class="fw-bold mb-1"><i class="bi bi-clipboard2-data me-2"></i>สรุปภาพรวมผลงานเขียน</h4>
           <p class="text-white-50 mb-0 small">
-            รวมผลตรวจของ AI ทุกรอบงานไว้ในหน้าเดียว — ทำอะไรได้ดีแล้ว ต้องแก้อะไรก่อนเขียนครั้งถัดไป
+            รวมผลตรวจของระบบทุกรอบงานไว้ในหน้าเดียว — ทำอะไรได้ดีแล้ว ต้องแก้อะไรก่อนเขียนครั้งถัดไป
             และร่างหลังดีขึ้นกว่าร่างก่อนจริงหรือไม่
           </p>
         </div>
@@ -61,7 +61,7 @@ $aiViewId    = $aiIsStudent
           </select>
         </div>
         <div class="col-md-4">
-          <a id="aiSumBackLink" href="ai_feedback.php" class="btn btn-outline-primary rounded-pill w-100">
+          <a id="aiSumBackLink" href="writing_feedback.php" class="btn btn-outline-primary rounded-pill w-100">
             <i class="bi bi-card-list me-1"></i>ดูผลตรวจรายฉบับของคนนี้
           </a>
         </div>
@@ -80,8 +80,8 @@ $aiViewId    = $aiIsStudent
   </div>
 </div>
 
-<script src="ai_review.js"></script>
-<script src="ai_summary.js"></script>
+<script src="writing_check.js"></script>
+<script src="writing_summary.js"></script>
 <script>
 const AI_IS_STUDENT = <?php echo $aiIsStudent ? 'true' : 'false'; ?>;
 const AI_MY_ID      = <?php echo json_encode($sessionUser['id']); ?>;
@@ -127,7 +127,7 @@ async function loadSummary() {
     document.getElementById('aiSumWho').innerHTML = '<i class="bi bi-person-fill me-1"></i>' + aiEsc(who);
   }
   const back = document.getElementById('aiSumBackLink');
-  if (back) back.href = 'ai_feedback.php?student_id=' + encodeURIComponent(sid);
+  if (back) back.href = 'writing_feedback.php?student_id=' + encodeURIComponent(sid);
 
   box.innerHTML = aiStudentSummaryHTML(all, AI_PHASES);
 }

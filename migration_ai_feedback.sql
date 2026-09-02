@@ -1,12 +1,12 @@
 -- =============================================================================
--- Migration: ระบบให้ข้อเสนอแนะเรียงความอัตโนมัติด้วย AI
+-- Migration: ระบบให้ข้อเสนอแนะเรียงความอัตโนมัติ
 --
 -- หมายเหตุ: ระบบมี auto-migration ใน db_config.php อยู่แล้ว (รันอัตโนมัติเมื่อเปิดเว็บ)
 -- ไฟล์นี้มีไว้สำหรับรันมือผ่าน phpMyAdmin / mysql client หากต้องการควบคุมเอง
 -- รันซ้ำได้อย่างปลอดภัย (ใช้ IF NOT EXISTS ทั้งหมด)
 -- =============================================================================
 
--- 1) ค่าตั้งค่าทั่วไปของระบบ (ครูกรอกผ่านหน้า "ตั้งค่า AI" ในเว็บ)
+-- 1) ค่าตั้งค่าทั่วไปของระบบ (ครูกรอกผ่านหน้า "ตั้งค่าระบบตรวจอัตโนมัติ" ในเว็บ)
 --    คีย์ที่ใช้: ai_provider, ai_model, ai_base_url, ai_api_key,
 --               ai_enabled, ai_student_enabled, ai_student_phases
 CREATE TABLE IF NOT EXISTS app_settings (
@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS app_settings (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 2) ผลการตรวจของ AI ต่อเรียงความ 1 ฉบับ (นักเรียน 1 คน ต่อ 1 รอบ = 1 แถว)
+-- 2) ผลการตรวจของระบบต่อเรียงความ 1 ฉบับ (นักเรียน 1 คน ต่อ 1 รอบ = 1 แถว)
 --    ตรวจใหม่จะทับของเดิม เพื่อให้เห็นผลล่าสุดเสมอ
 --    เก็บแยกจากตาราง evaluations ของงานวิจัย จึงไม่ปะปนกับคะแนนครู/เพื่อน/ตนเอง
 CREATE TABLE IF NOT EXISTS essay_ai_feedback (
@@ -62,12 +62,12 @@ CREATE TABLE IF NOT EXISTS essay_ai_feedback (
 -- ALTER TABLE essay_ai_feedback ADD COLUMN teacher_by VARCHAR(50) DEFAULT NULL AFTER teacher_total;
 -- ALTER TABLE essay_ai_feedback ADD COLUMN teacher_scored_at DATETIME DEFAULT NULL AFTER teacher_by;
 
--- 2.2) คะแนนที่ "ถูกปรับรายข้อ" หลัง AI ตรวจเสร็จ — ครูปรับเอง หรือสั่งให้ AI ตรวจเฉพาะข้อนั้นใหม่
---      เก็บแยกจากคอลัมน์ scores เพื่อให้คะแนนดั้งเดิมของ AI ยังตรวจสอบย้อนหลังได้เสมอ
+-- 2.2) คะแนนที่ "ถูกปรับรายข้อ" หลังระบบตรวจเสร็จ — ครูปรับเอง หรือสั่งให้ระบบตรวจเฉพาะข้อนั้นใหม่
+--      เก็บแยกจากคอลัมน์ scores เพื่อให้คะแนนดั้งเดิมของระบบยังตรวจสอบย้อนหลังได้เสมอ
 --      (auto-migration ใน db_config.php เติมให้อัตโนมัติ)
 -- ALTER TABLE essay_ai_feedback ADD COLUMN score_overrides LONGTEXT NULL AFTER scores;
 
--- 3) บันทึกการเรียกใช้ AI — ใช้จำกัดโควตารายวันและให้ครูตรวจสอบย้อนหลังได้
+-- 3) บันทึกการเรียกใช้ระบบ — ใช้จำกัดโควตารายวันและให้ครูตรวจสอบย้อนหลังได้
 CREATE TABLE IF NOT EXISTS ai_usage_log (
     id            INT AUTO_INCREMENT PRIMARY KEY,
     user_id       VARCHAR(50) NOT NULL,
@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS ai_usage_log (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
--- คิวตรวจใหม่: เมื่อนักเรียนแก้ไขต้นฉบับหลังจาก AI ตรวจไปแล้ว
+-- คิวตรวจใหม่: เมื่อนักเรียนแก้ไขต้นฉบับหลังจากระบบตรวจไปแล้ว
 -- (db_config.php รันให้อัตโนมัติเมื่อเปิดเว็บ — บรรทัดด้านล่างไว้รันมือกรณีจำเป็น)
 -- ---------------------------------------------------------------------------
 -- ALTER TABLE essay_ai_feedback ADD COLUMN essay_hash CHAR(40) DEFAULT NULL AFTER raw_response;
@@ -108,7 +108,7 @@ CREATE TABLE IF NOT EXISTS ai_usage_log (
 -- ALTER TABLE essay_ai_feedback ADD COLUMN draft_changes LONGTEXT NULL AFTER draft_comment;
 
 -- ---------------------------------------------------------------------------
--- ภาพรวมการนำเสนอรายรอบงาน (ทั้งชั้น) — AI สรุปหลังตรวจครบทั้งรอบ
+-- ภาพรวมการนำเสนอรายรอบงาน (ทั้งชั้น) — ระบบสรุปหลังตรวจครบทั้งรอบ
 -- 1 รอบงาน = 1 แถว สร้างใหม่ทับของเดิม
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS essay_ai_phase_summary (

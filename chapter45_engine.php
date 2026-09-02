@@ -1,32 +1,32 @@
 <?php
 /**
- * chapter45_ai.php — "สมอง" ของระบบวิเคราะห์บทที่ 4 และบทที่ 5 ด้วย AI
+ * chapter45_engine.php — "สมอง" ของระบบวิเคราะห์บทที่ 4 และบทที่ 5 อัตโนมัติ
  * ---------------------------------------------------------------------------
- * แนวคิดเดียวกับ ai_config.php ที่ใช้ตรวจเรียงความรายบุคคล แต่เปลี่ยนหน่วยของงาน
+ * แนวคิดเดียวกับ writing_check_config.php ที่ใช้ตรวจเรียงความรายบุคคล แต่เปลี่ยนหน่วยของงาน
  * จาก "เรียงความ 1 ฉบับ" เป็น "ผลการวิจัยทั้งชั้นเรียน"
  *
  * หลักการสำคัญ 3 ข้อ (ออกแบบไว้ให้ผลลัพธ์ใช้เขียนวิทยานิพนธ์ได้จริง)
  *
- *   1) ตัวเลขทุกตัวคำนวณด้วย PHP ไม่ใช่ให้ AI คิด
- *      AI ได้รับตัวเลขที่คำนวณเสร็จแล้วไปใช้เขียนบรรยายเท่านั้น จึงไม่มีทางที่สถิติจะคลาดเคลื่อน
+ *   1) ตัวเลขทุกตัวคำนวณด้วย PHP ไม่ใช่ให้ระบบคิด
+ *      ระบบได้รับตัวเลขที่คำนวณเสร็จแล้วไปใช้เขียนบรรยายเท่านั้น จึงไม่มีทางที่สถิติจะคลาดเคลื่อน
  *
  *   2) ข้อความที่ยกเป็นตัวอย่างต้องมาจากผลงานจริงเท่านั้น
- *      ระบบส่งตัวบทเรียงความจริงไปให้ AI แล้วบังคับให้ "คัดลอกคำต่อคำ" ห้ามแต่งขึ้นใหม่
- *      และตรวจซ้ำฝั่งเซิร์ฟเวอร์ว่าข้อความที่ AI ส่งกลับมาปรากฏอยู่ในต้นฉบับจริง
+ *      ระบบส่งตัวบทเรียงความจริงไปให้ระบบแล้วบังคับให้ "คัดลอกคำต่อคำ" ห้ามแต่งขึ้นใหม่
+ *      และตรวจซ้ำฝั่งเซิร์ฟเวอร์ว่าข้อความที่ระบบส่งกลับมาปรากฏอยู่ในต้นฉบับจริง
  *
  *   3) แบ่งงานเป็นชิ้นย่อย (job) ชิ้นละหนึ่งหัวข้อของบทที่ 4-5
- *      เพราะการขอให้ AI เขียนทั้งบทในครั้งเดียวจะได้งานที่ตื้นและถูกตัดกลางคัน
+ *      เพราะการขอให้ระบบเขียนทั้งบทในครั้งเดียวจะได้งานที่ตื้นและถูกตัดกลางคัน
  *      ระบบจึงสั่งทีละหัวข้อ เก็บผลไว้ และให้หัวข้อถัดไปอ่านผลของหัวข้อก่อนหน้าไปใช้ต่อได้
  */
 
-require_once 'ai_config.php';
+require_once 'writing_check_config.php';
 require_once 'chapter45_data.php';
 
 if (!defined('CH45_AI_LOADED')) {
     define('CH45_AI_LOADED', true);
     // จำนวนครั้งสูงสุดที่สั่งวิเคราะห์ได้ต่อวัน (1 รอบเต็ม = 20 ชิ้นงาน จึงเผื่อไว้ให้ทำซ้ำได้หลายรอบ)
     define('CH45_DAILY_LIMIT', 200);
-    // ความยาวสูงสุดของคำสั่งที่ส่งให้ AI ในหนึ่งชิ้นงาน
+    // ความยาวสูงสุดของคำสั่งที่ส่งให้ระบบในหนึ่งชิ้นงาน
     define('CH45_MAX_PROMPT_CHARS', 60000);
 }
 
@@ -196,10 +196,10 @@ function ch45_input_hash(array $ds, array $quant, array $defects) {
 }
 
 /* =========================================================================
- * ส่วนที่ 3  คำสั่งที่ส่งให้ AI
+ * ส่วนที่ 3  คำสั่งที่ส่งให้ระบบ
  * ========================================================================= */
 
-/** บทบาทและกติกาที่ AI ต้องยึดตลอดทุกชิ้นงาน */
+/** บทบาทและกติกาที่ระบบต้องยึดตลอดทุกชิ้นงาน */
 function ch45_ai_system_prompt() {
     return implode("\n", [
         'คุณคือผู้ช่วยนักวิจัยด้านการสอนภาษาไทย ทำหน้าที่เรียบเรียง "ผลการวิจัย" ของวิทยานิพนธ์',
@@ -350,7 +350,7 @@ function ch45_ai_evidence_block(array $ev, array $meta) {
 /**
  * สร้างคำสั่ง (user prompt) ของชิ้นงานหนึ่ง
  * $ctx = ['ds' => ..., 'quant' => ..., 'defects' => ..., 'mech' => ..., 'results' => ผลของชิ้นงานก่อนหน้า]
- * คืน ['prompt' => ข้อความคำสั่ง, 'evidence' => คลังผลงานที่ใช้ (ไว้ตรวจสอบข้อความที่ AI ยกมา)]
+ * คืน ['prompt' => ข้อความคำสั่ง, 'evidence' => คลังผลงานที่ใช้ (ไว้ตรวจสอบข้อความที่ระบบยกมา)]
  */
 function ch45_ai_build_prompt($jobKey, array $ctx) {
     $ds      = $ctx['ds'];
@@ -648,10 +648,10 @@ function ch45_ai_build_prompt($jobKey, array $ctx) {
 }
 
 /* =========================================================================
- * ส่วนที่ 5  ตรวจและแปลงคำตอบของ AI
+ * ส่วนที่ 5  ตรวจและแปลงคำตอบของระบบ
  * ========================================================================= */
 
-/** ทำความสะอาดข้อความที่ AI ส่งกลับมา */
+/** ทำความสะอาดข้อความที่ระบบส่งกลับมา */
 function ch45_clean($v, $maxLen = 4000) {
     if (is_array($v)) $v = implode(' ', array_map('strval', $v));
     $s = trim(preg_replace('/\s+/u', ' ', (string)$v));
@@ -669,8 +669,8 @@ function ch45_normalize_for_match($s) {
 }
 
 /**
- * ตรวจว่าข้อความที่ AI ยกมาเป็น "ข้อความจริง" จากผลงานของนักเรียนคนนั้นหรือไม่
- * นี่คือด่านสุดท้ายที่กันไม่ให้ตัวอย่างในบทที่ 4 เป็นข้อความที่ AI แต่งขึ้น
+ * ตรวจว่าข้อความที่ระบบยกมาเป็น "ข้อความจริง" จากผลงานของนักเรียนคนนั้นหรือไม่
+ * นี่คือด่านสุดท้ายที่กันไม่ให้ตัวอย่างในบทที่ 4 เป็นข้อความที่ระบบแต่งขึ้น
  */
 function ch45_verify_excerpt(array $excerpt, array $pool) {
     $no   = (int)($excerpt['student_no'] ?? 0);
@@ -681,14 +681,14 @@ function ch45_verify_excerpt(array $excerpt, array $pool) {
     if ($needle === '') return ['student_no' => $no, 'text' => $text, 'verified' => false,
                                 'reason' => 'ข้อความสั้นเกินกว่าจะตรวจสอบได้'];
 
-    // 1) ตรวจกับผลงานของนักเรียนหมายเลขที่ AI อ้างถึงก่อน
+    // 1) ตรวจกับผลงานของนักเรียนหมายเลขที่ระบบอ้างถึงก่อน
     $owner = null;
     foreach ($pool as $c) if ((int)$c['no'] === $no) { $owner = $c; break; }
     if ($owner && mb_strpos(ch45_normalize_for_match($owner['text']), $needle, 0, 'UTF-8') !== false) {
         return ['student_no' => $no, 'text' => $text, 'verified' => true, 'reason' => ''];
     }
 
-    // 2) ถ้าไม่ตรง ลองหาว่าข้อความนี้เป็นของนักเรียนคนอื่นในคลังหรือไม่ (AI อ้างเลขผิด)
+    // 2) ถ้าไม่ตรง ลองหาว่าข้อความนี้เป็นของนักเรียนคนอื่นในคลังหรือไม่ (ระบบอ้างเลขผิด)
     foreach ($pool as $c) {
         if (mb_strpos(ch45_normalize_for_match($c['text']), $needle, 0, 'UTF-8') !== false) {
             return ['student_no' => (int)$c['no'], 'text' => $text, 'verified' => true,
@@ -697,17 +697,17 @@ function ch45_verify_excerpt(array $excerpt, array $pool) {
     }
 
     return ['student_no' => $no, 'text' => $text, 'verified' => false,
-            'reason' => 'ไม่พบข้อความนี้ในผลงานจริงที่ส่งให้ AI — ต้องตรวจสอบก่อนนำไปใช้'];
+            'reason' => 'ไม่พบข้อความนี้ในผลงานจริงที่ส่งให้ระบบ — ต้องตรวจสอบก่อนนำไปใช้'];
 }
 
 /**
- * แปลงคำตอบดิบของ AI เป็นโครงสร้างที่ระบบใช้ต่อได้ พร้อมรายการคำเตือน
+ * แปลงคำตอบดิบของระบบเป็นโครงสร้างที่ระบบใช้ต่อได้ พร้อมรายการคำเตือน
  * คืน ['payload' => ..., 'warnings' => [...], 'error' => '']
  */
 function ch45_ai_parse($jobKey, $rawText, array $ctx = [], $evidence = null) {
     $obj = ai_extract_json($rawText);
     if (!is_array($obj)) {
-        return ['payload' => [], 'warnings' => [], 'error' => 'คำตอบของ AI ไม่ใช่รูปแบบ JSON ที่อ่านได้'];
+        return ['payload' => [], 'warnings' => [], 'error' => 'คำตอบของระบบไม่ใช่รูปแบบ JSON ที่อ่านได้'];
     }
     $warn = [];
 
@@ -715,7 +715,7 @@ function ch45_ai_parse($jobKey, $rawText, array $ctx = [], $evidence = null) {
         $p = [];
         foreach (['para_method', 'para_overall', 'para_domains', 'para_ranking'] as $k) {
             $p[$k] = ch45_clean($obj[$k] ?? '', 3000);
-            if ($p[$k] === '') $warn[] = 'AI ไม่ได้เขียนย่อหน้า ' . $k;
+            if ($p[$k] === '') $warn[] = 'ระบบไม่ได้เขียนย่อหน้า ' . $k;
         }
         return ['payload' => $p, 'warnings' => $warn, 'error' => ''];
     }
@@ -741,13 +741,13 @@ function ch45_ai_parse($jobKey, $rawText, array $ctx = [], $evidence = null) {
 
         foreach (['excerpt1' => 'ตัวอย่างของผลงานครั้งที่ 1', 'excerpt2' => 'ตัวอย่างของผลงานครั้งที่ 2'] as $k => $lab) {
             if ($p[$k]['verified'] === false) $warn[] = $lab . ': ' . $p[$k]['reason'];
-            if ($p[$k]['verified'] === null && $id !== '4.3') $warn[] = $lab . ': AI ไม่ได้ยกข้อความจากผลงานจริง';
+            if ($p[$k]['verified'] === null && $id !== '4.3') $warn[] = $lab . ': ระบบไม่ได้ยกข้อความจากผลงานจริง';
             if (!empty($p[$k]['reason']) && $p[$k]['verified'] === true) $warn[] = $lab . ': ' . $p[$k]['reason'];
         }
         if (!empty($ind['genre_bound']) && $p['caution'] === '') {
-            $warn[] = 'ตัวบ่งชี้นี้ผูกกับประเภทของงานเขียน แต่ AI ไม่ได้เขียนข้อความกำกับการตีความ';
+            $warn[] = 'ตัวบ่งชี้นี้ผูกกับประเภทของงานเขียนแต่ระบบไม่ได้เขียนข้อความกำกับการตีความ';
         }
-        if ($p['finding'] === '') $warn[] = 'AI ไม่ได้เขียนย่อหน้าเปิดหัวข้อ';
+        if ($p['finding'] === '') $warn[] = 'ระบบไม่ได้เขียนย่อหน้าเปิดหัวข้อ';
         return ['payload' => $p, 'warnings' => $warn, 'error' => ''];
     }
 
@@ -772,7 +772,7 @@ function ch45_ai_parse($jobKey, $rawText, array $ctx = [], $evidence = null) {
             if (trim((string)($r['cell1'] ?? '')) === '') $warn[] = 'ยังไม่มีข้อความในช่องตารางของตัวบ่งชี้ ' . $id;
         }
         $p = ['domain' => $dk, 'finding' => ch45_clean($obj['finding'] ?? '', 2000), 'table_rows' => $rows];
-        if ($p['finding'] === '') $warn[] = 'AI ไม่ได้เขียนประโยคสรุปข้อค้นพบของด้านนี้';
+        if ($p['finding'] === '') $warn[] = 'ระบบไม่ได้เขียนประโยคสรุปข้อค้นพบของด้านนี้';
         return ['payload' => $p, 'warnings' => $warn, 'error' => ''];
     }
 
@@ -799,7 +799,7 @@ function ch45_ai_parse($jobKey, $rawText, array $ctx = [], $evidence = null) {
 
     if ($jobKey === 'defect_narrative') {
         $p = ['para' => ch45_clean($obj['para'] ?? '', 3000)];
-        if ($p['para'] === '') $warn[] = 'AI ไม่ได้เขียนย่อหน้าใต้ตาราง 14';
+        if ($p['para'] === '') $warn[] = 'ระบบไม่ได้เขียนย่อหน้าใต้ตาราง 14';
         return ['payload' => $p, 'warnings' => $warn, 'error' => ''];
     }
 
@@ -833,7 +833,7 @@ function ch45_ai_parse($jobKey, $rawText, array $ctx = [], $evidence = null) {
             $newPoints[] = ['heading' => ch45_clean($n['heading'] ?? '', 200),
                             'text'    => ch45_clean($n['text'] ?? '', 3000)];
         }
-        if (!$checks) $warn[] = 'AI ไม่ได้ตรวจข้อสันนิษฐานในร่างอภิปรายผล';
+        if (!$checks) $warn[] = 'ระบบไม่ได้ตรวจข้อสันนิษฐานในร่างอภิปรายผล';
         foreach ($checks as $c) {
             if ($c['verdict'] === 'ขัดแย้ง') $warn[] = 'ประเด็น ' . $c['point'] . ' ในร่างอภิปรายผลขัดกับผลจริง ต้องแก้ก่อนส่ง';
         }
@@ -867,7 +867,7 @@ function ch45_ai_parse($jobKey, $rawText, array $ctx = [], $evidence = null) {
 }
 
 /* =========================================================================
- * ส่วนที่ 6  สั่งให้ AI ทำงานหนึ่งชิ้น
+ * ส่วนที่ 6  สั่งให้ระบบทำงานหนึ่งชิ้น
  * ========================================================================= */
 
 /**
@@ -879,14 +879,14 @@ function ch45_ai_run(PDO $pdo, $jobKey, array $ctx, array $who) {
     if (!isset($jobs[$jobKey])) return ['ok' => false, 'error' => 'ไม่รู้จักชิ้นงานที่สั่ง'];
 
     $settings = ai_settings($pdo);
-    if (!$settings['enabled'])    return ['ok' => false, 'error' => 'คุณครูปิดการใช้งานระบบ AI ไว้'];
-    if (!$settings['configured']) return ['ok' => false, 'error' => 'ยังไม่ได้ตั้งค่า AI กรุณาใส่ API key ในหน้า "ผู้ช่วย AI" ก่อน'];
+    if (!$settings['enabled'])    return ['ok' => false, 'error' => 'คุณครูปิดการใช้งานระบบตรวจอัตโนมัติไว้'];
+    if (!$settings['configured']) return ['ok' => false, 'error' => 'ยังไม่ได้ตั้งค่าระบบตรวจอัตโนมัติกรุณาใส่ API key ในหน้า "ระบบตรวจอัตโนมัติ" ก่อน'];
 
     $built = ch45_ai_build_prompt($jobKey, $ctx);
     $prompt = (string)$built['prompt'];
     if (trim($prompt) === '') return ['ok' => false, 'error' => 'สร้างคำสั่งของชิ้นงานนี้ไม่ได้'];
     if (mb_strlen($prompt, 'UTF-8') > CH45_MAX_PROMPT_CHARS) {
-        return ['ok' => false, 'error' => 'ข้อมูลนำเข้ายาวเกินกว่าที่จะส่งให้ AI ได้ในครั้งเดียว'];
+        return ['ok' => false, 'error' => 'ข้อมูลนำเข้ายาวเกินกว่าที่จะส่งให้ระบบได้ในครั้งเดียว'];
     }
 
     $res = ai_call_model($settings, ch45_ai_system_prompt(), $prompt);

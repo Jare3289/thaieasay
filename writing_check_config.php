@@ -1,18 +1,18 @@
 <?php
 /**
- * ai_config.php — ระบบให้ข้อเสนอแนะเรียงความอัตโนมัติด้วย AI
+ * writing_check_config.php — ระบบให้ข้อเสนอแนะเรียงความอัตโนมัติ
  * ---------------------------------------------------------------------------
- * ไฟล์นี้รวม "สมอง" ของฟีเจอร์ AI ไว้ที่เดียว ได้แก่
- *   1) การอ่าน/บันทึกการตั้งค่า AI (ผู้ให้บริการ, โมเดล, API key, สิทธิ์ของนักเรียน)
- *   2) เกณฑ์การประเมิน (rubric) ฉบับย่อที่ส่งให้ AI ใช้ตรวจ
+ * ไฟล์นี้รวม "สมอง" ของฟีเจอร์ตรวจอัตโนมัติไว้ที่เดียว ได้แก่
+ *   1) การอ่าน/บันทึกการตั้งค่าระบบตรวจอัตโนมัติ (ผู้ให้บริการ, โมเดล, API key, สิทธิ์ของนักเรียน)
+ *   2) เกณฑ์การประเมิน (rubric) ฉบับย่อที่ส่งให้ระบบใช้ตรวจ
  *   3) การสร้างคำสั่ง (prompt) ภาษาไทย และการเรียก API ของผู้ให้บริการ
- *   4) การแปลงคำตอบ JSON ของ AI ให้เป็นโครงสร้างที่ระบบใช้ต่อได้
+ *   4) การแปลงคำตอบ JSON ของระบบให้เป็นโครงสร้างที่ระบบใช้ต่อได้
  *
  * ค่าลับ (API key) เก็บได้ 2 ทาง — ระบบจะใช้ไฟล์ก่อนเสมอ:
- *   ก) ไฟล์ ai_secrets.php (ไม่ถูก commit ขึ้น git — ดู ai_secrets.sample.php)
+ *   ก) ไฟล์ writing_check_secrets.php (ไม่ถูก commit ขึ้น git — ดู writing_check_secrets.sample.php)
  *   ข) หน้าตั้งค่าในเว็บ (ครูกรอกเอง เก็บลงตาราง app_settings)
  *
- * หมายเหตุสำคัญเชิงงานวิจัย: คะแนนและข้อเสนอแนะจาก AI ถูกเก็บใน
+ * หมายเหตุสำคัญเชิงงานวิจัย: คะแนนและข้อเสนอแนะจากระบบถูกเก็บใน
  * ตาราง essay_ai_feedback แยกต่างหาก "ไม่ปะปน" กับตาราง evaluations
  * ที่ใช้เก็บคะแนนของครู/เพื่อน/ตนเอง จึงไม่กระทบข้อมูลวิจัยเดิม
  */
@@ -23,7 +23,7 @@ if (!defined('AI_FEEDBACK_LOADED')) {
     // โควตากันการกดรัวจนเปลืองโควตาฟรีของผู้ให้บริการ (ต่อคน ต่อวัน)
     // ครูเป็นผู้สั่งตรวจเพียงผู้เดียว และตรวจทีละทั้งรอบได้ (39 คน/รอบ × 6 รอบ = 234)
     // จึงตั้งค่าเริ่มต้นไว้ให้พอตรวจทั้งชั้นครบทุกรอบในวันเดียวแล้วยังเหลือสำหรับตรวจซ้ำบางฉบับ
-    // ค่านี้เป็นเพียง "ค่าเริ่มต้น" — ครูปรับได้เองในหน้าตั้งค่าผู้ช่วย AI (ดู ai_daily_limit())
+    // ค่านี้เป็นเพียง "ค่าเริ่มต้น" — ครูปรับได้เองในหน้าตั้งค่าระบบตรวจอัตโนมัติ (ดู ai_daily_limit())
     define('AI_DAILY_LIMIT_TEACHER', 400);
     // ขอบเขตที่ยอมให้ครูปรับโควตารายวัน (กันการตั้งค่าพลาดจนเปลืองโควตาฟรีของผู้ให้บริการ)
     define('AI_DAILY_LIMIT_MIN', 50);
@@ -35,11 +35,11 @@ if (!defined('AI_FEEDBACK_LOADED')) {
 }
 
 // ตัวนับคำภาษาไทย (ใช้ตอนเทียบว่าฉบับใหม่ยาวขึ้น/สั้นลงจากฉบับตั้งต้นเท่าไร)
-// ไฟล์นี้ไม่พึ่งฐานข้อมูล จึงโหลดได้ทุกที่ที่เรียก ai_config.php
+// ไฟล์นี้ไม่พึ่งฐานข้อมูล จึงโหลดได้ทุกที่ที่เรียก writing_check_config.php
 require_once __DIR__ . '/thai_text_utils.php';
 
 /**
- * รายชื่อผู้ให้บริการ AI ที่รองรับ พร้อมค่าเริ่มต้นที่ "มีโควตาให้ใช้ฟรี"
+ * รายชื่อผู้ให้บริการโมเดลภาษาที่รองรับ พร้อมค่าเริ่มต้นที่ "มีโควตาให้ใช้ฟรี"
  * - gemini    : Google AI Studio — มีชั้นใช้งานฟรี เหมาะกับโรงเรียนมากที่สุด
  * - typhoon   : OpenTyphoon (SCB 10X) — โมเดลที่เก่งภาษาไทยโดยเฉพาะ มีชั้นฟรี
  * - openrouter: รวมหลายโมเดล มีรุ่นลงท้าย :free ให้ใช้ฟรี
@@ -161,8 +161,8 @@ function ai_phase_short($phase) {
 }
 
 /**
- * อ่านการตั้งค่า AI ทั้งหมด (มี cache ต่อ 1 request)
- * ลำดับความสำคัญ: ไฟล์ ai_secrets.php > ค่าที่ครูกรอกในเว็บ > ค่าเริ่มต้น
+ * อ่านการตั้งค่าระบบตรวจอัตโนมัติทั้งหมด (มี cache ต่อ 1 request)
+ * ลำดับความสำคัญ: ไฟล์ writing_check_secrets.php > ค่าที่ครูกรอกในเว็บ > ค่าเริ่มต้น
  */
 function ai_settings(PDO $pdo) {
     static $cache = null;
@@ -175,7 +175,7 @@ function ai_settings(PDO $pdo) {
         'base_url'        => '',
         'api_key'         => '',
         'key_source'      => 'none',   // none | file | db
-        'enabled'         => true,     // เปิดใช้ฟีเจอร์ AI ทั้งระบบหรือไม่
+        'enabled'         => true,     // เปิดใช้ฟีเจอร์ตรวจอัตโนมัติทั้งระบบหรือไม่
         'daily_limit'     => AI_DAILY_LIMIT_TEACHER,  // โควตาการตรวจต่อครู ต่อวัน (ครูปรับได้)
     ];
 
@@ -201,10 +201,15 @@ function ai_settings(PDO $pdo) {
         }
     } catch (Exception $e) { /* ตารางอาจยังไม่ถูกสร้าง — ใช้ค่าเริ่มต้น */ }
 
-    // 2) ไฟล์ ai_secrets.php บนเซิร์ฟเวอร์ (สำคัญกว่าค่าที่กรอกในเว็บ)
-    if (file_exists(__DIR__ . '/ai_secrets.php')) {
+    // 2) ไฟล์ writing_check_secrets.php บนเซิร์ฟเวอร์ (สำคัญกว่าค่าที่กรอกในเว็บ)
+    //    รองรับชื่อเดิม ai_secrets.php ด้วย เผื่อเซิร์ฟเวอร์ที่ตั้งค่าไว้ก่อนเปลี่ยนชื่อไฟล์
+    $secretsFile = null;
+    foreach (['/writing_check_secrets.php', '/ai_secrets.php'] as $cand) {
+        if (file_exists(__DIR__ . $cand)) { $secretsFile = __DIR__ . $cand; break; }
+    }
+    if ($secretsFile !== null) {
         $ai_provider = $ai_model = $ai_base_url = $ai_api_key = null;
-        require __DIR__ . '/ai_secrets.php';
+        require $secretsFile;
         if (!empty($ai_provider)) $s['provider'] = $ai_provider;
         if (!empty($ai_model))    $s['model']    = $ai_model;
         if (!empty($ai_base_url)) $s['base_url'] = $ai_base_url;
@@ -224,7 +229,7 @@ function ai_settings(PDO $pdo) {
     return $cache;
 }
 
-/** บันทึกการตั้งค่า AI (เฉพาะคีย์ที่ส่งมา) แล้วล้าง cache ในหน่วยความจำ */
+/** บันทึกการตั้งค่าระบบตรวจอัตโนมัติ (เฉพาะคีย์ที่ส่งมา) แล้วล้าง cache ในหน่วยความจำ */
 function ai_save_setting(PDO $pdo, $key, $value) {
     $allowed = ['ai_provider', 'ai_model', 'ai_base_url', 'ai_api_key', 'ai_enabled', 'ai_daily_limit'];
     if (!in_array($key, $allowed, true)) return false;
@@ -238,7 +243,7 @@ function ai_save_setting(PDO $pdo, $key, $value) {
 /**
  * โควตาการตรวจต่อครู ต่อวัน ที่ใช้จริงในขณะนี้
  * ครูปรับได้ในหน้าตั้งค่า (เก็บใน app_settings) ถ้าไม่เคยตั้ง จะใช้ AI_DAILY_LIMIT_TEACHER
- * โควตานี้เป็นเพดานของ "ระบบเรา" เท่านั้น — ผู้ให้บริการ AI ยังมีเพดานของตัวเองอีกชั้นหนึ่ง
+ * โควตานี้เป็นเพดานของ "ระบบเรา" เท่านั้น — ผู้ให้บริการโมเดลภาษายังมีเพดานของตัวเองอีกชั้นหนึ่ง
  */
 function ai_daily_limit(PDO $pdo) {
     $s = ai_settings($pdo);
@@ -254,9 +259,9 @@ function ai_mask_key($key) {
 }
 
 /**
- * เกณฑ์การประเมินฉบับย่อสำหรับ AI (ตรงกับ rubric ในหน้า evaluation.php)
+ * เกณฑ์การประเมินฉบับย่อสำหรับระบบ (ตรงกับ rubric ในหน้า evaluation.php)
  * key = รหัสข้อ, name = ชื่อข้อ, max = คะแนนเต็มหลังถ่วงน้ำหนัก, multiplier = ตัวคูณ
- * ai = ตรวจด้วย AI ได้หรือไม่ (ข้อ 4.3 ความเรียบร้อย/ลายมือ ตรวจจากไฟล์พิมพ์ไม่ได้)
+ * ai = ตรวจอัตโนมัติได้หรือไม่ (ข้อ 4.3 ความเรียบร้อย/ลายมือ ตรวจจากไฟล์พิมพ์ไม่ได้)
  */
 function ai_rubric() {
     return [
@@ -280,9 +285,9 @@ function ai_rubric() {
          'guide' => '4=สะกดถูกทุกคำ, 3=ผิด 1-2 แห่ง, 2=ผิด 3-5 แห่ง, 1=ผิด 6-8 แห่ง, 0=ผิดตั้งแต่ 9 แห่งขึ้นไป'],
         ['id' => '4.2', 'name' => 'การเว้นวรรค',                   'multiplier' => 0.5,  'max' => 2,  'ai' => true,
          'guide' => '4=เว้นวรรคถูกต้องทั้งหมด, 3=ผิด 1-2 จุด, 2=ผิด 3-5 จุด, 1=ผิด 6-8 จุด, 0=ผิดตั้งแต่ 9 จุดขึ้นไป'],
-        // ข้อที่ AI ตรวจแทนไม่ได้ — ครูกรอกคะแนนเองในหน้า "ผู้ช่วย AI" (ระดับคะแนนตรงกับ rubric ในหน้า evaluation.php)
+        // ข้อที่ระบบตรวจแทนไม่ได้ — ครูกรอกคะแนนเองในหน้า "ระบบตรวจอัตโนมัติ" (ระดับคะแนนตรงกับ rubric ในหน้า evaluation.php)
         ['id' => '4.3', 'name' => 'ความเรียบร้อย (ลายมือ/ความสะอาด)', 'multiplier' => 0.5, 'max' => 2, 'ai' => false,
-         'guide' => 'ตรวจจากต้นฉบับลายมือเท่านั้น — AI ไม่ประเมินข้อนี้',
+         'guide' => 'ตรวจจากต้นฉบับลายมือเท่านั้น — ระบบไม่ประเมินข้อนี้',
          'levels' => [
              ['score' => 4, 'label' => 'ดีมาก',   'desc' => 'ผลงานสะอาด เป็นระเบียบ ลายมืออ่านง่าย ไม่ปรากฏรอยขูดลบขีดฆ่า'],
              ['score' => 3, 'label' => 'ดี',      'desc' => 'ผลงานสะอาดเรียบร้อย ลายมืออ่านง่าย ปรากฏรอยขูดลบขีดฆ่า 1 ถึง 2 จุด'],
@@ -293,14 +298,14 @@ function ai_rubric() {
     ];
 }
 
-/** คะแนนเต็มรวมของข้อที่ AI ประเมินได้ (58 จาก 60 — ยกเว้นข้อ 4.3) */
+/** คะแนนเต็มรวมของข้อที่ระบบประเมินได้ (58 จาก 60 — ยกเว้นข้อ 4.3) */
 function ai_rubric_max() {
     $sum = 0;
     foreach (ai_rubric() as $it) { if ($it['ai']) $sum += $it['max']; }
     return $sum;
 }
 
-/** ข้อที่ AI ตรวจแทนไม่ได้ ครูต้องให้คะแนนเองจากต้นฉบับ (ปัจจุบันคือข้อ 4.3 ความเรียบร้อย/ลายมือ) */
+/** ข้อที่ระบบตรวจแทนไม่ได้ ครูต้องให้คะแนนเองจากต้นฉบับ (ปัจจุบันคือข้อ 4.3 ความเรียบร้อย/ลายมือ) */
 function ai_rubric_manual() {
     $out = [];
     foreach (ai_rubric() as $it) { if (!$it['ai']) $out[] = $it; }
@@ -314,13 +319,13 @@ function ai_manual_max() {
     return $sum;
 }
 
-/** คะแนนเต็มทั้งฉบับตามเกณฑ์จริงของครู = ข้อที่ AI ตรวจ + ข้อที่ครูให้เอง (60) */
+/** คะแนนเต็มทั้งฉบับตามเกณฑ์จริงของครู = ข้อที่ระบบตรวจ + ข้อที่ครูให้เอง (60) */
 function ai_full_max() {
     return ai_rubric_max() + ai_manual_max();
 }
 
 /**
- * รอบการประเมินในหน้า evaluation.php ที่ตรงกับรอบงานของ AI
+ * รอบการประเมินในหน้า evaluation.php ที่ตรงกับรอบงานของระบบ
  * ('' = รอบนั้นคุณครูไม่ได้ให้คะแนนในระบบประเมิน เช่นร่างที่ 1 ซึ่งครูให้คะแนนเฉพาะร่างที่ 2)
  */
 function ai_eval_phase($aiPhase) {
@@ -334,12 +339,12 @@ function ai_eval_phase($aiPhase) {
 }
 
 /**
- * ดึงคะแนนข้อที่ AI ตรวจแทนไม่ได้ (ปัจจุบันคือ 4.3 ความเรียบร้อย) จาก "แบบประเมินของคุณครู"
+ * ดึงคะแนนข้อที่ระบบตรวจแทนไม่ได้ (ปัจจุบันคือ 4.3 ความเรียบร้อย) จาก "แบบประเมินของคุณครู"
  * ที่บันทึกไว้แล้วในหน้า evaluation.php เพื่อไม่ให้คุณครูต้องกรอกคะแนนซ้ำสองที่
  *
  * ตาราง evaluations เก็บคะแนน "หลังถ่วงน้ำหนัก" ไว้ จึงหารด้วยตัวคูณกลับเป็นระดับ 0-4
  * ระบุ $studentId = เฉพาะคนนั้น, ไม่ระบุ = ทุกคน (ใช้กับตารางภาพรวมทั้งชั้น)
- * คืนค่า: [รหัสนักเรียน => [รอบงานของ AI => ['scores', 'total', 'by', 'at']]]
+ * คืนค่า: [รหัสนักเรียน => [รอบงานของระบบ => ['scores', 'total', 'by', 'at']]]
  */
 function ai_teacher_eval_manual_all(PDO $pdo, $studentId = null) {
     $out    = [];
@@ -362,7 +367,7 @@ function ai_teacher_eval_manual_all(PDO $pdo, $studentId = null) {
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
 
-        // จับคู่รอบการประเมิน (pretest/task1/task2/posttest) กลับเป็นรอบงานของ AI
+        // จับคู่รอบการประเมิน (pretest/task1/task2/posttest) กลับเป็นรอบงานของระบบ
         $phaseBack = [];
         foreach (ai_all_phases() as $ph) {
             $ep = ai_eval_phase($ph);
@@ -406,14 +411,14 @@ function ai_teacher_eval_manual_all(PDO $pdo, $studentId = null) {
     return $out;
 }
 
-/** คะแนนข้อที่ครูให้ไว้ในแบบประเมิน ของนักเรียนคนเดียว: [รอบงานของ AI => [...]] */
+/** คะแนนข้อที่ครูให้ไว้ในแบบประเมิน ของนักเรียนคนเดียว: [รอบงานของระบบ => [...]] */
 function ai_teacher_eval_manual(PDO $pdo, $studentId) {
     if ($studentId === '' || $studentId === null) return [];
     $all = ai_teacher_eval_manual_all($pdo, $studentId);
     return $all[$studentId] ?? [];
 }
 
-/** แปลงคะแนนดิบ 0-4 ที่ครูกรอกในข้อที่ AI ตรวจแทนไม่ได้ ให้เป็นคะแนนถ่วงน้ำหนักพร้อมคะแนนรวม */
+/** แปลงคะแนนดิบ 0-4 ที่ครูกรอกในข้อที่ระบบตรวจแทนไม่ได้ ให้เป็นคะแนนถ่วงน้ำหนักพร้อมคะแนนรวม */
 function ai_build_manual_scores($rawScores) {
     if (!is_array($rawScores)) $rawScores = [];
     $scores = [];
@@ -439,7 +444,7 @@ function ai_build_manual_scores($rawScores) {
 
 /**
  * เติมข้อมูลฝั่ง "คะแนนที่ครูให้เอง" และคะแนนรวมเต็ม 60 ลงในผลตรวจ 1 ชุด
- * เพื่อให้หน้าเว็บแสดงคะแนนเต็มจริงตามเกณฑ์ของครูได้ ไม่ใช่แค่ 58 คะแนนที่ AI ตรวจได้
+ * เพื่อให้หน้าเว็บแสดงคะแนนเต็มจริงตามเกณฑ์ของครูได้ ไม่ใช่แค่ 58 คะแนนที่ระบบตรวจได้
  */
 function ai_attach_manual(array $data, $teacherScores = [], $teacherTotal = 0.0, $teacherBy = '', $teacherAt = '', $teacherSource = '') {
     if (!is_array($teacherScores)) $teacherScores = [];
@@ -457,14 +462,14 @@ function ai_attach_manual(array $data, $teacherScores = [], $teacherTotal = 0.0,
     $data['teacher_total']   = round((float)$teacherTotal, 2);
     $data['teacher_by']      = (string)$teacherBy;
     $data['teacher_at']      = (string)$teacherAt;
-    // 'evaluation' = ดึงมาจากแบบประเมินในหน้า evaluation.php, 'ai_page' = ครูกรอกในหน้าผู้ช่วย AI
+    // 'evaluation' = ดึงมาจากแบบประเมินในหน้า evaluation.php, 'ai_page' = ครูกรอกในหน้าระบบตรวจอัตโนมัติ
     $data['teacher_source']  = (string)$teacherSource;
     $data['manual_items']    = $items;
     $data['manual_max']      = ai_manual_max();
     $data['full_max']        = ai_full_max();
     $data['combined_total']  = round((float)($data['total_score'] ?? 0) + $data['teacher_total'], 2);
     $data['manual_done']     = (count($teacherScores) >= count($items));
-    // ระดับคุณภาพ "ของจริง" คิดได้ต่อเมื่อครูให้คะแนนข้อที่ AI ตรวจแทนไม่ได้ครบแล้วเท่านั้น
+    // ระดับคุณภาพ "ของจริง" คิดได้ต่อเมื่อครูให้คะแนนข้อที่ระบบตรวจแทนไม่ได้ครบแล้วเท่านั้น
     $data['full_quality_level'] = $data['manual_done'] ? ai_quality_level($data['combined_total']) : '';
     return $data;
 }
@@ -482,8 +487,8 @@ function ai_quality_level($total60) {
  * ลักษณะงานเขียนของแต่ละรอบ (ครูเป็นผู้กำหนด)
  *
  * เกณฑ์ให้คะแนน (ai_rubric) เป็นเกณฑ์กลางที่ใช้ได้กับเรียงความทุกชนิด
- * แต่ภาระงานของครูแต่ละรอบเป็นงานเขียนคนละชนิดกัน ถ้าไม่บอก AI ไว้
- * AI จะตรวจงานเชิงวิจารณ์ด้วยสายตาแบบงานบรรยาย แล้วให้คะแนนสูงกับงานที่
+ * แต่ภาระงานของครูแต่ละรอบเป็นงานเขียนคนละชนิดกัน ถ้าไม่บอกระบบไว้
+ * ระบบจะตรวจงานเชิงวิจารณ์ด้วยสายตาแบบงานบรรยาย แล้วให้คะแนนสูงกับงานที่
  * "เขียนดีแต่ไม่ได้วิจารณ์" ซึ่งไม่ตรงกับความเป็นจริงที่ครูต้องการเห็น
  *
  *   descriptive = เรียงความเชิงบรรยาย — หน่วยที่ 1 (D1.1 / D1.2)
@@ -520,7 +525,7 @@ function ai_essay_style($phase) {
 }
 
 /**
- * บล็อกคำสั่งที่บอก AI ว่ารอบนี้เป็นงานเขียนชนิดใด และชนิดนั้นมีผลกับคะแนนข้อไหนอย่างไร
+ * บล็อกคำสั่งที่บอกระบบว่ารอบนี้เป็นงานเขียนชนิดใด และชนิดนั้นมีผลกับคะแนนข้อไหนอย่างไร
  * ใช้ทั้งตอนตรวจทั้งฉบับและตอนสั่งตรวจใหม่รายข้อ เพื่อให้ทั้งสองทางตัดสินด้วยหลักเดียวกัน
  */
 function ai_essay_style_block($phase) {
@@ -623,7 +628,7 @@ function ai_baseline_strict_block($phase, $single = false) {
 ";
 }
 
-/** คำสั่งกำกับบทบาทของ AI (System Prompt) */
+/** คำสั่งกำกับบทบาทของระบบ (System Prompt) */
 function ai_system_prompt() {
     return implode("\n", [
         'คุณคือ "ครูภาษาไทย" ผู้เชี่ยวชาญการสอนเขียนเรียงความระดับมัธยมศึกษาตอนปลาย',
@@ -652,7 +657,7 @@ function ai_system_prompt() {
 /**
  * สร้างคำสั่งหลัก (User Prompt) จากเนื้อหาเรียงความจริง
  * $baseline = "ฉบับตั้งต้น" ที่ต้องเทียบตามคู่ที่ครูกำหนด (D1.2 เทียบ D1.1, D2.2 เทียบ D2.1, หลังเรียน เทียบ ก่อนเรียน)
- *             แนบทั้งตัวเรียงความและคะแนนของฉบับตั้งต้นไปด้วย เพื่อให้ AI เทียบข้อความจริงได้ ไม่ใช่เดาจากคะแนน
+ *             แนบทั้งตัวเรียงความและคะแนนของฉบับตั้งต้นไปด้วย เพื่อให้ระบบเทียบข้อความจริงได้ ไม่ใช่เดาจากคะแนน
  *             ระบบเทียบ "ตามคู่" อย่างเดียว ไม่มีการเทียบผลตรวจครั้งนี้กับการตรวจครั้งก่อนของฉบับเดียวกัน
  */
 function ai_build_prompt($topic, $phase, $intro, array $bodyArr, $conclusion, $wordCount, array $spellHints = [], array $baseline = []) {
@@ -677,7 +682,7 @@ function ai_build_prompt($topic, $phase, $intro, array $bodyArr, $conclusion, $w
 
     // ---- ฉบับตั้งต้นตามคู่ที่ครูกำหนด (D1.1 / D2.1 / ก่อนเรียน) ----
     // แนบตัวเรียงความของฉบับตั้งต้นไปด้วยทั้งฉบับ
-    // เพื่อให้ AI ยกข้อความของทั้งสองฉบับมาวางคู่กันได้จริง
+    // เพื่อให้ระบบยกข้อความของทั้งสองฉบับมาวางคู่กันได้จริง
     //
     // วิธีเทียบต่างกันตามประเภทของคู่ (ดู ai_baseline_kind)
     //   revision = ร่าง 2 เทียบร่าง 1 หัวข้อเดียวกัน → เทียบตัวข้อความว่าแก้ตรงไหน
@@ -690,8 +695,8 @@ function ai_build_prompt($topic, $phase, $intro, array $bodyArr, $conclusion, $w
     $baseTopic  = trim((string)($baseline['topic'] ?? ''));
     $editLines  = [];
     if ($hasBase) {
-        // ระบบเทียบข้อความทีละส่วนเองก่อน แล้วบอก AI ไปเลยว่าส่วนไหนถูกแก้ ส่วนไหนไม่ได้แตะ
-        // กันไม่ให้ AI เดาว่านักเรียน "แก้แล้ว" ทั้งที่ข้อความยังเหมือนเดิมทุกตัวอักษร
+        // ระบบเทียบข้อความทีละส่วนเองก่อน แล้วบอกโมเดลไปเลยว่าส่วนไหนถูกแก้ ส่วนไหนไม่ได้แตะ
+        // กันไม่ให้ระบบเดาว่านักเรียน "แก้แล้ว" ทั้งที่ข้อความยังเหมือนเดิมทุกตัวอักษร
         // คู่คนละหัวข้อไม่ต้องเทียบข้อความ เพราะเป็นงานเขียนคนละชิ้น ไม่ใช่การแก้ร่างเดิม
         if (!$isNewTopic && !empty($baseline['parts']) && is_array($baseline['parts'])) {
             $editLines = ai_edit_lines(ai_diff_essay_parts(
@@ -844,7 +849,7 @@ function ai_build_prompt($topic, $phase, $intro, array $bodyArr, $conclusion, $w
             (isset($baseline['word_count']) ? 'จำนวนคำของฉบับตั้งต้น: ' . (int)$baseline['word_count'] . ' คำ' : ''),
             ($baseScoreLine ? 'คะแนนดิบรายข้อของฉบับตั้งต้น: ' . implode(', ', $baseScoreLine) : ''),
             (isset($baseline['total_score'])
-                ? 'คะแนนรวมของ AI ในฉบับตั้งต้น: ' . (float)$baseline['total_score']
+                ? 'คะแนนรวมของระบบในฉบับตั้งต้น: ' . (float)$baseline['total_score']
                     . ' / ' . (float)($baseline['max_score'] ?? ai_rubric_max())
                     . (trim((string)($baseline['quality_level'] ?? '')) !== ''
                         ? ' (ระดับ ' . $baseline['quality_level'] . ')' : '')
@@ -875,7 +880,7 @@ function ai_build_prompt($topic, $phase, $intro, array $bodyArr, $conclusion, $w
             . ' (ความยาวที่ครูแนะนำคือ 250-300 คำ — เป็นแนวทางเท่านั้น ไม่ใช่เกณฑ์ให้คะแนน'
             . ' ถ้าเขียนยาวกว่านี้แต่เนื้อหายังอยู่ในขอบเขตของหัวข้อและมีสาระ ห้ามหักคะแนนเพราะความยาว'
             . ' และห้ามเขียนถึงเรื่องความยาวในจุดที่ควรปรับปรุง)',
-        // งานแต่ละรอบเป็นเรียงความคนละชนิด (เชิงบรรยาย/เชิงวิจารณ์) ต้องบอก AI ก่อนอ่านงาน
+        // งานแต่ละรอบเป็นเรียงความคนละชนิด (เชิงบรรยาย/เชิงวิจารณ์) ต้องบอกระบบก่อนอ่านงาน
         (ai_essay_style_block($phase) !== '' ? rtrim(ai_essay_style_block($phase)) : null),
         // ฉบับตั้งต้น (ก่อนเรียน / ร่างที่ 1) ต้องตรวจตามจริงอย่างเคร่งครัด เพราะเป็นฐานวัดพัฒนาการ
         (ai_baseline_strict_block($phase) !== '' ? rtrim(ai_baseline_strict_block($phase)) : null),
@@ -981,11 +986,11 @@ function ai_build_prompt($topic, $phase, $intro, array $bodyArr, $conclusion, $w
 
 /* ============================================================
    ภาพรวมการนำเสนอรายรอบงาน (ทั้งชั้น)
-   ใช้เมื่อ AI ตรวจครบทั้งรอบแล้ว — สรุปว่านักเรียนทั้งชั้นนำเสนอภาระงานนั้นไปทางใด
+   ใช้เมื่อระบบตรวจครบทั้งรอบแล้ว — สรุปว่านักเรียนทั้งชั้นนำเสนอภาระงานนั้นไปทางใด
    มีประเด็นใดน่าสนใจ และมีข้อสังเกตอะไรที่เป็นประโยชน์ต่อการอ่านผลวิจัย
    ============================================================ */
 
-/** คำสั่งกำกับบทบาทของ AI ตอนเขียนภาพรวมรายรอบงาน */
+/** คำสั่งกำกับบทบาทของระบบตอนเขียนภาพรวมรายรอบงาน */
 function ai_overview_system_prompt() {
     return implode("\n", [
         'คุณคือ "นักวิจัยด้านการสอนภาษาไทย" ที่กำลังอ่านผลตรวจเรียงความของนักเรียนทั้งชั้นในภาระงานหนึ่ง',
@@ -1006,7 +1011,7 @@ function ai_overview_system_prompt() {
 
 /**
  * สร้างคำสั่งสำหรับเขียนภาพรวมรายรอบงาน
- * $stats   = ตัวเลขสรุปของรอบนั้นที่ระบบคำนวณมาแล้ว (ห้ามให้ AI คำนวณเอง)
+ * $stats   = ตัวเลขสรุปของรอบนั้นที่ระบบคำนวณมาแล้ว (ห้ามให้ระบบคำนวณเอง)
  * $samples = ตัวอย่างการนำเสนอรายคน [['id','intro','conclusion','overall','score'], ...]
  */
 function ai_build_overview_prompt($phase, $topic, array $stats, array $samples) {
@@ -1044,8 +1049,8 @@ function ai_build_overview_prompt($phase, $topic, array $stats, array $samples) 
         '=== ข้อมูลของรอบงาน ===',
         'รอบงาน: ' . ai_phase_label($phase),
         'หัวข้อที่ครูกำหนด: ' . ($topic !== '' ? $topic : '(ครูไม่ได้กำหนดหัวข้อตายตัว)'),
-        'จำนวนเรียงความที่ AI ตรวจแล้ว: ' . (int)($stats['n'] ?? 0) . ' ฉบับ',
-        'คะแนนเฉลี่ยของ AI: ' . ($stats['mean'] ?? 0) . ' / ' . ($stats['max_score'] ?? ai_rubric_max()),
+        'จำนวนเรียงความที่ระบบตรวจแล้ว: ' . (int)($stats['n'] ?? 0) . ' ฉบับ',
+        'คะแนนเฉลี่ยของระบบ: ' . ($stats['mean'] ?? 0) . ' / ' . ($stats['max_score'] ?? ai_rubric_max()),
         'ความยาวเฉลี่ย: ' . (int)($stats['mean_words'] ?? 0) . ' คำ'
             . ' (ความยาวที่ครูแนะนำคือ 250-300 คำ เป็นแนวทางเท่านั้น'
             . ' อย่าสรุปว่าการเขียนยาวเกินช่วงนี้เป็นปัญหาของชั้นเรียน ถ้าเนื้อหายังอยู่ในขอบเขตของหัวข้อ)',
@@ -1100,11 +1105,11 @@ function ai_phase_overview_row(array $row) {
     ];
 }
 
-/** แปลงคำตอบภาพรวมรายรอบงานของ AI ให้เป็นโครงสร้างมาตรฐาน */
+/** แปลงคำตอบภาพรวมรายรอบงานของระบบให้เป็นโครงสร้างมาตรฐาน */
 function ai_parse_phase_overview($rawText) {
     $obj = ai_extract_json($rawText);
     if (!is_array($obj)) {
-        return ['ok' => false, 'data' => [], 'error' => 'อ่านคำตอบของ AI ไม่ได้ (ไม่ใช่ JSON ที่สมบูรณ์) กรุณาลองใหม่อีกครั้ง'];
+        return ['ok' => false, 'data' => [], 'error' => 'อ่านคำตอบของระบบไม่ได้ (ไม่ใช่ JSON ที่สมบูรณ์) กรุณาลองใหม่อีกครั้ง'];
     }
 
     $listOf = function ($raw, $maxLen = 600) {
@@ -1146,7 +1151,7 @@ function ai_parse_phase_overview($rawText) {
     ];
 
     if ($data['overview'] === '' && !$themes && !$data['observations']) {
-        return ['ok' => false, 'data' => [], 'error' => 'AI ตอบกลับมาไม่ครบถ้วน กรุณาลองใหม่อีกครั้ง'];
+        return ['ok' => false, 'data' => [], 'error' => 'ระบบตอบกลับมาไม่ครบถ้วน กรุณาลองใหม่อีกครั้ง'];
     }
     return ['ok' => true, 'data' => $data, 'error' => ''];
 }
@@ -1173,7 +1178,7 @@ function ai_http_post_json($url, array $headers, array $payload, $timeout = 90) 
         $err    = curl_error($ch);
         curl_close($ch);
         if ($body === false) {
-            return ['ok' => false, 'status' => 0, 'body' => '', 'error' => 'เชื่อมต่อผู้ให้บริการ AI ไม่ได้: ' . $err];
+            return ['ok' => false, 'status' => 0, 'body' => '', 'error' => 'เชื่อมต่อผู้ให้บริการโมเดลภาษาไม่ได้: ' . $err];
         }
         return ['ok' => ($status >= 200 && $status < 300), 'status' => $status, 'body' => (string)$body, 'error' => ''];
     }
@@ -1217,19 +1222,19 @@ function ai_extract_api_error($body, $status) {
         return 'ใช้โควตาฟรีของผู้ให้บริการครบแล้วในช่วงนี้ กรุณารอสักครู่แล้วลองใหม่ (' . $msg . ')';
     }
     if ($status === 404) {
-        return 'ไม่พบโมเดลที่ตั้งค่าไว้ กรุณาตรวจสอบชื่อโมเดลในหน้าตั้งค่า AI (' . $msg . ')';
+        return 'ไม่พบโมเดลที่ตั้งค่าไว้ กรุณาตรวจสอบชื่อโมเดลในหน้าตั้งค่าระบบตรวจอัตโนมัติ (' . $msg . ')';
     }
-    return 'ผู้ให้บริการ AI ตอบกลับข้อผิดพลาด (HTTP ' . $status . '): ' . $msg;
+    return 'ผู้ให้บริการโมเดลภาษาตอบกลับข้อผิดพลาด (HTTP ' . $status . '): ' . $msg;
 }
 
 /**
- * เรียกโมเดล AI ให้ตอบเป็นข้อความ
+ * เรียกโมเดลให้ตอบเป็นข้อความ
  * คืนค่า ['ok' => bool, 'text' => string, 'error' => string]
  */
 function ai_call_model(array $s, $systemPrompt, $userPrompt) {
     if (!$s['configured']) {
         return ['ok' => false, 'text' => '', 'finish' => '',
-                'error' => 'ยังไม่ได้ตั้งค่า AI (ขาด API key หรือชื่อโมเดล) กรุณาตั้งค่าในหน้า "ผู้ช่วย AI"'];
+                'error' => 'ยังไม่ได้ตั้งค่าระบบตรวจอัตโนมัติ (ขาด API key หรือชื่อโมเดล) กรุณาตั้งค่าในหน้า "ระบบตรวจอัตโนมัติ"'];
     }
 
     if ($s['kind'] === 'gemini') {
@@ -1260,7 +1265,7 @@ function ai_call_model(array $s, $systemPrompt, $userPrompt) {
         $reason = isset($obj['candidates'][0]['finishReason']) ? (string)$obj['candidates'][0]['finishReason'] : '';
         if (trim($text) === '') {
             return ['ok' => false, 'text' => '', 'finish' => $reason,
-                    'error' => 'AI ไม่ได้ส่งเนื้อหากลับมา' . ($reason !== '' ? " (สาเหตุ: $reason)" : '')];
+                    'error' => 'ระบบไม่ได้ส่งเนื้อหากลับมา' . ($reason !== '' ? " (สาเหตุ: $reason)" : '')];
         }
         return ['ok' => true, 'text' => $text, 'error' => '', 'finish' => $reason];
     }
@@ -1294,11 +1299,11 @@ function ai_call_model(array $s, $systemPrompt, $userPrompt) {
     $obj  = json_decode($res['body'], true);
     $text   = isset($obj['choices'][0]['message']['content']) ? (string)$obj['choices'][0]['message']['content'] : '';
     $reason = isset($obj['choices'][0]['finish_reason']) ? (string)$obj['choices'][0]['finish_reason'] : '';
-    if (trim($text) === '') return ['ok' => false, 'text' => '', 'finish' => $reason, 'error' => 'AI ไม่ได้ส่งเนื้อหากลับมา'];
+    if (trim($text) === '') return ['ok' => false, 'text' => '', 'finish' => $reason, 'error' => 'ระบบไม่ได้ส่งเนื้อหากลับมา'];
     return ['ok' => true, 'text' => $text, 'error' => '', 'finish' => $reason];
 }
 
-/** ดึงก้อน JSON ออกจากข้อความที่ AI ตอบ (เผื่อมี ``` หรือคำอธิบายห่อไว้) */
+/** ดึงก้อน JSON ออกจากข้อความที่ระบบตอบ (เผื่อมี ``` หรือคำอธิบายห่อไว้) */
 function ai_extract_json($text) {
     $t = trim((string)$text);
     $t = preg_replace('/^```(?:json)?\s*/i', '', $t);
@@ -1373,7 +1378,7 @@ function ai_salvage_json($text) {
     return is_array($obj) ? $obj : null;
 }
 
-/** ทำความสะอาดข้อความจาก AI ก่อนเก็บลงฐานข้อมูล */
+/** ทำความสะอาดข้อความจากระบบก่อนเก็บลงฐานข้อมูล */
 function ai_clean_text($v, $maxLen = 2000) {
     $s = trim(preg_replace('/\s+/u', ' ', (string)$v));
     if (mb_strlen($s, 'UTF-8') > $maxLen) $s = mb_substr($s, 0, $maxLen, 'UTF-8') . '…';
@@ -1381,8 +1386,8 @@ function ai_clean_text($v, $maxLen = 2000) {
 }
 
 /**
- * แปลงคำตัดสินของ AI เมื่อเทียบฉบับนี้กับ "ฉบับตั้งต้น" ให้เป็นรหัสมาตรฐาน
- * 'better' = ดีขึ้น, 'worse' = แย่ลง, 'same' = เท่าเดิม, '' = AI ไม่ได้ระบุ
+ * แปลงคำตัดสินของระบบเมื่อเทียบฉบับนี้กับ "ฉบับตั้งต้น" ให้เป็นรหัสมาตรฐาน
+ * 'better' = ดีขึ้น, 'worse' = แย่ลง, 'same' = เท่าเดิม, '' = ระบบไม่ได้ระบุ
  */
 function ai_verdict_code($v) {
     $t = mb_strtolower(trim((string)$v), 'UTF-8');
@@ -1398,7 +1403,7 @@ function ai_verdict_code($v) {
 }
 
 /**
- * แปลงคำตอบดิบของ AI เป็นโครงสร้างมาตรฐานของระบบ พร้อมคำนวณคะแนนถ่วงน้ำหนัก
+ * แปลงคำตอบดิบของระบบเป็นโครงสร้างมาตรฐานของระบบ พร้อมคำนวณคะแนนถ่วงน้ำหนัก
  * คืนค่า ['ok' => bool, 'data' => array, 'error' => string]
  */
 function ai_parse_feedback($rawText) {
@@ -1406,8 +1411,8 @@ function ai_parse_feedback($rawText) {
     if (!is_array($obj)) {
         $peek = ai_clean_text(mb_substr(trim((string)$rawText), 0, 160, 'UTF-8'), 200);
         return ['ok' => false, 'data' => [], 'error' =>
-            'อ่านคำตอบของ AI ไม่ได้ (ไม่ใช่ JSON ที่สมบูรณ์) กรุณากดตรวจใหม่อีกครั้ง'
-            . ($peek !== '' ? ' — คำตอบที่ได้ขึ้นต้นว่า: "' . $peek . '"' : ' — AI ไม่ได้ส่งข้อความใด ๆ กลับมา')];
+            'อ่านคำตอบของระบบไม่ได้ (ไม่ใช่ JSON ที่สมบูรณ์) กรุณากดตรวจใหม่อีกครั้ง'
+            . ($peek !== '' ? ' — คำตอบที่ได้ขึ้นต้นว่า: "' . $peek . '"' : ' — ระบบไม่ได้ส่งข้อความใด ๆ กลับมา')];
     }
 
     $strengths = [];
@@ -1454,7 +1459,7 @@ function ai_parse_feedback($rawText) {
             $changedRaw = mb_strtolower(trim((string)($v['changed'] ?? '')), 'UTF-8');
             $item = [
                 'criterion' => ai_clean_text($v['criterion'] ?? '', 20),
-                // AI บอกว่าข้อนี้มีอะไรเปลี่ยนไหม
+                // ระบบบอกว่าข้อนี้มีอะไรเปลี่ยนไหม
                 'changed'   => ($changedRaw === '' ? null
                                  : !in_array($changedRaw, ['no', 'false', 'ไม่', 'ไม่เปลี่ยน', 'ไม่ได้แก้'], true)),
                 // สามคำถามหลักของแต่ละข้อ: อะไรเพิ่มมา อะไรหายไป และทำไมคะแนนจึงขยับ
@@ -1508,7 +1513,7 @@ function ai_parse_feedback($rawText) {
 
     $maxScore = ai_rubric_max();
     $total    = round($total, 2);
-    // เทียบระดับคุณภาพบนสเกลเต็ม 60 (เกณฑ์เดียวกับครู) โดยเทียบสัดส่วนจากข้อที่ AI ตรวจได้
+    // เทียบระดับคุณภาพบนสเกลเต็ม 60 (เกณฑ์เดียวกับครู) โดยเทียบสัดส่วนจากข้อที่ระบบตรวจได้
     $scaled60 = ($maxScore > 0) ? ($total / $maxScore) * 60 : 0;
 
     $data = [
@@ -1517,7 +1522,7 @@ function ai_parse_feedback($rawText) {
         'improvements'  => $improvements,
         'next_steps'    => $nextSteps,
         'encouragement' => ai_clean_text($obj['encouragement'] ?? '', 600),
-        // มีเฉพาะรอบที่มีฉบับตั้งต้นให้เทียบ — AI สรุปว่าฉบับนี้ต่างจากฉบับตั้งต้นอย่างไร
+        // มีเฉพาะรอบที่มีฉบับตั้งต้นให้เทียบ — ระบบสรุปว่าฉบับนี้ต่างจากฉบับตั้งต้นอย่างไร
         'draft_comment' => ai_clean_text($obj['draft_comment'] ?? '', 1500),
         'draft_changes' => $draftChanges,
         'scores'        => $scores,
@@ -1528,11 +1533,11 @@ function ai_parse_feedback($rawText) {
     ];
 
     if ($data['overall'] === '' && empty($improvements) && empty($strengths)) {
-        return ['ok' => false, 'data' => [], 'error' => 'AI ตอบกลับมาไม่ครบถ้วน กรุณากดตรวจใหม่อีกครั้ง'];
+        return ['ok' => false, 'data' => [], 'error' => 'ระบบตอบกลับมาไม่ครบถ้วน กรุณากดตรวจใหม่อีกครั้ง'];
     }
 
     // ---- ผลตรวจที่ให้คะแนนไม่ครบ ถือว่า "ตรวจไม่ผ่าน" ----
-    // เดิมระบบยอมรับผลที่ AI ให้คะแนนมาไม่ครบ (หรือไม่ให้เลย) แล้วบันทึกลงฐานข้อมูล
+    // เดิมระบบยอมรับผลที่ระบบให้คะแนนมาไม่ครบ (หรือไม่ให้เลย) แล้วบันทึกลงฐานข้อมูล
     // ฉบับนั้นจึงถูกนับว่า "ตรวจแล้ว" ทั้งที่คะแนนขาดหรือเป็น 0 ถูกข้ามในการตรวจทั้งรอบ
     // และคะแนนที่ขาดยังทำให้สถิติของงานวิจัยเพี้ยนด้วย
     // ตอนนี้ถ้าให้คะแนนไม่ครบทุกข้อ จะไม่บันทึกอะไรเลย ฉบับนั้นยังเป็น "ยังไม่ตรวจ" และสั่งตรวจใหม่ได้
@@ -1543,7 +1548,7 @@ function ai_parse_feedback($rawText) {
     $missing = array_values(array_diff($needIds, array_keys($scores)));
     if ($missing) {
         return ['ok' => false, 'data' => [], 'error' =>
-            'AI ให้คะแนนมาไม่ครบทุกข้อ (ขาดข้อ ' . implode(', ', $missing) . ' จาก '
+            'ระบบให้คะแนนมาไม่ครบทุกข้อ (ขาดข้อ ' . implode(', ', $missing) . ' จาก '
             . count($needIds) . ' ข้อ) ระบบจึงยังไม่บันทึกผล — ถือว่าฉบับนี้ยังไม่ได้ตรวจ กรุณากดตรวจใหม่อีกครั้ง'];
     }
 
@@ -1551,16 +1556,16 @@ function ai_parse_feedback($rawText) {
 }
 
 /* ===========================================================================
- * คะแนนที่ "ถูกปรับรายข้อ" หลัง AI ตรวจเสร็จ
+ * คะแนนที่ "ถูกปรับรายข้อ" หลังระบบตรวจเสร็จ
  *
- * คุณครูไม่เห็นด้วยกับคะแนนที่ AI ให้ในข้อไหน ทำได้ 2 ทาง
+ * คุณครูไม่เห็นด้วยกับคะแนนที่ระบบให้ในข้อไหน ทำได้ 2 ทาง
  *   1) ปรับคะแนนข้อนั้นเอง พร้อมเขียนเหตุผลกำกับ            (source = teacher)
- *   2) สั่งให้ AI ตรวจเฉพาะข้อนั้นใหม่ ใส่คำสั่งเพิ่มเติมได้ (source = ai_recheck)
+ *   2) สั่งให้ระบบตรวจเฉพาะข้อนั้นใหม่ ใส่คำสั่งเพิ่มเติมได้ (source = ai_recheck)
  *
- * หลักการสำคัญของงานวิจัย: ไม่ทับคะแนนเดิมของ AI เด็ดขาด
- * คอลัมน์ scores ยังเป็นคะแนนที่ AI ให้ครั้งแรกเสมอ ส่วนคะแนนที่ปรับเก็บแยกไว้ใน
+ * หลักการสำคัญของงานวิจัย: ไม่ทับคะแนนเดิมของระบบเด็ดขาด
+ * คอลัมน์ scores ยังเป็นคะแนนที่ระบบให้ครั้งแรกเสมอ ส่วนคะแนนที่ปรับเก็บแยกไว้ใน
  * คอลัมน์ score_overrides แล้วค่อยนำมารวมกันตอนอ่าน จึงย้อนดูได้ตลอดว่า
- * AI ให้เท่าไร ใครปรับเป็นเท่าไร เมื่อไร และด้วยเหตุผลอะไร
+ * ระบบให้เท่าไร ใครปรับเป็นเท่าไร เมื่อไร และด้วยเหตุผลอะไร
  * =========================================================================== */
 
 /** ข้อมูลเกณฑ์ข้อหนึ่งจากรหัสข้อ (คืน null ถ้าไม่มีข้อนี้ในเกณฑ์) */
@@ -1588,7 +1593,7 @@ function ai_feedback_has_override_column(PDO $pdo) {
 }
 
 /**
- * ล้างข้อมูลคะแนนที่ถูกปรับให้เหลือเฉพาะข้อที่ AI ตรวจได้ และอยู่ในรูปแบบที่ระบบใช้ได้
+ * ล้างข้อมูลคะแนนที่ถูกปรับให้เหลือเฉพาะข้อที่ระบบตรวจได้ และอยู่ในรูปแบบที่ระบบใช้ได้
  * ข้อที่ครูให้เอง (4.3) ไม่ผ่านทางนี้ — มีช่องกรอกของตัวเองอยู่แล้วในคอลัมน์ teacher_scores
  */
 function ai_clean_score_overrides($raw) {
@@ -1612,10 +1617,10 @@ function ai_clean_score_overrides($raw) {
             'raw'      => $rawScore,
             'weighted' => round($rawScore * $it['multiplier'], 2),
             'max'      => $it['max'],
-            // teacher = ครูปรับเอง, ai_recheck = สั่งให้ AI ตรวจเฉพาะข้อนี้ใหม่
+            // teacher = ครูปรับเอง, ai_recheck = สั่งให้ระบบตรวจเฉพาะข้อนี้ใหม่
             'source'   => ((string)($ov['source'] ?? '') === 'ai_recheck') ? 'ai_recheck' : 'teacher',
             'reason'   => ai_clean_text($ov['reason'] ?? '', 800),
-            // คำสั่งเพิ่มเติมที่ครูพิมพ์ให้ AI ตอนสั่งตรวจข้อนี้ใหม่ (เก็บไว้ตรวจสอบย้อนหลังได้)
+            // คำสั่งเพิ่มเติมที่ครูพิมพ์ให้ระบบตอนสั่งตรวจข้อนี้ใหม่ (เก็บไว้ตรวจสอบย้อนหลังได้)
             'instruction' => ai_clean_text($ov['instruction'] ?? '', 800),
             'issue'       => ai_clean_text($ov['issue'] ?? '', 800),
             'suggestion'  => ai_clean_text($ov['suggestion'] ?? '', 800),
@@ -1629,17 +1634,17 @@ function ai_clean_score_overrides($raw) {
 }
 
 /**
- * รวมคะแนนที่ AI ให้ไว้กับคะแนนที่ถูกปรับรายข้อ ให้กลายเป็น "คะแนนที่ใช้จริง"
+ * รวมคะแนนที่ระบบให้ไว้กับคะแนนที่ถูกปรับรายข้อ ให้กลายเป็น "คะแนนที่ใช้จริง"
  *
  * $data = ผลตรวจ 1 ชุด (ต้องมีคีย์ scores / total_score / max_score / quality_level)
  * คืนชุดเดิมที่ scores, total_score, quality_level เป็นค่าหลังปรับแล้ว
- * พร้อมแนบคะแนนดั้งเดิมของ AI ไว้ในคีย์ ai_scores / ai_total_score / ai_quality_level
+ * พร้อมแนบคะแนนดั้งเดิมของระบบไว้ในคีย์ ai_scores / ai_total_score / ai_quality_level
  */
 function ai_apply_score_overrides(array $data, $overrides) {
     $ovs    = ai_clean_score_overrides($overrides);
     $scores = (isset($data['scores']) && is_array($data['scores'])) ? $data['scores'] : [];
 
-    // คะแนนดั้งเดิมของ AI ต้องอ่านได้เสมอ แม้ไม่มีการปรับ — รายงานวิจัยใช้เทียบว่าครูปรับไปเท่าไร
+    // คะแนนดั้งเดิมของระบบต้องอ่านได้เสมอ แม้ไม่มีการปรับ — รายงานวิจัยใช้เทียบว่าครูปรับไปเท่าไร
     $data['ai_scores']        = $scores;
     $data['ai_total_score']   = round((float)($data['total_score'] ?? 0), 2);
     $data['ai_quality_level'] = (string)($data['quality_level'] ?? '');
@@ -1655,7 +1660,7 @@ function ai_apply_score_overrides(array $data, $overrides) {
         if (!isset($scores[$id]) || !is_array($scores[$id])) continue;
         if (isset($ovs[$id])) {
             $ov = $ovs[$id];
-            // เก็บคะแนนเดิมของ AI ไว้ในแถวเดียวกัน หน้าเว็บจะได้แสดงคู่กันว่า AI ให้เท่าไร ปรับเป็นเท่าไร
+            // เก็บคะแนนเดิมของระบบไว้ในแถวเดียวกัน หน้าเว็บจะได้แสดงคู่กันว่าระบบให้เท่าไร ปรับเป็นเท่าไร
             $scores[$id]['ai_raw']      = (float)($scores[$id]['raw'] ?? 0);
             $scores[$id]['ai_weighted'] = (float)($scores[$id]['weighted'] ?? 0);
             $scores[$id]['ai_reason']   = (string)($scores[$id]['reason'] ?? '');
@@ -1672,12 +1677,12 @@ function ai_apply_score_overrides(array $data, $overrides) {
     $max = (float)($data['max_score'] ?? ai_rubric_max());
     $data['scores']      = $scores;
     $data['total_score'] = round($total, 2);
-    // ระดับคุณภาพคิดบนสเกลเต็ม 60 เหมือนตอน AI ตรวจครั้งแรก (เทียบสัดส่วนจากข้อที่ AI ตรวจได้)
+    // ระดับคุณภาพคิดบนสเกลเต็ม 60 เหมือนตอนระบบตรวจครั้งแรก (เทียบสัดส่วนจากข้อที่ระบบตรวจได้)
     $data['quality_level'] = ($graded > 0 && $max > 0)
         ? ai_quality_level(($total / $max) * 60)
         : (string)($data['quality_level'] ?? '');
 
-    // ข้อที่สั่งให้ AI ตรวจใหม่ ได้ข้อความ "บกพร่องอะไร / แก้อย่างไร" ชุดใหม่มาด้วย
+    // ข้อที่สั่งให้ระบบตรวจใหม่ ได้ข้อความ "บกพร่องอะไร / แก้อย่างไร" ชุดใหม่มาด้วย
     // ต้องแทนที่การ์ดเดิมของข้อนั้น ไม่เช่นนั้นครูจะเห็นคะแนนใหม่คู่กับคำอธิบายของรอบที่ถูกแทนที่ไปแล้ว
     $imps = (isset($data['improvements']) && is_array($data['improvements'])) ? $data['improvements'] : [];
     foreach ($ovs as $id => $ov) {
@@ -1705,9 +1710,9 @@ function ai_apply_score_overrides(array $data, $overrides) {
 }
 
 /**
- * คำสั่งให้ AI ตรวจ "เกณฑ์ข้อเดียว" ใหม่ โดยอ่านเรียงความทั้งฉบับเหมือนเดิม
+ * คำสั่งให้ระบบตรวจ "เกณฑ์ข้อเดียว" ใหม่ โดยอ่านเรียงความทั้งฉบับเหมือนเดิม
  *
- * ไม่บอกคะแนนที่ AI เคยให้ไว้ และไม่บอกว่าครูคิดว่าควรได้เท่าไร เพื่อให้ตรวจใหม่แบบสด ๆ
+ * ไม่บอกคะแนนที่ระบบเคยให้ไว้ และไม่บอกว่าครูคิดว่าควรได้เท่าไร เพื่อให้ตรวจใหม่แบบสด ๆ
  * ไม่ถูกคะแนนเดิมตรึงไว้ ส่วน $instruction คือคำสั่งเพิ่มเติมที่ครูพิมพ์เข้ามาเอง
  */
 function ai_build_criterion_prompt(array $item, $topic, $phase, $intro, array $bodyArr, $conclusion,
@@ -1823,13 +1828,13 @@ function ai_build_criterion_prompt(array $item, $topic, $phase, $intro, array $b
     ]);
 }
 
-/** อ่านคำตอบของ AI จากการตรวจเกณฑ์ข้อเดียว */
+/** อ่านคำตอบของระบบจากการตรวจเกณฑ์ข้อเดียว */
 function ai_parse_criterion_result($rawText, array $item) {
     $obj = ai_extract_json($rawText);
     if (!is_array($obj) || !isset($obj['raw']) || !is_numeric($obj['raw'])) {
         $peek = ai_clean_text(mb_substr(trim((string)$rawText), 0, 160, 'UTF-8'), 200);
         return ['ok' => false, 'data' => [], 'error' =>
-            'อ่านคำตอบของ AI ไม่ได้ (ไม่มีคะแนนของข้อ ' . $item['id'] . ' ในคำตอบ) กรุณากดตรวจใหม่อีกครั้ง'
+            'อ่านคำตอบของระบบไม่ได้ (ไม่มีคะแนนของข้อ ' . $item['id'] . ' ในคำตอบ) กรุณากดตรวจใหม่อีกครั้ง'
             . ($peek !== '' ? ' — คำตอบที่ได้ขึ้นต้นว่า: "' . $peek . '"' : '')];
     }
 
@@ -1950,7 +1955,7 @@ function ai_baseline_snapshot($phase, array $data, $reviewedAt, $wordCount = 0, 
         'phase'         => (string)$phase,
         'label'         => ai_phase_label($phase),
         'short'         => ai_phase_short($phase),
-        // หัวข้อของฉบับตั้งต้น — คู่ "คนละหัวข้อ" (หลังเรียน↔ก่อนเรียน) ต้องบอก AI ว่าฉบับเดิมเขียนหัวข้ออะไร
+        // หัวข้อของฉบับตั้งต้น — คู่ "คนละหัวข้อ" (หลังเรียน↔ก่อนเรียน) ต้องบอกระบบว่าฉบับเดิมเขียนหัวข้ออะไร
         'topic'         => (string)$topic,
         'reviewed_at'   => (string)$reviewedAt,
         'word_count'    => (int)$wordCount,
@@ -1967,12 +1972,12 @@ function ai_baseline_snapshot($phase, array $data, $reviewedAt, $wordCount = 0, 
 
 /**
  * เทียบฉบับที่กำลังดูอยู่กับ "ฉบับตั้งต้น" ตามคู่ที่ครูกำหนด แล้วสรุปว่าคะแนนดีขึ้นจริงไหม
- * คิดจากคะแนนที่เก็บไว้เสมอ (ไม่ต้องพึ่งคำบรรยายของ AI) จึงได้ผลเหมือนกันทั้งตอนตรวจใหม่และตอนเปิดดูย้อนหลัง
+ * คิดจากคะแนนที่เก็บไว้เสมอ (ไม่ต้องพึ่งคำบรรยายของระบบ) จึงได้ผลเหมือนกันทั้งตอนตรวจใหม่และตอนเปิดดูย้อนหลัง
  * คืน ['has_baseline' => false] เมื่อรอบนี้ไม่มีคู่เทียบ หรือฉบับตั้งต้นยังไม่ถูกตรวจ
  *
  * ค่าที่ใช้บอกครูว่า "ผิดคาด" มี 3 ตัว
  *   improved   = คะแนนรวมสูงขึ้นจากฉบับตั้งต้นหรือไม่ (สิ่งที่ควรเกิด)
- *   identical  = คะแนนรวมและคะแนนรายข้อเท่ากันหมด (น่าสงสัยว่า AI ไม่ได้เทียบจริง หรือนักเรียนไม่ได้แก้)
+ *   identical  = คะแนนรวมและคะแนนรายข้อเท่ากันหมด (น่าสงสัยว่าระบบไม่ได้เทียบจริง หรือนักเรียนไม่ได้แก้)
  *   same_text  = ข้อความทั้งฉบับเหมือนฉบับตั้งต้นทุกตัวอักษร (นักเรียนคัดลอกมา ยังไม่ได้เขียนใหม่)
  *
  * kind บอกว่าคู่นี้เทียบกันแบบไหน (ดู ai_baseline_kind)
@@ -2033,12 +2038,12 @@ function ai_draft_progress(array $curr, $baseline, $currentHash = '', $currentWo
             'weighted'      => $cw,
             'delta'         => $delta,
             'dir'           => $dir,
-            // ข้อความที่ AI ยกมาเทียบให้เห็นว่าเปลี่ยนตรงไหน (ว่างได้ ถ้าโมเดลไม่ได้ตอบมา)
+            // ข้อความที่ระบบยกมาเทียบให้เห็นว่าเปลี่ยนตรงไหน (ว่างได้ ถ้าโมเดลไม่ได้ตอบมา)
             'before'        => (string)($ch['before'] ?? ''),
             'after'         => (string)($ch['after'] ?? ''),
             'verdict'       => (string)($ch['verdict'] ?? ''),
             'note'          => (string)($ch['note'] ?? ''),
-            // AI อธิบายว่าข้อนี้ถูกแก้อะไรไปบ้าง และทำไมคะแนนจึงขยับ
+            // ระบบอธิบายว่าข้อนี้ถูกแก้อะไรไปบ้าง และทำไมคะแนนจึงขยับ
             'added'         => (string)($ch['added'] ?? ''),
             'removed'       => (string)($ch['removed'] ?? ''),
             'reason'        => (string)($ch['reason'] ?? ''),
@@ -2083,7 +2088,7 @@ function ai_draft_progress(array $curr, $baseline, $currentHash = '', $currentWo
         'criteria'        => $criteria,
         'comment'         => $comment,
         'changes'         => $changes,
-        // ส่วนของเรียงความที่ถูกแก้จริง — ระบบเทียบข้อความเอง ไม่ได้ถาม AI
+        // ส่วนของเรียงความที่ถูกแก้จริง — ระบบเทียบข้อความเอง ไม่ได้ถามโมเดล
         'edits'           => array_values($edits),
         'edit_summary'    => ai_edit_summary($edits),
         // true = เทียบจากต้นฉบับ ณ ตอนเปิดดู (ผลตรวจนี้บันทึกไว้ก่อนระบบจะเก็บผลเทียบให้)
@@ -2093,8 +2098,8 @@ function ai_draft_progress(array $curr, $baseline, $currentHash = '', $currentWo
 
 /* ============================================================
    เทียบ "ตัวข้อความ" ของสองฉบับให้เห็นว่าแก้อะไรไปบ้าง
-   ระบบทำเองแบบตรงไปตรงมา (ไม่ต้องพึ่ง AI) จึงเชื่อถือได้ว่าส่วนไหน "ไม่ได้แตะเลย" จริง ๆ
-   ผลที่ได้ใช้ 2 ทาง: แนบไปในคำสั่งให้ AI อธิบายได้ตรงจุด และแสดงให้ครู/นักเรียนเห็นในผลตรวจ
+   ระบบทำเองแบบตรงไปตรงมา (ไม่ต้องพึ่งโมเดล) จึงเชื่อถือได้ว่าส่วนไหน "ไม่ได้แตะเลย" จริง ๆ
+   ผลที่ได้ใช้ 2 ทาง: แนบไปในคำสั่งให้ระบบอธิบายได้ตรงจุด และแสดงให้ครู/นักเรียนเห็นในผลตรวจ
    ============================================================ */
 
 /** แยกเรียงความเป็นส่วน ๆ ตามโครงที่ครูกำหนด (คำนำ · เนื้อเรื่องทีละย่อหน้า · สรุป) */
@@ -2300,7 +2305,7 @@ function ai_edit_summary(array $edits) {
     return $sum;
 }
 
-/** สรุปผลเทียบข้อความเป็นบรรทัดภาษาไทย สำหรับแนบไปในคำสั่งที่ส่งให้ AI */
+/** สรุปผลเทียบข้อความเป็นบรรทัดภาษาไทย สำหรับแนบไปในคำสั่งที่ส่งให้ระบบ */
 function ai_edit_lines(array $edits) {
     $lines = [];
     foreach ($edits as $e) {
@@ -2326,7 +2331,7 @@ function ai_edit_lines(array $edits) {
 
 /**
  * ลายนิ้วมือของเนื้อหาเรียงความ 1 ฉบับ (ส่วนนำ + เนื้อเรื่องทุกย่อหน้า + สรุป)
- * ใช้เทียบว่าต้นฉบับถูกแก้ไขไปจากตอนที่ AI ตรวจไว้หรือไม่ — ถ้าเหมือนเดิมเป๊ะ ไม่ต้องตรวจใหม่
+ * ใช้เทียบว่าต้นฉบับถูกแก้ไขไปจากตอนที่ระบบตรวจไว้หรือไม่ — ถ้าเหมือนเดิมเป๊ะ ไม่ต้องตรวจใหม่
  * ไม่รวบช่องว่างให้ เพราะการเว้นวรรคเป็นเกณฑ์การให้คะแนนข้อ 4.2 อยู่แล้ว
  */
 function ai_essay_hash($intro, $bodyArr, $conclusion) {
@@ -2342,8 +2347,8 @@ function ai_essay_hash($intro, $bodyArr, $conclusion) {
 }
 
 /**
- * นักเรียนบันทึกต้นฉบับใหม่ → ถ้าเรียงความฉบับนี้เคยให้ AI ตรวจไว้แล้วและเนื้อหาเปลี่ยนไปจริง
- * ให้ทำเครื่องหมาย "รอตรวจใหม่" ไว้ในผลตรวจเดิม เพื่อเข้าคิวให้คุณครูสั่ง AI ตรวจซ้ำ
+ * นักเรียนบันทึกต้นฉบับใหม่ → ถ้าเรียงความฉบับนี้เคยให้ระบบตรวจไว้แล้วและเนื้อหาเปลี่ยนไปจริง
+ * ให้ทำเครื่องหมาย "รอตรวจใหม่" ไว้ในผลตรวจเดิม เพื่อเข้าคิวให้คุณครูสั่งระบบตรวจซ้ำ
  * ถ้านักเรียนแก้แล้วย้อนกลับมาเหมือนเดิมเป๊ะ ระบบจะถอดออกจากคิวให้เอง
  * คืนค่า true เมื่อฉบับนี้ถูกจัดเข้าคิวตรวจใหม่
  */
@@ -2352,7 +2357,7 @@ function ai_mark_essay_recheck(PDO $pdo, $studentId, $phase, $hash) {
         $stmt = $pdo->prepare('SELECT essay_hash FROM essay_ai_feedback WHERE student_id = ? AND essay_phase = ?');
         $stmt->execute([$studentId, $phase]);
         $row = $stmt->fetch();
-        if (!$row) return false;   // ยังไม่เคยให้ AI ตรวจฉบับนี้ — ไม่มีอะไรต้องเข้าคิว
+        if (!$row) return false;   // ยังไม่เคยให้ระบบตรวจฉบับนี้ — ไม่มีอะไรต้องเข้าคิว
 
         // ผลตรวจเก่าที่บันทึกไว้ก่อนมีระบบคิว (ไม่มีลายนิ้วมือ) ถือว่าต้องตรวจใหม่ไว้ก่อน
         $old  = (string)($row['essay_hash'] ?? '');
@@ -2370,7 +2375,7 @@ function ai_mark_essay_recheck(PDO $pdo, $studentId, $phase, $hash) {
     }
 }
 
-/** นับจำนวนครั้งที่ผู้ใช้คนนี้เรียก AI ไปแล้ววันนี้ (กันการกดรัวจนโควตาฟรีหมด) */
+/** นับจำนวนครั้งที่ผู้ใช้คนนี้เรียกระบบไปแล้ววันนี้ (กันการกดรัวจนโควตาฟรีหมด) */
 function ai_usage_today(PDO $pdo, $userId) {
     try {
         // นับเฉพาะครั้งที่ตรวจสำเร็จ — ครั้งที่ตรวจไม่ผ่านถือว่ายังไม่ได้ตรวจ จึงไม่ควรกินโควตาของครู
@@ -2384,7 +2389,7 @@ function ai_usage_today(PDO $pdo, $userId) {
     }
 }
 
-/** บันทึกการเรียกใช้ AI 1 ครั้ง */
+/** บันทึกการเรียกใช้ระบบ 1 ครั้ง */
 function ai_log_usage(PDO $pdo, $userId, $role, $studentId, $phase, $ok, $errorMsg = '') {
     try {
         $stmt = $pdo->prepare('
@@ -2425,7 +2430,7 @@ function ai_feedback_row_to_array(array $row, ?array $evalManual = null, ?array 
         'requested_role'=> (string)$row['requested_role'],
         'created_at'    => (string)$row['created_at'],
         'updated_at'    => (string)($row['updated_at'] ?? ''),
-        // ต้นฉบับถูกแก้ไขหลัง AI ตรวจหรือยัง (ใช้แสดงป้าย "รอตรวจใหม่" และจัดคิวตรวจซ้ำ)
+        // ต้นฉบับถูกแก้ไขหลังระบบตรวจหรือยัง (ใช้แสดงป้าย "รอตรวจใหม่" และจัดคิวตรวจซ้ำ)
         'needs_recheck'     => !empty($row['recheck_needed']),
         'recheck_marked_at' => (string)($row['recheck_marked_at'] ?? ''),
         // ตรวจฉบับนี้เป็นครั้งที่เท่าไร (ตัวนับเฉย ๆ — ระบบไม่ได้เทียบผลตรวจข้ามครั้งแล้ว)
@@ -2435,8 +2440,8 @@ function ai_feedback_row_to_array(array $row, ?array $evalManual = null, ?array 
         'baseline_phase'    => (string)($row['baseline_phase'] ?? ''),
     ];
 
-    // คะแนนที่ถูกปรับรายข้อ (ครูปรับเอง หรือสั่งให้ AI ตรวจเฉพาะข้อนั้นใหม่)
-    // ทับลงบนคะแนนของ AI ให้กลายเป็น "คะแนนที่ใช้จริง" ก่อนคิดผลเทียบร่าง
+    // คะแนนที่ถูกปรับรายข้อ (ครูปรับเอง หรือสั่งให้ระบบตรวจเฉพาะข้อนั้นใหม่)
+    // ทับลงบนคะแนนของระบบให้กลายเป็น "คะแนนที่ใช้จริง" ก่อนคิดผลเทียบร่าง
     // ตารางเทียบร่างจะได้ใช้คะแนนชุดเดียวกับที่แสดงในตารางคะแนนรายเกณฑ์
     $out = ai_apply_score_overrides($out, $row['score_overrides'] ?? '');
 
@@ -2489,7 +2494,7 @@ function ai_feedback_row_to_array(array $row, ?array $evalManual = null, ?array 
     $tAt     = (string)($row['teacher_scored_at'] ?? '');
     $tSource = $tScores ? 'ai_page' : '';
 
-    // ยังไม่ได้กรอกคะแนนข้อนี้ในหน้าผู้ช่วย AI แต่คุณครูเคยให้คะแนนไว้ในแบบประเมินแล้ว
+    // ยังไม่ได้กรอกคะแนนข้อนี้ในหน้าระบบตรวจอัตโนมัติแต่คุณครูเคยให้คะแนนไว้ในแบบประเมินแล้ว
     // → ดึงคะแนนจากหน้า evaluation.php มาใช้เลย ไม่ต้องกรอกซ้ำ
     if (!$tScores && $evalManual !== null) {
         $ev = $evalManual[$row['essay_phase']] ?? null;

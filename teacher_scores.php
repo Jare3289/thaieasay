@@ -9,9 +9,9 @@
  *   0) รายการงานที่ครูยังไม่ได้ตรวจ พร้อมลิงก์กดไปตรวจได้ทันที (ขึ้นก่อนทุกตาราง)
  *   1) ตารางคะแนนครูรายบุคคล 4 รอบ พร้อมค่าเฉลี่ยและส่วนเบี่ยงเบนมาตรฐานท้ายตาราง
  *   2) สถิติเปรียบเทียบแบบจับคู่ 2 คู่ (ก่อนเรียน↔หลังเรียน · หน่วยที่ 1↔หน่วยที่ 2) แยกกันคนละชุด
- *   3) ตารางคะแนนที่ AI ตรวจ รายบุคคล 4 รอบ พร้อม M, SD
- *   4) สถิติเปรียบเทียบแบบจับคู่ของคะแนน AI
- *   5) เทียบคะแนน AI กับคะแนนครูรายรอบบนสเกลเดียวกัน
+ *   3) ตารางคะแนนที่ระบบตรวจ รายบุคคล 4 รอบ พร้อม M, SD
+ *   4) สถิติเปรียบเทียบแบบจับคู่ของคะแนนอัตโนมัติ
+ *   5) เทียบคะแนนอัตโนมัติกับคะแนนครูรายรอบบนสเกลเดียวกัน
  *
  * ตัวเลขทุกตัวคำนวณด้วยฟังก์ชันสถิติชุดเดียวกับบทที่ 4-5 (chapter45_stats.php)
  * พารามิเตอร์ (GET): group (กลุ่มการวิจัย · 'all' = ทุกกลุ่ม), classroom (ห้องเรียน), export=csv
@@ -113,8 +113,8 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     }
     $w([]);
 
-    // --- ตารางที่ 3: คะแนน AI รายบุคคล ---
-    $w(['ตารางที่ 3  คะแนนที่ AI ตรวจรายบุคคล (เต็ม ' . $tsAiMax . ' คะแนน — เฉพาะข้อที่ AI ตรวจได้)']);
+    // --- ตารางที่ 3: คะแนนอัตโนมัติรายบุคคล ---
+    $w(['ตารางที่ 3  คะแนนที่ระบบตรวจรายบุคคล (เต็ม ' . $tsAiMax . ' คะแนน — เฉพาะข้อที่ระบบตรวจได้)']);
     $head = ['ลำดับ', 'รหัสนักเรียน', 'ชื่อ-สกุล', 'ห้อง'];
     foreach ($tsRounds as $r) $head[] = $r['label'];
     $w($head);
@@ -123,12 +123,12 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
         foreach ($tsRounds as $rk => $r) {
             $a = $s['ai'][$rk];
             if ($a)                            $row[] = number_format($a['total'], 2);
-            elseif (!empty($s['essay'][$rk]))  $row[] = 'AI ยังไม่ตรวจ';
+            elseif (!empty($s['essay'][$rk]))  $row[] = 'ระบบยังไม่ตรวจ';
             else                               $row[] = 'ยังไม่ส่งงาน';
         }
         $w($row);
     }
-    foreach ([['n (ฉบับที่ AI ตรวจแล้ว)', 'n'], ['ค่าเฉลี่ย (M)', 'mean'], ['ส่วนเบี่ยงเบนมาตรฐาน (SD)', 'sd']] as $stat) {
+    foreach ([['n (ฉบับที่ระบบตรวจแล้ว)', 'n'], ['ค่าเฉลี่ย (M)', 'mean'], ['ส่วนเบี่ยงเบนมาตรฐาน (SD)', 'sd']] as $stat) {
         $row = ['', '', $stat[0], ''];
         foreach ($tsRounds as $rk => $r) {
             $v = $tsRep['ai_columns'][$rk][$stat[1]];
@@ -138,8 +138,8 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     }
     $w([]);
 
-    // --- ตารางที่ 4: สถิติจับคู่ของคะแนน AI ---
-    $w(['ตารางที่ 4  ผลการเปรียบเทียบแบบจับคู่ จากคะแนนที่ AI ตรวจ (เต็ม ' . $tsAiMax . ')']);
+    // --- ตารางที่ 4: สถิติจับคู่ของคะแนนอัตโนมัติ ---
+    $w(['ตารางที่ 4  ผลการเปรียบเทียบแบบจับคู่ จากคะแนนที่ระบบตรวจ (เต็ม ' . $tsAiMax . ')']);
     $w(['คู่เทียบ', 'n', 'M รอบแรก', 'SD รอบแรก', 'M รอบหลัง', 'SD รอบหลัง',
         'ผลต่างเฉลี่ย', 'SD ผลต่าง', 't', 'df', 'p', "Cohen's dz"]);
     foreach ($tsRep['ai_pairs'] as $pk => $p) {
@@ -150,9 +150,9 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     }
     $w([]);
 
-    // --- ตารางที่ 5: เทียบ AI กับครู ---
-    $w(['ตารางที่ 5  เทียบคะแนน AI กับคะแนนครู รายรอบ บนสเกลเดียวกัน (เฉพาะข้อที่ AI ตรวจได้ เต็ม ' . $tsAiMax . ')']);
-    $w(['รอบ', 'n', 'M ครู', 'SD ครู', 'M AI', 'SD AI', 'ผลต่าง (AI − ครู)', 't', 'df', 'p', 'Pearson r']);
+    // --- ตารางที่ 5: เทียบระบบกับครู ---
+    $w(['ตารางที่ 5  เทียบคะแนนอัตโนมัติกับคะแนนครู รายรอบ บนสเกลเดียวกัน (เฉพาะข้อที่ระบบตรวจได้ เต็ม ' . $tsAiMax . ')']);
+    $w(['รอบ', 'n', 'M ครู', 'SD ครู', 'M ระบบ', 'SD ระบบ', 'ผลต่าง (ระบบ − ครู)', 't', 'df', 'p', 'Pearson r']);
     foreach ($tsRep['agreement'] as $rk => $row) {
         $w([$tsRounds[$rk]['label'], $row['n'], ts_num($row['a_mean']), ts_num($row['a_sd']),
             ts_num($row['b_mean']), ts_num($row['b_sd']), ts_num($row['diff']),
@@ -343,7 +343,7 @@ $tsPend = $tsRep['pending'];
                   <span class="text-danger fw-semibold">รอตรวจ <?php echo $b['teacher_ready']; ?></span> ·
                 <?php endif; ?>
                 ยังไม่ส่ง <?php echo $b['teacher_no_work']; ?>
-                <?php if ($b['ai_ready']): ?> · AI ค้าง <?php echo $b['ai_ready']; ?><?php endif; ?>
+                <?php if ($b['ai_ready']): ?> · ระบบค้าง <?php echo $b['ai_ready']; ?><?php endif; ?>
               </div>
             </div>
           </div>
@@ -418,8 +418,8 @@ $tsPend = $tsRep['pending'];
       <?php if ($tsPend['count']['ai_ready']): ?>
         <details class="mt-2">
           <summary class="fw-semibold small text-muted" style="cursor:pointer;">
-            งานที่ส่งแล้วแต่ AI ยังไม่ได้ตรวจ <?php echo $tsPend['count']['ai_ready']; ?> ชิ้น
-            (กดเพื่อดูรายชื่อ · สั่งตรวจได้ที่หน้า <a href="ai_feedback.php">ผู้ช่วย AI ตรวจงาน</a>)
+            งานที่ส่งแล้วแต่ระบบยังไม่ได้ตรวจ <?php echo $tsPend['count']['ai_ready']; ?> ชิ้น
+            (กดเพื่อดูรายชื่อ · สั่งตรวจได้ที่หน้า <a href="writing_feedback.php">ระบบตรวจงานเขียนอัตโนมัติ</a>)
           </summary>
           <div class="table-responsive mt-2" style="max-height: 300px; overflow-y: auto;">
             <table class="table table-sm align-middle mb-0 ts-table">
@@ -671,15 +671,15 @@ $tsPend = $tsRep['pending'];
     </div>
   <?php endforeach; ?>
 
-  <!-- ===================== 3) ตารางคะแนน AI รายบุคคล ===================== -->
+  <!-- ===================== 3) ตารางคะแนนอัตโนมัติรายบุคคล ===================== -->
   <div class="card border-0 shadow-sm rounded-4 mb-4" style="border-top:4px solid #7c3aed !important;">
     <div class="card-body p-4">
-      <h5 class="fw-bold mb-1"><i class="bi bi-robot me-2 text-primary"></i>ตารางที่ 3
-        คะแนนที่ AI ตรวจรายบุคคล</h5>
+      <h5 class="fw-bold mb-1"><i class="bi bi-file-earmark-check me-2 text-primary"></i>ตารางที่ 3
+        คะแนนที่ระบบตรวจรายบุคคล</h5>
       <p class="text-muted small mb-3">
-        คะแนนเต็ม <?php echo (int)$tsAiMax; ?> คะแนน — AI ตรวจได้ 10 ตัวบ่งชี้
+        คะแนนเต็ม <?php echo (int)$tsAiMax; ?> คะแนน — ระบบตรวจได้ 10 ตัวบ่งชี้
         ส่วนข้อ 4.3 ความเรียบร้อย (เต็ม <?php echo (int)$tsRep['meta']['manual_max']; ?> คะแนน)
-        ต้องดูจากต้นฉบับลายมือ ครูจึงเป็นผู้ให้เอง AI ตรวจแทนไม่ได้ ·
+        ต้องดูจากต้นฉบับลายมือ ครูจึงเป็นผู้ให้เอง ระบบตรวจแทนไม่ได้ ·
         ตัวเลขที่แสดงคือคะแนนหลังครูปรับรายข้อแล้ว (ถ้ามีการปรับ) ·
         <strong>คะแนนชุดนี้เป็นข้อมูลประกอบ ไม่ใช้ตัดสินผลการเรียน</strong>
       </p>
@@ -718,7 +718,7 @@ $tsPend = $tsRep['pending'];
                               title="ครูปรับคะแนนเอง <?php echo (int)$a['override']; ?> ข้อ">ปรับ <?php echo (int)$a['override']; ?></span>
                       <?php endif; ?>
                     <?php elseif (!empty($s['essay'][$rk])): ?>
-                      <span class="ts-none">AI ยังไม่ตรวจ</span>
+                      <span class="ts-none">ระบบยังไม่ตรวจ</span>
                     <?php else: ?>
                       <span class="ts-nowork">ยังไม่ส่งงาน</span>
                     <?php endif; ?>
@@ -737,7 +737,7 @@ $tsPend = $tsRep['pending'];
             <?php endif; ?>
           </tbody>
           <tfoot>
-            <?php foreach ([['n (ฉบับที่ AI ตรวจแล้ว)', 'n', 0], ['ค่าเฉลี่ย (M)', 'mean', 2],
+            <?php foreach ([['n (ฉบับที่ระบบตรวจแล้ว)', 'n', 0], ['ค่าเฉลี่ย (M)', 'mean', 2],
                             ['ส่วนเบี่ยงเบนมาตรฐาน (SD)', 'sd', 2]] as $sr): ?>
               <tr>
                 <td colspan="3" class="ts-stat-label"><?php echo htmlspecialchars($sr[0]); ?></td>
@@ -753,14 +753,14 @@ $tsPend = $tsRep['pending'];
     </div>
   </div>
 
-  <!-- ===================== 4) สถิติจับคู่ของคะแนน AI ===================== -->
+  <!-- ===================== 4) สถิติจับคู่ของคะแนนอัตโนมัติ ===================== -->
   <div class="card border-0 shadow-sm rounded-4 mb-4" style="border-top:4px solid #7c3aed !important;">
     <div class="card-body p-4">
       <h5 class="fw-bold mb-1"><i class="bi bi-graph-up me-2 text-primary"></i>ตารางที่ 4
-        ผลการเปรียบเทียบแบบจับคู่ จากคะแนนที่ AI ตรวจ</h5>
+        ผลการเปรียบเทียบแบบจับคู่ จากคะแนนที่ระบบตรวจ</h5>
       <p class="text-muted small mb-3">
         คู่เดียวกับตารางที่ 2 และคิดแยกกันคนละคู่เช่นเดียวกัน
-        แต่ละคู่ใช้เฉพาะนักเรียนที่ AI ตรวจครบทั้งสองรอบของคู่นั้น (เต็ม <?php echo (int)$tsAiMax; ?> คะแนน)
+        แต่ละคู่ใช้เฉพาะนักเรียนที่ระบบตรวจครบทั้งสองรอบของคู่นั้น (เต็ม <?php echo (int)$tsAiMax; ?> คะแนน)
       </p>
       <div class="table-responsive">
         <table class="table table-hover align-middle mb-0 ts-table">
@@ -808,15 +808,15 @@ $tsPend = $tsRep['pending'];
     </div>
   </div>
 
-  <!-- ===================== 5) เทียบ AI กับครู ===================== -->
+  <!-- ===================== 5) เทียบระบบกับครู ===================== -->
   <div class="card border-0 shadow-sm rounded-4 mb-4" style="border-top:4px solid #b45309 !important;">
     <div class="card-body p-4">
       <h5 class="fw-bold mb-1"><i class="bi bi-people me-2 text-warning-emphasis"></i>ตารางที่ 5
-        เทียบคะแนน AI กับคะแนนครู รายรอบ</h5>
+        เทียบคะแนนอัตโนมัติกับคะแนนครู รายรอบ</h5>
       <p class="text-muted small mb-3">
-        เทียบบน<strong>สเกลเดียวกัน</strong> คือนับเฉพาะ 10 ตัวบ่งชี้ที่ AI ตรวจได้ (เต็ม <?php echo (int)$tsAiMax; ?> คะแนน)
+        เทียบบน<strong>สเกลเดียวกัน</strong> คือนับเฉพาะ 10 ตัวบ่งชี้ที่ระบบตรวจได้ (เต็ม <?php echo (int)$tsAiMax; ?> คะแนน)
         โดยตัดข้อ 4.3 ความเรียบร้อยออกจากคะแนนของครูด้วย มิฉะนั้นจะเทียบคนละฐานคะแนน ·
-        ใช้เฉพาะนักเรียนที่มีทั้งคะแนนครูและคะแนน AI ในรอบนั้น
+        ใช้เฉพาะนักเรียนที่มีทั้งคะแนนครูและคะแนนอัตโนมัติในรอบนั้น
       </p>
       <div class="table-responsive">
         <table class="table table-hover align-middle mb-0 ts-table">
@@ -825,8 +825,8 @@ $tsPend = $tsRep['pending'];
               <th rowspan="2" class="text-start align-middle">รอบ</th>
               <th rowspan="2" class="align-middle">n</th>
               <th colspan="2" class="grp-pre">ครูประเมิน</th>
-              <th colspan="2" class="grp-post">AI ตรวจ</th>
-              <th rowspan="2" class="align-middle">ผลต่างเฉลี่ย<br><span class="fw-normal small">(AI − ครู)</span></th>
+              <th colspan="2" class="grp-post">ระบบตรวจ</th>
+              <th rowspan="2" class="align-middle">ผลต่างเฉลี่ย<br><span class="fw-normal small">(ระบบ − ครู)</span></th>
               <th rowspan="2" class="align-middle">t</th>
               <th rowspan="2" class="align-middle">df</th>
               <th rowspan="2" class="align-middle">p</th>
@@ -861,7 +861,7 @@ $tsPend = $tsRep['pending'];
       </div>
       <div class="ts-legend mt-2">
         <i class="bi bi-info-circle me-1"></i>
-        ค่า p ที่<strong>ไม่</strong>มีนัยสำคัญในตารางนี้เป็นสัญญาณที่ดี — แปลว่าคะแนนของ AI
+        ค่า p ที่<strong>ไม่</strong>มีนัยสำคัญในตารางนี้เป็นสัญญาณที่ดี — แปลว่าคะแนนของระบบ
         กับของครูไม่ต่างกันอย่างเป็นระบบ ส่วนค่า r ยิ่งเข้าใกล้ 1 ยิ่งจัดลำดับนักเรียนได้ตรงกัน
         ไม่ว่าผลจะออกมาอย่างไร <strong>การตัดสินผลยังใช้คะแนนของครูเท่านั้น</strong>
       </div>

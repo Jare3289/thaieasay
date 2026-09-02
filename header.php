@@ -19,7 +19,7 @@ function teg_menu_for_role($role) {
       'main' => [
         ['หน้าหลัก',          'index.php',                 'bi-grid-1x2-fill',      'index'],
         ['บันทึกเรียงความ',    'essay_writer.php',          'bi-pencil-square',      'essay_writer'],
-        ['ผู้ช่วย AI ตรวจงาน',  'ai_feedback.php',           'bi-robot',              'ai_feedback'],
+        ['ตรวจงานเขียนอัตโนมัติ',  'writing_feedback.php',           'bi-file-earmark-check',              'writing_feedback'],
         ['ประเมินตนเอง',      'evaluation.php?mode=self',  'bi-person-check-fill',  'evaluation:self'],
         ['จับคู่เพื่อน',       'peer_matching.php',         'bi-people-fill',        'peer_matching'],
         ['ประเมินเพื่อน',      'evaluation.php?mode=peer',  'bi-clipboard-check',    'evaluation:peer'],
@@ -37,7 +37,7 @@ function teg_menu_for_role($role) {
         ['หน้าหลัก',            'index.php',                   'bi-grid-1x2-fill',   'index'],
         ['ประเมินผลงาน',       'evaluation.php?mode=expert',  'bi-clipboard-check', 'evaluation:expert'],
         ['เรียงความนักเรียน',   'essay_viewer.php',            'bi-journal-text',    'essay_viewer'],
-        ['ผลตรวจจาก AI',       'ai_feedback.php',             'bi-robot',           'ai_feedback'],
+        ['ผลตรวจอัตโนมัติ',       'writing_feedback.php',             'bi-file-earmark-check',           'writing_feedback'],
         ['รายงานรายบุคคล',     'student_report.php',          'bi-person-vcard',    'student_report'],
         ['วิเคราะห์บทที่ 4-5',  'chapter45.php',               'bi-journal-richtext','chapter45'],
       ],
@@ -53,7 +53,7 @@ function teg_menu_for_role($role) {
       ['แดชบอร์ดวิจัย',       'dashboard.php',                'bi-bar-chart-line-fill','dashboard'],
       ['รายงานการส่งงาน',     'submission_report.php',        'bi-table',              'submission_report'],
       ['เรียงความนักเรียน',   'essay_viewer.php',             'bi-journal-text',       'essay_viewer'],
-      ['ผู้ช่วย AI ตรวจงาน',  'ai_feedback.php',              'bi-robot',              'ai_feedback'],
+      ['ตรวจงานเขียนอัตโนมัติ',  'writing_feedback.php',              'bi-file-earmark-check',              'writing_feedback'],
     ],
     'general' => [
       ['รายงานรายบุคคล',       'student_report.php',           'bi-person-vcard',       'student_report'],

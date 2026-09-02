@@ -6,12 +6,12 @@
 -- รันซ้ำได้อย่างปลอดภัย (ใช้ IF NOT EXISTS ทั้งหมด)
 -- =============================================================================
 
--- 1) ผลวิเคราะห์ของ AI แยกตามหัวข้อของบทที่ 4-5 (หัวข้อละ 1 แถว วิเคราะห์ใหม่จะทับของเดิม)
+-- 1) ผลวิเคราะห์ของระบบแยกตามหัวข้อของบทที่ 4-5 (หัวข้อละ 1 แถว วิเคราะห์ใหม่จะทับของเดิม)
 CREATE TABLE IF NOT EXISTS ch45_analysis (
     job_key      VARCHAR(40) PRIMARY KEY,   -- quant_narrative, ind_1_1 … ind_4_3, domain_d1 … domain_d4,
                                             -- overview, defect_narrative, ch5_summary, ch5_discussion, ch5_recommend
     payload      LONGTEXT,                  -- JSON ผลวิเคราะห์ที่ผ่านการตรวจแล้ว
-    raw_response LONGTEXT,                  -- คำตอบดิบของ AI ไว้ตรวจย้อนหลัง
+    raw_response LONGTEXT,                  -- คำตอบดิบของระบบไว้ตรวจย้อนหลัง
     provider     VARCHAR(30)  DEFAULT NULL,
     model        VARCHAR(100) DEFAULT NULL,
     requested_by VARCHAR(50)  DEFAULT NULL,

@@ -275,7 +275,7 @@ function rs_eval_detail($full, $no = '4') {
 /* --------------------------------------------------- 5) ผลงาน (สรุป) */
 
 function rs_works($sum, $no = '5') {
-    rs_title($no, 'ผลงานของนักเรียน', 'เรียงความทุกรอบ และผลตรวจโดยผู้ช่วย AI', 'sec-works');
+    rs_title($no, 'ผลงานของนักเรียน', 'เรียงความทุกรอบ และผลตรวจโดยระบบตรวจอัตโนมัติ', 'sec-works');
     ?>
     <table>
       <thead>
@@ -284,7 +284,7 @@ function rs_works($sum, $no = '5') {
           <th class="num" style="width:11%">สถานะ</th>
           <th class="num" style="width:11%">จำนวนคำ</th>
           <th class="wrap" style="width:16%">บันทึกล่าสุด</th>
-          <th class="num" style="width:12%">คะแนน AI</th>
+          <th class="num" style="width:12%">คะแนนอัตโนมัติ</th>
           <th class="num" style="width:10%">ครั้งที่ตรวจ</th>
           <th class="num" style="width:12%">เทียบฉบับตั้งต้น</th>
         </tr>
@@ -308,7 +308,7 @@ function rs_works($sum, $no = '5') {
       </tbody>
     </table>
     <div class="note">
-      คะแนนของ AI เป็นเพียงข้อมูลประกอบการพัฒนางานเขียน (เต็ม <?php echo rp_num(ai_rubric_max(), 0); ?> คะแนนเฉพาะข้อที่ AI ตรวจได้)
+      คะแนนของระบบเป็นเพียงข้อมูลประกอบการพัฒนางานเขียน (เต็ม <?php echo rp_num(ai_rubric_max(), 0); ?> คะแนนเฉพาะข้อที่ระบบตรวจได้)
       ไม่ถูกนำไปรวมกับคะแนนจริงของครู · ช่อง "เทียบฉบับตั้งต้น" คือส่วนต่างจากฉบับที่ต้องนำมาเทียบตามคู่ที่ครูกำหนด
       (D1.2 เทียบ D1.1 · D2.2 เทียบ D2.1 · หลังเรียน เทียบ ก่อนเรียน) — รอบที่ไม่มีคู่เทียบจะขึ้นเป็น —
     </div>
@@ -370,10 +370,10 @@ function rs_essays($full, $no = '6') {
     if (!$any) rs_empty('ยังไม่มีเรียงความที่บันทึกไว้ในระบบ');
 }
 
-/* --------------------------------------------- 7) ผลตรวจของ AI ทุกรอบ */
+/* --------------------------------------------- 7) ผลตรวจของระบบทุกรอบ */
 
 function rs_ai($full, $no = '7') {
-    rs_title($no, 'ผลตรวจจากผู้ช่วย AI ทุกรอบงาน', 'จุดแข็ง จุดที่ควรปรับปรุง และพัฒนาการระหว่างรอบตรวจ', 'sec-ai');
+    rs_title($no, 'ผลตรวจจากระบบตรวจอัตโนมัติทุกรอบงาน', 'จุดแข็ง จุดที่ควรปรับปรุง และพัฒนาการระหว่างรอบตรวจ', 'sec-ai');
     $any = false;
     foreach (report_essay_phases() as $ph => $label) {
         $fb = $full['ai'][$ph] ?? null;
@@ -414,7 +414,7 @@ function rs_ai($full, $no = '7') {
           <?php endif; ?>
           <?php if (!empty($dc['comment'])): ?><div class="kv"><?php echo rp_esc($dc['comment']); ?></div><?php endif; ?>
           <?php
-          // ข้อที่คะแนนขยับ พร้อมข้อความที่ AI ยกมาเทียบให้เห็นว่าต่างกันตรงไหน
+          // ข้อที่คะแนนขยับ พร้อมข้อความที่ระบบยกมาเทียบให้เห็นว่าต่างกันตรงไหน
           foreach (($dc['criteria'] ?? []) as $c) {
               if ($c['dir'] === 'same' && trim((string)$c['note']) === '') continue;
               $head = 'ข้อ ' . $c['id'] . ' ' . $c['name'];
@@ -429,7 +429,7 @@ function rs_ai($full, $no = '7') {
 
         <div class="twocol">
           <div class="box good">
-            <h4>จุดแข็งที่ AI พบ</h4>
+            <h4>จุดแข็งที่ระบบพบ</h4>
             <?php if (!empty($fb['strengths'])): ?>
             <ul><?php foreach ($fb['strengths'] as $s): ?><li><?php echo rp_esc($s); ?></li><?php endforeach; ?></ul>
             <?php else: ?><div class="muted">— ไม่มีข้อมูล —</div><?php endif; ?>
@@ -461,7 +461,7 @@ function rs_ai($full, $no = '7') {
         <?php endif; ?>
         <?php
     }
-    if (!$any) rs_empty('ยังไม่เคยให้ AI ตรวจเรียงความของนักเรียนคนนี้');
+    if (!$any) rs_empty('ยังไม่เคยให้ระบบตรวจเรียงความของนักเรียนคนนี้');
 }
 
 /* ------------------------------------- 8) เครื่องมือสะท้อนคิด */
