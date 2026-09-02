@@ -730,6 +730,7 @@ $role = $sessionUser['role'];
   </div>
 </div>
 
+<script src="html_utils.js?v=1.0"></script>
 <script>
   let studentDB = {};
 
@@ -739,6 +740,9 @@ $role = $sessionUser['role'];
   let currentReflectionUnit = 1; // หน่วยการเรียนที่นักเรียนกำลังบันทึก (1 หรือ 2)
   let currentMonitorUnit = 1;    // หน่วยการเรียนที่ครูเลือกดูในแดชบอร์ดภาพรวม (1 หรือ 2)
   let loadTeacherDashboardSummary = function() {}; // Global placeholder to prevent ReferenceError
+
+  // ใช้ตัวช่วยกลางเฉพาะตอนแสดงผล ข้อมูลต้นฉบับในฐานข้อมูลไม่ถูกเปลี่ยน
+  const reflectionEscapeHtml = window.HtmlUtils.escapeHtml;
 
   // โหลดแฟ้มรายบุคคลของนักเรียนที่ครูกำลังส่องอยู่ใหม่ (ใช้ตอนสลับหน่วยการเรียน) — กำหนดจริงในบล็อกของครู
   let reloadInspectedStudent = function() {};
@@ -1700,8 +1704,8 @@ $role = $sessionUser['role'];
             const hasInfo = rawProb !== '' || rawSol !== '';
             
             if (hasInfo) {
-              const displayProb = rawProb || '<span class="text-muted font-italic">- ไม่ได้ระบุปัญหา -</span>';
-              const displaySol = rawSol || '<span class="text-muted font-italic">- ไม่ได้ระบุแผนแก้ปัญหา -</span>';
+              const displayProb = rawProb ? reflectionEscapeHtml(rawProb) : '<span class="text-muted font-italic">- ไม่ได้ระบุปัญหา -</span>';
+              const displaySol = rawSol ? reflectionEscapeHtml(rawSol) : '<span class="text-muted font-italic">- ไม่ได้ระบุแผนแก้ปัญหา -</span>';
               html += `
                 <tr>
                   <td class="fw-bold text-dark">${criteriaLabelMap[key]}</td>
@@ -1753,12 +1757,12 @@ $role = $sessionUser['role'];
             html += `
               <li class="list-group-item d-flex justify-content-between align-items-center">
                 <span>${chkLabelMap[key]}</span>
-                <span class="badge ${badgeClass} rounded-pill">${val}</span>
+                <span class="badge ${badgeClass} rounded-pill">${reflectionEscapeHtml(val)}</span>
               </li>
             `;
           });
           inspectChecklistList.innerHTML = html;
-          inspectChecklistNotes.innerHTML = `<strong>บันทึกเพิ่มเติม:</strong><br>${d.notes ? d.notes : '<span class="text-muted">- ไม่มีบันทึกเพิ่มเติม -</span>'}`;
+          inspectChecklistNotes.innerHTML = `<strong>บันทึกเพิ่มเติม:</strong><br>${d.notes ? reflectionEscapeHtml(d.notes) : '<span class="text-muted">- ไม่มีบันทึกเพิ่มเติม -</span>'}`;
         } else {
           inspectChecklistList.innerHTML = '<li class="list-group-item text-center text-muted py-4">นักเรียนยังไม่ได้ส่งแบบรายการตรวจสอบตนเอง</li>';
           inspectChecklistNotes.textContent = '';
@@ -1773,29 +1777,29 @@ $role = $sessionUser['role'];
               <div class="accordion-item mb-2 border rounded-3 overflow-hidden">
                 <h2 class="accordion-header" id="headingPeer${index}">
                   <button class="accordion-button collapsed py-2 px-3 fw-bold small bg-light text-dark shadow-none" type="button" data-bs-toggle="collapse" data-bs-target="#collapsePeer${index}" aria-expanded="false" aria-controls="collapsePeer${index}">
-                    👩‍🎓 ผู้ประเมิน: ${row.reviewer_name}
+                    👩‍🎓 ผู้ประเมิน: ${reflectionEscapeHtml(row.reviewer_name)}
                   </button>
                 </h2>
                 <div id="collapsePeer${index}" class="accordion-collapse collapse" aria-labelledby="headingPeer${index}" data-bs-parent="#peerReviewsInspectAccordion">
                   <div class="accordion-body p-3 bg-white">
                     <div class="row g-2 mb-3">
-                      <div class="col-6 small"><strong>1.1 ตรงประเด็น:</strong> ${row.score_1_1}</div>
-                      <div class="col-6 small"><strong>1.2 แก่นเรื่อง:</strong> ${row.score_1_2}</div>
-                      <div class="col-6 small"><strong>1.3 ขยายความ:</strong> ${row.score_1_3}</div>
-                      <div class="col-6 small text-primary"><strong>1.4 เอกภาพของเนื้อหา:</strong> ${row.score_1_4}</div>
-                      <div class="col-6 small"><strong>2.1 องค์ประกอบครบ:</strong> ${row.score_2_1}</div>
-                      <div class="col-6 small"><strong>2.2 ลำดับเป็นระบบ:</strong> ${row.score_2_2}</div>
-                      <div class="col-6 small"><strong>3.1 ประโยคถูกต้อง:</strong> ${row.score_3_1}</div>
-                      <div class="col-6 small"><strong>3.2 เลือกใช้คำ:</strong> ${row.score_3_2}</div>
-                      <div class="col-6 small"><strong>3.3 ระดับภาษา:</strong> ${row.score_3_3}</div>
-                      <div class="col-6 small text-primary"><strong>3.4 การใช้คำเชื่อม:</strong> ${row.score_3_4}</div>
-                      <div class="col-6 small"><strong>4.1 สะกดคำ:</strong> ${row.score_4_1}</div>
-                      <div class="col-6 small"><strong>4.2 เว้นวรรค:</strong> ${row.score_4_2}</div>
-                      <div class="col-6 small"><strong>4.3 เรียบร้อย:</strong> ${row.score_4_3}</div>
+                      <div class="col-6 small"><strong>1.1 ตรงประเด็น:</strong> ${reflectionEscapeHtml(row.score_1_1)}</div>
+                      <div class="col-6 small"><strong>1.2 แก่นเรื่อง:</strong> ${reflectionEscapeHtml(row.score_1_2)}</div>
+                      <div class="col-6 small"><strong>1.3 ขยายความ:</strong> ${reflectionEscapeHtml(row.score_1_3)}</div>
+                      <div class="col-6 small text-primary"><strong>1.4 เอกภาพของเนื้อหา:</strong> ${reflectionEscapeHtml(row.score_1_4)}</div>
+                      <div class="col-6 small"><strong>2.1 องค์ประกอบครบ:</strong> ${reflectionEscapeHtml(row.score_2_1)}</div>
+                      <div class="col-6 small"><strong>2.2 ลำดับเป็นระบบ:</strong> ${reflectionEscapeHtml(row.score_2_2)}</div>
+                      <div class="col-6 small"><strong>3.1 ประโยคถูกต้อง:</strong> ${reflectionEscapeHtml(row.score_3_1)}</div>
+                      <div class="col-6 small"><strong>3.2 เลือกใช้คำ:</strong> ${reflectionEscapeHtml(row.score_3_2)}</div>
+                      <div class="col-6 small"><strong>3.3 ระดับภาษา:</strong> ${reflectionEscapeHtml(row.score_3_3)}</div>
+                      <div class="col-6 small text-primary"><strong>3.4 การใช้คำเชื่อม:</strong> ${reflectionEscapeHtml(row.score_3_4)}</div>
+                      <div class="col-6 small"><strong>4.1 สะกดคำ:</strong> ${reflectionEscapeHtml(row.score_4_1)}</div>
+                      <div class="col-6 small"><strong>4.2 เว้นวรรค:</strong> ${reflectionEscapeHtml(row.score_4_2)}</div>
+                      <div class="col-6 small"><strong>4.3 เรียบร้อย:</strong> ${reflectionEscapeHtml(row.score_4_3)}</div>
                     </div>
-                    <div class="p-2 bg-light rounded text-muted small mb-1"><strong>จุดแข็ง:</strong> ${row.strength || '-'}</div>
-                    <div class="p-2 bg-light rounded text-muted small mb-1"><strong>จุดปรับปรุง:</strong> ${row.improvement || '-'}</div>
-                    <div class="p-2 bg-light rounded text-muted small"><strong>กำลังใจ:</strong> "${row.encouragement || '-'}"</div>
+                    <div class="p-2 bg-light rounded text-muted small mb-1"><strong>จุดแข็ง:</strong> ${reflectionEscapeHtml(row.strength || '-')}</div>
+                    <div class="p-2 bg-light rounded text-muted small mb-1"><strong>จุดปรับปรุง:</strong> ${reflectionEscapeHtml(row.improvement || '-')}</div>
+                    <div class="p-2 bg-light rounded text-muted small"><strong>กำลังใจ:</strong> "${reflectionEscapeHtml(row.encouragement || '-')}"</div>
                   </div>
                 </div>
               </div>
