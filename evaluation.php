@@ -444,7 +444,6 @@ require_once 'header.php';
       <h6 class="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
         <i class="bi bi-file-earmark-text text-primary"></i>
         <span class="essay-panel-title-full">เนื้อหาเรียงความที่นักเรียนบันทึกไว้ (Student Essay Content)</span>
-        <span class="essay-panel-title-short">เรียงความ</span>
       </h6>
       <div class="d-flex align-items-center gap-2 flex-shrink-0">
         <span class="badge bg-primary-subtle text-primary rounded-pill px-3 py-1 font-mono small" id="essayPanelWordCount">0 คำ</span>
@@ -526,31 +525,50 @@ require_once 'header.php';
   transition: background .15s ease;
 }
 .essay-collapse-btn:hover { background: rgba(0,0,0,0.06); }
-.essay-panel-title-short { display: none; }
 
-/* สถานะย่อ: ลอยเป็นกล่องเล็กมุมขวาล่างเสมอ ไม่ว่าจะจอเล็กหรือจอใหญ่ ไม่บังเนื้อหาแบบประเมิน */
+/* สถานะย่อ: เหลือเป็นปุ่มกลมเล็ก ๆ (เฉพาะไอคอน) ที่มุมขวาล่าง ไม่บังปุ่มบันทึกผลการประเมิน */
 #essayFloating.essay-collapsed {
   position: fixed !important;
   /* bottom เว้นสูงกว่ากล่อง toast แจ้งเตือน (.toast-container-custom อยู่มุมเดียวกันที่ bottom:20px) ไม่ให้ซ้อนทับกัน */
   inset: auto 16px 90px auto !important;
   top: auto !important;
-  width: auto !important;
-  max-width: calc(100vw - 32px);
-  height: auto !important;
+  width: 46px !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  height: 46px !important;
   margin: 0 !important;
-  border-radius: 999px !important;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  padding: 0 !important;
+  border-radius: 50% !important;
+  background: #fffdf0;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.22);
+  opacity: 0.92;
   z-index: 1035;
-  border-left: 1px solid #e7e5e4 !important;
+  border: 1px solid #e7e5e4 !important;
 }
-#essayFloating.essay-collapsed .essay-doc-scroll { display: none; }
+#essayFloating.essay-collapsed:hover { opacity: 1; }
+/* ย่อแล้วซ่อนทุกอย่างที่ทำให้กล่องกว้าง: เนื้อเรียงความ ชื่อหัวข้อ และป้ายจำนวนคำ */
+#essayFloating.essay-collapsed .essay-doc-scroll,
+#essayFloating.essay-collapsed .essay-panel-header h6,
+#essayFloating.essay-collapsed #essayPanelWordCount { display: none !important; }
 #essayFloating.essay-collapsed .essay-panel-header {
-  padding: 10px 18px;
+  width: 46px;
+  height: 46px;
+  padding: 0 !important;
+  gap: 0 !important;
+  justify-content: center !important;
   border-bottom: none;
-  border-radius: 999px;
+  border-radius: 50%;
 }
-#essayFloating.essay-collapsed .essay-panel-title-full { display: none; }
-#essayFloating.essay-collapsed .essay-panel-title-short { display: inline; }
+#essayFloating.essay-collapsed .essay-collapse-btn {
+  padding: 0;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+}
 
 /* แผ่นกระดาษสัดส่วน A4 (210:297 ≈ 1:1.414) — ขยายให้กว้างขึ้นด้านละ ~1 นิ้ว มีระยะขอบเหมือนกระดาษจริง */
 .essay-sheet {
