@@ -160,54 +160,95 @@ $aiPhases    = ai_all_phases();
   </div><!-- /tab-person -->
 
 <?php if (!$aiIsStudent): ?>
-  <!-- ======================= แท็บที่ 2: ภาพรวมผลตรวจอัตโนมัติทั้งชั้น ======================= -->
+  <!-- ======================= แท็บที่ 2: รายงานภาพรวมทั้งชั้น ======================= -->
   <div class="tab-pane fade" id="tab-class" role="tabpanel">
 
-    <!-- ตัวเลขเด่น ๆ ของทั้งชั้น — ตอบคำถามที่ครูถามบ่อยที่สุดก่อน ไม่ต้องไล่อ่านทั้งตาราง -->
-    <div id="aiClassHighlights" class="mb-4">
-      <div class="text-center text-muted py-4"><i class="bi bi-hourglass-split me-2"></i>กำลังโหลด...</div>
+    <!-- หัวรายงาน — ให้หน้านี้อ่านเป็นรายงานวิชาการ พร้อมส่งออกเป็น Google Doc ได้ในคลิกเดียว -->
+    <div class="ai-report-head rounded-4 p-4 mb-3">
+      <div class="d-flex align-items-start justify-content-between flex-wrap gap-3">
+        <div>
+          <div class="ai-report-kicker">รายงานผลการตรวจเรียงความด้วยระบบอัตโนมัติ</div>
+          <h5 class="fw-bold text-dark mb-1"><i class="bi bi-journal-bookmark-fill text-primary me-2"></i>ภาพรวมทั้งชั้นเรียน</h5>
+          <div class="text-muted small" style="max-width:640px;">
+            สรุปผลตรวจอัตโนมัติทั้งชั้น แนวทางการนำเสนอรายรอบงานพร้อมสถิติและรายชื่อ และค่าเฉลี่ยรายรอบงาน
+            — จัดทำจากผลตรวจที่ระบบบันทึกไว้แล้วทั้งหมด แบ่งเป็น 3 ส่วนตามแท็บด้านล่าง
+          </div>
+        </div>
+<?php if ($aiIsTeacher): ?>
+        <div class="text-lg-end">
+          <button id="reportExportBtn" class="btn fw-bold rounded-pill px-4 text-white" type="button"
+                  style="background:linear-gradient(135deg,#1a1a2e,#4c1d95);" onclick="sendWritingReportToGoogleDocs()">
+            <i class="bi bi-google me-1"></i>ส่งออกรายงานหน้านี้เป็น Google Doc
+          </button>
+          <div id="reportGoogleStatusBox" class="small text-muted mt-2"></div>
+        </div>
+<?php else: ?>
+        <div class="text-muted small text-lg-end"><i class="bi bi-info-circle me-1"></i>ส่งออกเป็น Google Doc ได้เฉพาะคุณครู</div>
+<?php endif; ?>
+      </div>
     </div>
 
-    <!-- ค่าเฉลี่ยทั้งชั้นรายรอบงาน (ย้ายมาจากแท็บรายบุคคล) -->
-    <div id="aiClassAvgCards" class="mb-4"></div>
+    <!-- แท็บย่อยของรายงาน — แยก 3 ส่วนให้อ่านทีละประเด็น -->
+    <ul class="nav nav-tabs ai-report-tabs mb-3" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#rep-overview" type="button" role="tab">
+          <span class="ai-report-tab-num">1</span>ภาพรวมผลตรวจอัตโนมัติทั้งชั้น
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#rep-presentation" type="button" role="tab">
+          <span class="ai-report-tab-num">2</span>ภาพรวมการนำเสนอรายรอบงาน
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#rep-avg" type="button" role="tab">
+          <span class="ai-report-tab-num">3</span>ค่าเฉลี่ยทั้งชั้นรายรอบงาน
+        </button>
+      </li>
+    </ul>
 
-    <!-- ภาพรวมการนำเสนอรายรอบงาน — ใช้เมื่อระบบตรวจครบทั้งรอบแล้ว -->
-    <div class="card border-0 shadow-sm rounded-4 mb-4" style="border-top:4px solid #b45309 !important;">
-      <div class="card-header bg-white border-bottom py-3 px-4 rounded-top-4">
-        <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
-          <div>
+    <div class="tab-content mb-4">
+      <!-- ส่วนที่ 1: ตัวเลขเด่น ๆ ของทั้งชั้น — ตอบคำถามที่ครูถามบ่อยที่สุดก่อน ไม่ต้องไล่อ่านทั้งตาราง -->
+      <div class="tab-pane fade show active" id="rep-overview" role="tabpanel">
+        <div id="aiClassHighlights">
+          <div class="text-center text-muted py-4"><i class="bi bi-hourglass-split me-2"></i>กำลังโหลด...</div>
+        </div>
+      </div>
+
+      <!-- ส่วนที่ 2: ภาพรวมการนำเสนอรายรอบงาน — ใช้เมื่อระบบตรวจครบทั้งรอบแล้ว -->
+      <div class="tab-pane fade" id="rep-presentation" role="tabpanel">
+        <div class="card border-0 shadow-sm rounded-4" style="border-top:4px solid #b45309 !important;">
+          <div class="card-header bg-white border-bottom py-3 px-4 rounded-top-4">
             <h6 class="fw-bold text-dark mb-0">
               <i class="bi bi-journal-richtext text-warning me-2"></i>ภาพรวมการนำเสนอรายรอบงาน
             </h6>
             <div class="text-muted small mt-1">
-              เมื่อระบบตรวจครบทั้งรอบแล้ว ให้ระบบอ่านงานทั้งชั้นรวดเดียว แล้วสรุปว่านักเรียนนำเสนอไปทางใด
-              มีประเด็นใดน่าสนใจ และมีข้อสังเกตอะไรที่เป็นประโยชน์ต่อการอ่านผลวิจัย
+              เมื่อระบบตรวจครบทั้งรอบแล้ว ให้ระบบอ่านงานทั้งชั้นรวดเดียว แล้วคำนวณว่านักเรียนนำเสนอไปทางใดบ้าง
+              สัดส่วนเท่าไร พร้อมระบุว่าเป็นงานของใคร มีประเด็นใดน่าสนใจ และมีข้อสังเกตอะไรที่เป็นประโยชน์ต่อการอ่านผลวิจัย
+            </div>
+            <!-- เลือกรอบงานด้วยปุ่ม (แทนเมนู select) -->
+            <div id="ovPhaseButtons" class="d-flex flex-wrap gap-2 mt-3"></div>
+<?php if ($aiIsTeacher): ?>
+            <div class="d-flex align-items-center flex-wrap gap-2 mt-2">
+              <button id="ovRunBtn" class="btn btn-sm fw-bold rounded-pill px-4 text-white"
+                      style="background:linear-gradient(135deg,#b45309,#6d28d9);" onclick="runPhaseOverview()">
+                <i class="bi bi-stars me-1"></i>ให้ระบบเขียนภาพรวมรอบนี้
+              </button>
+              <span id="ovHint" class="small text-muted"></span>
+            </div>
+<?php endif; ?>
+          </div>
+          <div class="card-body p-4">
+            <div id="ovBox">
+              <div class="text-center text-muted py-4"><i class="bi bi-hourglass-split me-2"></i>กำลังโหลด...</div>
             </div>
           </div>
         </div>
-        <div class="row g-2 mt-2">
-          <div class="col-md-5">
-            <select id="ovPhase" class="form-select form-select-sm rounded-3" onchange="paintPhaseOverview()">
-              <?php foreach ($aiPhases as $ph): ?>
-              <option value="<?php echo $ph; ?>"><?php echo htmlspecialchars(ai_phase_label($ph)); ?></option>
-              <?php endforeach; ?>
-            </select>
-          </div>
-<?php if ($aiIsTeacher): ?>
-          <div class="col-md-7 d-flex gap-2">
-            <button id="ovRunBtn" class="btn btn-sm fw-bold rounded-pill px-4 text-white"
-                    style="background:linear-gradient(135deg,#b45309,#6d28d9);" onclick="runPhaseOverview()">
-              <i class="bi bi-stars me-1"></i>ให้ระบบเขียนภาพรวมรอบนี้
-            </button>
-            <span id="ovHint" class="small text-muted align-self-center"></span>
-          </div>
-<?php endif; ?>
-        </div>
       </div>
-      <div class="card-body p-4">
-        <div id="ovBox">
-          <div class="text-center text-muted py-4"><i class="bi bi-hourglass-split me-2"></i>กำลังโหลด...</div>
-        </div>
+
+      <!-- ส่วนที่ 3: ค่าเฉลี่ยทั้งชั้นรายรอบงาน -->
+      <div class="tab-pane fade" id="rep-avg" role="tabpanel">
+        <div id="aiClassAvgCards"></div>
       </div>
     </div>
 
@@ -548,6 +589,44 @@ $aiPhases    = ai_all_phases();
   .ai-person-figure .num { font-size: 1.55rem; font-weight: 800; color: #4c1d95; }
   .ai-person-figure .cap { font-size: 0.75rem; color: #64748b; }
 
+  /* หัวรายงานของแท็บ "ภาพรวมทั้งชั้น" — ให้หน้าตาเป็นรายงานวิชาการ */
+  .ai-report-head { background: linear-gradient(135deg, #faf7ff 0%, #f7fafc 60%, #f0fdfa 100%); border: 1px solid #e2e8f0; }
+  .ai-report-kicker {
+    text-transform: uppercase; letter-spacing: .06em; font-size: 0.72rem; font-weight: 800;
+    color: #6d28d9; margin-bottom: 4px;
+  }
+  /* แท็บย่อยของรายงาน (1/2/3) */
+  .ai-report-tabs .nav-link {
+    color: var(--primary-navy); font-weight: 700; border: 1px solid transparent; border-bottom: none;
+  }
+  .ai-report-tabs .nav-link.active {
+    color: #4c1d95; background: #faf7ff; border-color: var(--border-gray);
+  }
+  .ai-report-tab-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; border-radius: 50%; margin-right: 6px;
+    background: #ede9fe; color: #4c1d95; font-size: 0.72rem; font-weight: 800;
+  }
+  .ai-report-tabs .nav-link.active .ai-report-tab-num { background: #6d28d9; color: #fff; }
+
+  /* ปุ่มเลือกรอบงานในภาพรวมการนำเสนอ (แทนเมนู select) */
+  .ov-phase-btn {
+    border: 2px solid var(--border-gray); background: #fff; color: var(--primary-navy);
+    font-weight: 700; font-size: 0.82rem; padding: 6px 16px; border-radius: 999px;
+  }
+  .ov-phase-btn-active { border-color: #b45309; background: #fffbeb; color: #92400e; }
+  .ov-phase-btn-dot {
+    display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #d97706; margin-left: 5px;
+  }
+
+  /* ป้ายชื่อนักเรียนที่เป็นตัวอย่างของประเด็นหนึ่ง ๆ — คลิกเพื่อเปิดฉบับของคนนั้น */
+  .ai-student-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ai-student-chip {
+    border: 1px solid #ddd6fe; background: #faf7ff; color: #4c1d95; font-size: 0.74rem; font-weight: 600;
+    padding: 2px 10px; border-radius: 999px;
+  }
+  .ai-student-chip:hover { background: #ede9fe; border-color: #6d28d9; }
+
   /* การ์ดแนวทางการนำเสนอในภาพรวมรายรอบงาน */
   .ov-theme { background: #fffdf5; border: 1px solid #fde68a; border-left: 4px solid #f59e0b; }
 
@@ -634,6 +713,7 @@ const AI_ROLE       = <?php echo json_encode($aiRole); ?>;
 const AI_IS_STUDENT = <?php echo $aiIsStudent ? 'true' : 'false'; ?>;
 const AI_IS_TEACHER = <?php echo $aiIsTeacher ? 'true' : 'false'; ?>;
 const AI_MY_ID      = <?php echo json_encode($sessionUser['id']); ?>;
+const WRITING_REPORT_AUTHOR = <?php echo json_encode($sessionUser['name'] ?? 'ครูผู้สอน'); ?>;
 const AI_PHASES     = <?php echo json_encode($aiPhases); ?>;
 // ลักษณะงานเขียนของแต่ละรอบ (เชิงบรรยาย/เชิงวิจารณ์ + คำสำคัญที่ครูกำหนด)
 // ใช้บอกบนการ์ดว่ารอบนั้นเป็นงานชนิดใด ครูจะได้รู้ว่าระบบตรวจด้วยหลักอะไร
@@ -1039,6 +1119,8 @@ function paintClassHighlights() {
    ============================================================ */
 let aiOverviews = {};      // รหัสรอบงาน => ภาพรวมที่เคยสร้างไว้
 let ovRunning   = false;
+// รอบงานที่กำลังเปิดดูอยู่ในแท็บ "ภาพรวมการนำเสนอรายรอบงาน" (เลือกด้วยปุ่ม ไม่ใช้เมนู select)
+let selectedOverviewPhase = AI_PHASES[0] || '';
 
 async function loadPhaseOverviews() {
   const box = document.getElementById('ovBox');
@@ -1058,11 +1140,33 @@ function ovReviewedCount(phase) {
   return (aiOverviewList || []).filter(r => r.essay_phase === phase).length;
 }
 
+function selectOverviewPhase(phase) {
+  if (selectedOverviewPhase === phase) return;
+  selectedOverviewPhase = phase;
+  paintPhaseOverview();
+}
+
+// แถบปุ่มเลือกรอบงาน — ปุ่มที่ทำภาพรวมไว้แล้วมีติ๊กถูก ส่วนปุ่มที่ตรวจครบ 2 ฉบับแล้วแต่ยังไม่เคยทำมีจุดเตือน
+function renderOvPhaseButtons() {
+  const wrap = document.getElementById('ovPhaseButtons');
+  if (!wrap) return;
+  wrap.innerHTML = AI_PHASES.map(ph => {
+    const active = (ph === selectedOverviewPhase);
+    const has    = !!aiOverviews[ph];
+    const ready  = ovReviewedCount(ph) >= 2;
+    return `<button type="button" class="ov-phase-btn ${active ? 'ov-phase-btn-active' : ''}"
+              onclick="selectOverviewPhase('${ph}')">
+        ${esc(AI_PHASE_LABELS[ph] || ph)}
+        ${has ? '<i class="bi bi-check-circle-fill ms-1"></i>' : (ready ? '<span class="ov-phase-btn-dot"></span>' : '')}
+      </button>`;
+  }).join('');
+}
+
 function paintPhaseOverview() {
   const box = document.getElementById('ovBox');
-  const sel = document.getElementById('ovPhase');
-  if (!box || !sel) return;
-  const phase = sel.value;
+  if (!box) return;
+  renderOvPhaseButtons();
+  const phase = selectedOverviewPhase;
   const ov    = aiOverviews[phase];
   const done  = ovReviewedCount(phase);
 
@@ -1093,18 +1197,38 @@ function paintPhaseOverview() {
   box.innerHTML = overviewHTML(ov);
 }
 
-// รายการหัวข้อย่อยแบบมีสัญลักษณ์นำ
-function ovList(items, icon, color) {
+// แปลง **ข้อความ** เป็นตัวหนา (ทำหลัง escape เสมอ กันแทรก HTML)
+function mdBoldEsc(s) {
+  return esc(s || '').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+}
+
+// ป้ายชื่อนักเรียนที่เป็นตัวอย่างของประเด็นนั้น — คลิกเพื่อเปิดฉบับของคนนั้นในแท็บผลตรวจรายบุคคลได้ทันที
+function studentChipsHTML(ids, roster, phase) {
+  if (!ids || !ids.length) return '';
+  roster = roster || {};
+  return '<div class="ai-student-chips mt-2">' + ids.map(id => {
+    const name = roster[id] || id;
+    return `<button type="button" class="ai-student-chip" onclick="jumpToStudentPhase('${esc(id)}','${esc(phase || '')}')"
+              title="เปิดฉบับนี้ของ ${esc(name)}"><i class="bi bi-person-fill me-1"></i>${esc(name)}</button>`;
+  }).join('') + '</div>';
+}
+
+// รายการหัวข้อย่อยแบบมีสัญลักษณ์นำ — แต่ละข้อบอกด้วยว่าไปพบในงานของใครบ้าง
+function ovList(items, icon, color, phase, roster) {
   if (!items || !items.length) return '<div class="text-muted small">— ไม่มีข้อมูล —</div>';
-  return items.map(t => `<div class="d-flex align-items-start gap-2 mb-2">
+  return items.map(t => `<div class="d-flex align-items-start gap-2 mb-3">
     <i class="bi ${icon} mt-1" style="color:${color};"></i>
-    <span class="small" style="line-height:1.8;">${esc(t)}</span>
+    <div class="flex-grow-1">
+      <span class="small" style="line-height:1.8;">${esc(t.text)}</span>
+      ${studentChipsHTML(t.students, roster, phase)}
+    </div>
   </div>`).join('');
 }
 
 function overviewHTML(ov) {
-  const st = ov.stats || {};
-  const when = ov.updated_at ? String(ov.updated_at).replace('T', ' ').slice(0, 16) : '';
+  const st     = ov.stats || {};
+  const roster = st.roster || {};
+  const when   = ov.updated_at ? String(ov.updated_at).replace('T', ' ').slice(0, 16) : '';
 
   // แถบตัวเลขของรอบนั้น — ระบบคำนวณเอง ไม่ได้มาจากระบบ
   const pair = st.pair;
@@ -1120,15 +1244,17 @@ function overviewHTML(ov) {
        <span class="text-muted">ดีขึ้น ${pair.improved}/${pair.n} ฉบับ</span></span>` : ''
   ].filter(Boolean).join('');
 
+  // นักเรียนนำเสนอไปทางใดบ้าง — สัดส่วนและจำนวนคนระบบนับเองจากรายชื่อที่จัดเข้าแต่ละแนวทางจริง ไม่ใช่คำกะประมาณ
   const themes = (ov.themes || []).map((t, i) => `
     <div class="ov-theme p-3 rounded-3 mb-2">
       <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
         <span class="fw-bold text-dark small">
           <span class="badge bg-warning-subtle text-warning-emphasis me-1">แนวที่ ${i + 1}</span>${esc(t.theme)}
         </span>
-        ${t.how_many ? `<span class="badge bg-light text-secondary border text-nowrap">${esc(t.how_many)}</span>` : ''}
+        <span class="badge bg-dark text-white text-nowrap">${t.count || 0} คน · ${t.pct || 0}%</span>
       </div>
-      ${t.example ? `<div class="small text-muted mt-1"><i class="bi bi-quote me-1"></i>${esc(t.example)}</div>` : ''}
+      ${t.description ? `<div class="small text-muted mt-1">${esc(t.description)}</div>` : ''}
+      ${studentChipsHTML(t.students, roster, ov.essay_phase)}
     </div>`).join('') || '<div class="text-muted small">— ไม่มีข้อมูล —</div>';
 
   return `
@@ -1145,35 +1271,32 @@ function overviewHTML(ov) {
     <div class="row g-4 mt-1">
       <div class="col-lg-6">
         <h6 class="fw-bold text-primary mb-2"><i class="bi bi-lightbulb-fill me-2"></i>ประเด็นที่น่าสนใจ</h6>
-        ${ovList(ov.interesting, 'bi-stars', '#6d28d9')}
+        ${ovList(ov.interesting, 'bi-stars', '#6d28d9', ov.essay_phase, roster)}
       </div>
       <div class="col-lg-6">
         <h6 class="fw-bold text-dark mb-2"><i class="bi bi-clipboard2-data me-2"></i>ข้อสังเกตต่อผลวิจัย</h6>
-        ${ovList(ov.observations, 'bi-graph-up', '#0d7377')}
+        ${ovList(ov.observations, 'bi-graph-up', '#0d7377', ov.essay_phase, roster)}
       </div>
     </div>
 
     <div class="row g-4 mt-1">
       <div class="col-lg-6">
         <h6 class="fw-bold text-success mb-2"><i class="bi bi-hand-thumbs-up-fill me-2"></i>จุดที่ทั้งชั้นทำได้ดี</h6>
-        ${ovList(ov.common_strengths, 'bi-check-circle-fill', '#16a34a')}
+        ${ovList(ov.common_strengths, 'bi-check-circle-fill', '#16a34a', ov.essay_phase, roster)}
       </div>
       <div class="col-lg-6">
         <h6 class="fw-bold text-warning-emphasis mb-2"><i class="bi bi-tools me-2"></i>จุดบกพร่องที่พบซ้ำทั้งชั้น</h6>
-        ${ovList(ov.common_problems, 'bi-exclamation-triangle-fill', '#d97706')}
+        ${ovList(ov.common_problems, 'bi-exclamation-triangle-fill', '#d97706', ov.essay_phase, roster)}
       </div>
     </div>
 
-    ${(ov.teaching_notes && ov.teaching_notes.length) ? `
+    ${(ov.teaching_notes && ov.teaching_notes.trim()) ? `
     <h6 class="fw-bold text-primary mt-4 mb-2"><i class="bi bi-mortarboard-fill me-2"></i>สิ่งที่ควรทำต่อในคาบถัดไป</h6>
-    <div class="row row-cols-1 row-cols-md-2 g-2">
-      ${ov.teaching_notes.map((t, i) => `<div class="col"><div class="ai-summary-step p-3 rounded-3 h-100 small">
-        <span class="badge bg-primary-subtle text-primary-emphasis me-1">${i + 1}</span>${esc(t)}</div></div>`).join('')}
-    </div>` : ''}
+    <div class="ai-summary-step p-3 rounded-3 small" style="line-height:2;">${mdBoldEsc(ov.teaching_notes)}</div>` : ''}
 
     <div class="alert border-0 rounded-3 mt-4 mb-0 small" style="background:#f1f5f9;">
       <i class="bi bi-exclamation-circle me-1"></i>
-      <strong>ข้อสังเกตนี้ไม่ใช่ผลทดสอบทางสถิติ</strong> — ตัวเลขในกล่องนี้เป็นค่าบรรยาย (ค่าเฉลี่ย จำนวนฉบับที่ดีขึ้น)
+      <strong>ข้อสังเกตนี้ไม่ใช่ผลทดสอบทางสถิติ</strong> — ตัวเลขในกล่องนี้เป็นค่าบรรยาย (ค่าเฉลี่ย จำนวนฉบับที่ดีขึ้น สัดส่วนตามแนวทางนำเสนอ)
       ที่ระบบคำนวณเอง ส่วนการทดสอบนัยสำคัญด้วย <strong>Paired t-test</strong> อยู่ในหน้า
       <a href="research_analysis.php" class="alert-link">วิเคราะห์สถิติงานวิจัย</a> ให้อ้างอิงค่าจากหน้านั้นในการรายงานผล
     </div>
@@ -1184,11 +1307,26 @@ function overviewHTML(ov) {
     </div>`;
 }
 
+// เปิดฉบับของนักเรียนคนหนึ่งในรอบงานหนึ่ง — ใช้เมื่อคลิกชื่อนักเรียนจากภาพรวมการนำเสนอ
+async function jumpToStudentPhase(sid, phase) {
+  if (!sid) return;
+  const personTabBtn = document.querySelector('[data-bs-target="#tab-person"]');
+  if (personTabBtn) personTabBtn.click();
+  const sel = document.getElementById('aiStudentSelect');
+  if (sel) {
+    sel.value = sid;
+    if (window.SearchSelect) window.SearchSelect.refresh(sel);
+  }
+  selectedPhase = '';
+  updateReviewButton();
+  await loadFeedback();
+  if (phase && aiAllFeedback[phase]) selectPhase(phase);
+}
+
 <?php if ($aiIsTeacher): ?>
 async function runPhaseOverview() {
   if (ovRunning) return;
-  const sel   = document.getElementById('ovPhase');
-  const phase = sel.value;
+  const phase = selectedOverviewPhase;
   const done  = ovReviewedCount(phase);
   if (done < 2) { showToast('รอบนี้ยังมีผลตรวจไม่พอสำหรับเขียนภาพรวม', 'error'); return; }
   if (aiOverviews[phase] && !confirm(`เขียนภาพรวมของ "${AI_PHASE_LABELS[phase]}" ใหม่ทับของเดิมใช่ไหม?`)) return;
@@ -3008,6 +3146,203 @@ async function clearApiKey() {
     showToast('เชื่อมต่อไม่สำเร็จ', 'error');
   }
 }
+
+/* ============================================================
+   ส่งออกรายงานภาพรวมทั้งชั้น (3 ส่วนตามแท็บ) เป็น Google Doc
+   ใช้ข้อมูลที่โหลดไว้ในหน่วยความจำอยู่แล้ว (aiOverviewList / aiOverviews)
+   ไม่ต้องยิง API ซ้ำ — ต่อกับ google_upload_doc.php ตัวเดียวกับหน้าวิเคราะห์สถิติงานวิจัย
+   ============================================================ */
+function wrEsc(s) { return esc(String(s == null ? '' : s)); }
+
+function wrTable(headers, rows) {
+  let h = '<table class="data"><thead><tr>';
+  headers.forEach(x => h += '<th>' + wrEsc(x) + '</th>');
+  h += '</tr></thead><tbody>';
+  if (!rows.length) h += '<tr><td colspan="' + headers.length + '" style="text-align:center;color:#888">— ยังไม่มีข้อมูล —</td></tr>';
+  rows.forEach(r => {
+    h += '<tr>' + r.map(c => '<td>' + (c === null || c === undefined ? '' : wrEsc(c)) + '</td>').join('') + '</tr>';
+  });
+  return h + '</tbody></table>';
+}
+
+// รายชื่อพร้อมรหัส สำหรับใส่ในตาราง/ย่อหน้าของรายงาน (ไม่ใช่ chip ที่คลิกได้แบบในหน้าเว็บ)
+function wrNames(ids, roster) {
+  if (!ids || !ids.length) return '-';
+  roster = roster || {};
+  return ids.map(id => (roster[id] || id)).join(', ');
+}
+
+function buildWritingReportHtml() {
+  const now    = new Date();
+  const thDate = now.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+  const P = [];
+
+  // ---------- ส่วนที่ 1: ภาพรวมผลตรวจอัตโนมัติทั้งชั้น ----------
+  P.push('<h1 class="secn" id="s1">ส่วนที่ 1 ภาพรวมผลตรวจอัตโนมัติทั้งชั้น</h1>');
+  const list = aiOverviewList || [];
+  if (!list.length) {
+    P.push('<p style="color:#888">— ยังไม่มีผลตรวจของระบบในระบบ —</p>');
+  } else {
+    const fullMax  = Number(list[0].full_max) || 60;
+    const students = new Set(list.map(r => r.student_id));
+    const avg      = list.reduce((a, r) => a + Number(r.combined_total), 0) / list.length;
+    const waiting  = list.filter(r => !r.manual_done).length;
+    const stale    = list.filter(r => r.needs_recheck).length;
+    const pairRows = list.filter(r => r.draft_delta !== null && r.draft_delta !== undefined);
+    const pairOk   = pairRows.filter(r => r.draft_delta > 0).length;
+    const pairPct  = pairRows.length ? Math.round((pairOk / pairRows.length) * 100) : 0;
+    P.push(wrTable(['ตัวชี้วัด', 'ค่า'], [
+      ['จำนวนนักเรียนที่มีผลตรวจ', students.size + ' คน (จากผลตรวจทั้งหมด ' + list.length + ' ฉบับ)'],
+      ['คะแนนเฉลี่ยทั้งชั้น', aiNum1(avg) + ' / ' + aiNum(fullMax) + ' (ระดับ ' + aiLevelFromScore(avg) + ')'],
+      ['ร่างหลังดีขึ้นจริง', pairRows.length ? (pairPct + '% — ' + pairOk + ' จาก ' + pairRows.length + ' ฉบับที่เทียบกับฉบับตั้งต้นได้') : 'ยังไม่มีคู่ที่เทียบได้'],
+      ['ค้างอยู่ตอนนี้', (waiting + stale) + ' ฉบับ (รอคะแนนครู ' + waiting + ' · รอตรวจใหม่ ' + stale + ')'],
+    ]));
+    P.push('<p class="analysis">&quot;ร่างหลังดีขึ้นจริง&quot; นับเฉพาะคู่ที่ครูกำหนดให้เทียบกัน (D1.2 เทียบ D1.1 · D2.2 เทียบ D2.1 · หลังเรียน เทียบ ก่อนเรียน)</p>');
+  }
+
+  // ---------- ส่วนที่ 2: ค่าเฉลี่ยทั้งชั้นรายรอบงาน ----------
+  P.push('<div class="pagebreak"></div>');
+  P.push('<h1 class="secn" id="s2">ส่วนที่ 2 ค่าเฉลี่ยทั้งชั้นรายรอบงาน</h1>');
+  const classAvg = aiClassAverages();
+  const avgRows = AI_PHASES.filter(ph => classAvg[ph] && classAvg[ph].cnt).map(ph => {
+    const s = classAvg[ph];
+    return [AI_PHASE_LABELS[ph] || ph, s.cnt, aiNum1(s.avg), aiNum(s.max), aiLevelFromScore(s.avg)];
+  });
+  P.push(wrTable(['รอบงาน', 'จำนวนฉบับ', 'คะแนนเฉลี่ย', 'คะแนนเต็ม', 'ระดับเฉลี่ย'], avgRows));
+
+  // ---------- ส่วนที่ 3: ภาพรวมการนำเสนอรายรอบงาน ----------
+  P.push('<div class="pagebreak"></div>');
+  P.push('<h1 class="secn" id="s3">ส่วนที่ 3 ภาพรวมการนำเสนอรายรอบงาน</h1>');
+  const ovPhases = AI_PHASES.filter(ph => aiOverviews[ph]);
+  if (!ovPhases.length) {
+    P.push('<p style="color:#888">— ยังไม่เคยให้ระบบเขียนภาพรวมของรอบงานใดเลย —</p>');
+  }
+  ovPhases.forEach(ph => {
+    const ov  = aiOverviews[ph];
+    const st  = ov.stats || {};
+    const roster = st.roster || {};
+    P.push('<h2>' + wrEsc(AI_PHASE_LABELS[ph] || ph) + '</h2>');
+    P.push('<p>' + wrEsc(ov.overview) + '</p>');
+
+    P.push('<h3>นักเรียนนำเสนอไปทางใดบ้าง</h3>');
+    P.push(wrTable(['แนวทางที่นักเรียนนำเสนอ', 'จำนวนคน', 'สัดส่วน', 'รายชื่อ'],
+      (ov.themes || []).map((t, i) => ['แนวที่ ' + (i + 1) + ': ' + t.theme + (t.description ? ' — ' + t.description : ''),
+        t.count || 0, (t.pct || 0) + '%', wrNames(t.students, roster)])));
+
+    const groupList = (title, items) => {
+      P.push('<h3>' + wrEsc(title) + '</h3>');
+      if (!items || !items.length) { P.push('<p style="color:#888">— ไม่มีข้อมูล —</p>'); return; }
+      P.push('<ul>' + items.map(it =>
+        '<li>' + wrEsc(it.text) + (it.students && it.students.length ? ' <i>(พบในงานของ ' + wrEsc(wrNames(it.students, roster)) + ')</i>' : '') + '</li>'
+      ).join('') + '</ul>');
+    };
+    groupList('ประเด็นที่น่าสนใจ', ov.interesting);
+    groupList('ข้อสังเกตต่อผลวิจัย', ov.observations);
+    groupList('จุดที่ทั้งชั้นทำได้ดี', ov.common_strengths);
+    groupList('จุดบกพร่องที่พบซ้ำทั้งชั้น', ov.common_problems);
+
+    if (ov.teaching_notes) {
+      P.push('<h3>สิ่งที่ควรทำต่อในคาบถัดไป</h3>');
+      P.push('<p class="analysis">' + mdBoldEsc(ov.teaching_notes) + '</p>');
+    }
+  });
+
+  const body = P.join('\n');
+  const toc = '<div class="toc"><h1 class="secn nonum">สารบัญ</h1>'
+    + '<div class="tocitem"><span>ส่วนที่ 1 ภาพรวมผลตรวจอัตโนมัติทั้งชั้น</span></div>'
+    + '<div class="tocitem"><span>ส่วนที่ 2 ค่าเฉลี่ยทั้งชั้นรายรอบงาน</span></div>'
+    + '<div class="tocitem"><span>ส่วนที่ 3 ภาพรวมการนำเสนอรายรอบงาน</span></div>'
+    + '</div>';
+  const cover = '<div class="cover">'
+    + '<div class="cover-top">รายงานผลการตรวจเรียงความด้วยระบบอัตโนมัติ</div>'
+    + '<div class="cover-title">ภาพรวมทั้งชั้นเรียน</div>'
+    + '<div class="cover-box">ผลตรวจของระบบ ' + (list.length || 0) + ' ฉบับ</div>'
+    + '<div class="cover-foot">จัดทำโดย ' + wrEsc(WRITING_REPORT_AUTHOR) + '<br>วันที่ ' + wrEsc(thDate) + '</div>'
+    + '</div>';
+  const css = '@page { size: A4; margin: 2.54cm 2.2cm; }'
+    + 'body { font-family: "TH Sarabun New","Sarabun","Angsana New","Cordia New",serif; font-size: 16pt; color:#000; line-height:1.5; }'
+    + 'h1.secn { font-size: 20pt; color:#4c1d95; border-bottom:2pt solid #4c1d95; padding-bottom:4pt; margin:0 0 12pt; }'
+    + 'h2 { font-size: 17pt; color:#4c1d95; margin:14pt 0 6pt; }'
+    + 'h3 { font-size: 16pt; color:#333; margin:10pt 0 4pt; }'
+    + 'p { margin: 0 0 8pt; text-align: justify; } ul { margin: 0 0 8pt 0; }'
+    + 'table.data { border-collapse: collapse; width: 100%; margin: 6pt 0 12pt; font-size: 15pt; }'
+    + 'table.data th { background:#4c1d95; color:#fff; border:0.75pt solid #33455f; padding:4pt 6pt; text-align:center; }'
+    + 'table.data td { border:0.75pt solid #999; padding:3pt 6pt; vertical-align:top; }'
+    + 'p.analysis { background:#faf7ff; border-left:3pt solid #4c1d95; padding:6pt 10pt; margin:6pt 0 12pt; }'
+    + '.pagebreak { page-break-before: always; }'
+    + '.cover { text-align:center; padding-top:110pt; }'
+    + '.cover-top { font-size:22pt; color:#4c1d95; letter-spacing:1pt; margin-bottom:30pt; }'
+    + '.cover-title { font-size:30pt; font-weight:bold; color:#111; margin-bottom:16pt; }'
+    + '.cover-box { display:inline-block; border:1.5pt solid #4c1d95; border-radius:6pt; padding:8pt 20pt; font-size:16pt; color:#4c1d95; margin-bottom:60pt; }'
+    + '.cover-foot { font-size:17pt; color:#333; }'
+    + '.toc .tocitem { font-size:16pt; padding:5pt 0; border-bottom:0.5pt dotted #bbb; }'
+    + 'h1.nonum { text-align:center; border-bottom:none; }';
+  const doc = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">'
+    + '<head><meta charset="utf-8"><title>รายงานภาพรวมทั้งชั้น</title>'
+    + '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->'
+    + '<style>' + css + '</style></head><body>'
+    + cover + toc + '<div class="pagebreak"></div>' + body + '</body></html>';
+
+  return { doc, filename: 'รายงานภาพรวมทั้งชั้น_เขียนเรียงความ_' + now.toISOString().slice(0, 10) };
+}
+
+async function sendWritingReportToGoogleDocs() {
+  const btn = document.getElementById('reportExportBtn');
+  const original = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>กำลังจัดทำและส่งเข้า Google Docs...'; }
+  try {
+    let status;
+    try { status = await (await fetch('google_auth.php?action=status&_t=' + Date.now())).json(); }
+    catch (e) { throw new Error('ยังไม่ได้ตั้งค่า Google API (google_auth.php) บนเซิร์ฟเวอร์'); }
+    if (!status || !status.configured) {
+      showToast('ผู้ดูแลระบบยังไม่ได้ตั้งค่า Google API (โปรดกรอก Client ID/Secret ใน google_config.php)', 'error');
+      return;
+    }
+    if (!status.connected) {
+      showToast('กำลังพาไปเชื่อมต่อบัญชี Google ครั้งแรก...', 'info');
+      const ret = encodeURIComponent(location.pathname + '#tab-class');
+      window.location.href = 'google_auth.php?action=connect&return=' + ret;
+      return;
+    }
+    const rep = buildWritingReportHtml();
+    const httpResp = await fetch('google_upload_doc.php', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ html: rep.doc, title: rep.filename })
+    });
+    const raw = await httpResp.text();
+    let res;
+    try { res = JSON.parse(raw); }
+    catch (e) { throw new Error('เซิร์ฟเวอร์ตอบไม่ใช่ JSON (HTTP ' + httpResp.status + '): ' + raw.slice(0, 200)); }
+    if (res.success) {
+      showToast('ส่งเข้า Google Docs สำเร็จ! กำลังเปิดเอกสาร...', 'success');
+      window.open(res.link, '_blank');
+    } else if (res.reauth) {
+      const ret = encodeURIComponent(location.pathname + '#tab-class');
+      window.location.href = 'google_auth.php?action=connect&return=' + ret;
+    } else {
+      throw new Error(res.error || ('อัปโหลดไม่สำเร็จ (HTTP ' + httpResp.status + ')'));
+    }
+  } catch (err) {
+    showToast('เกิดข้อผิดพลาด: ' + err.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = original; }
+  }
+}
+
+async function loadWritingGoogleStatus() {
+  const box = document.getElementById('reportGoogleStatusBox');
+  if (!box) return;
+  try {
+    const st = await (await fetch('google_auth.php?action=status&_t=' + Date.now())).json();
+    if (!st.configured) {
+      box.innerHTML = '<span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle"></i> ยังไม่ได้ตั้งค่า Google API</span>';
+    } else if (st.connected) {
+      box.innerHTML = '<span class="badge bg-success"><i class="bi bi-check-circle"></i> เชื่อมต่อบัญชี Google แล้ว</span>';
+    } else {
+      box.innerHTML = '<span class="badge bg-secondary"><i class="bi bi-plug"></i> ยังไม่ได้เชื่อมต่อบัญชี Google</span>';
+    }
+  } catch (e) { box.innerHTML = ''; }
+}
 <?php endif; ?>
 
 // Init
@@ -3033,6 +3368,7 @@ async function clearApiKey() {
   paintBatchResume(true);
   // และตรวจสอบจากข้อมูลจริงในระบบด้วยว่าครั้งล่าสุดตรวจถึงไหน เหลืออะไรบ้าง
   loadServerResume();
+  loadWritingGoogleStatus();   // สถานะการเชื่อมต่อ Google Docs สำหรับปุ่มส่งออกรายงาน
 <?php endif; ?>
   await loadFeedback();
   // มีรอบงานระบุมาทาง URL (เช่นลิงก์จากหน้าเรียงความนักเรียน) → เปิดรายละเอียดฉบับนั้นให้ทันที

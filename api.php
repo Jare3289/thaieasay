@@ -3585,10 +3585,11 @@ try {
             $ovRows = [];
             try {
                 $st = $pdo->prepare('
-                    SELECT f.*, se.intro_content, se.conclusion_content, se.word_count
+                    SELECT f.*, se.intro_content, se.conclusion_content, se.word_count, s.student_name
                       FROM essay_ai_feedback f
                       LEFT JOIN student_essays se
                              ON se.student_id = f.student_id AND se.essay_phase = f.essay_phase
+                      LEFT JOIN students s ON s.student_id = f.student_id
                      WHERE f.essay_phase = ?
                      ORDER BY f.student_id ASC
                 ');
@@ -3637,6 +3638,8 @@ try {
                 // ตัวอย่างการนำเสนอรายคน — ตัดให้สั้นพอที่คำสั่งจะไม่ยาวเกินไป
                 if (count($ovSamples) < 45) {
                     $ovSamples[] = [
+                        'id'         => (string)$r['student_id'],
+                        'name'       => formatNamePrefix((string)($r['student_name'] ?? '')),
                         'score'      => (float)$r['total_score'],
                         'intro'      => ai_clean_text($r['intro_content'] ?? '', 220),
                         'conclusion' => ai_clean_text($r['conclusion_content'] ?? '', 180),
@@ -3644,6 +3647,10 @@ try {
                     ];
                 }
             }
+
+            // รหัส → ชื่อ ของนักเรียนที่ระบบได้อ่านจริง (ใช้กันหลอนรหัส และให้หน้าเว็บแสดงชื่อได้โดยไม่ต้องสืบค้นซ้ำ)
+            $ovIdName = [];
+            foreach ($ovSamples as $sp) { $ovIdName[$sp['id']] = $sp['name']; }
 
             $ovCritOut = [];
             foreach (ai_rubric() as $it) {
@@ -3678,6 +3685,8 @@ try {
                     'worse'      => $ovWorse,
                 ];
             }
+            // รหัส → ชื่อ ของนักเรียนที่ส่งให้ระบบอ่าน — หน้าเว็บใช้แปลงรหัสใน themes/interesting/... เป็นชื่อได้ทันที
+            $ovStats['roster'] = $ovIdName;
 
             $ovTopics = essay_topics_map($pdo);
             $ovTopic  = (string)($ovTopics[essay_topic_phase($ovPhase)] ?? '');
@@ -3690,13 +3699,20 @@ try {
                 echo json_encode(['success' => false, 'error' => $ovCall['error']]);
                 exit;
             }
-            $ovParsed = ai_parse_phase_overview($ovCall['text']);
+            $ovParsed = ai_parse_phase_overview($ovCall['text'], array_keys($ovIdName));
             if (!$ovParsed['ok']) {
                 ai_log_usage($pdo, $aiUser['id'], $aiRole, null, $ovPhase, false, $ovParsed['error']);
                 echo json_encode(['success' => false, 'error' => $ovParsed['error']]);
                 exit;
             }
             $ovData = $ovParsed['data'];
+
+            // สัดส่วนของแต่ละแนวทางนำเสนอ — ระบบนับเองจากรายชื่อที่ระบบจัดเข้าแนวทางนั้นจริง ไม่ปล่อยให้โมเดลกะเอง
+            foreach ($ovData['themes'] as &$ovTh) {
+                $ovTh['count'] = count($ovTh['students']);
+                $ovTh['pct']   = count($ovRows) > 0 ? (int)round($ovTh['count'] * 100 / count($ovRows)) : 0;
+            }
+            unset($ovTh);
 
             $jsonOpt = JSON_UNESCAPED_UNICODE;
             try {
