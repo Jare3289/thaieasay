@@ -3763,6 +3763,242 @@ try {
             ]);
             break;
 
+        // ดึงภาพรวมเชิงคุณภาพของข้อมูลสะท้อนคิด (reflection_tools.php) ที่เคยสร้างไว้แล้ว
+        case 'get_ai_reflection_overview':
+            if (!isset($_SESSION['user']) || !in_array($_SESSION['user']['role'], ['teacher', 'expert'], true)) {
+                echo json_encode(['success' => false, 'error' => 'ต้องเป็นครูหรือผู้เชี่ยวชาญ']);
+                exit;
+            }
+            $rfList = [];
+            try {
+                $st = $pdo->query('SELECT * FROM reflection_ai_summary');
+                while ($r = $st->fetch()) {
+                    $rfList[(int)$r['task_unit']] = ai_reflection_overview_row($r);
+                }
+            } catch (Exception $e) { /* ยังไม่มีตาราง = ยังไม่เคยสร้างภาพรวม */ }
+            echo json_encode(['success' => true, 'overviews' => $rfList]);
+            break;
+
+        // ครู: ให้ระบบสังเคราะห์ข้อมูลสะท้อนคิดทั้งชั้นของหน่วยการเรียนหนึ่งเป็นข้อมูลเชิงคุณภาพ
+        // (ปัญหาการเขียน + การตรวจสอบตนเอง + การประเมินเพื่อน + บทสะท้อนการเรียนรู้) ใช้โควตาเดียวกับระบบตรวจอัตโนมัติ
+        case 'ai_reflection_overview':
+            $rfUser = isset($_SESSION['user']) ? $_SESSION['user'] : null;
+            $rfRole = $rfUser ? $rfUser['role'] : '';
+            if ($rfRole !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้นที่สั่งให้ระบบวิเคราะห์ได้']);
+                exit;
+            }
+            $rfUnit = (isset($request_data['task_unit']) && (int)$request_data['task_unit'] === 2) ? 2 : 1;
+
+            $rfSet = ai_settings($pdo);
+            if (!$rfSet['enabled'] || !$rfSet['configured']) {
+                echo json_encode(['success' => false, 'error' => 'ระบบตรวจอัตโนมัติยังไม่พร้อมใช้งาน กรุณาตรวจสอบการตั้งค่า']);
+                exit;
+            }
+            $rfLimit = ai_daily_limit($pdo);
+            $rfUsed  = ai_usage_today($pdo, $rfUser['id']);
+            if ($rfUsed >= $rfLimit) {
+                echo json_encode(['success' => false, 'error' => 'วันนี้ใช้ระบบครบ ' . $rfLimit . ' ครั้งแล้ว กรุณาลองใหม่ในวันพรุ่งนี้']);
+                exit;
+            }
+
+            // ---- รวบรวมข้อมูลสะท้อนคิดทั้งชั้นของหน่วยนี้ ----
+            $rfCritLabels = ai_reflection_criteria_labels();
+            $rfCritKeys   = array_keys($rfCritLabels);
+
+            $probCols = [];
+            foreach ($rfCritKeys as $k) { $probCols[] = 'wp.prob_' . $k; $probCols[] = 'wp.sol_' . $k; }
+            $chkCols = [];
+            foreach ($rfCritKeys as $k) { $chkCols[] = 'chk.check_' . $k; }
+
+            $rfRows = [];
+            try {
+                $st = $pdo->prepare('
+                    SELECT s.student_id, s.student_name,
+                           ' . implode(', ', $probCols) . ',
+                           ' . implode(', ', $chkCols) . ',
+                           chk.notes AS checklist_notes,
+                           ref.content_structure, ref.language_mechanics, ref.feedback_applied, ref.future_goals
+                    FROM students s
+                    LEFT JOIN writing_problems wp ON s.student_id = wp.student_id AND wp.task_unit = ?
+                    LEFT JOIN self_checklists chk ON s.student_id = chk.student_id AND chk.task_unit = ?
+                    LEFT JOIN learning_reflections ref ON s.student_id = ref.student_id AND ref.task_unit = ?
+                    ORDER BY s.student_id ASC
+                ');
+                $st->execute([$rfUnit, $rfUnit, $rfUnit]);
+                $rfRows = $st->fetchAll();
+            } catch (Exception $e) {
+                $rfRows = [];
+            }
+
+            // เพื่อนประเมิน (ตาราง peer_reviews ไม่แยกตามหน่วยการเรียน — นับรวมทุกหน่วยตามที่ระบบอื่นทำ)
+            $rfPeerReceived = [];
+            $rfPeerGiven    = [];
+            $rfPeerCount    = 0;
+            try {
+                $st = $pdo->query('SELECT student_id, reviewer_id, strength, improvement, encouragement FROM peer_reviews');
+                while ($r = $st->fetch()) {
+                    $rfPeerCount++;
+                    $txt = trim(implode(' ', array_filter([
+                        (string)($r['strength'] ?? ''), (string)($r['improvement'] ?? ''), (string)($r['encouragement'] ?? ''),
+                    ], function ($v) { return trim($v) !== ''; })));
+                    if ($txt === '') continue;
+                    $rfPeerReceived[$r['student_id']][] = $txt;
+                    $rfPeerGiven[$r['reviewer_id']][] = $txt;
+                }
+            } catch (Exception $e) { /* ไม่มีข้อมูล */ }
+
+            // ---- ตัวเลขสรุป: ระบบคำนวณเองทั้งหมด ไม่ให้โมเดลนับเอง ----
+            $rfProbFreq = array_fill_keys($rfCritKeys, 0);
+            $rfChkDist  = [];
+            foreach ($rfCritKeys as $k) { $rfChkDist[$k] = []; }
+            $rfProbDone = 0; $rfChkDone = 0; $rfRefDone = 0;
+            $rfSamples  = [];
+            $rfIdName   = [];
+            $refFieldMap = [
+                'content_structure' => 'โครงสร้างเนื้อหา', 'language_mechanics' => 'กลไกภาษา',
+                'feedback_applied' => 'การนำข้อเสนอแนะไปใช้', 'future_goals' => 'เป้าหมายที่จะพัฒนาต่อ',
+            ];
+
+            foreach ($rfRows as $r) {
+                $sid = $r['student_id'];
+                $problems = [];
+                $hasProb = false;
+                foreach ($rfCritKeys as $k) {
+                    $prob = trim((string)($r['prob_' . $k] ?? ''));
+                    $sol  = trim((string)($r['sol_' . $k] ?? ''));
+                    if ($prob === '' && $sol === '') continue;
+                    $hasProb = true;
+                    $rfProbFreq[$k]++;
+                    if (count($problems) < 4) {
+                        $problems[] = ['label' => $rfCritLabels[$k], 'prob' => ai_clean_text($prob, 300), 'sol' => ai_clean_text($sol, 200)];
+                    }
+                }
+                if ($hasProb) $rfProbDone++;
+
+                $hasChk = false;
+                foreach ($rfCritKeys as $k) {
+                    $lv = trim((string)($r['check_' . $k] ?? ''));
+                    if ($lv === '') continue;
+                    $hasChk = true;
+                    $rfChkDist[$k][$lv] = ($rfChkDist[$k][$lv] ?? 0) + 1;
+                }
+                if ($hasChk) $rfChkDone++;
+
+                $reflections = [];
+                $hasRef = false;
+                foreach ($refFieldMap as $fk => $flabel) {
+                    $v = trim((string)($r[$fk] ?? ''));
+                    if ($v === '') continue;
+                    $hasRef = true;
+                    $reflections[$flabel] = ai_clean_text($v, 300);
+                }
+                if ($hasRef) $rfRefDone++;
+
+                if (!$hasProb && !$hasChk && !$hasRef) continue;
+
+                $rfIdName[$sid] = formatNamePrefix((string)($r['student_name'] ?? ''));
+
+                if (count($rfSamples) < 45) {
+                    $rfSamples[] = [
+                        'id' => $sid, 'name' => $rfIdName[$sid],
+                        'problems' => $problems,
+                        'checklist_notes' => ai_clean_text($r['checklist_notes'] ?? '', 300),
+                        'reflections' => $reflections,
+                        'peer_received' => array_map(function ($t) { return ai_clean_text($t, 250); }, array_slice($rfPeerReceived[$sid] ?? [], 0, 2)),
+                        'peer_given' => array_map(function ($t) { return ai_clean_text($t, 250); }, array_slice($rfPeerGiven[$sid] ?? [], 0, 2)),
+                    ];
+                }
+            }
+
+            if (count($rfSamples) < 2) {
+                echo json_encode(['success' => false, 'error' =>
+                    'หน่วยนี้มีนักเรียนที่บันทึกข้อมูลสะท้อนคิดเพียง ' . count($rfSamples) . ' คน — ต้องมีอย่างน้อย 2 คนจึงจะวิเคราะห์เชิงคุณภาพได้']);
+                exit;
+            }
+
+            $rfStats = [
+                'unit' => $rfUnit,
+                'n' => count($rfSamples),
+                'problems_completed' => $rfProbDone,
+                'checklists_completed' => $rfChkDone,
+                'reflections_completed' => $rfRefDone,
+                'peer_reviews_count' => $rfPeerCount,
+                'criteria_problem_freq' => $rfProbFreq,
+                'checklist_level_dist' => $rfChkDist,
+                'roster' => $rfIdName,
+            ];
+
+            @set_time_limit(150);
+            $rfPrompt = ai_build_reflection_overview_prompt($rfUnit, $rfStats, $rfSamples);
+            $rfCall   = ai_call_model($rfSet, ai_reflection_overview_system_prompt(), $rfPrompt);
+            if (!$rfCall['ok']) {
+                ai_log_usage($pdo, $rfUser['id'], $rfRole, null, 'refl_unit' . $rfUnit, false, $rfCall['error']);
+                echo json_encode(['success' => false, 'error' => $rfCall['error']]);
+                exit;
+            }
+            $rfParsed = ai_parse_phase_overview($rfCall['text'], array_keys($rfIdName));
+            if (!$rfParsed['ok']) {
+                ai_log_usage($pdo, $rfUser['id'], $rfRole, null, 'refl_unit' . $rfUnit, false, $rfParsed['error']);
+                echo json_encode(['success' => false, 'error' => $rfParsed['error']]);
+                exit;
+            }
+            $rfData = $rfParsed['data'];
+            foreach ($rfData['themes'] as &$rfTh) {
+                $rfTh['count'] = count($rfTh['students']);
+                $rfTh['pct']   = count($rfSamples) > 0 ? (int)round($rfTh['count'] * 100 / count($rfSamples)) : 0;
+            }
+            unset($rfTh);
+
+            $jsonOpt = JSON_UNESCAPED_UNICODE;
+            try {
+                $st = $pdo->prepare('
+                    INSERT INTO reflection_ai_summary
+                        (task_unit, overview, themes, interesting, common_strengths, common_problems,
+                         observations, teaching_notes, stats, student_count, provider, model, generated_by)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE
+                        overview = VALUES(overview), themes = VALUES(themes),
+                        interesting = VALUES(interesting), common_strengths = VALUES(common_strengths),
+                        common_problems = VALUES(common_problems), observations = VALUES(observations),
+                        teaching_notes = VALUES(teaching_notes), stats = VALUES(stats),
+                        student_count = VALUES(student_count), provider = VALUES(provider),
+                        model = VALUES(model), generated_by = VALUES(generated_by),
+                        updated_at = CURRENT_TIMESTAMP
+                ');
+                $st->execute([
+                    $rfUnit, $rfData['overview'],
+                    json_encode($rfData['themes'], $jsonOpt),
+                    json_encode($rfData['interesting'], $jsonOpt),
+                    json_encode($rfData['common_strengths'], $jsonOpt),
+                    json_encode($rfData['common_problems'], $jsonOpt),
+                    json_encode($rfData['observations'], $jsonOpt),
+                    json_encode($rfData['teaching_notes'], $jsonOpt),
+                    json_encode($rfStats, $jsonOpt),
+                    count($rfSamples), $rfSet['provider'], $rfSet['model'], $rfUser['id'],
+                ]);
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'error' => 'บันทึกภาพรวมไม่สำเร็จ: ' . $e->getMessage()]);
+                exit;
+            }
+
+            ai_log_usage($pdo, $rfUser['id'], $rfRole, null, 'refl_unit' . $rfUnit, true);
+
+            $rfData['task_unit']     = $rfUnit;
+            $rfData['unit_label']    = 'หน่วยที่ ' . $rfUnit;
+            $rfData['stats']         = $rfStats;
+            $rfData['student_count'] = count($rfSamples);
+            $rfData['model']         = $rfSet['model'];
+            $rfData['provider']      = $rfSet['provider'];
+            $rfData['updated_at']    = date('Y-m-d H:i:s');
+
+            echo json_encode([
+                'success'    => true,
+                'overview'   => $rfData,
+                'quota_left' => max(0, $rfLimit - ($rfUsed + 1)),
+            ]);
+            break;
+
         // ครูลบผลตรวจอัตโนมัติของเรียงความฉบับใดฉบับหนึ่ง (เช่นผลที่ไม่เหมาะสม)
         case 'delete_ai_feedback':
             if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {

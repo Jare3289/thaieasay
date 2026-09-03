@@ -860,6 +860,36 @@ try {
     // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
 }
 
+// ตาราง "ภาพรวมเชิงคุณภาพของข้อมูลสะท้อนคิด" — ระบบสังเคราะห์ปัญหาการเขียน/การตรวจสอบตนเอง/
+// การประเมินเพื่อน/การสะท้อนการเรียนรู้ ของทั้งชั้นในหน่วยการเรียนหนึ่งเป็นข้อมูลเชิงคุณภาพ
+// 1 หน่วยการเรียน = 1 แถว (สร้างใหม่ทับของเดิม)
+try {
+    $tRf = $pdo->query("SHOW TABLES LIKE 'reflection_ai_summary'");
+    if (!$tRf || $tRf->rowCount() === 0) {
+        safe_ddl($pdo, "
+            CREATE TABLE IF NOT EXISTS reflection_ai_summary (
+                task_unit        TINYINT PRIMARY KEY,
+                overview         TEXT,          -- ภาพรวมเชิงคุณภาพของข้อมูลสะท้อนคิดทั้งชั้น
+                themes           LONGTEXT,      -- JSON array แนวทางปัญหาการเขียนที่พบบ่อย
+                interesting      LONGTEXT,      -- JSON array สิ่งที่น่าสนใจ
+                common_strengths LONGTEXT,      -- JSON array จุดแข็งด้านการตรวจสอบตนเอง/การสะท้อนคิด
+                common_problems  LONGTEXT,      -- JSON array ปัญหาการเขียนที่พบซ้ำ
+                observations     LONGTEXT,      -- JSON array ข้อสังเกตเชิงวิจัย
+                teaching_notes   LONGTEXT,      -- JSON สิ่งที่ครูควรทำต่อ
+                stats            LONGTEXT,      -- JSON ตัวเลขที่ใช้ตอนสร้าง (ไว้อ้างอิงย้อนหลัง)
+                student_count    INT NOT NULL DEFAULT 0,
+                provider         VARCHAR(30)  DEFAULT NULL,
+                model            VARCHAR(100) DEFAULT NULL,
+                generated_by     VARCHAR(50)  DEFAULT NULL,
+                created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+    }
+} catch (Exception $e) {
+    // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
+}
+
 // เพิ่มคอลัมน์ "เทียบกับฉบับตั้งต้น" ให้ตาราง essay_ai_feedback (ฐานข้อมูลที่สร้างไว้ก่อนหน้านี้)
 // คู่ที่ต้องเทียบกันเสมอตามที่คุณครูกำหนด: ร่างที่ 2 เทียบร่างที่ 1 ของหน่วยเดียวกัน และหลังเรียนเทียบก่อนเรียน
 // เก็บผลตรวจของฉบับตั้งต้นไว้ 1 ชุด เพื่อบอกได้ว่าคะแนน "ดีขึ้นจริงไหม" และต่างกันตรงไหน
