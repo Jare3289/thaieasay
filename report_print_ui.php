@@ -127,6 +127,28 @@ function rp_styles($scope = '', $fontFamily = null) {
     background: #fff; max-width: 770px; margin: 16px auto; padding: 26px 30px 30px;
     box-shadow: 0 4px 18px rgba(0,0,0,0.08);
   }
+  @@ .report-cover { min-height: 245mm; display: flex; flex-direction: column; justify-content: center;
+    text-align: center; padding: 22mm 14mm; break-after: page; page-break-after: always; }
+  @@ .cover-rule { width: 48mm; border-top: 3px solid #1e3a8a; margin: 0 auto 18mm; }
+  @@ .cover-kicker { font-size: 16pt; letter-spacing: .08em; color: #475569; margin-bottom: 8mm; }
+  @@ .report-cover h1 { font-size: 28pt; line-height: 1.45; color: #0f172a; margin: 0; }
+  @@ .cover-sub { font-size: 19pt; color: #334155; margin: 7mm 0 18mm; }
+  @@ .cover-identity { width: 80%; margin: 0 auto; text-align: left; border-top: 1px solid #94a3b8; }
+  @@ .cover-identity div { display: grid; grid-template-columns: 38% 1fr; border-bottom: 1px solid #cbd5e1; padding: 4mm 2mm; }
+  @@ .cover-identity dt { color: #64748b; } @@ .cover-identity dd { margin: 0; font-weight: 700; }
+  @@ .cover-date { margin-top: auto; color: #64748b; }
+  @@ .back-cover { break-before: page; page-break-before: always; text-align: left; }
+  @@ .back-cover h2 { text-align: center; color: #1e3a8a; font-size: 22pt; }
+  @@ .back-cover p { text-align: justify; line-height: 1.9; text-indent: 2.5em; }
+  @@ .back-meta { margin-top: 16mm; padding-top: 6mm; border-top: 1px solid #94a3b8; text-align: center; color: #475569; }
+  @@ .section-intro { text-align: justify; line-height: 1.8; }
+  @@ .analysis-entry { margin: 0 0 12px; padding: 0 0 10px; border-bottom: 1px solid #cbd5e1; }
+  @@ .analysis-entry h3, @@ .narrative-block h4, @@ .rubric-findings h4 { color: #1e3a8a; font-size: 15.5pt; margin: 6px 0; }
+  @@ .analysis-entry ul, @@ .narrative-block ul, @@ .rubric-findings ol { margin: 5px 0; }
+  @@ .interpretation { color: #475569; margin: 6px 0 0; }
+  @@ .narrative-block { margin: 8px 0; padding-bottom: 8px; border-bottom: 1px solid #cbd5e1; }
+  @@ .rubric-findings { margin-top: 9px; border-top: 1px solid #94a3b8; padding-top: 5px; }
+  @@ .rubric-findings li { margin-bottom: 6px; }
   @@ .doc-head { text-align: center; border-bottom: 2px solid #1e3a8a; padding-bottom: 10px; }
   @@ .doc-head h1 { font-size: 23pt; font-weight: 700; margin: 0 0 3px; line-height: 1.3; color: #0f172a; }
   @@ .doc-head .sub { font-size: 15.5pt; font-weight: 400; color: #64748b; }
@@ -298,6 +320,7 @@ function rp_styles($scope = '', $fontFamily = null) {
     @@ thead { display: table-header-group; }   /* ตารางยาวข้ามหน้า ให้หัวตารางซ้ำทุกหน้า */
     /* หัวข้อต้องไม่ตกค้างอยู่ท้ายหน้าโดยไม่มีเนื้อหาตามมา และห้ามทิ้งบรรทัดเดี่ยวข้ามหน้า */
     @@ h2.sec-title, @@ h3.sub-title { break-after: avoid; page-break-after: avoid; }
+    @@ h2.sec-title[id^="sec-"] { break-before: page; page-break-before: always; }
     @@ h2.sec-title { margin-top: 15px; }
     @@ p, @@ li, @@ .kv { orphans: 2; widows: 2; }
     @page { size: A4 portrait; margin: 12mm 12mm 14mm; }

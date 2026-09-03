@@ -108,6 +108,7 @@ foreach ($targets as $sid):
 ?>
 <div class="sheet">
   <?php
+  if (!$brief) rs_front_cover($sum['student']);
   rs_doc_head($sum['student']);
   if ($brief) {
       // ฉบับย่อ: เก็บเฉพาะส่วนที่ครูใช้บ่อยที่สุด เหมาะกับการพิมพ์แจกทั้งห้อง (ไม่ใส่ส่วนนำ/สารบัญ เพื่อให้สั้นตามที่ตั้งใจ)
@@ -129,7 +130,8 @@ foreach ($targets as $sid):
       rs_peer($full, '9');
       rs_overview($sum, $full, $ins, '10');
   }
-  rs_signature($sum);
+  rs_report_footer($sum);
+  if (!$brief) rs_back_cover($sum);
   ?>
 </div>
 <?php endforeach; ?>

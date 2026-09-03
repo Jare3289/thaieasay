@@ -124,6 +124,7 @@ require_once 'header.php';
   <div class="content-card">
     <div class="rp-doc">
       <?php
+      rs_front_cover($sum['student']);
       rs_doc_head($sum['student']);
       rs_intro($sum);
       rs_toc();
@@ -137,7 +138,8 @@ require_once 'header.php';
       rs_reflection($full, '8');
       rs_peer($full, '9');
       rs_overview($sum, $full, $ins, '10');
-      rs_signature($sum);
+      rs_report_footer($sum);
+      rs_back_cover($sum);
       ?>
     </div>
   </div>
