@@ -1005,7 +1005,13 @@ function ai_overview_system_prompt() {
         '   การทดสอบนัยสำคัญทำในหน้าวิเคราะห์สถิติของระบบด้วย Paired t-test อยู่แล้ว',
         '   ให้คุณบรรยายเพียง "ทิศทางและขนาดของการเปลี่ยนแปลง" ตามตัวเลขที่ให้มา',
         '4. เขียนเป็นภาษาไทยเชิงวิชาการที่อ่านง่าย ตรงไปตรงมา ไม่เยินยอเกินจริง',
-        '5. ตอบกลับเป็น JSON เพียงอย่างเดียว ห้ามมีข้อความอื่นนอกวงเล็บปีกกา ห้ามใส่ ```',
+        '5. ทุกครั้งที่ระบุ "students" ให้ใช้ค่า "รหัสนักเรียน" ตามที่กำหนดไว้ในข้อมูลแต่ละคนเท่านั้น',
+        '   ห้ามสร้างรหัสขึ้นใหม่ ห้ามใส่ชื่อแทนรหัส และห้ามใส่รหัสที่ไม่มีอยู่ในรายการที่ให้มา',
+        '6. ข้อ "themes" ต้องจัดนักเรียนทุกคนในรายการให้อยู่ในแนวทางใดแนวทางหนึ่งเสมอ (ห้ามตกหล่นใคร)',
+        '   นักเรียนคนหนึ่งอยู่ได้มากกว่า 1 แนวทางถ้าเนื้อหาก้ำกึ่งจริง ๆ แต่ต้องอยู่อย่างน้อย 1 แนวทางเสมอ',
+        '7. ข้อ "teaching_notes" ให้เขียนเป็น "ย่อหน้าเดียว" (ข้อความยาวต่อเนื่อง ไม่ใช่ลิสต์) ความยาว 4-8 ประโยค',
+        '   และใช้เครื่องหมาย ** ครอบคำหรือวลีสำคัญที่ครูควรสังเกตเป็นพิเศษอย่างน้อย 2 จุด เช่น **ฝึกเขียนย่อหน้าเปิดเรื่องให้ชัด**',
+        '8. ตอบกลับเป็น JSON เพียงอย่างเดียว ห้ามมีข้อความอื่นนอกวงเล็บปีกกา ห้ามใส่ ```',
     ]);
 }
 
@@ -1037,7 +1043,8 @@ function ai_build_overview_prompt($phase, $topic, array $stats, array $samples) 
 
     $sampleLines = [];
     foreach ($samples as $i => $sp) {
-        $sampleLines[] = ($i + 1) . ') คะแนน ' . $sp['score'] . '/' . ($stats['max_score'] ?? ai_rubric_max())
+        $sampleLines[] = ($i + 1) . ') รหัส ' . ($sp['id'] ?? '') . ' (' . ($sp['name'] ?? '') . ')'
+            . ' — คะแนน ' . $sp['score'] . '/' . ($stats['max_score'] ?? ai_rubric_max())
             . "\n   คำนำ: " . $sp['intro']
             . "\n   สรุป: " . $sp['conclusion']
             . ($sp['overall'] !== '' ? "\n   ผลตรวจโดยย่อ: " . $sp['overall'] : '');
@@ -1058,25 +1065,41 @@ function ai_build_overview_prompt($phase, $topic, array $stats, array $samples) 
         ($critLine ? "คะแนนเฉลี่ยรายเกณฑ์:\n- " . implode("\n- ", $critLine) : ''),
         ($pairLine !== '' ? $pairLine : ''),
         '',
-        '=== การนำเสนอของนักเรียนแต่ละคน (คำนำ / สรุป / ผลตรวจโดยย่อ) ===',
+        '=== การนำเสนอของนักเรียนแต่ละคน (รหัส / คำนำ / สรุป / ผลตรวจโดยย่อ) ===',
         implode("\n", $sampleLines),
         '',
         '=== รูปแบบคำตอบ (ตอบเป็น JSON เท่านั้น) ===',
         '{',
         '  "overview": "ภาพรวม 4-6 ประโยคว่านักเรียนทั้งชั้นนำเสนอภาระงานนี้ไปในทิศทางใด มองประเด็นจากมุมไหนเป็นหลัก",',
         '  "themes": [',
-        '    { "theme": "แนวทาง/ประเด็นที่นักเรียนเลือกนำเสนอ", "how_many": "ส่วนใหญ่ หรือ ประมาณครึ่งหนึ่ง หรือ ส่วนน้อย",',
-        '      "example": "ยกตัวอย่างสั้น ๆ จากงานจริงที่เห็นในข้อมูล" }',
+        '    { "theme": "ชื่อแนวทาง/ประเด็นที่นักเรียนเลือกนำเสนอ สั้น กระชับ",',
+        '      "description": "อธิบายแนวทางนี้ 1-2 ประโยค ว่ามองประเด็นจากมุมไหน มีจุดร่วมอะไร",',
+        '      "students": ["รหัสนักเรียนทุกคนที่นำเสนอไปในแนวทางนี้ ตามรหัสที่กำหนดให้ข้างบนเท่านั้น"] }',
         '  ],',
-        '  "interesting": ["สิ่งที่น่าสนใจหรือเหนือความคาดหมายที่พบในงานชุดนี้", "..."],',
-        '  "common_strengths": ["จุดที่นักเรียนส่วนใหญ่ทำได้ดีในรอบนี้", "..."],',
-        '  "common_problems": ["จุดบกพร่องที่พบซ้ำ ๆ ทั้งชั้น พร้อมบอกว่าน่าจะมาจากอะไร", "..."],',
-        '  "observations": ["ข้อสังเกตเชิงวิจัยที่อ้างอิงตัวเลขที่ให้มาข้างบนเท่านั้น", "..."],',
-        '  "teaching_notes": ["สิ่งที่ครูควรทำต่อในคาบถัดไป จากสิ่งที่เห็นในงานชุดนี้", "..."]',
+        '  "interesting": [',
+        '    { "text": "สิ่งที่น่าสนใจหรือเหนือความคาดหมายที่พบในงานชุดนี้",',
+        '      "students": ["รหัสนักเรียนที่เป็นตัวอย่างของสิ่งนี้"] }',
+        '  ],',
+        '  "common_strengths": [',
+        '    { "text": "จุดที่นักเรียนทำได้ดีในรอบนี้ อธิบายว่าดีอย่างไร",',
+        '      "students": ["รหัสนักเรียนที่เห็นจุดแข็งนี้ชัดเจน"] }',
+        '  ],',
+        '  "common_problems": [',
+        '    { "text": "จุดบกพร่องที่พบซ้ำ ๆ พร้อมบอกว่าน่าจะมาจากอะไร และมีลักษณะอย่างไรในงานจริง",',
+        '      "students": ["รหัสนักเรียนที่พบปัญหานี้"] }',
+        '  ],',
+        '  "observations": [',
+        '    { "text": "ข้อสังเกตเชิงวิจัยที่อ้างอิงตัวเลขที่ให้มาข้างบนเท่านั้น",',
+        '      "students": ["รหัสนักเรียนที่เกี่ยวข้อง ถ้ามี — ไม่มีก็ปล่อยเป็นลิสต์ว่าง"] }',
+        '  ],',
+        '  "teaching_notes": "ย่อหน้าเดียว 4-8 ประโยค บอกสิ่งที่ครูควรทำต่อในคาบถัดไปจากสิ่งที่เห็นในงานชุดนี้ '
+            . 'ใช้ **ตัวเน้น** ครอบคำ/วลีสำคัญอย่างน้อย 2 จุด"',
         '}',
         '',
-        'ข้อกำหนด: themes ให้ 3-5 ข้อ, interesting 2-4 ข้อ, common_strengths 2-4 ข้อ,',
-        'common_problems 2-4 ข้อ, observations 2-4 ข้อ, teaching_notes 2-4 ข้อ',
+        'ข้อกำหนด: themes ให้ 3-5 แนวทาง และนักเรียนทุกคนในรายการด้านบนต้องถูกจัดอยู่ในอย่างน้อย 1 แนวทางเสมอ (ห้ามตกหล่น),',
+        'interesting 2-4 ข้อ, common_strengths 2-4 ข้อ, common_problems 2-4 ข้อ, observations 2-4 ข้อ,',
+        'teaching_notes เป็นสตริงย่อหน้าเดียว ไม่ใช่ลิสต์',
+        'ทุกฟิลด์ "students" ต้องใช้เฉพาะรหัสที่ปรากฏในรายการนักเรียนด้านบนเท่านั้น ห้ามสร้างรหัสใหม่หรือใส่ชื่อแทนรหัส',
         'ย้ำอีกครั้ง: ห้ามระบุค่าทางสถิติหรือสรุปว่า "มีนัยสำคัญ" เอง ให้บรรยายทิศทางและขนาดของการเปลี่ยนแปลงเท่านั้น',
     ], function ($v) { return $v !== ''; }));
 }
@@ -1105,12 +1128,30 @@ function ai_phase_overview_row(array $row) {
     ];
 }
 
-/** แปลงคำตอบภาพรวมรายรอบงานของระบบให้เป็นโครงสร้างมาตรฐาน */
-function ai_parse_phase_overview($rawText) {
+/**
+ * แปลงคำตอบภาพรวมรายรอบงานของระบบให้เป็นโครงสร้างมาตรฐาน
+ * $allowedIds = รหัสนักเรียนที่ส่งให้ระบบอ่านจริง ๆ ในรอบนี้ — ใช้กันการเดารหัส/หลอนรหัสที่ไม่มีอยู่จริง
+ */
+function ai_parse_phase_overview($rawText, array $allowedIds = []) {
     $obj = ai_extract_json($rawText);
     if (!is_array($obj)) {
         return ['ok' => false, 'data' => [], 'error' => 'อ่านคำตอบของระบบไม่ได้ (ไม่ใช่ JSON ที่สมบูรณ์) กรุณาลองใหม่อีกครั้ง'];
     }
+
+    $allowedSet = array_flip($allowedIds);
+    // รับรหัสนักเรียนจากคำตอบของระบบ — เก็บเฉพาะรหัสที่มีอยู่จริงในชุดข้อมูลที่ให้ไป (กันหลอน) และตัดรหัสซ้ำ
+    $studentsOf = function ($raw) use ($allowedSet) {
+        $out = [];
+        if (is_array($raw)) {
+            foreach ($raw as $v) {
+                $id = trim((string)(is_array($v) ? ($v['id'] ?? '') : $v));
+                if ($id === '') continue;
+                if ($allowedSet && !isset($allowedSet[$id])) continue;
+                if (!in_array($id, $out, true)) $out[] = $id;
+            }
+        }
+        return $out;
+    };
 
     $listOf = function ($raw, $maxLen = 600) {
         $out = [];
@@ -1123,31 +1164,54 @@ function ai_parse_phase_overview($rawText) {
         return $out;
     };
 
+    // ลิสต์ข้อสังเกต/จุดแข็ง/จุดบกพร่อง ที่ระบบต้องระบุด้วยว่าไปพบในงานของนักเรียนคนใดบ้าง
+    $listWithStudents = function ($raw, $maxLen = 600) use ($studentsOf) {
+        $out = [];
+        if (is_array($raw)) {
+            foreach ($raw as $v) {
+                if (is_array($v)) {
+                    $t  = ai_clean_text($v['text'] ?? '', $maxLen);
+                    $st = $studentsOf($v['students'] ?? null);
+                } else {
+                    $t  = ai_clean_text($v, $maxLen);
+                    $st = [];
+                }
+                if ($t !== '') $out[] = ['text' => $t, 'students' => $st];
+            }
+        }
+        return $out;
+    };
+
     $themes = [];
     if (isset($obj['themes']) && is_array($obj['themes'])) {
         foreach ($obj['themes'] as $t) {
             if (is_array($t)) {
                 $item = [
-                    'theme'    => ai_clean_text($t['theme'] ?? '', 300),
-                    'how_many' => ai_clean_text($t['how_many'] ?? '', 60),
-                    'example'  => ai_clean_text($t['example'] ?? '', 400),
+                    'theme'       => ai_clean_text($t['theme'] ?? '', 200),
+                    'description' => ai_clean_text($t['description'] ?? ($t['example'] ?? ''), 400),
+                    'students'    => $studentsOf($t['students'] ?? null),
                 ];
                 if ($item['theme'] !== '') $themes[] = $item;
             } else {
-                $tt = ai_clean_text($t, 300);
-                if ($tt !== '') $themes[] = ['theme' => $tt, 'how_many' => '', 'example' => ''];
+                $tt = ai_clean_text($t, 200);
+                if ($tt !== '') $themes[] = ['theme' => $tt, 'description' => '', 'students' => []];
             }
         }
     }
 
+    $teachingNotesRaw = $obj['teaching_notes'] ?? '';
+    if (is_array($teachingNotesRaw)) $teachingNotesRaw = implode(' ', array_map(function ($v) {
+        return is_array($v) ? implode(' ', $v) : (string)$v;
+    }, $teachingNotesRaw));
+
     $data = [
         'overview'         => ai_clean_text($obj['overview'] ?? '', 2000),
         'themes'           => $themes,
-        'interesting'      => $listOf($obj['interesting'] ?? null),
-        'common_strengths' => $listOf($obj['common_strengths'] ?? null),
-        'common_problems'  => $listOf($obj['common_problems'] ?? null),
-        'observations'     => $listOf($obj['observations'] ?? null, 800),
-        'teaching_notes'   => $listOf($obj['teaching_notes'] ?? null),
+        'interesting'      => $listWithStudents($obj['interesting'] ?? null),
+        'common_strengths' => $listWithStudents($obj['common_strengths'] ?? null),
+        'common_problems'  => $listWithStudents($obj['common_problems'] ?? null),
+        'observations'     => $listWithStudents($obj['observations'] ?? null, 800),
+        'teaching_notes'   => ai_clean_text($teachingNotesRaw, 2000),
     ];
 
     if ($data['overview'] === '' && !$themes && !$data['observations']) {
