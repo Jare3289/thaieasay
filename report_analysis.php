@@ -319,3 +319,98 @@ function report_student_insights(array $sum, array $full) {
 
     return $out;
 }
+
+/**
+ * คำอธิบายใต้ตาราง "สถิติรายเกณฑ์" (ส่วนที่ 3) — สรุปภาพรวมของทั้ง 11 เกณฑ์เป็นย่อหน้าเดียว
+ * $sum = ผลจาก report_student_summary()
+ */
+function report_criteria_explanation(array $sum) {
+    $rows = array_values(array_filter($sum['criteria'], function ($c) { return $c['diff'] !== null; }));
+    if (!$rows) {
+        return 'ยังสรุปภาพรวมรายเกณฑ์ไม่ได้ เพราะยังไม่มีคะแนนของคุณครูครบทั้งก่อนเรียนและหลังเรียน';
+    }
+    $up   = count(array_filter($rows, function ($c) { return $c['diff'] > 0.005; }));
+    $down = count(array_filter($rows, function ($c) { return $c['diff'] < -0.005; }));
+    $same = count($rows) - $up - $down;
+
+    $aboveClass = 0; $belowClass = 0; $withClass = 0;
+    foreach ($sum['criteria'] as $c) {
+        if ($c['post'] === null || $c['class_post'] === null) continue;
+        $withClass++;
+        if ($c['post'] > $c['class_post'] + 0.005) $aboveClass++;
+        elseif ($c['post'] < $c['class_post'] - 0.005) $belowClass++;
+    }
+
+    $txt = 'จากเกณฑ์การประเมินทั้งหมด 11 ข้อ นักเรียนมีคะแนนพัฒนาขึ้น ' . $up . ' เกณฑ์'
+         . ($down > 0 ? ' ถดถอยลง ' . $down . ' เกณฑ์' : '')
+         . ($same > 0 ? ' และคงที่ ' . $same . ' เกณฑ์' : '') . ' เมื่อเทียบก่อนเรียนกับหลังเรียน';
+    if ($withClass > 0) {
+        $txt .= ' เมื่อเทียบกับค่าเฉลี่ยของชั้นหลังเรียน นักเรียนทำได้สูงกว่าค่าเฉลี่ย ' . $aboveClass . ' เกณฑ์';
+        if ($belowClass > 0) $txt .= ' และยังต่ำกว่าค่าเฉลี่ย ' . $belowClass . ' เกณฑ์ ซึ่งควรได้รับการฝึกเสริมเป็นลำดับแรก';
+        else $txt .= ' และไม่มีเกณฑ์ใดต่ำกว่าค่าเฉลี่ยเลย';
+    }
+    if (!empty($sum['strong'])) {
+        $names = array_map(function ($c) { return $c['id']; }, array_slice($sum['strong'], 0, 3));
+        $txt .= ' เกณฑ์ที่โดดเด่นที่สุดคือ ' . implode(', ', $names)
+              . ' ดังรายละเอียดในกล่อง "จุดแข็งของนักเรียน" ด้านล่าง';
+    }
+    if (!empty($sum['weak'])) {
+        $names = array_map(function ($c) { return $c['id']; }, array_slice($sum['weak'], 0, 3));
+        $txt .= ' ส่วนเกณฑ์ที่ควรพัฒนาต่อคือ ' . implode(', ', $names) . ' ตามที่สรุปไว้ในกล่อง "จุดที่ควรพัฒนาต่อ"';
+    }
+    return $txt;
+}
+
+/**
+ * สังเคราะห์ข้อมูลสะท้อนคิดของนักเรียน (ปัญหาการเขียน · การตรวจสอบตนเอง · การสะท้อนการเรียนรู้)
+ * ให้เป็นย่อหน้าเดียว ต่อหน่วยการเรียนที่มีข้อมูล — ใช้ประกอบส่วนที่ 9 (การประเมินร่วมกับเพื่อน)
+ * และส่วนที่ 10 (ภาพรวมทั้งหมด)  $full = report_full_data()[student_id]
+ * คืนค่าเป็น [ ['unit'=>1, 'text'=>'...'], ... ]
+ */
+function report_reflection_synthesis(array $full) {
+    $out = [];
+    foreach ([1, 2] as $u) {
+        $prob = $full['problems'][$u]    ?? null;
+        $chk  = $full['checklists'][$u]  ?? null;
+        $ref  = $full['reflections'][$u] ?? null;
+        if (!$prob && !$chk && !$ref) continue;
+
+        $parts = [];
+
+        // ปัญหาการเขียน
+        if ($prob && $prob['items']) {
+            $labels = array_map(function ($it) { return $it['label']; }, $prob['items']);
+            $parts[] = 'ด้านปัญหาการเขียน นักเรียนบันทึกไว้เอง ' . count($prob['items']) . ' เกณฑ์ ได้แก่ '
+                     . implode(', ', array_slice($labels, 0, 4)) . (count($labels) > 4 ? ' และอื่น ๆ' : '')
+                     . ' พร้อมแนวทางแก้ไขที่วางแผนไว้';
+        } else {
+            $parts[] = 'ด้านปัญหาการเขียน นักเรียนยังไม่ได้บันทึกปัญหาของตนเองไว้ในหน่วยนี้';
+        }
+
+        // การตรวจสอบตนเอง
+        if ($chk && !empty($chk['items'])) {
+            $count = ['ครบถ้วน' => 0, 'บางส่วน' => 0, 'ต้องปรับปรุง' => 0];
+            foreach ($chk['items'] as $it) { if (isset($count[$it['value']])) $count[$it['value']]++; }
+            $parts[] = 'ด้านการตรวจสอบตนเอง นักเรียนประเมินว่าทำได้ครบถ้วน ' . $count['ครบถ้วน'] . ' เกณฑ์ '
+                     . 'ทำได้บางส่วน ' . $count['บางส่วน'] . ' เกณฑ์ และยังต้องปรับปรุง ' . $count['ต้องปรับปรุง'] . ' เกณฑ์'
+                     . ($count['ต้องปรับปรุง'] > 0 ? ' ซึ่งสอดคล้องกับปัญหาการเขียนที่บันทึกไว้ข้างต้น' : '');
+        } else {
+            $parts[] = 'ด้านการตรวจสอบตนเอง นักเรียนยังไม่ได้ทำรายการตรวจสอบตนเองในหน่วยนี้';
+        }
+
+        // การสะท้อนการเรียนรู้
+        if ($ref) {
+            $written = count(array_filter($ref['fields'], function ($f) { return $f['text'] !== ''; }));
+            $total   = count($ref['fields']);
+            $parts[] = $written > 0
+                ? 'ด้านการสะท้อนการเรียนรู้ นักเรียนเขียนบันทึกไว้ ' . $written . ' จาก ' . $total . ' หัวข้อ '
+                  . 'แสดงถึงความตระหนักในกระบวนการเรียนรู้ของตนเองในระดับหนึ่ง'
+                : 'ด้านการสะท้อนการเรียนรู้ นักเรียนยังไม่ได้เขียนบันทึกสะท้อนคิดในหน่วยนี้';
+        } else {
+            $parts[] = 'ด้านการสะท้อนการเรียนรู้ นักเรียนยังไม่ได้เขียนบันทึกสะท้อนคิดในหน่วยนี้';
+        }
+
+        $out[] = ['unit' => $u, 'text' => implode(' ', $parts)];
+    }
+    return $out;
+}

@@ -367,19 +367,23 @@ $scope = implode(' · ', $scopeParts);
   <?php if (!$quant['interrater']): ?>
     <p class="para">ยังคำนวณไม่ได้ — ต้องมีผู้ประเมินตั้งแต่ 2 คนขึ้นไปให้คะแนนผลงานชุดเดียวกัน</p>
   <?php else: ?>
+  <p class="para">ใช้ ICC แบบสองทางสุ่ม ความสอดคล้องสัมบูรณ์ (two-way random, absolute agreement) เป็นค่าหลักในการสรุปผล
+    ตามเกณฑ์แปลผลของ Koo &amp; Li (2016) — Pearson r แสดงประกอบเป็นค่าความสัมพันธ์รายคู่เท่านั้น</p>
   <table class="thesis">
-    <thead><tr><th class="l">รอบ</th><th>ผู้ประเมิน</th><th>n</th><th class="l">Pearson r</th>
-      <th>ICC</th><th>แปลผล</th></tr></thead>
+    <thead><tr><th class="l">รอบ</th><th>ผู้ประเมิน</th><th>n</th><th>ICC(2,1)</th>
+      <th>ICC(2,k)</th><th>p</th><th>แปลผล (ยึดตาม ICC)</th><th class="l">Pearson r (ประกอบ)</th></tr></thead>
     <tbody>
       <?php foreach ($quant['interrater'] as $ir): ?>
       <tr>
         <td class="l"><?php echo rp_esc($ir['label']); ?></td>
         <td class="c"><?php echo (int)$ir['k']; ?></td>
         <td class="c"><?php echo (int)$ir['n']; ?></td>
+        <td class="c"><?php echo ch45_fmt_r($ir['icc']['icc1']); ?></td>
+        <td class="c"><strong><?php echo ch45_fmt_r($ir['icc']['iccK']); ?></strong></td>
+        <td class="c"><?php echo ch45_fmt_p($ir['icc']['p']); ?></td>
+        <td class="c"><?php echo rp_esc($ir['icc_label']); ?></td>
         <td class="l"><?php
           echo rp_esc(implode(', ', array_map(function ($p) { return 'r = ' . ch45_fmt_r($p['r']); }, $ir['pearson']))); ?></td>
-        <td class="c"><?php echo ch45_fmt_r($ir['icc']['iccK']); ?></td>
-        <td class="c"><?php echo rp_esc($ir['icc_label']); ?></td>
       </tr>
       <?php endforeach; ?>
     </tbody>

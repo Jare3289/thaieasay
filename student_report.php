@@ -120,34 +120,13 @@ require_once 'header.php';
   </div>
 <?php else: ?>
 
-  <!-- สารบัญลัด -->
-  <div class="content-card mb-3 py-2">
-    <div class="d-flex flex-wrap gap-2 align-items-center">
-      <span class="text-muted small fw-bold me-1">ไปยังส่วน:</span>
-      <?php
-      $toc = [
-          'sec-achievement' => 'ผลสัมฤทธิ์',
-          'sec-analysis'    => 'บทวิเคราะห์',
-          'sec-criteria'    => 'สถิติรายเกณฑ์',
-          'sec-eval'        => 'คะแนนจากผู้ประเมินทุกฝ่าย',
-          'sec-works'       => 'ผลงาน',
-          'sec-essays'      => 'เรียงความฉบับเต็ม',
-          'sec-ai'          => 'ผลตรวจอัตโนมัติ',
-          'sec-reflect'     => 'บันทึกสะท้อนคิด',
-          'sec-peer'        => 'ประเมินกับเพื่อน',
-      ];
-      foreach ($toc as $id => $label): ?>
-      <a class="btn btn-sm btn-outline-primary rounded-pill px-3" href="#<?php echo rp_esc($id); ?>">
-        <?php echo rp_esc($label); ?></a>
-      <?php endforeach; ?>
-    </div>
-  </div>
-
   <!-- เนื้อหารายงาน — สไตล์ถูกจำกัดไว้ในกล่อง .rp-doc เท่านั้น ไม่กระทบหน้าอื่นของระบบ -->
   <div class="content-card">
     <div class="rp-doc">
       <?php
       rs_doc_head($sum['student']);
+      rs_intro($sum);
+      rs_toc();
       rs_achievement($sum, '1');
       rs_analysis($ins, '2');
       rs_criteria($sum, '3');
@@ -157,6 +136,7 @@ require_once 'header.php';
       rs_ai($full, '7');
       rs_reflection($full, '8');
       rs_peer($full, '9');
+      rs_overview($sum, $full, $ins, '10');
       rs_signature($sum);
       ?>
     </div>
@@ -165,7 +145,7 @@ require_once 'header.php';
 <?php endif; ?>
 </div>
 
-<?php rp_styles('.rp-doc'); ?>
+<?php rp_styles('.rp-doc', "'Google Sans', sans-serif"); ?>
 <style>
   /* กล่องรายงานในหน้าเว็บ: พื้นหลังขาวเหมือนกระดาษ และเลื่อนหัวข้อไม่ให้ไปซ่อนใต้แถบบน */
   .rp-doc { background: #fff; }

@@ -809,7 +809,7 @@ require_once 'header.php';
     P.push('<div class="pagebreak"></div>');
     P.push('<h1 class="secn" id="s5">ส่วนที่ 5 ผลงานเรียงความของนักเรียน (เชิงปริมาณ)</h1>');
     const essayRows = phaseKeys.map(([k, label]) => {
-      const list = sampleEssays.filter(e => e.essay_phase === k);
+      const list = sampleEssays.filter(e => essayTopicPhase(e.essay_phase) === k);
       const words = list.map(e => Number(e.word_count) || 0);
       const st = descStats(words);
       return st ? [label, list.length, Math.round(st.mean).toLocaleString('th-TH'), st.min.toLocaleString('th-TH'), st.max.toLocaleString('th-TH')] : [label, 0, '-', '-', '-'];
@@ -2044,6 +2044,16 @@ require_once 'header.php';
       .replace(/'/g, '&#39;');
   }
 
+  // essay_phase ของจริงในฐานข้อมูลถูกแยกเป็นฉบับร่าง เช่น task1_d1/task1_d2/task2_d1/task2_d2
+  // ฟังก์ชันนี้ย่อกลับเป็นหน่วยงานหยาบ (task1/task2) ให้ตรงกับตัวเลือกตัวกรองในหน้านี้
+  // (สอดคล้องกับ essay_topic_phase() ฝั่งเซิร์ฟเวอร์ใน db_config.php)
+  function essayTopicPhase(phase) {
+    phase = String(phase || '');
+    if (phase.indexOf('task1') === 0) return 'task1';
+    if (phase.indexOf('task2') === 0) return 'task2';
+    return phase; // pretest / posttest
+  }
+
   // ตัดคำภาษาไทยด้วย Intl.Segmenter เพื่อแสดงขอบเขตคำให้เห็น (แสดงผลอย่างเดียว ไม่ใช่การแก้ไข)
   let __raWordSegmenter = null;
   if (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function') {
@@ -2180,7 +2190,7 @@ require_once 'header.php';
     const container   = document.getElementById('essayViewerContainer');
 
     let filtered = essays.filter(e => {
-      if (phaseFilter !== 'all' && e.essay_phase !== phaseFilter) return false;
+      if (phaseFilter !== 'all' && essayTopicPhase(e.essay_phase) !== phaseFilter) return false;
 
       let searchableText = e.essay_content || '';
       try {
@@ -2298,7 +2308,7 @@ require_once 'header.php';
     const query       = ((document.getElementById('essaySearchInput') || {}).value || '').toLowerCase();
 
     let filtered = allEssaysCache.filter(e => {
-      if (phaseFilter !== 'all' && e.essay_phase !== phaseFilter) return false;
+      if (phaseFilter !== 'all' && essayTopicPhase(e.essay_phase) !== phaseFilter) return false;
       if (query) {
         const combined = ((e.student_name||'')+(e.essay_title||'')+(e.essay_content||'')).toLowerCase();
         if (!combined.includes(query)) return false;

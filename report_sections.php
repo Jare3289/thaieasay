@@ -11,6 +11,7 @@
  */
 
 require_once 'report_data.php';
+require_once 'report_analysis.php';
 require_once 'report_print_ui.php';
 
 /** หัวข้อประจำส่วน (มี id ไว้ให้หน้าเว็บทำสารบัญลิงก์ไปได้) */
@@ -39,6 +40,60 @@ function rs_doc_head($stu, $title = 'รายงานผลการเรี�
       <?php if (($stu['classroom'] ?? '') !== ''): ?><div><b>ห้อง:</b> <?php echo rp_esc($stu['classroom']); ?></div><?php endif; ?>
       <?php if (($stu['student_group'] ?? '') !== ''): ?><div><b>กลุ่ม:</b> <?php echo rp_esc($stu['student_group']); ?></div><?php endif; ?>
       <div class="grow"><b>ออกรายงาน:</b> <?php echo rp_esc(rp_thai_date()); ?></div>
+    </div>
+    <?php
+}
+
+/** รายชื่อทุกส่วนของรายงาน ตามลำดับที่พิมพ์จริง — ใช้ทำสารบัญ และอ้างอิงเลขส่วนให้ตรงกันทุกจุด */
+function rs_section_list() {
+    return [
+        ['no' => '1',  'id' => 'sec-achievement', 'title' => 'ผลสัมฤทธิ์'],
+        ['no' => '2',  'id' => 'sec-analysis',     'title' => 'บทวิเคราะห์รายบุคคล'],
+        ['no' => '3',  'id' => 'sec-criteria',     'title' => 'สถิติรายเกณฑ์'],
+        ['no' => '4',  'id' => 'sec-eval',         'title' => 'คะแนนรายเกณฑ์จากระบบตรวจอัตโนมัติ'],
+        ['no' => '5',  'id' => 'sec-works',        'title' => 'ผลงานของนักเรียน'],
+        ['no' => '6',  'id' => 'sec-essays',       'title' => 'เรียงความฉบับเต็มทุกรอบ'],
+        ['no' => '7',  'id' => 'sec-ai',           'title' => 'ผลตรวจจากระบบตรวจอัตโนมัติทุกรอบงาน'],
+        ['no' => '8',  'id' => 'sec-reflect',      'title' => 'บันทึกสะท้อนคิดของนักเรียน'],
+        ['no' => '9',  'id' => 'sec-peer',         'title' => 'การประเมินร่วมกับเพื่อน'],
+        ['no' => '10', 'id' => 'sec-overview',     'title' => 'ภาพรวมทั้งหมด'],
+    ];
+}
+
+/** ส่วนนำ — เกริ่นนำที่มาและขอบเขตของรายงานก่อนเข้าเนื้อหา */
+function rs_intro($sum) {
+    $stu = $sum['student'];
+    ?>
+    <div class="front-sec">
+      <h2 class="sec-title front-title">ส่วนนำ</h2>
+      <p>
+        รายงานฉบับนี้จัดทำขึ้นเพื่อสรุปผลการเรียนรู้ในรายวิชาภาษาไทย ด้านการพัฒนาความสามารถในการเขียนเรียงความ
+        ของ <b><?php echo rp_esc($stu['student_name'] ?: '—'); ?></b> (รหัสนักเรียน <?php echo rp_esc($stu['student_id']); ?>)
+        โดยรวบรวมข้อมูลจริงทั้งหมดที่บันทึกไว้ในระบบประเมินการเขียนเรียงความ ได้แก่ คะแนนผลสัมฤทธิ์ของคุณครูผู้สอน
+        บทวิเคราะห์รายบุคคล สถิติรายเกณฑ์เทียบก่อนเรียน-หลังเรียน คะแนนและหมายเหตุจากระบบตรวจอัตโนมัติ
+        ผลงานเรียงความฉบับเต็มทุกรอบ บันทึกสะท้อนคิดของนักเรียน และผลการประเมินร่วมกับเพื่อน
+        เพื่อให้คุณครู นักเรียน และผู้ปกครองเห็นภาพรวมพัฒนาการของนักเรียนคนนี้ได้ครบถ้วนในเอกสารฉบับเดียว
+      </p>
+      <p>
+        รายงานแบ่งออกเป็น 10 ส่วนตามสารบัญด้านล่าง เนื้อหาทุกส่วนคำนวณและเรียบเรียงจากข้อมูลจริงในระบบ
+        ส่วนใดที่ยังไม่มีข้อมูลเพียงพอจะระบุไว้ตรง ๆ ในส่วนนั้น
+      </p>
+    </div>
+    <?php
+}
+
+/** สารบัญ — ลิงก์ไปยังแต่ละส่วนตามลำดับจริงของรายงาน */
+function rs_toc() {
+    ?>
+    <div class="front-sec toc">
+      <h2 class="sec-title front-title">สารบัญ</h2>
+      <ol class="toc-list">
+        <?php foreach (rs_section_list() as $s): ?>
+        <li><a href="#<?php echo rp_esc($s['id']); ?>">
+          <span class="toc-title"><?php echo rp_esc($s['title']); ?></span>
+        </a></li>
+        <?php endforeach; ?>
+      </ol>
     </div>
     <?php
 }
@@ -83,18 +138,15 @@ function rs_achievement($sum, $no = '1') {
       </div>
     </div>
 
-    <h3 class="sub-title">คะแนนรายรอบการประเมิน</h3>
+    <h3 class="sub-title">คะแนนรายรอบการประเมิน (ครูผู้สอน)</h3>
     <table>
       <thead>
         <tr>
-          <th style="width:24%">รอบการประเมิน</th>
-          <th class="num" style="width:11%">ครูประเมิน</th>
-          <th class="num" style="width:11%">ตนเอง</th>
-          <th class="num" style="width:11%">เพื่อน</th>
-          <th class="num" style="width:11%">ผู้เชี่ยวชาญ</th>
-          <th class="num" style="width:12%">เฉลี่ยทั้งชั้น</th>
-          <th class="num" style="width:10%">สูง/ต่ำกว่า</th>
-          <th style="width:10%">ระดับคุณภาพ</th>
+          <th style="width:34%">รอบการประเมิน</th>
+          <th class="num" style="width:16%">คะแนนที่ครูให้</th>
+          <th class="num" style="width:16%">เฉลี่ยทั้งชั้น</th>
+          <th class="num" style="width:14%">สูง/ต่ำกว่า</th>
+          <th style="width:20%">ระดับคุณภาพ</th>
         </tr>
       </thead>
       <tbody>
@@ -102,9 +154,6 @@ function rs_achievement($sum, $no = '1') {
         <tr<?php echo ($ph === 'posttest') ? ' class="hi"' : ''; ?>>
           <td><?php echo rp_esc($a['label']); ?><?php echo rp_bar($a['teacher'], 60, $ph === 'pretest' ? 'pre' : 'post'); ?></td>
           <td class="num"><b><?php echo rp_num($a['teacher'], 1); ?></b></td>
-          <td class="num"><?php echo rp_num($a['self'], 1); ?></td>
-          <td class="num"><?php echo rp_num($a['peer'], 1); ?></td>
-          <td class="num"><?php echo rp_num($a['expert'], 1); ?></td>
           <td class="num"><?php echo rp_num($a['class_mean'], 1); ?></td>
           <td class="num"><?php echo rp_diff($a['vs_class'], 1); ?></td>
           <td><?php echo rp_level_badge($a['level']); ?></td>
@@ -113,8 +162,9 @@ function rs_achievement($sum, $no = '1') {
       </tbody>
     </table>
     <div class="note">
-      คะแนนของครูผู้สอนเป็นคะแนนที่ใช้ตัดสินผลสัมฤทธิ์ ส่วนคะแนนของตนเองและเพื่อนเป็นข้อมูลประกอบ
-      เพื่อให้เห็นว่านักเรียนประเมินงานของตนเองใกล้เคียงกับครูเพียงใด
+      คะแนนในตารางนี้เป็นคะแนนของคุณครูผู้สอนเท่านั้น ซึ่งเป็นคะแนนที่ใช้ตัดสินผลสัมฤทธิ์ตามเกณฑ์ของสถานศึกษา
+      (คะแนนที่นักเรียนประเมินตนเองและเพื่อนประเมินให้ ดูได้ในส่วนที่ 4 "คะแนนรายเกณฑ์จากระบบตรวจอัตโนมัติ"
+      และส่วนที่ 9 "การประเมินร่วมกับเพื่อน")
     </div>
     <?php
 }
@@ -181,6 +231,7 @@ function rs_criteria($sum, $no = '3') {
         </tr>
       </tfoot>
     </table>
+    <div class="note"><?php echo rp_esc(report_criteria_explanation($sum)); ?></div>
 
     <div class="twocol" style="margin-top:8px;">
       <div class="box good">
@@ -207,36 +258,38 @@ function rs_criteria($sum, $no = '3') {
     <?php
 }
 
-/* ------------------------------- 4) คะแนนรายเกณฑ์จากผู้ประเมินทุกฝ่าย */
+/* ------------------------------- 4) คะแนนรายเกณฑ์จากระบบตรวจอัตโนมัติ */
 
 function rs_eval_detail($full, $no = '4') {
-    rs_title($no, 'คะแนนรายเกณฑ์จากผู้ประเมินทุกฝ่าย', 'ครู · ตนเอง · เพื่อน · ผู้เชี่ยวชาญ แยกตามรอบ', 'sec-eval');
+    rs_title($no, 'คะแนนรายเกณฑ์จากระบบตรวจอัตโนมัติ', 'แยกตามรอบ พร้อมหมายเหตุจากระบบตรวจรายเกณฑ์', 'sec-eval');
     $any = false;
-    foreach (report_eval_phases() as $ph => $label) {
-        $rows = $full['evals'][$ph] ?? [];
-        if (!$rows) continue;
+    foreach (report_essay_phases() as $ph => $label) {
+        $fb = $full['ai'][$ph] ?? null;
+        if (!$fb || empty($fb['scores'])) continue;
         $any = true;
-        echo '<h3 class="sub-title">' . rp_esc($label) . '</h3>';
         ?>
+        <h3 class="sub-title"><?php echo rp_esc($label); ?>
+          <span class="muted" style="font-weight:400;">(ตรวจครั้งที่ <?php echo (int)($fb['review_round'] ?? 1); ?>
+            · <?php echo rp_esc(rp_when($fb['created_at'])); ?>)</span>
+        </h3>
         <table>
           <thead>
             <tr>
-              <th style="width:32%">เกณฑ์การประเมิน</th>
+              <th style="width:26%">เกณฑ์การประเมิน</th>
               <th class="num" style="width:8%">เต็ม</th>
-              <?php foreach ($rows as $r): ?>
-              <th class="wrap"><?php echo rp_esc($r['type_label']); ?><br>
-                <span class="muted" style="font-weight:400;"><?php echo rp_esc($r['evaluator_name'] ?: '—'); ?></span></th>
-              <?php endforeach; ?>
+              <th class="num" style="width:12%">คะแนนที่ระบบให้</th>
+              <th style="width:54%">หมายเหตุจากระบบตรวจ</th>
             </tr>
           </thead>
           <tbody>
-            <?php foreach (report_criteria() as $c): ?>
+            <?php foreach (report_criteria() as $c):
+              $sc = $fb['scores'][$c['id']] ?? null; ?>
             <tr>
               <td><?php echo rp_esc($c['id'] . ' ' . $c['name']); ?></td>
               <td class="num"><?php echo rp_num($c['max'], 0); ?></td>
-              <?php foreach ($rows as $r): ?>
-              <td class="num"><?php echo rp_num($r['scores'][$c['id']] ?? null, 2); ?></td>
-              <?php endforeach; ?>
+              <td class="num"><?php echo $sc ? rp_num($sc['weighted'] ?? null, 2) : '<span class="muted">—</span>'; ?></td>
+              <td><?php echo ($sc && trim((string)($sc['reason'] ?? '')) !== '')
+                    ? rp_esc($sc['reason']) : '<span class="muted">— ไม่มีหมายเหตุ —</span>'; ?></td>
             </tr>
             <?php endforeach; ?>
           </tbody>
@@ -244,32 +297,20 @@ function rs_eval_detail($full, $no = '4') {
             <tr>
               <td>รวม</td>
               <td class="num">60</td>
-              <?php foreach ($rows as $r): ?>
-              <td class="num"><?php echo rp_num($r['total'], 2); ?></td>
-              <?php endforeach; ?>
-            </tr>
-            <tr>
-              <td colspan="2">ระดับคุณภาพ · วันที่ประเมิน</td>
-              <?php foreach ($rows as $r): ?>
-              <td class="wrap"><?php echo rp_level_badge($r['level']); ?><br>
-                <span class="muted"><?php echo rp_esc(rp_when($r['timestamp'])); ?></span></td>
-              <?php endforeach; ?>
+              <td class="num"><?php echo rp_num($fb['total_score'] ?? null, 2); ?></td>
+              <td><?php echo rp_level_badge($fb['quality_level'] ?? ''); ?></td>
             </tr>
           </tfoot>
         </table>
+        <?php if (!empty($fb['overall'])): ?>
+        <div class="box info" style="margin-top:6px;">
+          <h4>ความคิดเห็นภาพรวมจากระบบตรวจอัตโนมัติ</h4>
+          <div class="kv"><?php echo rp_esc($fb['overall']); ?></div>
+        </div>
+        <?php endif; ?>
         <?php
-        // ความคิดเห็นเชิงบรรยายที่แนบมากับการประเมินรอบนี้ (ส่วนใหญ่มาจากเพื่อน)
-        foreach ($rows as $r) {
-            if ($r['strength'] === '' && $r['improvement'] === '' && $r['encouragement'] === '') continue;
-            echo '<div class="box info" style="margin-top:6px;"><h4>ความคิดเห็นจาก' . rp_esc($r['type_label'])
-               . ($r['evaluator_name'] !== '' ? ' · ' . rp_esc($r['evaluator_name']) : '') . '</h4><div class="kv">';
-            if ($r['strength'] !== '')      echo '<div><b>จุดแข็ง:</b> ' . rp_esc($r['strength']) . '</div>';
-            if ($r['improvement'] !== '')   echo '<div><b>ควรปรับปรุง:</b> ' . rp_esc($r['improvement']) . '</div>';
-            if ($r['encouragement'] !== '') echo '<div><b>กำลังใจ:</b> ' . rp_esc($r['encouragement']) . '</div>';
-            echo '</div></div>';
-        }
     }
-    if (!$any) rs_empty('ยังไม่มีการประเมินให้คะแนนในรอบใดเลย');
+    if (!$any) rs_empty('ยังไม่เคยให้ระบบตรวจอัตโนมัติตรวจเรียงความของนักเรียนคนนี้ในรอบใดเลย');
 }
 
 /* --------------------------------------------------- 5) ผลงาน (สรุป) */
@@ -364,6 +405,17 @@ function rs_essays($full, $no = '6') {
           <div class="part">สรุป</div>
           <p><?php echo nl2br(rp_esc($e['conclusion'])); ?></p>
           <?php endif; ?>
+
+          <?php $fb = $full['ai'][$ph] ?? null; if ($fb): ?>
+          <div class="box info" style="margin-top:8px;">
+            <h4>หมายเหตุจากระบบตรวจ</h4>
+            <?php if (!empty($fb['overall'])): ?>
+            <div class="kv"><?php echo rp_esc($fb['overall']); ?></div>
+            <?php endif; ?>
+            <div class="kv">คะแนนที่ระบบให้ <?php echo rp_num($fb['total_score'] ?? null, 2); ?>/<?php echo rp_num($fb['max_score'] ?? null, 0); ?>
+              <?php echo rp_level_badge($fb['quality_level'] ?? ''); ?></div>
+          </div>
+          <?php endif; ?>
         </div>
         <?php
     }
@@ -374,94 +426,124 @@ function rs_essays($full, $no = '6') {
 
 function rs_ai($full, $no = '7') {
     rs_title($no, 'ผลตรวจจากระบบตรวจอัตโนมัติทุกรอบงาน', 'จุดแข็ง จุดที่ควรปรับปรุง และพัฒนาการระหว่างรอบตรวจ', 'sec-ai');
-    $any = false;
+
+    // แถวข้อมูลของทุกรอบที่มีผลตรวจ — ใช้ทำตาราง "ภาพรวมพัฒนาการ" ให้เห็นแนวโน้มทั้งหมดในสายตาเดียว
+    $phaseRows = [];
     foreach (report_essay_phases() as $ph => $label) {
         $fb = $full['ai'][$ph] ?? null;
-        if (!$fb) continue;
-        $any = true;
-        ?>
-        <h3 class="sub-title"><?php echo rp_esc($label); ?>
-          — <?php echo rp_num($fb['total_score'], 2); ?>/<?php echo rp_num($fb['max_score'], 0); ?> คะแนน
-          <?php echo rp_level_badge($fb['quality_level']); ?>
-          <span class="muted" style="font-weight:400;">(ตรวจครั้งที่ <?php echo (int)($fb['review_round'] ?? 1); ?>
-            · <?php echo rp_esc(rp_when($fb['created_at'])); ?>)</span>
-        </h3>
-
-        <?php if (!empty($fb['overall'])): ?>
-        <div class="kv" style="margin-bottom:5px;"><?php echo rp_esc($fb['overall']); ?></div>
-        <?php endif; ?>
-
-        <?php if (!empty($fb['draft_compare']['has_baseline'])): $dc = $fb['draft_compare'];
-              // คู่คนละหัวข้อ (หลังเรียน↔ก่อนเรียน) เทียบที่คุณภาพเนื้อหาตามเกณฑ์ ไม่ใช่เทียบว่าแก้ข้อความตรงไหน
-              $dcNewTopic = (($dc['kind'] ?? '') === 'newtopic'); ?>
-        <div class="box <?php echo ($dc['delta'] > 0) ? 'good' : (($dc['delta'] < 0) ? 'watch' : 'info'); ?>" style="margin-bottom:6px;">
-          <h4><?php echo $dcNewTopic ? 'พัฒนาการเทียบกับ ' : 'เทียบกับ '; ?><?php echo rp_esc($dc['label']); ?><?php
-              echo $dcNewTopic ? ' (คนละหัวข้อ — เทียบที่คุณภาพเนื้อหาตามเกณฑ์)' : ''; ?></h4>
-          <div class="kv">คะแนน <?php echo rp_num($dc['base_total'], 2); ?> → <?php echo rp_num($dc['total'], 2); ?>
-            <?php echo rp_diff($dc['delta'], 2); ?>
-            · <?php echo ($dc['delta'] > 0) ? 'ดีขึ้นตามที่ควรเป็น'
-                 : (($dc['delta'] < 0) ? 'คะแนนถอยลง' : 'คะแนนเท่าเดิม ยังไม่ดีขึ้น'); ?>
-            · ดีขึ้น <?php echo (int)$dc['up']; ?> ข้อ · ลดลง <?php echo (int)$dc['down']; ?> ข้อ
-            · เท่าเดิม <?php echo (int)$dc['same']; ?> ข้อ</div>
-          <?php if (!empty($dc['same_text'])): ?>
-          <div class="kv"><b>ข้อความเหมือนฉบับตั้งต้นทุกตัวอักษร</b> —
-            <?php echo $dcNewTopic ? 'ทั้งที่เป็นคนละหัวข้อ ควรตรวจสอบว่าส่งงานผิดฉบับหรือไม่'
-                                   : 'นักเรียนยังไม่ได้แก้ไขงาน'; ?></div>
-          <?php elseif (!empty($dc['identical'])): ?>
-          <div class="kv"><b>คะแนนรายข้อเท่ากันทุกข้อ</b> —
-            <?php echo $dcNewTopic ? 'ความสามารถในการเขียนยังอยู่ระดับเดิมทุกด้าน'
-                                   : 'งานเปลี่ยนแล้วแต่ยังไม่ถึงระดับถัดไปสักข้อ'; ?></div>
-          <?php endif; ?>
-          <?php if (!empty($dc['comment'])): ?><div class="kv"><?php echo rp_esc($dc['comment']); ?></div><?php endif; ?>
-          <?php
-          // ข้อที่คะแนนขยับ พร้อมข้อความที่ระบบยกมาเทียบให้เห็นว่าต่างกันตรงไหน
-          foreach (($dc['criteria'] ?? []) as $c) {
-              if ($c['dir'] === 'same' && trim((string)$c['note']) === '') continue;
-              $head = 'ข้อ ' . $c['id'] . ' ' . $c['name'];
-              $body = ($c['dir'] === 'up') ? 'ดีขึ้น ' : (($c['dir'] === 'down') ? 'ลดลง ' : 'เท่าเดิม ');
-              $body .= rp_num($c['base_weighted'], 2) . ' → ' . rp_num($c['weighted'], 2);
-              if (trim((string)$c['note']) !== '') $body .= ' · ' . $c['note'];
-              echo '<div class="kv"><b>' . rp_esc($head) . ':</b> ' . rp_esc($body) . '</div>';
-          }
-          ?>
-        </div>
-        <?php endif; ?>
-
-        <div class="twocol">
-          <div class="box good">
-            <h4>จุดแข็งที่ระบบพบ</h4>
-            <?php if (!empty($fb['strengths'])): ?>
-            <ul><?php foreach ($fb['strengths'] as $s): ?><li><?php echo rp_esc($s); ?></li><?php endforeach; ?></ul>
-            <?php else: ?><div class="muted">— ไม่มีข้อมูล —</div><?php endif; ?>
-          </div>
-          <div class="box watch">
-            <h4>จุดที่ควรปรับปรุง</h4>
-            <?php if (!empty($fb['improvements'])): ?>
-            <ul>
-              <?php foreach ($fb['improvements'] as $im): ?>
-              <li><?php echo rp_esc(($im['criterion'] !== '' ? 'ข้อ ' . $im['criterion'] . ': ' : '') . $im['issue']); ?>
-                <?php if (!empty($im['suggestion'])): ?><div class="muted">แนวทางแก้: <?php echo rp_esc($im['suggestion']); ?></div><?php endif; ?>
-                <?php if (!empty($im['example'])): ?><div class="muted">ตัวอย่างหลังแก้: <?php echo rp_esc($im['example']); ?></div><?php endif; ?>
-              </li>
-              <?php endforeach; ?>
-            </ul>
-            <?php else: ?><div class="muted">— ไม่มีข้อมูล —</div><?php endif; ?>
-          </div>
-        </div>
-
-        <?php if (!empty($fb['next_steps'])): ?>
-        <div class="box info" style="margin-top:6px;">
-          <h4>สิ่งที่ควรทำต่อในงานเขียนชิ้นถัดไป</h4>
-          <ul><?php foreach ($fb['next_steps'] as $s): ?><li><?php echo rp_esc($s); ?></li><?php endforeach; ?></ul>
-        </div>
-        <?php endif; ?>
-
-        <?php if (!empty($fb['encouragement'])): ?>
-        <div class="note"><?php echo rp_esc($fb['encouragement']); ?></div>
-        <?php endif; ?>
-        <?php
+        if ($fb) $phaseRows[$ph] = ['label' => $label, 'fb' => $fb];
     }
-    if (!$any) rs_empty('ยังไม่เคยให้ระบบตรวจเรียงความของนักเรียนคนนี้');
+    if (!$phaseRows) { rs_empty('ยังไม่เคยให้ระบบตรวจเรียงความของนักเรียนคนนี้'); return; }
+
+    echo '<h3 class="sub-title">ภาพรวมพัฒนาการทุกรอบ</h3>';
+    ?>
+    <table style="margin-bottom:10px;">
+      <thead>
+        <tr>
+          <th style="width:30%">รอบงาน</th>
+          <th class="num" style="width:16%">คะแนนที่ระบบให้</th>
+          <th style="width:22%">ระดับคุณภาพ</th>
+          <th style="width:32%">เทียบกับฉบับตั้งต้น</th>
+        </tr>
+      </thead>
+      <tbody>
+        <?php foreach ($phaseRows as $r):
+          $fb = $r['fb'];
+          $dc = $fb['draft_compare'] ?? null;
+          $hasDc = !empty($dc['has_baseline']); ?>
+        <tr>
+          <td><?php echo rp_esc($r['label']); ?>
+            <span class="muted">(ครั้งที่ <?php echo (int)($fb['review_round'] ?? 1); ?> · <?php echo rp_esc(rp_when($fb['created_at'])); ?>)</span></td>
+          <td class="num"><?php echo rp_num($fb['total_score'] ?? null, 2); ?>/<?php echo rp_num($fb['max_score'] ?? null, 0); ?></td>
+          <td><?php echo rp_level_badge($fb['quality_level'] ?? ''); ?></td>
+          <td><?php
+            if (!$hasDc) { echo '<span class="muted">— ไม่มีคู่เทียบ —</span>'; }
+            else {
+                echo rp_diff($dc['delta'], 2) . ' คะแนน';
+                echo ($dc['delta'] > 0) ? ' (ดีขึ้น)' : (($dc['delta'] < 0) ? ' (ถอยลง)' : ' (เท่าเดิม)');
+            }
+          ?></td>
+        </tr>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
+
+    <?php foreach ($phaseRows as $ph => $r): $fb = $r['fb']; ?>
+    <h3 class="sub-title"><?php echo rp_esc($r['label']); ?>
+      — <?php echo rp_num($fb['total_score'], 2); ?>/<?php echo rp_num($fb['max_score'], 0); ?> คะแนน
+      <?php echo rp_level_badge($fb['quality_level']); ?>
+    </h3>
+
+    <?php if (!empty($fb['overall'])): ?>
+    <div class="kv" style="margin-bottom:5px;"><?php echo rp_esc($fb['overall']); ?></div>
+    <?php endif; ?>
+
+    <?php if (!empty($fb['draft_compare']['has_baseline'])): $dc = $fb['draft_compare'];
+          // คู่คนละหัวข้อ (หลังเรียน↔ก่อนเรียน) เทียบที่คุณภาพเนื้อหาตามเกณฑ์ ไม่ใช่เทียบว่าแก้ข้อความตรงไหน
+          $dcNewTopic = (($dc['kind'] ?? '') === 'newtopic'); ?>
+    <div class="box <?php echo ($dc['delta'] > 0) ? 'good' : (($dc['delta'] < 0) ? 'watch' : 'info'); ?>" style="margin-bottom:6px;">
+      <h4><?php echo $dcNewTopic ? 'พัฒนาการเทียบกับ ' : 'เทียบกับ '; ?><?php echo rp_esc($dc['label']); ?><?php
+          echo $dcNewTopic ? ' (คนละหัวข้อ — เทียบที่คุณภาพเนื้อหาตามเกณฑ์)' : ''; ?></h4>
+      <div class="kv">คะแนน <?php echo rp_num($dc['base_total'], 2); ?> → <?php echo rp_num($dc['total'], 2); ?>
+        <?php echo rp_diff($dc['delta'], 2); ?>
+        · ดีขึ้น <?php echo (int)$dc['up']; ?> ข้อ · ลดลง <?php echo (int)$dc['down']; ?> ข้อ
+        · เท่าเดิม <?php echo (int)$dc['same']; ?> ข้อ</div>
+      <?php if (!empty($dc['same_text'])): ?>
+      <div class="kv"><b>ข้อความเหมือนฉบับตั้งต้นทุกตัวอักษร</b> —
+        <?php echo $dcNewTopic ? 'ทั้งที่เป็นคนละหัวข้อ ควรตรวจสอบว่าส่งงานผิดฉบับหรือไม่' : 'นักเรียนยังไม่ได้แก้ไขงาน'; ?></div>
+      <?php elseif (!empty($dc['identical'])): ?>
+      <div class="kv"><b>คะแนนรายข้อเท่ากันทุกข้อ</b> —
+        <?php echo $dcNewTopic ? 'ความสามารถในการเขียนยังอยู่ระดับเดิมทุกด้าน' : 'งานเปลี่ยนแล้วแต่ยังไม่ถึงระดับถัดไปสักข้อ'; ?></div>
+      <?php endif; ?>
+      <?php if (!empty($dc['comment'])): ?><div class="kv"><?php echo rp_esc($dc['comment']); ?></div><?php endif; ?>
+      <?php
+      // ข้อที่คะแนนขยับ — รวมเป็นบรรทัดเดียวต่อข้อ อ่านง่ายกว่าไล่ทีละข้อ
+      $moved = [];
+      foreach (($dc['criteria'] ?? []) as $c) {
+          if ($c['dir'] === 'same' && trim((string)$c['note']) === '') continue;
+          $arrow = ($c['dir'] === 'up') ? '↑' : (($c['dir'] === 'down') ? '↓' : '→');
+          $line = $arrow . ' ข้อ ' . $c['id'] . ' ' . $c['name'] . ' (' . rp_num($c['base_weighted'], 2) . '→' . rp_num($c['weighted'], 2) . ')';
+          if (trim((string)$c['note']) !== '') $line .= ': ' . $c['note'];
+          $moved[] = $line;
+      }
+      if ($moved): ?>
+      <ul class="mb-0"><?php foreach ($moved as $ln) echo '<li>' . rp_esc($ln) . '</li>'; ?></ul>
+      <?php endif; ?>
+    </div>
+    <?php endif; ?>
+
+    <div class="twocol">
+      <div class="box good">
+        <h4>จุดแข็งที่ระบบพบ</h4>
+        <?php if (!empty($fb['strengths'])): ?>
+        <ul><?php foreach ($fb['strengths'] as $s): ?><li><?php echo rp_esc($s); ?></li><?php endforeach; ?></ul>
+        <?php else: ?><div class="muted">— ไม่มีข้อมูล —</div><?php endif; ?>
+      </div>
+      <div class="box watch">
+        <h4>จุดที่ควรปรับปรุง</h4>
+        <?php if (!empty($fb['improvements'])): ?>
+        <ul>
+          <?php foreach ($fb['improvements'] as $im):
+            $line = ($im['criterion'] !== '' ? 'ข้อ ' . $im['criterion'] . ': ' : '') . $im['issue'];
+            if (!empty($im['suggestion'])) $line .= ' — แนวทางแก้: ' . $im['suggestion']; ?>
+          <li><?php echo rp_esc($line); ?></li>
+          <?php endforeach; ?>
+        </ul>
+        <?php else: ?><div class="muted">— ไม่มีข้อมูล —</div><?php endif; ?>
+      </div>
+    </div>
+
+    <?php if (!empty($fb['next_steps'])): ?>
+    <div class="box info" style="margin-top:6px;">
+      <h4>สิ่งที่ควรทำต่อในงานเขียนชิ้นถัดไป</h4>
+      <ul><?php foreach ($fb['next_steps'] as $s): ?><li><?php echo rp_esc($s); ?></li><?php endforeach; ?></ul>
+    </div>
+    <?php endif; ?>
+
+    <?php if (!empty($fb['encouragement'])): ?>
+    <div class="note"><?php echo rp_esc($fb['encouragement']); ?></div>
+    <?php endif; ?>
+    <?php endforeach;
 }
 
 /* ------------------------------------- 8) เครื่องมือสะท้อนคิด */
@@ -538,6 +620,17 @@ function rs_peer($full, $no = '9') {
     $recv  = $full['peer_received'] ?? [];
     $given = $full['peer_given'] ?? [];
 
+    // สรุปข้อมูลสะท้อนคิดของนักเรียนเอง (ปัญหาการเขียน · การตรวจสอบตนเอง · การสะท้อนการเรียนรู้)
+    // เป็นย่อหน้าเดียว ไว้เทียบมุมมองของนักเรียนเองกับสิ่งที่เพื่อนประเมินให้ด้านล่าง
+    $synth = report_reflection_synthesis($full);
+    if ($synth) {
+        echo '<h3 class="sub-title">สรุปมุมมองของนักเรียนเอง (เทียบกับการประเมินของเพื่อน)</h3>';
+        foreach ($synth as $s) {
+            echo '<div class="kv" style="margin-bottom:6px;"><b>หน่วยการเรียนที่ ' . (int)$s['unit'] . ':</b> '
+               . rp_esc($s['text']) . '</div>';
+        }
+    }
+
     if ($recv) {
         echo '<h3 class="sub-title">ผลการประเมินที่ได้รับจากเพื่อน (' . count($recv) . ' คน)</h3>';
         $show = array_slice($recv, 0, 4);
@@ -592,6 +685,88 @@ function rs_peer($full, $no = '9') {
         </table>
         <?php
     }
+}
+
+/* ------------------------------------- 10) ภาพรวมทั้งหมด */
+
+function rs_overview($sum, $full, $ins, $no = '10') {
+    rs_title($no, 'ภาพรวมทั้งหมด', 'สรุปทุกส่วนของรายงานนี้ไว้ในที่เดียว', 'sec-overview');
+    $g = $sum['growth'];
+    ?>
+    <div class="cards">
+      <div class="card">
+        <div class="lbl">ผลสัมฤทธิ์ (ครูให้)</div>
+        <div class="val"><?php echo rp_num($g['post'], 1); ?>/60</div>
+        <div class="foot"><?php echo $g['level_to'] !== '' ? rp_esc($g['level_to']) : 'ยังไม่มีคะแนน'; ?></div>
+      </div>
+      <div class="card">
+        <div class="lbl">พัฒนาการก่อน→หลังเรียน</div>
+        <div class="val"><?php echo rp_diff($g['diff'], 1); ?></div>
+        <div class="foot"><?php echo ($g['pct'] === null) ? '—' : 'คิดเป็น ' . rp_num($g['pct'], 1) . '%'; ?></div>
+      </div>
+      <div class="card">
+        <div class="lbl">ความครบถ้วนของงาน</div>
+        <div class="val"><?php echo (int)$sum['done']; ?>/<?php echo (int)$sum['done_total']; ?></div>
+        <div class="foot">ชิ้นงานที่ส่งแล้ว</div>
+      </div>
+      <div class="card">
+        <div class="lbl">ผลตรวจจากระบบตรวจอัตโนมัติ</div>
+        <div class="val"><?php echo count($full['ai'] ?? []); ?></div>
+        <div class="foot">รอบงานที่ระบบตรวจแล้ว</div>
+      </div>
+      <div class="card">
+        <div class="lbl">เพื่อนประเมินให้</div>
+        <div class="val"><?php echo count($full['peer_received'] ?? []); ?></div>
+        <div class="foot">คน</div>
+      </div>
+      <div class="card">
+        <div class="lbl">ประเมินให้เพื่อน</div>
+        <div class="val"><?php echo count($full['peer_given'] ?? []); ?></div>
+        <div class="foot">คน</div>
+      </div>
+    </div>
+
+    <h3 class="sub-title">บทสรุปภาพรวม</h3>
+    <?php
+    $good = count(array_filter($ins, function ($i) { return ($i['tone'] ?? '') === 'good'; }));
+    $warn = count(array_filter($ins, function ($i) { return ($i['tone'] ?? '') === 'warn'; }));
+
+    $parts = [];
+    if ($g['diff'] !== null) {
+        $parts[] = ((float)$g['diff'] > 0)
+            ? 'นักเรียนคนนี้มีพัฒนาการโดยรวมในทางบวก คะแนนผลสัมฤทธิ์เพิ่มขึ้นจาก ' . rp_num($g['pre'], 1)
+              . ' เป็น ' . rp_num($g['post'], 1) . ' คะแนน จากคะแนนเต็ม 60 คะแนน'
+            : (((float)$g['diff'] < 0)
+                ? 'คะแนนผลสัมฤทธิ์ของนักเรียนคนนี้ลดลงจาก ' . rp_num($g['pre'], 1) . ' เหลือ ' . rp_num($g['post'], 1)
+                  . ' คะแนน ควรได้รับการดูแลเพิ่มเติม'
+                : 'คะแนนผลสัมฤทธิ์ของนักเรียนคนนี้คงที่ที่ ' . rp_num($g['post'], 1) . ' คะแนน ทั้งก่อนและหลังเรียน');
+    } else {
+        $parts[] = 'ยังไม่มีคะแนนของคุณครูครบทั้งก่อนเรียนและหลังเรียน จึงยังสรุปพัฒนาการโดยรวมไม่ได้';
+    }
+    if (!empty($sum['strong'])) {
+        $parts[] = 'จุดแข็งที่ชัดเจนที่สุดคือเกณฑ์ ' . implode(', ', array_map(function ($c) { return $c['id']; }, array_slice($sum['strong'], 0, 3)));
+    }
+    if (!empty($sum['weak'])) {
+        $parts[] = 'ส่วนเกณฑ์ที่ควรพัฒนาต่อคือ ' . implode(', ', array_map(function ($c) { return $c['id']; }, array_slice($sum['weak'], 0, 3)));
+    }
+    $parts[] = 'ส่งงานแล้ว ' . (int)$sum['done'] . ' จาก ' . (int)$sum['done_total'] . ' ชิ้น'
+             . (((int)$sum['done'] >= (int)$sum['done_total']) ? ' ครบถ้วนทุกชิ้น' : ' ยังขาดอยู่บางส่วน');
+    if (!empty($sum['latest_ai']['next_steps'])) {
+        $parts[] = 'ระบบตรวจอัตโนมัติแนะนำให้ทำต่อคือ ' . reset($sum['latest_ai']['next_steps']);
+    }
+    $synth = report_reflection_synthesis($full);
+    if ($synth) {
+        $parts[] = 'ด้านการสะท้อนคิดของนักเรียนเอง ' . implode(' ', array_map(function ($s) { return $s['text']; }, $synth));
+    }
+    if ($good + $warn > 0) {
+        $parts[] = 'เมื่อพิจารณาบทวิเคราะห์รายบุคคลทั้งหมด พบประเด็นเชิงบวก ' . $good . ' ประเด็น และประเด็นที่ควรดูแลเพิ่มเติม ' . $warn . ' ประเด็น';
+    }
+    echo '<p style="line-height:1.9;">' . rp_esc(implode(' ', $parts)) . '</p>';
+    ?>
+    <div class="note">
+      สรุปนี้รวบรวมข้อมูลจากทุกส่วนของรายงานฉบับนี้ (ส่วนที่ 1-9) เข้าด้วยกัน — โปรดดูรายละเอียดของแต่ละหัวข้อในส่วนที่เกี่ยวข้องด้านบน
+    </div>
+    <?php
 }
 
 /* ------------------------------------- ท้ายเอกสาร */

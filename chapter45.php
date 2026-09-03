@@ -46,9 +46,16 @@ $c45IsTeacher = ($sessionUser['role'] === 'teacher');
           <span class="badge bg-white text-dark px-3 py-2 fw-bold d-block mb-2">
             <i class="bi bi-person-fill me-1"></i><?php echo htmlspecialchars($sessionUser['name']); ?>
           </span>
-          <a href="chapter45_print.php" target="_blank" class="btn btn-light btn-sm fw-bold rounded-pill px-3">
+          <a href="chapter45_print.php" target="_blank" class="btn btn-light btn-sm fw-bold rounded-pill px-3 mb-2">
             <i class="bi bi-file-earmark-text me-1"></i>เปิดร่างบทที่ 4-5
           </a>
+<?php if ($c45IsTeacher): ?>
+          <button id="c45ExportBtn" class="btn btn-sm fw-bold rounded-pill px-3 text-white d-block w-100"
+                  style="background:linear-gradient(135deg,#1a1a2e,#4c1d95);" type="button" onclick="sendChapter45ReportToGoogleDocs()">
+            <i class="bi bi-google me-1"></i>ส่งออกหน้านี้ทั้งหมดเป็น Google Doc
+          </button>
+          <div id="c45GoogleStatusBox" class="small text-white-50 mt-1"></div>
+<?php endif; ?>
         </div>
       </div>
     </div>
@@ -327,23 +334,30 @@ function c45PaintQuant() {
   const ir = q.interrater || {};
   const keys = Object.keys(ir);
   if (keys.length) {
-    x += '<div class="border rounded-3 p-2"><div class="fw-bold mb-1">ความเที่ยงระหว่างผู้ประเมิน</div>'
+    x += '<div class="border rounded-3 p-2"><div class="fw-bold mb-1">ความเที่ยงระหว่างผู้ประเมิน (Inter-rater reliability)</div>'
+      + '<div class="text-muted small mb-2">ใช้ ICC แบบสองทางสุ่ม ความสอดคล้องสัมบูรณ์ (two-way random, absolute agreement)'
+      + ' เป็นค่าหลักในการสรุปผล ตามเกณฑ์แปลผลของ Koo &amp; Li (2016) — Pearson r แสดงประกอบเป็นค่าความสัมพันธ์รายคู่เท่านั้น</div>'
       + '<table class="table table-sm mb-0"><thead><tr><th>รอบ</th><th class="text-center">ผู้ประเมิน</th>'
-      + '<th class="text-center">n</th><th>Pearson r รายคู่</th><th class="text-center">ICC</th>'
-      + '<th class="text-center">แปลผล</th></tr></thead><tbody>';
+      + '<th class="text-center">n</th><th class="text-center">ICC(2,1)</th><th class="text-center">ICC(2,k)</th>'
+      + '<th class="text-center">p</th><th class="text-center">แปลผล (ยึดตาม ICC)</th><th>Pearson r รายคู่<br><small class="text-muted">(ประกอบ)</small></th>'
+      + '</tr></thead><tbody>';
     keys.forEach(function (k) {
       const v = ir[k];
       x += '<tr><td>' + c45Esc(v.label) + '</td><td class="text-center">' + v.k + '</td>'
-        + '<td class="text-center">' + v.n + '</td><td>'
+        + '<td class="text-center">' + v.n + '</td>'
+        + '<td class="text-center">' + c45R(v.icc.icc1) + '</td>'
+        + '<td class="text-center fw-bold">' + c45R(v.icc.iccK) + '</td>'
+        + '<td class="text-center">' + c45P(v.icc.p) + '</td>'
+        + '<td class="text-center"><span class="badge bg-primary-subtle text-primary-emphasis">' + c45Esc(v.icc_label) + '</span></td>'
+        + '<td class="small text-muted">'
         + v.pearson.map(function (p) { return 'r = ' + c45R(p.r); }).join(', ')
-        + '</td><td class="text-center">' + c45R(v.icc.iccK) + '</td>'
-        + '<td class="text-center">' + c45Esc(v.icc_label) + '</td></tr>';
+        + '</td></tr>';
     });
     x += '</tbody></table></div>';
   } else {
     x += '<div class="alert alert-warning border-0 rounded-3 py-2 mb-0 small">'
       + 'ยังคำนวณความเที่ยงระหว่างผู้ประเมินไม่ได้ — ต้องมีผู้ประเมินตั้งแต่ 2 คนขึ้นไป'
-      + 'ให้คะแนนผลงานชุดเดียวกันในรอบเดียวกัน (โครงบทที่ 4 กำหนดให้ต้องรายงานค่านี้)</div>';
+      + 'ให้คะแนนผลงานชุดเดียวกันในรอบเดียวกัน (โครงบทที่ 4 กำหนดให้ต้องรายงานค่านี้ โดยยึด ICC เป็นค่าหลัก)</div>';
   }
   document.getElementById('c45QuantExtra').innerHTML = x;
 }
@@ -887,8 +901,248 @@ async function c45DeleteLog(id) {
   c45PaintReadinessAfterLog();
 }
 
+/* ============================================================
+   ส่งออกข้อมูลทั้งหมดของหน้านี้ (ความพร้อมข้อมูล, ตาราง 12, ความเที่ยงระหว่างผู้ประเมิน,
+   ตาราง 14, ผลวิเคราะห์รายหัวข้อทุกหัวข้อที่วิเคราะห์แล้ว, บันทึกหลังสอน, ข้อมูลประจำงานวิจัย)
+   เป็น Google Doc — ใช้ c45Data ที่โหลดไว้ในหน่วยความจำอยู่แล้ว ต่อกับ google_upload_doc.php
+   ตัวเดียวกับหน้าวิเคราะห์สถิติงานวิจัยและหน้าตรวจเรียงความอัตโนมัติ
+   ============================================================ */
+const C45_REPORT_AUTHOR = <?php echo json_encode($sessionUser['name'] ?? 'ครูผู้สอน'); ?>;
+
+function c45WrTable(headers, rows) {
+  let h = '<table class="data"><thead><tr>';
+  headers.forEach(function (x) { h += '<th>' + c45Esc(x) + '</th>'; });
+  h += '</tr></thead><tbody>';
+  if (!rows.length) h += '<tr><td colspan="' + headers.length + '" style="text-align:center;color:#888">— ยังไม่มีข้อมูล —</td></tr>';
+  rows.forEach(function (r) {
+    h += '<tr>' + r.map(function (c) { return '<td>' + (c === null || c === undefined ? '' : c45Esc(c)) + '</td>'; }).join('') + '</tr>';
+  });
+  return h + '</tbody></table>';
+}
+
+function buildChapter45ReportHtml() {
+  const now    = new Date();
+  const thDate = now.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+  const P = [];
+  const d = c45Data || {};
+
+  // ---------- ส่วนที่ 1: ความพร้อมของข้อมูล ----------
+  P.push('<h1 class="secn" id="s1">ส่วนที่ 1 ความพร้อมของข้อมูล</h1>');
+  const items = (d.readiness && d.readiness.items) || [];
+  P.push(c45WrTable(['รายการ', 'สถานะ', 'รายละเอียด'], items.map(function (it) {
+    const statusLabel = it.status === 'ok' ? 'พร้อม' : (it.status === 'warn' ? 'ควรตรวจสอบ' : 'ยังขาด');
+    return [it.label, statusLabel, it.detail || ''];
+  })));
+
+  // ---------- ส่วนที่ 2: ตาราง 12 + ความเที่ยงระหว่างผู้ประเมิน ----------
+  P.push('<div class="pagebreak"></div>');
+  P.push('<h1 class="secn" id="s2">ส่วนที่ 2 ตาราง 12 ผลการเปรียบเทียบก่อนเรียนและหลังเรียน</h1>');
+  const q = d.quant || {};
+  P.push('<p>n = ' + c45Esc(q.n) + ' คน · df = ' + c45Esc(q.df) + ' · ทดสอบด้วย Paired-samples t-test สองทาง</p>');
+  P.push(c45WrTable(['ความสามารถในการเขียนเรียงความ', 'คะแนนเต็ม', 'ก่อนเรียน M', 'SD', 'หลังเรียน M', 'SD', 't', 'p', 'dz', 'ขนาดอิทธิพล'],
+    (q.rows || []).map(function (r) {
+      return [r.label, c45Num(r.max, 0), c45Num(r.pre_mean), c45Num(r.pre_sd), c45Num(r.post_mean), c45Num(r.post_sd),
+        c45Num(r.t, 3) + (r.sig ? '*' : ''), c45P(r.p), c45Num(r.dz), r.effect];
+    })));
+
+  const n2 = q.normality && q.normality.overall;
+  if (n2 && n2.W !== null) {
+    P.push('<p class="analysis">การแจกแจงของคะแนนผลต่าง (Shapiro-Wilk): W = ' + c45R(n2.W) + ', p = ' + c45P(n2.p) + ' — '
+      + (n2.normal ? 'ไม่แตกต่างจากการแจกแจงปกติ จึงใช้ Paired-samples t-test ได้'
+                   : 'แตกต่างจากการแจกแจงปกติอย่างมีนัยสำคัญ ควรรายงานผลอย่างระมัดระวัง หรือเพิ่ม Wilcoxon signed-rank') + '</p>');
+  }
+
+  P.push('<h2>ความเที่ยงระหว่างผู้ประเมิน (Inter-rater reliability)</h2>');
+  const ir = q.interrater || {};
+  const irKeys = Object.keys(ir);
+  if (irKeys.length) {
+    P.push('<p>ใช้ ICC แบบสองทางสุ่ม ความสอดคล้องสัมบูรณ์ (two-way random, absolute agreement) เป็นค่าหลักในการสรุปผล '
+      + 'ตามเกณฑ์แปลผลของ Koo &amp; Li (2016) — Pearson r แสดงประกอบเป็นค่าความสัมพันธ์รายคู่เท่านั้น</p>');
+    P.push(c45WrTable(['รอบ', 'ผู้ประเมิน (k)', 'n', 'ICC(2,1)', 'ICC(2,k)', 'p', 'แปลผล (ยึดตาม ICC)', 'Pearson r รายคู่ (ประกอบ)'],
+      irKeys.map(function (k) {
+        const v = ir[k];
+        return [v.label, v.k, v.n, c45R(v.icc.icc1), c45R(v.icc.iccK), c45P(v.icc.p), v.icc_label,
+          v.pearson.map(function (p) { return 'r = ' + c45R(p.r); }).join(', ')];
+      })));
+  } else {
+    P.push('<p style="color:#888">ยังคำนวณความเที่ยงระหว่างผู้ประเมินไม่ได้ — ต้องมีผู้ประเมินตั้งแต่ 2 คนขึ้นไปให้คะแนนผลงานชุดเดียวกันในรอบเดียวกัน</p>');
+  }
+
+  // ---------- ส่วนที่ 3: ตาราง 14 ----------
+  P.push('<div class="pagebreak"></div>');
+  P.push('<h1 class="secn" id="s3">ส่วนที่ 3 ตาราง 14 จำนวนและร้อยละของนักเรียนที่ปรากฏข้อบกพร่อง</h1>');
+  const def = d.defects || {};
+  P.push('<p>n = ' + c45Esc(def.n) + ' คน (ผู้ที่มีคะแนนครบทั้งสองครั้ง) · ' + c45Esc(def.rule || '') + '</p>');
+  Object.keys(d.domains || {}).forEach(function (dk) {
+    const dom = d.domains[dk];
+    P.push('<h3>ด้าน' + c45Esc(dom.name) + '</h3>');
+    P.push(c45WrTable(['ข้อบกพร่องที่พบในผลงานเรียงความ', 'ครั้งที่ 1 n', 'ครั้งที่ 1 %', 'ครั้งที่ 2 n', 'ครั้งที่ 2 %', 'เปลี่ยนแปลง'],
+      (dom.indicators || []).map(function (id) {
+        const r = (def.rows || {})[id];
+        if (!r) return null;
+        return [r.no + '. ' + r.defect, r.n1, c45Num(r.pct1, 1), r.n2, c45Num(r.pct2, 1),
+          (r.diff_pct === null ? '—' : (r.diff_pct > 0 ? '+' : '') + c45Num(r.diff_pct, 1) + '%')];
+      }).filter(Boolean)));
+  });
+
+  // ---------- ส่วนที่ 4: ผลวิเคราะห์รายหัวข้อ ----------
+  P.push('<div class="pagebreak"></div>');
+  P.push('<h1 class="secn" id="s4">ส่วนที่ 4 ผลวิเคราะห์รายหัวข้อจากระบบตรวจอัตโนมัติ</h1>');
+  const jobs = d.jobs || {};
+  const groups = d.job_groups || {};
+  const results = d.results || {};
+  const doneJobs = Object.keys(jobs).filter(function (k) { return results[k]; });
+  if (!doneJobs.length) {
+    P.push('<p style="color:#888">— ยังไม่เคยให้ระบบวิเคราะห์หัวข้อใดเลย —</p>');
+  } else {
+    Object.keys(groups).forEach(function (gk) {
+      const gItems = Object.keys(jobs).filter(function (k) { return jobs[k].group === gk && results[k]; });
+      if (!gItems.length) return;
+      P.push('<h2>' + c45Esc(groups[gk]) + '</h2>');
+      gItems.forEach(function (k) {
+        const job = jobs[k];
+        const res = results[k];
+        P.push('<h3>' + c45Esc(job.label) + '</h3>');
+        if (res.warnings && res.warnings.length) {
+          P.push('<p class="analysis"><strong>ต้องตรวจสอบก่อนนำไปใช้:</strong> ' + res.warnings.map(c45Esc).join(' · ') + '</p>');
+        }
+        P.push(c45RenderPayload(k, res.payload));
+      });
+    });
+    const pending = Object.keys(jobs).filter(function (k) { return !results[k]; });
+    if (pending.length) {
+      P.push('<p style="color:#888">หัวข้อที่ยังไม่ได้วิเคราะห์ (' + pending.length + ' หัวข้อ): '
+        + pending.map(function (k) { return c45Esc(jobs[k].label); }).join(' · ') + '</p>');
+    }
+  }
+
+  // ---------- ส่วนที่ 5: บันทึกหลังสอน ----------
+  P.push('<div class="pagebreak"></div>');
+  P.push('<h1 class="secn" id="s5">ส่วนที่ 5 บันทึกหลังสอน</h1>');
+  const stages = d.poa_stages || {};
+  const logs = d.logs || [];
+  P.push(c45WrTable(['ขั้นของ POA', 'หน่วย', 'ปัญหาที่พบจริง', 'แนวทางแก้ไข', 'ข้อสังเกต/หลักฐานประกอบ'],
+    logs.map(function (l) {
+      return [stages[l.poa_stage] || l.poa_stage, (Number(l.task_unit) > 0 ? l.task_unit : '—'), l.problem, l.solution || '—', l.evidence || '—'];
+    })));
+
+  // ---------- ส่วนที่ 6: ข้อมูลประจำงานวิจัย ----------
+  P.push('<div class="pagebreak"></div>');
+  P.push('<h1 class="secn" id="s6">ส่วนที่ 6 ข้อมูลประจำงานวิจัย</h1>');
+  const metaFields = d.meta_fields || {};
+  const meta = d.meta || {};
+  const phases = d.phases || {};
+  P.push(c45WrTable(['รายการ', 'ค่าที่ตั้งไว้'], Object.keys(metaFields).map(function (k) {
+    const f = metaFields[k];
+    let v = meta[k] === undefined ? '' : meta[k];
+    if (f.type === 'phase') v = phases[v] || v;
+    return [f.label, v];
+  })));
+
+  const body = P.join('\n');
+  const secLabels = ['ส่วนที่ 1 ความพร้อมของข้อมูล', 'ส่วนที่ 2 ตาราง 12 ผลการเปรียบเทียบก่อนเรียนและหลังเรียน',
+    'ส่วนที่ 3 ตาราง 14 จำนวนและร้อยละของนักเรียนที่ปรากฏข้อบกพร่อง', 'ส่วนที่ 4 ผลวิเคราะห์รายหัวข้อจากระบบตรวจอัตโนมัติ',
+    'ส่วนที่ 5 บันทึกหลังสอน', 'ส่วนที่ 6 ข้อมูลประจำงานวิจัย'];
+  const toc = '<div class="toc"><h1 class="secn nonum">สารบัญ</h1>'
+    + secLabels.map(function (s) { return '<div class="tocitem"><span>' + c45Esc(s) + '</span></div>'; }).join('')
+    + '</div>';
+  const cover = '<div class="cover">'
+    + '<div class="cover-top">รายงานวิเคราะห์บทที่ 4 และบทที่ 5</div>'
+    + '<div class="cover-title">ข้อมูลทั้งหมดในหน้าวิเคราะห์บทที่ 4-5</div>'
+    + '<div class="cover-box">วิเคราะห์แล้ว ' + doneJobs.length + ' / ' + Object.keys(jobs).length + ' หัวข้อ</div>'
+    + '<div class="cover-foot">จัดทำโดย ' + c45Esc(C45_REPORT_AUTHOR) + '<br>วันที่ ' + c45Esc(thDate) + '</div>'
+    + '</div>';
+  const css = '@page { size: A4; margin: 2.54cm 2.2cm; }'
+    + 'body { font-family: "TH Sarabun New","Sarabun","Angsana New","Cordia New",serif; font-size: 16pt; color:#000; line-height:1.5; }'
+    + 'h1.secn { font-size: 20pt; color:#4c1d95; border-bottom:2pt solid #4c1d95; padding-bottom:4pt; margin:0 0 12pt; }'
+    + 'h2 { font-size: 17pt; color:#4c1d95; margin:14pt 0 6pt; }'
+    + 'h3 { font-size: 16pt; color:#333; margin:10pt 0 4pt; }'
+    + 'p { margin: 0 0 8pt; text-align: justify; } ul { margin: 0 0 8pt 0; }'
+    + 'table.data { border-collapse: collapse; width: 100%; margin: 6pt 0 12pt; font-size: 14pt; }'
+    + 'table.data th { background:#4c1d95; color:#fff; border:0.75pt solid #33455f; padding:4pt 6pt; text-align:center; }'
+    + 'table.data td { border:0.75pt solid #999; padding:3pt 6pt; vertical-align:top; }'
+    + 'table.table { border-collapse: collapse; width: 100%; margin: 6pt 0 12pt; font-size: 14pt; }'
+    + 'table.table th, table.table td { border:0.75pt solid #999; padding:3pt 6pt; vertical-align:top; }'
+    + 'table.table th { background:#f3f4f6; }'
+    + 'p.analysis { background:#faf7ff; border-left:3pt solid #4c1d95; padding:6pt 10pt; margin:6pt 0 12pt; }'
+    + '.pagebreak { page-break-before: always; }'
+    + '.cover { text-align:center; padding-top:110pt; }'
+    + '.cover-top { font-size:22pt; color:#4c1d95; letter-spacing:1pt; margin-bottom:30pt; }'
+    + '.cover-title { font-size:26pt; font-weight:bold; color:#111; margin-bottom:16pt; }'
+    + '.cover-box { display:inline-block; border:1.5pt solid #4c1d95; border-radius:6pt; padding:8pt 20pt; font-size:16pt; color:#4c1d95; margin-bottom:60pt; }'
+    + '.cover-foot { font-size:17pt; color:#333; }'
+    + '.toc .tocitem { font-size:16pt; padding:5pt 0; border-bottom:0.5pt dotted #bbb; }'
+    + 'h1.nonum { text-align:center; border-bottom:none; }';
+  const doc = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">'
+    + '<head><meta charset="utf-8"><title>รายงานวิเคราะห์บทที่ 4-5</title>'
+    + '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->'
+    + '<style>' + css + '</style></head><body>'
+    + cover + toc + '<div class="pagebreak"></div>' + body + '</body></html>';
+
+  return { doc, filename: 'รายงานวิเคราะห์บทที่4-5_' + now.toISOString().slice(0, 10) };
+}
+
+async function sendChapter45ReportToGoogleDocs() {
+  const btn = document.getElementById('c45ExportBtn');
+  const original = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>กำลังจัดทำและส่งเข้า Google Docs...'; }
+  try {
+    if (!c45Data) { throw new Error('กรุณารอให้ข้อมูลในหน้านี้โหลดเสร็จก่อน'); }
+    let status;
+    try { status = await (await fetch('google_auth.php?action=status&_t=' + Date.now())).json(); }
+    catch (e) { throw new Error('ยังไม่ได้ตั้งค่า Google API (google_auth.php) บนเซิร์ฟเวอร์'); }
+    if (!status || !status.configured) {
+      showToast('ผู้ดูแลระบบยังไม่ได้ตั้งค่า Google API (โปรดกรอก Client ID/Secret ใน google_config.php)', 'error');
+      return;
+    }
+    if (!status.connected) {
+      showToast('กำลังพาไปเชื่อมต่อบัญชี Google ครั้งแรก...', 'info');
+      const ret = encodeURIComponent(location.pathname + location.hash);
+      window.location.href = 'google_auth.php?action=connect&return=' + ret;
+      return;
+    }
+    const rep = buildChapter45ReportHtml();
+    const httpResp = await fetch('google_upload_doc.php', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ html: rep.doc, title: rep.filename })
+    });
+    const raw = await httpResp.text();
+    let res;
+    try { res = JSON.parse(raw); }
+    catch (e) { throw new Error('เซิร์ฟเวอร์ตอบไม่ใช่ JSON (HTTP ' + httpResp.status + '): ' + raw.slice(0, 200)); }
+    if (res.success) {
+      showToast('ส่งเข้า Google Docs สำเร็จ! กำลังเปิดเอกสาร...', 'success');
+      window.open(res.link, '_blank');
+    } else if (res.reauth) {
+      const ret = encodeURIComponent(location.pathname + location.hash);
+      window.location.href = 'google_auth.php?action=connect&return=' + ret;
+    } else {
+      throw new Error(res.error || ('อัปโหลดไม่สำเร็จ (HTTP ' + httpResp.status + ')'));
+    }
+  } catch (err) {
+    showToast('เกิดข้อผิดพลาด: ' + err.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = original; }
+  }
+}
+
+async function loadChapter45GoogleStatus() {
+  const box = document.getElementById('c45GoogleStatusBox');
+  if (!box) return;
+  try {
+    const st = await (await fetch('google_auth.php?action=status&_t=' + Date.now())).json();
+    if (!st.configured) {
+      box.innerHTML = '<span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle"></i> ยังไม่ได้ตั้งค่า Google API</span>';
+    } else if (st.connected) {
+      box.innerHTML = '<span class="badge bg-success"><i class="bi bi-check-circle"></i> เชื่อมต่อ Google แล้ว</span>';
+    } else {
+      box.innerHTML = '<span class="badge bg-light text-dark"><i class="bi bi-plug"></i> ยังไม่ได้เชื่อมต่อบัญชี Google</span>';
+    }
+  } catch (e) { box.innerHTML = ''; }
+}
+
 /* ---------------------------------------------------------------- เริ่มทำงาน */
-(async function () { await c45Load(); })();
+(async function () { await c45Load(); if (C45_IS_TEACHER) loadChapter45GoogleStatus(); })();
 </script>
 
 <?php require_once 'footer.php'; ?>

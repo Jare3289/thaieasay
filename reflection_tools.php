@@ -599,6 +599,25 @@ $role = $sessionUser['role'];
                     <p class="text-white-50 small mb-0">รวบรวมข้อเสนอแนะจากทั้ง 3 แหล่งข้อมูลไว้ในที่เดียว แต่ละส่วนมีบทวิเคราะห์ภาพรวมและรายการที่จัดลำดับความสำคัญจากมากไปน้อย เพื่อให้ครูออกแบบกิจกรรมเสริมได้ตรงจุด</p>
                   </div>
 
+                  <!-- ให้ระบบตรวจอัตโนมัติวิเคราะห์ข้อมูลสะท้อนคิดทั้งชั้นเป็นข้อมูลเชิงคุณภาพ -->
+                  <div class="card border-0 p-3 mb-4 rounded-4 bg-white shadow-sm">
+                    <div class="d-flex align-items-start justify-content-between flex-wrap gap-3">
+                      <div>
+                        <h6 class="fw-bold text-dark mb-1"><i class="bi bi-file-earmark-check text-primary"></i> ให้ระบบตรวจอัตโนมัติวิเคราะห์เชิงคุณภาพ</h6>
+                        <p class="text-muted small mb-0" style="max-width:640px;">
+                          สังเคราะห์ปัญหาการเขียน การตรวจสอบตนเอง การประเมินเพื่อน และบทสะท้อนการเรียนรู้ ของทั้งชั้นในหน่วยที่เลือก
+                          ให้เป็นข้อมูลเชิงคุณภาพ (ภาพรวม แนวโน้มปัญหาที่พบร่วมกัน จุดแข็ง ข้อสังเกต และสิ่งที่ควรทำต่อ)
+                        </p>
+                      </div>
+                      <?php if ($role === 'teacher'): ?>
+                      <button id="reflAiBtn" class="btn fw-bold rounded-pill px-4 text-white" type="button" onclick="runReflectionAiOverview()">
+                        <i class="bi bi-stars me-1"></i>ให้ระบบวิเคราะห์หน่วยนี้
+                      </button>
+                      <?php endif; ?>
+                    </div>
+                    <div id="reflAiOutput" class="mt-3"></div>
+                  </div>
+
                   <!-- ข้อเสนอแนะขอบเขตการเรียนรู้เพิ่มเติม (วิเคราะห์รวมจากทั้ง 3 แหล่งข้อมูล) -->
                   <div class="card border-0 p-3 mb-4 rounded-4" id="enablingPanel" style="display: none; background: linear-gradient(135deg,#fff7ed,#ffedd5);">
                     <h6 class="fw-bold text-dark mb-1"><i class="bi bi-lightbulb-fill text-warning"></i> ขอบเขตการเรียนรู้เพิ่มเติมที่แนะนำ (วิเคราะห์ภาพรวม)</h6>
@@ -761,6 +780,7 @@ $role = $sessionUser['role'];
     if (typeof loadTeacherDashboardSummary === 'function') loadTeacherDashboardSummary();
     // แท็บตรวจสอบรายบุคคลต้องเปลี่ยนตามหน่วยที่เลือกด้วย ไม่อย่างนั้นจะค้างอยู่ที่ข้อมูลของหน่วยเดิม
     if (typeof reloadInspectedStudent === 'function') reloadInspectedStudent();
+    if (typeof loadReflectionAiOverview === 'function') loadReflectionAiOverview(currentMonitorUnit);
   };
 
 
@@ -1024,6 +1044,112 @@ $role = $sessionUser['role'];
 
     container.innerHTML = html;
     panel.style.display = 'block';
+  }
+
+  // ==========================================
+  // ให้ระบบตรวจอัตโนมัติวิเคราะห์ข้อมูลสะท้อนคิดเชิงคุณภาพ (ปัญหาการเขียน + ตรวจสอบตนเอง
+  // + ประเมินเพื่อน + สะท้อนการเรียนรู้) ของหน่วยที่ครูกำลังดูอยู่ (currentMonitorUnit)
+  // ใช้ท่อเดียวกับ "ระบบตรวจอัตโนมัติ" ของหน้าตรวจเรียงความ (api.php action ai_reflection_overview)
+  // ==========================================
+  const reflEsc = (v) => (window.HtmlUtils ? HtmlUtils.escapeHtml(v) : String(v == null ? '' : v));
+
+  function reflMdBoldEsc(s) {
+    return reflEsc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  }
+
+  function reflStudentChips(ids, roster) {
+    if (!ids || !ids.length) return '';
+    roster = roster || {};
+    return '<div class="mt-1">' + ids.map(id =>
+      `<span class="badge bg-light text-dark border me-1 mb-1">${reflEsc(roster[id] || id)}</span>`
+    ).join('') + '</div>';
+  }
+
+  function reflOverviewHTML(ov) {
+    const st = ov.stats || {};
+    const roster = st.roster || {};
+    let h = '<div class="p-3 mb-3 rounded-3" style="background:#f5f3ff;border-left:4px solid #6d28d9;">'
+      + `<div class="fw-bold text-dark small mb-1"><i class="bi bi-stars text-primary"></i> ภาพรวม</div>`
+      + `<p class="mb-0 small text-dark" style="line-height:1.75;">${reflEsc(ov.overview)}</p></div>`;
+
+    if (ov.themes && ov.themes.length) {
+      h += '<div class="mb-3"><div class="fw-bold small text-dark mb-2">กลุ่มปัญหาการเขียนที่พบบ่อย</div>';
+      h += ov.themes.map(t => `
+        <div class="p-2 mb-2 bg-white rounded-3 border small">
+          <div class="d-flex justify-content-between align-items-start">
+            <div class="fw-bold text-dark">${reflEsc(t.theme)}</div>
+            <span class="badge bg-primary-subtle text-primary-emphasis">${t.count || 0} คน (${t.pct || 0}%)</span>
+          </div>
+          ${t.description ? `<div class="text-muted">${reflEsc(t.description)}</div>` : ''}
+          ${reflStudentChips(t.students, roster)}
+        </div>`).join('');
+      h += '</div>';
+    }
+
+    const groupList = (title, icon, items) => {
+      if (!items || !items.length) return '';
+      let g = `<div class="mb-3"><div class="fw-bold small text-dark mb-2"><i class="bi ${icon}"></i> ${title}</div>`;
+      g += items.map(it => `
+        <div class="p-2 mb-2 bg-white rounded-3 border small">
+          <div class="text-dark">${reflEsc(it.text)}</div>
+          ${reflStudentChips(it.students, roster)}
+        </div>`).join('');
+      return g + '</div>';
+    };
+    h += '<div class="row g-2">';
+    h += '<div class="col-md-6">' + groupList('จุดแข็งด้านการตรวจสอบตนเอง/สะท้อนคิด', 'bi-hand-thumbs-up text-success', ov.common_strengths) + '</div>';
+    h += '<div class="col-md-6">' + groupList('ปัญหาการเขียนที่พบซ้ำ', 'bi-exclamation-triangle text-warning', ov.common_problems) + '</div>';
+    h += '</div>';
+    h += groupList('สิ่งที่น่าสนใจ', 'bi-eye text-info', ov.interesting);
+    h += groupList('ข้อสังเกตเชิงวิจัย', 'bi-clipboard-data text-secondary', ov.observations);
+
+    if (ov.teaching_notes) {
+      h += `<div class="p-3 rounded-3" style="background:#fff7ed;border-left:4px solid #f59e0b;">
+              <div class="fw-bold text-dark small mb-1"><i class="bi bi-lightbulb text-warning"></i> สิ่งที่ควรทำต่อ</div>
+              <p class="mb-0 small text-dark" style="line-height:1.75;">${reflMdBoldEsc(ov.teaching_notes)}</p></div>`;
+    }
+
+    h += `<div class="small text-muted mt-2">วิเคราะห์เมื่อ ${reflEsc(ov.updated_at || '')}`
+      + (ov.model ? ` · โมเดล ${reflEsc(ov.model)}` : '') + ` · จากข้อมูลของนักเรียน ${ov.student_count || 0} คน</div>`;
+    h += '<div class="small text-muted">ข้อมูลเชิงคุณภาพนี้จัดทำโดยระบบตรวจอัตโนมัติ สังเคราะห์จากข้อมูลจริงในระบบเท่านั้น ไม่ใช่ผลทดสอบทางสถิติ</div>';
+    return h;
+  }
+
+  async function loadReflectionAiOverview(unit) {
+    const box = document.getElementById('reflAiOutput');
+    if (!box) return;
+    try {
+      const res = await (await fetch(`api.php?action=get_ai_reflection_overview&_t=${Date.now()}`)).json();
+      const ov = res && res.success ? (res.overviews || {})[unit] : null;
+      box.innerHTML = ov ? reflOverviewHTML(ov)
+        : '<div class="text-muted small">ยังไม่เคยให้ระบบวิเคราะห์หน่วยนี้ — กดปุ่ม "ให้ระบบวิเคราะห์หน่วยนี้" ด้านบน</div>';
+    } catch (e) { box.innerHTML = ''; }
+  }
+
+  async function runReflectionAiOverview() {
+    const btn = document.getElementById('reflAiBtn');
+    const box = document.getElementById('reflAiOutput');
+    const unit = (typeof currentMonitorUnit !== 'undefined') ? currentMonitorUnit : 1;
+    const original = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>กำลังวิเคราะห์... (ปกติใช้เวลา 20-60 วินาที)'; }
+    if (box) box.innerHTML = '<div class="text-primary small"><span class="spinner-border spinner-border-sm me-2"></span>ระบบกำลังอ่านข้อมูลและวิเคราะห์เชิงคุณภาพ...</div>';
+    try {
+      const res = await (await fetch('api.php', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'ai_reflection_overview', task_unit: unit })
+      })).json();
+      if (!res.success) {
+        if (box) box.innerHTML = `<div class="alert alert-warning border-0 rounded-3 small mb-0">${reflEsc(res.error || 'วิเคราะห์ไม่สำเร็จ')}</div>`;
+        showToast(res.error || 'วิเคราะห์ไม่สำเร็จ', 'error');
+        return;
+      }
+      if (box) box.innerHTML = reflOverviewHTML(res.overview);
+      showToast('ระบบวิเคราะห์เชิงคุณภาพเสร็จแล้ว', 'success');
+    } catch (e) {
+      if (box) box.innerHTML = '<div class="alert alert-danger border-0 rounded-3 small mb-0">เชื่อมต่อไม่สำเร็จ กรุณาลองใหม่</div>';
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerHTML = original; }
+    }
   }
 
   // ==========================================
@@ -1851,6 +1977,7 @@ $role = $sessionUser['role'];
     document.addEventListener('DOMContentLoaded', async () => {
       await loadStudents();
       await loadTeacherDashboardSummary();
+      await loadReflectionAiOverview(currentMonitorUnit);
     });
   }
 

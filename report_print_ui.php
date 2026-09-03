@@ -80,9 +80,14 @@ function rp_toolbar($extraHtml = '') {
  * $scope = '' (ค่าเริ่มต้น) → ใช้กับทั้งหน้า เหมาะกับเอกสารสำหรับพิมพ์ที่ไม่มีอย่างอื่นในหน้า
  * $scope = '.rp-doc' ฯลฯ  → จำกัดสไตล์ไว้เฉพาะในกล่องนั้น ใช้ตอนฝังรายงานในหน้าเว็บของระบบ
  *                            (กันไม่ให้ชนกับ Bootstrap ของหน้าเว็บ เช่นคลาส .card)
+ * $fontFamily = null (ค่าเริ่มต้น) → ใช้ฟอนต์ "TH Sarabun New"/"Sarabun" ตามมาตรฐานเอกสารราชการไทย
+ *               (ใช้กับเอกสารสำหรับพิมพ์/PDF เท่านั้น — ไม่โหลดฟอนต์ภายนอก พิมพ์ได้แม้ไม่มีอินเทอร์เน็ต)
+ *             → ระบุค่าอื่น (เช่นฟอนต์เดียวกับหน้าเว็บ) เมื่อฝังรายงานไว้ดูบนหน้าเว็บของระบบ (ไม่ใช่ตอนพิมพ์)
  */
-function rp_styles($scope = '') {
+function rp_styles($scope = '', $fontFamily = null) {
     $root = ($scope === '' || $scope === null) ? 'body' : $scope;
+    $font = ($fontFamily !== null && $fontFamily !== '')
+        ? $fontFamily : '"TH Sarabun New", "Sarabun", "Segoe UI", Tahoma, sans-serif';
     $css  = <<<'RPCSS'
   /* ขนาดตัวอักษรของเอกสารนี้กำหนดเป็น "พอยต์ (pt)" ทั้งหมด ตามมาตรฐานเอกสารราชการไทย
      (TH Sarabun New 16 pt) เพื่อให้อ่านง่ายทั้งบนจอและบนกระดาษ
@@ -96,7 +101,7 @@ function rp_styles($scope = '') {
      และเว้นระยะหายใจให้มากขึ้นทั้งในตาราง กล่อง และระหว่างหัวข้อ */
   @@ * { box-sizing: border-box; }
   @@ {
-    font-family: "TH Sarabun New", "Sarabun", "Segoe UI", Tahoma, sans-serif;
+    font-family: FONTFAMILY;
     color: #1e293b; margin: 0; padding: 0; background: #f1f5f9;
     font-size: 16pt; line-height: 1.55;
     font-weight: 400;
@@ -143,6 +148,22 @@ function rp_styles($scope = '') {
     border-left: 5px solid #1e3a8a; border-bottom: 1px solid #dbe2ef;
   }
   @@ .sheet > .sec-title:first-of-type, @@ .doc-head + .sec-title { margin-top: 14px; }
+
+  /* ---- ส่วนนำ และสารบัญ (หน้าแรกของรายงาน ก่อนเข้าเนื้อหาส่วนที่ 1) ---- */
+  @@ .front-sec { margin-bottom: 6px; }
+  @@ .front-sec p { margin: 0 0 8px; line-height: 1.8; text-align: justify; }
+  @@ h2.front-title { margin-top: 8px; }
+  @@ .toc-list { list-style: none; margin: 4px 0 0; padding: 0; counter-reset: toc; }
+  @@ .toc-list li { counter-increment: toc; margin-bottom: 2px; }
+  @@ .toc-list li a {
+    display: flex; align-items: baseline; gap: 6px; text-decoration: none; color: #1e293b;
+    padding: 5px 4px; border-bottom: 1px dotted #dbe2ef; font-size: 15pt;
+  }
+  @@ .toc-list li a::before {
+    content: "ส่วนที่ " counter(toc) " ·"; font-weight: 700; color: #1e3a8a; white-space: nowrap;
+  }
+  @@ .toc-list li a:hover { background: #f8fafc; }
+  @@ .toc-title { color: #1e293b; }
   @@ h2.sec-title span { font-weight: 400; font-size: 14.5pt; color: #64748b; }
   @@ h3.sub-title {
     font-size: 16pt; font-weight: 700; margin: 14px 0 6px; color: #1e40af;
@@ -289,5 +310,6 @@ function rp_styles($scope = '') {
     @@ h2.sec-title { margin-top: 20px; }
   }
 RPCSS;
+    $css = str_replace('FONTFAMILY', $font, $css);
     echo "<style>\n" . str_replace('@@', $root, $css) . "\n</style>";
 }
