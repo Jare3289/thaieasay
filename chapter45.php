@@ -335,10 +335,10 @@ function c45PaintQuant() {
   const keys = Object.keys(ir);
   if (keys.length) {
     x += '<div class="border rounded-3 p-2"><div class="fw-bold mb-1">ความเที่ยงระหว่างผู้ประเมิน (Inter-rater reliability)</div>'
-      + '<div class="text-muted small mb-2">ใช้ ICC แบบสองทางสุ่ม ความสอดคล้องสัมบูรณ์ (two-way random, absolute agreement)'
+      + '<div class="text-muted small mb-2">ใช้ ICC แบบสองทางผสม ความสอดคล้องสัมบูรณ์ (two-way mixed effects, absolute agreement)'
       + ' เป็นค่าหลักในการสรุปผล ตามเกณฑ์แปลผลของ Koo &amp; Li (2016) — Pearson r แสดงประกอบเป็นค่าความสัมพันธ์รายคู่เท่านั้น</div>'
       + '<table class="table table-sm mb-0"><thead><tr><th>รอบ</th><th class="text-center">ผู้ประเมิน</th>'
-      + '<th class="text-center">n</th><th class="text-center">ICC(2,1)</th><th class="text-center">ICC(2,k)</th>'
+      + '<th class="text-center">n</th><th class="text-center">ICC(3,1)</th><th class="text-center">ICC(3,k)</th>'
       + '<th class="text-center">p</th><th class="text-center">แปลผล (ยึดตาม ICC)</th><th>Pearson r รายคู่<br><small class="text-muted">(ประกอบ)</small></th>'
       + '</tr></thead><tbody>';
     keys.forEach(function (k) {
@@ -956,9 +956,9 @@ function buildChapter45ReportHtml() {
   const ir = q.interrater || {};
   const irKeys = Object.keys(ir);
   if (irKeys.length) {
-    P.push('<p>ใช้ ICC แบบสองทางสุ่ม ความสอดคล้องสัมบูรณ์ (two-way random, absolute agreement) เป็นค่าหลักในการสรุปผล '
+    P.push('<p>ใช้ ICC แบบสองทางผสม ความสอดคล้องสัมบูรณ์ (two-way mixed effects, absolute agreement) เป็นค่าหลักในการสรุปผล '
       + 'ตามเกณฑ์แปลผลของ Koo &amp; Li (2016) — Pearson r แสดงประกอบเป็นค่าความสัมพันธ์รายคู่เท่านั้น</p>');
-    P.push(c45WrTable(['รอบ', 'ผู้ประเมิน (k)', 'n', 'ICC(2,1)', 'ICC(2,k)', 'p', 'แปลผล (ยึดตาม ICC)', 'Pearson r รายคู่ (ประกอบ)'],
+    P.push(c45WrTable(['รอบ', 'ผู้ประเมิน (k)', 'n', 'ICC(3,1)', 'ICC(3,k)', 'p', 'แปลผล (ยึดตาม ICC)', 'Pearson r รายคู่ (ประกอบ)'],
       irKeys.map(function (k) {
         const v = ir[k];
         return [v.label, v.k, v.n, c45R(v.icc.icc1), c45R(v.icc.iccK), c45P(v.icc.p), v.icc_label,

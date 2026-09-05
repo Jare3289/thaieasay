@@ -102,7 +102,7 @@ require_once 'header.php';
               <div class="card border-0 rounded-3 p-3 bg-white shadow-sm border-start border-3 border-primary h-100">
                 <h6 class="fw-bold text-dark mb-3"><i class="bi bi-info-circle-fill text-primary"></i> การตีความความสอดคล้องผู้ตรวจ (Koo &amp; Li, 2016)</h6>
                 <p class="small text-muted mb-3" style="line-height: 1.6;">
-                  คำนวณค่าสัมประสิทธิ์สหสัมพันธ์ภายในชั้น (Intraclass Correlation Coefficient — ICC) ของคะแนนที่ให้โดยผู้ตรวจ 3 คน คือ <strong>ครูผู้สอน + ผู้เชี่ยวชาญ 2 ท่าน</strong> สำหรับงานของนักเรียน<strong>ห้อง 606 (กลุ่มทดลอง)</strong> เพื่อตรวจสอบความสอดคล้องระหว่างผู้ตรวจ (Inter-rater Reliability) — ใช้โมเดล ICC(2,1) two-way random, absolute agreement
+                  คำนวณค่าสัมประสิทธิ์สหสัมพันธ์ภายในชั้น (Intraclass Correlation Coefficient — ICC) ของคะแนนที่ให้โดยผู้ตรวจ 3 คน คือ <strong>ครูผู้สอน + ผู้เชี่ยวชาญ 2 ท่าน</strong> สำหรับงานของนักเรียน<strong>ห้อง 606 (กลุ่มทดลอง)</strong> เพื่อตรวจสอบความสอดคล้องระหว่างผู้ตรวจ (Inter-rater Reliability) — ใช้โมเดล ICC(3,1) two-way mixed effects, absolute agreement
                 </p>
                 <div class="d-flex flex-column gap-2 small">
                   <div class="d-flex justify-content-between p-2 rounded bg-success bg-opacity-10 text-success fw-semibold">
@@ -719,7 +719,7 @@ require_once 'header.php';
       '<li><b>แบบบันทึกการสะท้อนการเรียนรู้</b> (Learning Reflection)</li>' +
       '</ul>');
     P.push('<h2>1.5 การตรวจสอบความเที่ยงของเครื่องมือ</h2>');
-    P.push('<p>งานเขียนของกลุ่มทดลองได้รับการตรวจโดยผู้ประเมิน 3 คน คือ <b>ครูผู้สอนและผู้เชี่ยวชาญ 2 ท่าน</b> เพื่อคำนวณค่าความสอดคล้องระหว่างผู้ตรวจ ด้วยสัมประสิทธิ์สหสัมพันธ์ภายในชั้น ICC(2,1) แบบ two-way random effects, absolute agreement ตามแนวทางของ Koo &amp; Li (2016)</p>');
+    P.push('<p>งานเขียนของกลุ่มทดลองได้รับการตรวจโดยผู้ประเมิน 3 คน คือ <b>ครูผู้สอนและผู้เชี่ยวชาญ 2 ท่าน</b> เพื่อคำนวณค่าความสอดคล้องระหว่างผู้ตรวจ ด้วยสัมประสิทธิ์สหสัมพันธ์ภายในชั้น ICC(3,1) แบบ two-way mixed effects, absolute agreement ตามแนวทางของ Koo &amp; Li (2016)</p>');
 
     // ----- ส่วนที่ 2 : ICC (606, หน่วย 1, ละเอียด) -----
     P.push('<div class="pagebreak"></div>');
@@ -1134,7 +1134,9 @@ require_once 'header.php';
     return { text: 'ต่ำ (Poor)', css: 'bg-danger' };
   }
 
-  // คำนวณ ICC(2,1): two-way random-effects, absolute agreement, single rater
+  // คำนวณ ICC(3,1): two-way mixed effects, absolute agreement, single rater
+  // (ผู้ตรวจเป็นชุดคนตายตัว คือ ครูผู้สอน + ผู้เชี่ยวชาญ 2 ท่านที่เจาะจงไว้ ไม่ได้สุ่มมา
+  // จึงเลือกโมเดล mixed ตามแนวทางของ Koo & Li, 2016 — สูตรคำนวณเหมือน ICC(2,1) ทุกประการ)
   function computeICC(matrix) {
     const n = matrix.length;
     if (n < 2) return null;
@@ -1211,7 +1213,7 @@ require_once 'header.php';
         <div class="col-6 col-md-3"><div class="border rounded-2 p-2 text-center bg-light"><div class="text-muted" style="font-size:.75rem;">จำนวนนักเรียน (n)</div><div class="fs-5 fw-bold text-dark">${n}</div></div></div>
         <div class="col-6 col-md-3"><div class="border rounded-2 p-2 text-center bg-light"><div class="text-muted" style="font-size:.75rem;">จำนวนผู้ตรวจ (k)</div><div class="fs-5 fw-bold text-dark">${k}</div></div></div>
         <div class="col-6 col-md-3"><div class="border rounded-2 p-2 text-center bg-light"><div class="text-muted" style="font-size:.75rem;">ค่าเฉลี่ยรวม (Grand mean)</div><div class="fs-5 fw-bold text-dark">${f2(d.grand)}</div></div></div>
-        <div class="col-6 col-md-3"><div class="border rounded-2 p-2 text-center bg-light"><div class="text-muted" style="font-size:.75rem;">ผลลัพธ์ ICC(2,1)</div><div class="fs-5 fw-bold text-primary">${f4(d.icc)}</div></div></div>
+        <div class="col-6 col-md-3"><div class="border rounded-2 p-2 text-center bg-light"><div class="text-muted" style="font-size:.75rem;">ผลลัพธ์ ICC(3,1)</div><div class="fs-5 fw-bold text-primary">${f4(d.icc)}</div></div></div>
       </div>
       <div class="table-responsive mb-3">
         <table class="table table-sm table-bordered text-center align-middle mb-0">
@@ -1225,7 +1227,7 @@ require_once 'header.php';
         </table>
       </div>
       <div class="p-3 rounded-3" style="background:#eff6ff; line-height:2;">
-        <div class="fw-bold text-dark mb-1">สูตร ICC(2,1) — two-way random effects, absolute agreement, single rater</div>
+        <div class="fw-bold text-dark mb-1">สูตร ICC(3,1) — two-way mixed effects, absolute agreement, single rater</div>
         <div class="font-mono">ICC = (MSR − MSE) / [ MSR + (k−1)·MSE + (k/n)·(MSC − MSE) ]</div>
         <div class="font-mono">= ( ${f3(d.MSR)} − ${f3(d.MSE)} ) / [ ${f3(d.MSR)} + (${k}−1)·${f3(d.MSE)} + (${k}/${n})·( ${f3(d.MSC)} − ${f3(d.MSE)} ) ]</div>
         <div class="font-mono">= ${f3(num)} / ${f3(d.denom)} = <span class="fw-bold text-primary">${f4(d.icc)}</span></div>
@@ -1436,7 +1438,7 @@ require_once 'header.php';
         <h6 class="fw-bold text-dark mb-2"><i class="bi bi-file-earmark-text text-primary"></i> บทวิเคราะห์ค่าความสอดคล้องระหว่างผู้ตรวจ (Inter-rater Reliability — ICC)</h6>
         <p class="mb-0 text-slate-700" style="line-height: 1.6;">
           การตรวจสอบความสอดคล้องของการให้คะแนนโดยผู้ตรวจ 3 คน (ครูผู้สอน และผู้เชี่ยวชาญ 2 ท่าน) สำหรับงานเขียนของนักเรียน<strong>ห้อง 606 (กลุ่มทดลอง)</strong> (N = ${triples.length} คน)
-          ด้วยค่าสัมประสิทธิ์สหสัมพันธ์ภายในชั้น <strong>ICC(2,1) — two-way random-effects, absolute agreement, single rater</strong>
+          ด้วยค่าสัมประสิทธิ์สหสัมพันธ์ภายในชั้น <strong>ICC(3,1) — two-way mixed effects, absolute agreement, single rater</strong>
           พบว่า <strong>ค่า ICC ของคะแนนรวมเท่ากับ ${overallICC !== null ? overallICC.toFixed(4) : "N/A"}</strong> ซึ่งเมื่อแปลผลตามเกณฑ์ของ Koo &amp; Li (2016) จัดอยู่ใน<strong>ระดับ${overallInterpText}</strong>
           และเมื่อพิจารณาแยกราย 4 ด้าน พบว่าค่า ICC อยู่ระหว่าง <strong>${minICC}</strong> ถึง <strong>${maxICC}</strong> สะท้อนถึงความสอดคล้องของเกณฑ์ประเมินระหว่างผู้ตรวจในระดับที่เชื่อถือได้เชิงสถิติวิจัย
         </p>

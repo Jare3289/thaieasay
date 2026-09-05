@@ -367,11 +367,11 @@ $scope = implode(' · ', $scopeParts);
   <?php if (!$quant['interrater']): ?>
     <p class="para">ยังคำนวณไม่ได้ — ต้องมีผู้ประเมินตั้งแต่ 2 คนขึ้นไปให้คะแนนผลงานชุดเดียวกัน</p>
   <?php else: ?>
-  <p class="para">ใช้ ICC แบบสองทางสุ่ม ความสอดคล้องสัมบูรณ์ (two-way random, absolute agreement) เป็นค่าหลักในการสรุปผล
+  <p class="para">ใช้ ICC แบบสองทางผสม ความสอดคล้องสัมบูรณ์ (two-way mixed effects, absolute agreement) เป็นค่าหลักในการสรุปผล
     ตามเกณฑ์แปลผลของ Koo &amp; Li (2016) — Pearson r แสดงประกอบเป็นค่าความสัมพันธ์รายคู่เท่านั้น</p>
   <table class="thesis">
-    <thead><tr><th class="l">รอบ</th><th>ผู้ประเมิน</th><th>n</th><th>ICC(2,1)</th>
-      <th>ICC(2,k)</th><th>p</th><th>แปลผล (ยึดตาม ICC)</th><th class="l">Pearson r (ประกอบ)</th></tr></thead>
+    <thead><tr><th class="l">รอบ</th><th>ผู้ประเมิน</th><th>n</th><th>ICC(3,1)</th>
+      <th>ICC(3,k)</th><th>p</th><th>แปลผล (ยึดตาม ICC)</th><th class="l">Pearson r (ประกอบ)</th></tr></thead>
     <tbody>
       <?php foreach ($quant['interrater'] as $ir): ?>
       <tr>
