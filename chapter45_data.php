@@ -886,6 +886,11 @@ function ch45_evidence(array $ds, $indicatorId, array $defects, $perSlot = 3) {
             $cand[] = [
                 'sid'   => $sid,
                 'no'    => $ds['students'][$sid]['no'],
+                // ชื่อจริง — ใช้เฉพาะตอนครู/ผู้เชี่ยวชาญเปิดโหมด "แสดงชื่อจริง" เพื่อไล่หาต้นฉบับ
+                // เท่านั้น ห้ามหลุดเข้าไปในข้อความที่ส่งให้ AI หรือบทที่ 4 ฉบับจริงเด็ดขาด
+                // (ch45_ai_evidence_block ด้านล่างหยิบเฉพาะฟิลด์ที่ต้องใช้ ไม่ได้ dump ทั้งอาร์เรย์
+                // จึงไม่หลุดไปในคำสั่งที่ส่งให้ระบบโดยอัตโนมัติอยู่แล้ว)
+                'name'  => $ds['students'][$sid]['name'],
                 'raw'   => $sc ? $sc['raw'][$indicatorId] : null,
                 'tag'   => $tag,
                 'intro' => ch45_trim_text($essay['intro'], 700),

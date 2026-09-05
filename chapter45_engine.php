@@ -671,32 +671,36 @@ function ch45_normalize_for_match($s) {
 /**
  * ตรวจว่าข้อความที่ระบบยกมาเป็น "ข้อความจริง" จากผลงานของนักเรียนคนนั้นหรือไม่
  * นี่คือด่านสุดท้ายที่กันไม่ให้ตัวอย่างในบทที่ 4 เป็นข้อความที่ระบบแต่งขึ้น
+ *
+ * คืนค่า 'student_name' เพิ่มมาด้วย (นอกเหนือจาก 'student_no" ที่ใช้อ้างในบทที่ 4) —
+ * ใช้เฉพาะตอนครู/ผู้เชี่ยวชาญเปิดโหมด "แสดงชื่อจริง" บนหน้าจอ/หน้าพิมพ์ เพื่อไล่หาต้นฉบับ
+ * เท่านั้น ไม่มีผลต่อข้อความที่เขียนลงบทที่ 4 จริงซึ่งยังคงอ้างด้วยหมายเลขเสมอ
  */
 function ch45_verify_excerpt(array $excerpt, array $pool) {
     $no   = (int)($excerpt['student_no'] ?? 0);
     $text = ch45_clean($excerpt['text'] ?? '', 1500);
-    if ($text === '') return ['student_no' => 0, 'text' => '', 'verified' => null, 'reason' => 'ไม่ได้ยกตัวอย่าง'];
+    if ($text === '') return ['student_no' => 0, 'student_name' => '', 'text' => '', 'verified' => null, 'reason' => 'ไม่ได้ยกตัวอย่าง'];
 
     $needle = ch45_normalize_for_match($text);
-    if ($needle === '') return ['student_no' => $no, 'text' => $text, 'verified' => false,
+    if ($needle === '') return ['student_no' => $no, 'student_name' => '', 'text' => $text, 'verified' => false,
                                 'reason' => 'ข้อความสั้นเกินกว่าจะตรวจสอบได้'];
 
     // 1) ตรวจกับผลงานของนักเรียนหมายเลขที่ระบบอ้างถึงก่อน
     $owner = null;
     foreach ($pool as $c) if ((int)$c['no'] === $no) { $owner = $c; break; }
     if ($owner && mb_strpos(ch45_normalize_for_match($owner['text']), $needle, 0, 'UTF-8') !== false) {
-        return ['student_no' => $no, 'text' => $text, 'verified' => true, 'reason' => ''];
+        return ['student_no' => $no, 'student_name' => $owner['name'] ?? '', 'text' => $text, 'verified' => true, 'reason' => ''];
     }
 
     // 2) ถ้าไม่ตรง ลองหาว่าข้อความนี้เป็นของนักเรียนคนอื่นในคลังหรือไม่ (ระบบอ้างเลขผิด)
     foreach ($pool as $c) {
         if (mb_strpos(ch45_normalize_for_match($c['text']), $needle, 0, 'UTF-8') !== false) {
-            return ['student_no' => (int)$c['no'], 'text' => $text, 'verified' => true,
+            return ['student_no' => (int)$c['no'], 'student_name' => $c['name'] ?? '', 'text' => $text, 'verified' => true,
                     'reason' => 'ระบบแก้หมายเลขนักเรียนจาก ' . $no . ' เป็น ' . $c['no'] . ' ให้ตรงกับผลงานจริง'];
         }
     }
 
-    return ['student_no' => $no, 'text' => $text, 'verified' => false,
+    return ['student_no' => $no, 'student_name' => $owner['name'] ?? '', 'text' => $text, 'verified' => false,
             'reason' => 'ไม่พบข้อความนี้ในผลงานจริงที่ส่งให้ระบบ — ต้องตรวจสอบก่อนนำไปใช้'];
 }
 
