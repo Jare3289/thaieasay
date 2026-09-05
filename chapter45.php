@@ -334,7 +334,7 @@ function c45PaintQuant() {
   const ir = q.interrater || {};
   const keys = Object.keys(ir);
   if (keys.length) {
-    x += '<div class="border rounded-3 p-2"><div class="fw-bold mb-1">ความเที่ยงระหว่างผู้ประเมิน (Inter-rater reliability)</div>'
+    x += '<div class="border rounded-3 p-2"><div class="fw-bold mb-1">ความเที่ยงระหว่างผู้ประเมิน (ICC — Inter-rater Reliability)</div>'
       + '<div class="text-muted small mb-2">ใช้ ICC แบบสองทางผสม ความสอดคล้องสัมบูรณ์ (two-way mixed effects, absolute agreement)'
       + ' เป็นค่าหลักในการสรุปผล ตามเกณฑ์แปลผลของ Koo &amp; Li (2016) — Pearson r แสดงประกอบเป็นค่าความสัมพันธ์รายคู่เท่านั้น</div>'
       + '<table class="table table-sm mb-0"><thead><tr><th>รอบ</th><th class="text-center">ผู้ประเมิน</th>'
@@ -952,7 +952,7 @@ function buildChapter45ReportHtml() {
                    : 'แตกต่างจากการแจกแจงปกติอย่างมีนัยสำคัญ ควรรายงานผลอย่างระมัดระวัง หรือเพิ่ม Wilcoxon signed-rank') + '</p>');
   }
 
-  P.push('<h2>ความเที่ยงระหว่างผู้ประเมิน (Inter-rater reliability)</h2>');
+  P.push('<h2>ความเที่ยงระหว่างผู้ประเมิน (ICC — Inter-rater Reliability)</h2>');
   const ir = q.interrater || {};
   const irKeys = Object.keys(ir);
   if (irKeys.length) {

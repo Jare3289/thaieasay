@@ -363,7 +363,7 @@ $scope = implode(' · ', $scopeParts);
 
 <div class="sheet no-print">
   <div class="doc-head"><h1>ภาคผนวกของร่าง</h1><div class="sub">ข้อมูลประกอบที่ไม่ต้องพิมพ์ลงวิทยานิพนธ์</div></div>
-  <h2 class="sec-title">ความเที่ยงระหว่างผู้ประเมิน</h2>
+  <h2 class="sec-title">ความเที่ยงระหว่างผู้ประเมิน (ICC)</h2>
   <?php if (!$quant['interrater']): ?>
     <p class="para">ยังคำนวณไม่ได้ — ต้องมีผู้ประเมินตั้งแต่ 2 คนขึ้นไปให้คะแนนผลงานชุดเดียวกัน</p>
   <?php else: ?>
