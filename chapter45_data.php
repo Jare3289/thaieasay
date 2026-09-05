@@ -1032,7 +1032,7 @@ function ch45_readiness(array $ds, array $quant, array $defects, array $mech) {
 
     // 4) ความเที่ยงระหว่างผู้ประเมิน
     $ir = $quant['interrater'];
-    $add($items, 'interrater', 'ความเที่ยงระหว่างผู้ประเมิน (ต้องรายงานในตาราง 12)',
+    $add($items, 'interrater', 'ความเที่ยงระหว่างผู้ประเมิน (ICC) (ต้องรายงานในตาราง 12)',
         $ir ? 'ok' : 'missing',
         $ir ? ('คำนวณได้ ' . count($ir) . ' รอบ')
             : 'ยังไม่มีรอบใดที่มีผู้ประเมินตั้งแต่ 2 คนขึ้นไปให้คะแนนผลงานชุดเดียวกัน',
