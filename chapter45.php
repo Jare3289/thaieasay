@@ -215,6 +215,17 @@ let c45Data = null;
 let c45Stopped = false;
 let c45Running = false;
 
+// สลับแสดง/ซ่อนชื่อจริงของนักเรียนในตัวอย่างที่ยกมา — ใช้ไล่หาต้นฉบับเท่านั้น
+// (ค่าเริ่มต้นคือซ่อน เพราะบทที่ 4 ฉบับจริงต้องอ้างด้วยหมายเลขนักเรียนเสมอ ห้ามใช้ชื่อจริง)
+let c45RevealNames = (function () {
+  try { return localStorage.getItem('c45_reveal_names') === '1'; } catch (e) { return false; }
+})();
+function c45ToggleRevealNames(checked) {
+  c45RevealNames = !!checked;
+  try { localStorage.setItem('c45_reveal_names', c45RevealNames ? '1' : '0'); } catch (e) {}
+  c45PaintResults();
+}
+
 /* ---------------------------------------------------------------- ตัวช่วย */
 function c45Esc(s) {
   return String(s === null || s === undefined ? '' : s)
@@ -436,6 +447,8 @@ function c45Excerpt(exNo, ex, roundLabel) {
       + '</div>';
   }
   const ok = ex.verified === true;
+  const who = 'นักเรียนคนที่ ' + c45Esc(ex.student_no)
+    + (c45RevealNames && ex.student_name ? ' (ชื่อจริง: ' + c45Esc(ex.student_name) + ')' : '');
   return '<div class="border rounded-3 p-2 mb-2 ' + (ok ? 'border-success-subtle' : 'border-danger') + '">'
     + '<div class="d-flex justify-content-between align-items-center mb-1">'
     + '<span class="badge ' + (ok ? 'bg-success-subtle text-success-emphasis' : 'bg-danger') + '">'
@@ -443,7 +456,7 @@ function c45Excerpt(exNo, ex, roundLabel) {
     + '</span>'
     + '<span class="small text-muted">ตัวอย่าง (' + exNo + ')</span></div>'
     + '<div style="line-height:1.9;">' + c45Esc(ex.text) + '</div>'
-    + '<div class="small text-muted mt-1">(นักเรียนคนที่ ' + c45Esc(ex.student_no) + ' ' + c45Esc(roundLabel) + ')</div>'
+    + '<div class="small text-muted mt-1">(' + who + ' ' + c45Esc(roundLabel) + ')</div>'
     + (ex.reason ? '<div class="small text-danger mt-1">' + c45Esc(ex.reason) + '</div>' : '')
     + '</div>';
 }
@@ -560,6 +573,14 @@ function c45PaintResults() {
   const groups = c45Data.job_groups;
   const results = c45Data.results || {};
   let html = '';
+
+  html += '<div class="alert alert-warning border-0 rounded-3 d-flex align-items-start gap-2 mb-3">'
+    + '<input type="checkbox" class="form-check-input mt-1" id="c45RevealNamesToggle" '
+    + (c45RevealNames ? 'checked' : '') + ' onchange="c45ToggleRevealNames(this.checked)">'
+    + '<label for="c45RevealNamesToggle" class="form-check-label small mb-0">'
+    + '<strong>แสดงชื่อจริงของนักเรียนในตัวอย่างที่ยกมา</strong> — เปิดไว้ชั่วคราวเพื่อไล่หาต้นฉบับเทียบกับผลงานจริงเท่านั้น '
+    + '(บทที่ 4 ฉบับจริงต้องอ้างด้วย &quot;นักเรียนคนที่ N&quot; เสมอ ห้ามใช้ชื่อจริง — ปิดโหมดนี้ก่อนคัดลอกไปใช้งาน)'
+    + '</label></div>';
 
   Object.keys(groups).forEach(function (gk) {
     const items = Object.keys(jobs).filter(function (k) { return jobs[k].group === gk; });
@@ -735,12 +756,15 @@ async function c45ShowEvidence(indicatorId) {
   const ev = d.evidence;
   const meta = c45Data.meta;
   let h = '<div class="small text-muted mb-2">นี่คือผลงานจริงที่ระบบคัดส่งให้ระบบเลือกยกเป็นตัวอย่าง — '
-    + 'ระบบยกข้อความได้จากผลงานเหล่านี้เท่านั้น</div>';
+    + 'ระบบยกข้อความได้จากผลงานเหล่านี้เท่านั้น'
+    + (c45RevealNames ? ' (กำลังแสดงชื่อจริง — ปิดสวิตช์ด้านบนก่อนคัดลอกไปใช้งาน)' : '') + '</div>';
   [['work1', meta.work1_label], ['work2', meta.work2_label]].forEach(function (p) {
     h += '<h6 class="fw-bold mt-3">' + c45Esc(p[1]) + '</h6>';
     if (!ev[p[0]] || !ev[p[0]].length) { h += '<div class="text-muted small">ไม่พบผลงานในรอบนี้</div>'; return; }
     ev[p[0]].forEach(function (c) {
-      h += '<div class="border rounded-3 p-2 mb-2"><div class="small fw-bold mb-1">นักเรียนคนที่ ' + c.no
+      const who = 'นักเรียนคนที่ ' + c45Esc(c.no)
+        + (c45RevealNames && c.name ? ' (ชื่อจริง: ' + c45Esc(c.name) + ')' : '');
+      h += '<div class="border rounded-3 p-2 mb-2"><div class="small fw-bold mb-1">' + who
         + ' · คะแนนดิบ ' + (c.raw === null ? '—' : Number(c.raw).toFixed(1)) + '/4 · ' + c45Esc(c.tag) + '</div>'
         + '<div class="small" style="line-height:1.8;">' + c45Esc(c.text) + '</div></div>';
     });

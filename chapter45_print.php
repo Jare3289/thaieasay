@@ -23,6 +23,9 @@ require_once 'report_print_ui.php';
 
 $fGroup     = isset($_GET['group'])     ? trim($_GET['group'])     : '';
 $fClassroom = isset($_GET['classroom']) ? trim($_GET['classroom']) : '';
+// เปิดชั่วคราวเพื่อไล่หาต้นฉบับเทียบกับผลงานจริงเท่านั้น — ค่าเริ่มต้นซ่อนชื่อจริงเสมอ
+// เพราะบทที่ 4 ฉบับจริงต้องอ้างด้วย "นักเรียนคนที่ N" เท่านั้น ห้ามใช้ชื่อจริง
+$fReveal = isset($_GET['reveal']) && $_GET['reveal'] === '1';
 
 $ctx     = ch45_build_context($pdo, ['group' => $fGroup, 'classroom' => $fClassroom]);
 $ds      = $ctx['ds'];
@@ -53,13 +56,16 @@ function c45para($html) {
 
 /** ข้อความตัวอย่างที่ยกจากผลงานจริง พร้อมบรรทัดอ้างอิงและป้ายผลการตรวจสอบ */
 function c45quote($ex, $roundLabel) {
+    global $fReveal;
     if (!$ex || trim((string)($ex['text'] ?? '')) === '') {
         return '<div class="quote todo-box">[ยังไม่มีข้อความตัวอย่างจากผลงานจริง]</div>';
     }
     $bad = ($ex['verified'] === false);
+    $who = 'นักเรียนคนที่ ' . rp_esc($ex['student_no'])
+        . (($fReveal && !empty($ex['student_name'])) ? ' (ชื่อจริง: ' . rp_esc($ex['student_name']) . ')' : '');
     return '<div class="quote' . ($bad ? ' quote-bad' : '') . '">'
         . rp_esc($ex['text'])
-        . '<div class="quote-cite">(นักเรียนคนที่ ' . rp_esc($ex['student_no']) . ' ' . rp_esc($roundLabel) . ')</div>'
+        . '<div class="quote-cite">(' . $who . ' ' . rp_esc($roundLabel) . ')</div>'
         . ($bad ? '<div class="quote-warn">⚠ ระบบตรวจไม่พบข้อความนี้ในผลงานจริง — ต้องตรวจสอบก่อนนำไปใช้</div>' : '')
         . '</div>';
 }
@@ -112,7 +118,18 @@ $scope = implode(' · ', $scopeParts);
     <strong>เอกสารนี้เป็น &quot;ร่าง&quot;</strong> — ตัวเลขและตารางคำนวณจากข้อมูลจริงในระบบ
     ส่วนความเรียงเรียบเรียงโดยระบบผู้วิจัยต้องอ่านทวน ตรวจสอบข้อความตัวอย่างกับต้นฉบับลายมือ
     และปรับสำนวนให้เป็นเสียงของตนเองก่อนนำไปใช้ในวิทยานิพนธ์เสมอ ·
-    ขอบเขตข้อมูล: <?php echo rp_esc($scope); ?> · จัดทำเมื่อ <?php echo rp_thai_date(); ?>
+    ขอบเขตข้อมูล: <?php echo rp_esc($scope); ?> · จัดทำเมื่อ <?php echo rp_thai_date(); ?> ·
+    <?php
+    $toggleQs = $_GET;
+    $toggleQs['reveal'] = $fReveal ? '0' : '1';
+    $toggleUrl = 'chapter45_print.php?' . http_build_query($toggleQs);
+    ?>
+    <?php if ($fReveal): ?>
+      <strong>กำลังแสดงชื่อจริง</strong> (ใช้ไล่หาต้นฉบับเท่านั้น ห้ามพิมพ์ฉบับนี้ส่ง)
+      — <a href="<?php echo rp_esc($toggleUrl); ?>">ซ่อนชื่อจริง</a>
+    <?php else: ?>
+      <a href="<?php echo rp_esc($toggleUrl); ?>">แสดงชื่อจริงชั่วคราว (ไล่หาต้นฉบับ)</a>
+    <?php endif; ?>
   </div>
 
   <div class="doc-head">
