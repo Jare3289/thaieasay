@@ -574,13 +574,18 @@ function c45PaintResults() {
   const results = c45Data.results || {};
   let html = '';
 
-  html += '<div class="alert alert-warning border-0 rounded-3 d-flex align-items-start gap-2 mb-3">'
-    + '<input type="checkbox" class="form-check-input mt-1" id="c45RevealNamesToggle" '
-    + (c45RevealNames ? 'checked' : '') + ' onchange="c45ToggleRevealNames(this.checked)">'
-    + '<label for="c45RevealNamesToggle" class="form-check-label small mb-0">'
-    + '<strong>แสดงชื่อจริงของนักเรียนในตัวอย่างที่ยกมา</strong> — เปิดไว้ชั่วคราวเพื่อไล่หาต้นฉบับเทียบกับผลงานจริงเท่านั้น '
-    + '(บทที่ 4 ฉบับจริงต้องอ้างด้วย &quot;นักเรียนคนที่ N&quot; เสมอ ห้ามใช้ชื่อจริง — ปิดโหมดนี้ก่อนคัดลอกไปใช้งาน)'
-    + '</label></div>';
+  html += '<div class="alert ' + (c45RevealNames ? 'alert-danger' : 'alert-warning')
+    + ' border-0 rounded-3 d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3">'
+    + '<div class="small pe-2">'
+    + '<strong>ตัวอย่างที่ยกมาอ้างชื่อนักเรียนด้วย &quot;นักเรียนคนที่ N&quot; เสมอ</strong><br>'
+    + 'กดปุ่มด้านขวาเพื่อเปิดดูชื่อจริงชั่วคราว สำหรับไล่หาต้นฉบับเทียบกับผลงานจริงเท่านั้น '
+    + '(บทที่ 4 ฉบับจริงห้ามใช้ชื่อจริง — ปิดโหมดนี้ก่อนคัดลอกไปใช้งานเสมอ)'
+    + '</div>'
+    + '<button type="button" id="c45RevealNamesToggle" class="btn btn-sm fw-bold rounded-pill px-4 flex-shrink-0 '
+    + (c45RevealNames ? 'btn-danger' : 'btn-outline-dark') + '" onclick="c45ToggleRevealNames(!c45RevealNames)">'
+    + '<i class="bi ' + (c45RevealNames ? 'bi-eye-fill' : 'bi-eye-slash-fill') + ' me-1"></i>'
+    + (c45RevealNames ? 'กำลังแสดงชื่อจริง — กดเพื่อซ่อน' : 'แสดงชื่อจริงชั่วคราว')
+    + '</button></div>';
 
   Object.keys(groups).forEach(function (gk) {
     const items = Object.keys(jobs).filter(function (k) { return jobs[k].group === gk; });
