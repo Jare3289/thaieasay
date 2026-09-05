@@ -24,6 +24,23 @@ require_once 'header.php';
 $c45IsTeacher = ($sessionUser['role'] === 'teacher');
 ?>
 
+<style>
+/* สวิตช์แสดง/ซ่อนชื่อจริง — ทำเป็นสวิตช์เปิด-ปิดแบบเครื่องใช้ไฟฟ้า */
+.c45-pwr-switch { position: relative; display: inline-flex; align-items: center; width: 60px; height: 30px; cursor: pointer; outline: none; }
+.c45-pwr-switch .c45-pwr-track {
+  position: absolute; inset: 0; border-radius: 999px; background: #94a3b8;
+  box-shadow: inset 0 1px 4px rgba(0,0,0,.35); transition: background .25s ease, box-shadow .25s ease;
+}
+.c45-pwr-switch .c45-pwr-knob {
+  position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%;
+  background: #fff; display: flex; align-items: center; justify-content: center;
+  color: #64748b; font-size: 13px; box-shadow: 0 1px 3px rgba(0,0,0,.45); transition: left .25s ease, color .25s ease;
+}
+.c45-pwr-switch.on .c45-pwr-track { background: #dc2626; box-shadow: inset 0 1px 4px rgba(0,0,0,.35), 0 0 10px rgba(220,38,38,.65); }
+.c45-pwr-switch.on .c45-pwr-knob { left: 33px; color: #dc2626; }
+.c45-pwr-switch:focus-visible .c45-pwr-track { outline: 2px solid #0d6efd; outline-offset: 2px; }
+</style>
+
 <div id="view-chapter45" class="text-start">
   <div class="mb-3">
     <a href="index.php" class="btn btn-link text-decoration-none text-secondary fw-bold p-0">
@@ -578,14 +595,19 @@ function c45PaintResults() {
     + ' border-0 rounded-3 d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3">'
     + '<div class="small pe-2">'
     + '<strong>ตัวอย่างที่ยกมาอ้างชื่อนักเรียนด้วย &quot;นักเรียนคนที่ N&quot; เสมอ</strong><br>'
-    + 'กดปุ่มด้านขวาเพื่อเปิดดูชื่อจริงชั่วคราว สำหรับไล่หาต้นฉบับเทียบกับผลงานจริงเท่านั้น '
+    + 'กดสวิตช์ด้านขวาเพื่อเปิดดูชื่อจริงชั่วคราว สำหรับไล่หาต้นฉบับเทียบกับผลงานจริงเท่านั้น '
     + '(บทที่ 4 ฉบับจริงห้ามใช้ชื่อจริง — ปิดโหมดนี้ก่อนคัดลอกไปใช้งานเสมอ)'
     + '</div>'
-    + '<button type="button" id="c45RevealNamesToggle" class="btn btn-sm fw-bold rounded-pill px-4 flex-shrink-0 '
-    + (c45RevealNames ? 'btn-danger' : 'btn-outline-dark') + '" onclick="c45ToggleRevealNames(!c45RevealNames)">'
-    + '<i class="bi ' + (c45RevealNames ? 'bi-eye-fill' : 'bi-eye-slash-fill') + ' me-1"></i>'
-    + (c45RevealNames ? 'กำลังแสดงชื่อจริง — กดเพื่อซ่อน' : 'แสดงชื่อจริงชั่วคราว')
-    + '</button></div>';
+    + '<div class="d-flex align-items-center gap-2 flex-shrink-0">'
+    + '<span class="small fw-bold ' + (c45RevealNames ? 'text-danger' : 'text-secondary') + '">'
+    + (c45RevealNames ? 'เปิด (แสดงชื่อจริง)' : 'ปิด (ซ่อนชื่อจริง)') + '</span>'
+    + '<div id="c45RevealNamesToggle" class="c45-pwr-switch' + (c45RevealNames ? ' on' : '') + '" '
+    + 'role="switch" aria-checked="' + (c45RevealNames ? 'true' : 'false') + '" tabindex="0" '
+    + 'title="' + (c45RevealNames ? 'กำลังแสดงชื่อจริง — กดเพื่อซ่อน' : 'แสดงชื่อจริงชั่วคราว') + '" '
+    + 'onclick="c45ToggleRevealNames(!c45RevealNames)" '
+    + 'onkeydown="if(event.key===\' \'||event.key===\'Enter\'){event.preventDefault();c45ToggleRevealNames(!c45RevealNames);}">'
+    + '<span class="c45-pwr-track"></span><span class="c45-pwr-knob"><i class="bi bi-power"></i></span>'
+    + '</div></div></div>';
 
   Object.keys(groups).forEach(function (gk) {
     const items = Object.keys(jobs).filter(function (k) { return jobs[k].group === gk; });
