@@ -913,8 +913,16 @@ function ch45_ai_run(PDO $pdo, $jobKey, array $ctx, array $who) {
 
 /** เตรียมข้อมูลนำเข้าทั้งหมดที่ทุกชิ้นงานใช้ร่วมกัน (เรียกครั้งเดียวต่อการวิเคราะห์หนึ่งรอบ) */
 function ch45_build_context(PDO $pdo, array $opt = []) {
-    $ds      = ch45_dataset($pdo, $opt);
-    $quant   = ch45_quant($ds);
+    $ds = ch45_dataset($pdo, $opt);
+
+    // ความเที่ยงระหว่างผู้ประเมิน (ICC) มีอยู่แค่ในกลุ่มทดลองเท่านั้น จึงต้องดึงข้อมูลกลุ่มนี้มาคำนวณ
+    // เสมอ แยกจาก $ds ที่กรองตามกลุ่มที่ผู้ใช้กำลังเลือกดูอยู่บนหน้าจอ (ปกติคือกลุ่มตัวอย่าง) —
+    // ไม่เช่นนั้นตาราง 12 จะแสดงว่า "ยังไม่มีข้อมูล" เมื่อผู้ใช้ไม่ได้สลับมาดูกลุ่มทดลองอยู่
+    $iccDs = (($opt['group'] ?? '') === CH45_ICC_GROUP)
+        ? $ds
+        : ch45_dataset($pdo, array_merge($opt, ['group' => CH45_ICC_GROUP, 'classroom' => '']));
+
+    $quant   = ch45_quant($ds, $iccDs);
     $defects = ch45_defects($ds);
     $mech    = ch45_mechanics($pdo, $ds);
     return [
