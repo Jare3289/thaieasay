@@ -23,17 +23,23 @@ CREATE TABLE IF NOT EXISTS ch45_analysis (
 
 -- 2) บันทึกหลังสอนของผู้วิจัย — แหล่งข้อมูลของ "ข้อเสนอแนะสำหรับการนำผลวิจัยไปใช้" ในบทที่ 5
 CREATE TABLE IF NOT EXISTS ch45_teaching_logs (
-    id         INT AUTO_INCREMENT PRIMARY KEY,
-    poa_stage  VARCHAR(20) NOT NULL DEFAULT 'general', -- motivating / enabling / assessing / general
-    task_unit  TINYINT     NOT NULL DEFAULT 0,         -- 0 = ไม่ระบุหน่วย
-    problem    TEXT        NOT NULL,                   -- ปัญหาที่พบจริงระหว่างจัดการเรียนการสอน
-    solution   TEXT,                                   -- แนวทางแก้ไขที่ใช้แล้วได้ผล
-    evidence   TEXT,                                   -- ข้อสังเกต/หลักฐานประกอบ
-    created_by VARCHAR(50) DEFAULT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    poa_stage   VARCHAR(20) NOT NULL DEFAULT 'general', -- motivating / enabling / assessing / general
+    poa_substep VARCHAR(10) DEFAULT NULL,               -- ขั้นย่อยของผู้วิจัยเอง เช่น 1.1 / 2.2 (ไม่บังคับ)
+    task_unit   TINYINT     NOT NULL DEFAULT 0,         -- 0 = ไม่ระบุหน่วย
+    problem     TEXT        NOT NULL,                   -- ปัญหาที่พบจริงระหว่างจัดการเรียนการสอน
+    solution    TEXT,                                   -- แนวทางแก้ไขที่ใช้แล้วได้ผล
+    evidence    TEXT,                                   -- ข้อสังเกต/หลักฐานประกอบ
+    created_by  VARCHAR(50) DEFAULT NULL,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_ch45_log_stage (poa_stage, task_unit)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ตารางที่สร้างไว้ก่อนหน้านี้แล้วจะไม่มีคอลัมน์ใหม่จาก CREATE TABLE ด้านบน (เพราะมี IF NOT EXISTS)
+-- จึงต้องเพิ่มคอลัมน์ให้ตารางเดิมด้วย (ต้องการ MySQL 8.0.29+ หรือ MariaDB 10.2+)
+ALTER TABLE ch45_teaching_logs
+    ADD COLUMN IF NOT EXISTS poa_substep VARCHAR(10) DEFAULT NULL AFTER poa_stage;
 
 -- 3) คลังอ้างอิงงานวิจัยที่เกี่ยวข้องที่ผู้วิจัยกรอกเอง (ตรวจสอบมาแล้วว่ามีอยู่จริง)
 --    ใช้ให้ระบบ "จับคู่" กับผลจริงตอนเขียนอภิปรายผลบทที่ 5 เท่านั้น

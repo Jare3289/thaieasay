@@ -981,6 +981,8 @@ function ch45_save_teaching_log(PDO $pdo, array $in, $by = '') {
     $stages = ch45_poa_stages();
     $stage = (string)($in['poa_stage'] ?? 'general');
     if (!isset($stages[$stage])) $stage = 'general';
+    $substep = trim((string)($in['poa_substep'] ?? ''));
+    if (mb_strlen($substep) > 10) $substep = mb_substr($substep, 0, 10);
     $unit    = (int)($in['task_unit'] ?? 0);
     $problem = trim((string)($in['problem'] ?? ''));
     $solution= trim((string)($in['solution'] ?? ''));
@@ -990,14 +992,14 @@ function ch45_save_teaching_log(PDO $pdo, array $in, $by = '') {
     if ($problem === '') return ['ok' => false, 'error' => 'กรุณาระบุปัญหาที่พบระหว่างการจัดการเรียนการสอน'];
 
     if ($id > 0) {
-        $stmt = $pdo->prepare('UPDATE ch45_teaching_logs SET poa_stage = ?, task_unit = ?, problem = ?,
-                               solution = ?, evidence = ? WHERE id = ?');
-        $stmt->execute([$stage, $unit, $problem, $solution, $evidence, $id]);
+        $stmt = $pdo->prepare('UPDATE ch45_teaching_logs SET poa_stage = ?, poa_substep = ?, task_unit = ?,
+                               problem = ?, solution = ?, evidence = ? WHERE id = ?');
+        $stmt->execute([$stage, ($substep !== '' ? $substep : null), $unit, $problem, $solution, $evidence, $id]);
         return ['ok' => true, 'id' => $id];
     }
-    $stmt = $pdo->prepare('INSERT INTO ch45_teaching_logs (poa_stage, task_unit, problem, solution, evidence, created_by)
-                           VALUES (?, ?, ?, ?, ?, ?)');
-    $stmt->execute([$stage, $unit, $problem, $solution, $evidence, $by]);
+    $stmt = $pdo->prepare('INSERT INTO ch45_teaching_logs (poa_stage, poa_substep, task_unit, problem, solution, evidence, created_by)
+                           VALUES (?, ?, ?, ?, ?, ?, ?)');
+    $stmt->execute([$stage, ($substep !== '' ? $substep : null), $unit, $problem, $solution, $evidence, $by]);
     return ['ok' => true, 'id' => (int)$pdo->lastInsertId()];
 }
 

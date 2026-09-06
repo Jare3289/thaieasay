@@ -932,18 +932,29 @@ try {
         ");
         safe_ddl($pdo, "
             CREATE TABLE IF NOT EXISTS ch45_teaching_logs (
-                id         INT AUTO_INCREMENT PRIMARY KEY,
-                poa_stage  VARCHAR(20) NOT NULL DEFAULT 'general', -- motivating / enabling / assessing / general
-                task_unit  TINYINT     NOT NULL DEFAULT 0,         -- 0 = ไม่ระบุหน่วย
-                problem    TEXT        NOT NULL,                   -- ปัญหาที่พบจริงระหว่างจัดการเรียนการสอน
-                solution   TEXT,                                   -- แนวทางแก้ไขที่ใช้แล้วได้ผล
-                evidence   TEXT,                                   -- ข้อสังเกต/หลักฐานประกอบ
-                created_by VARCHAR(50) DEFAULT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                id          INT AUTO_INCREMENT PRIMARY KEY,
+                poa_stage   VARCHAR(20) NOT NULL DEFAULT 'general', -- motivating / enabling / assessing / general
+                poa_substep VARCHAR(10) DEFAULT NULL,               -- ขั้นย่อยของผู้วิจัยเอง เช่น 1.1 / 2.2 (ไม่บังคับ)
+                task_unit   TINYINT     NOT NULL DEFAULT 0,         -- 0 = ไม่ระบุหน่วย
+                problem     TEXT        NOT NULL,                   -- ปัญหาที่พบจริงระหว่างจัดการเรียนการสอน
+                solution    TEXT,                                   -- แนวทางแก้ไขที่ใช้แล้วได้ผล
+                evidence    TEXT,                                   -- ข้อสังเกต/หลักฐานประกอบ
+                created_by  VARCHAR(50) DEFAULT NULL,
+                created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 INDEX idx_ch45_log_stage (poa_stage, task_unit)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         ");
+    }
+} catch (Exception $e) {
+    // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
+}
+
+// เพิ่มคอลัมน์ "ขั้นย่อย" ให้ตาราง ch45_teaching_logs ที่สร้างไว้ก่อนหน้านี้แล้ว (ไม่มีคอลัมน์นี้ตั้งแต่ต้น)
+try {
+    $colSubstep = $pdo->query("SHOW COLUMNS FROM ch45_teaching_logs LIKE 'poa_substep'");
+    if ($colSubstep && $colSubstep->rowCount() === 0) {
+        safe_ddl($pdo, "ALTER TABLE ch45_teaching_logs ADD COLUMN poa_substep VARCHAR(10) DEFAULT NULL AFTER poa_stage");
     }
 } catch (Exception $e) {
     // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
