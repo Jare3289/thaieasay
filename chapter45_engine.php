@@ -471,6 +471,108 @@ function ch45_ai_findings(array $quant, array $defects) {
     return $out;
 }
 
+/**
+ * ลิงก์ค้นหา Google Scholar สำหรับประเด็นหนึ่ง — ใช้เป็นทางเลือกสำรองเมื่อค้นเว็บจริงด้วย AI ไม่ได้
+ * (ผู้ให้บริการที่ตั้งค่าไว้ไม่ใช่ Gemini หรือคีย์ที่ใช้ไม่รองรับฟีเจอร์ค้นเว็บ)
+ * ผู้วิจัยกดเปิดแล้วค้นหาเอง คัดลอกรายการที่พบจริงมากรอกในคลังอ้างอิงตามปกติ
+ */
+function ch45_scholar_search_url(array $finding) {
+    $q = 'process-oriented approach POA essay writing ' . $finding['heading'];
+    return 'https://scholar.google.com/scholar?q=' . rawurlencode($q);
+}
+
+/**
+ * ให้ Gemini ค้นเว็บจริงด้วย Google Search grounding เพื่อหางานวิจัยที่เกี่ยวข้องกับประเด็นอภิปรายผล
+ * ใช้ได้เฉพาะผู้ให้บริการ Gemini เท่านั้น (ผู้ให้บริการอื่นไม่มีเครื่องมือค้นเว็บให้เรียกใช้)
+ * แยกออกมาจาก ai_call_model() เพราะ Gemini API ไม่รองรับการส่ง responseMimeType บังคับ JSON
+ * พร้อมกับเปิดใช้เครื่องมือ (tools) ในคำขอเดียวกัน
+ *
+ * คืนค่า:
+ *   ['ok' => true,  'items' => [...], 'grounded' => bool]   grounded = true ต่อเมื่อพบหลักฐานว่าค้นเว็บจริง
+ *   ['ok' => false, 'reason' => 'unsupported', 'error' => ...]  ผู้ให้บริการ/คีย์นี้ใช้เครื่องมือค้นเว็บไม่ได้
+ *   ['ok' => false, 'reason' => 'error',       'error' => ...]  ข้อผิดพลาดอื่น
+ */
+function ch45_ai_search_references(array $settings, array $findings) {
+    if ($settings['kind'] !== 'gemini') {
+        return ['ok' => false, 'reason' => 'unsupported',
+                'error' => 'ค้นเว็บจริงได้เฉพาะเมื่อตั้งค่าผู้ให้บริการเป็น Google Gemini เท่านั้น'];
+    }
+    if (!$findings) {
+        return ['ok' => false, 'reason' => 'error', 'error' => 'ยังไม่มีประเด็นให้ค้นหางานวิจัยประกอบ'];
+    }
+
+    $L = ['คุณคือผู้ช่วยนักวิจัยที่กำลังค้นหา "งานวิจัยที่เกี่ยวข้อง" จริงจากอินเทอร์เน็ต',
+          'เพื่อใช้ประกอบการเขียนอภิปรายผลวิทยานิพนธ์เรื่องผลการจัดการเรียนการสอนเขียนตามแนวคิด POA',
+          'ที่มีต่อความสามารถในการเขียนเรียงความของนักเรียนมัธยมศึกษาตอนปลาย',
+          '', 'ประเด็นที่ต้องการหางานวิจัยมาสนับสนุนหรือเทียบเคียงมีดังนี้:'];
+    foreach ($findings as $i => $f) {
+        $L[] = ($i + 1) . '. [' . $f['key'] . '] ' . $f['heading'] . ' — ' . $f['summary'];
+    }
+    $L = array_merge($L, ['',
+        'ให้ค้นหาจากอินเทอร์เน็ตจริงเท่านั้น ห้ามตอบจากความจำเดิมโดยไม่ค้นก่อน',
+        'หางานวิจัย วิทยานิพนธ์ หรือบทความวิชาการที่เกี่ยวข้องจริง ๆ กับแต่ละประเด็น ไม่เกินประเด็นละ 2 ชิ้น',
+        'ถ้าค้นแล้วไม่พบงานที่เกี่ยวข้องจริงในประเด็นใด ให้ข้ามประเด็นนั้นไปเลย ห้ามแต่งขึ้นมาโดยเด็ดขาด',
+        'ทุกชิ้นที่นำมาต้องมีลิงก์แหล่งที่มาจริงจากผลค้นหาแนบมาด้วยเสมอ',
+        '',
+        'ตอบเป็น JSON เท่านั้น ห้ามมีข้อความอื่นนอกก้อน JSON รูปแบบนี้:',
+        '{"items":[{"finding_key":"คีย์ของประเด็นที่เกี่ยวข้อง",',
+        ' "citation_label":"ป้ายอ้างอิงรูปแบบ ผู้แต่ง (ปี) เช่น Shi (2023) หรือ อรุณี ใจเที่ยง (2565)",',
+        ' "key_finding":"สิ่งที่งานนี้ค้นพบที่เกี่ยวข้องกับประเด็นนี้ โดยย่อ เขียนเป็นภาษาไทย",',
+        ' "source_type":"thesis หรือ journal หรือ book หรือ other","url":"ลิงก์ของแหล่งที่มาจริงที่ค้นพบ"}]}',
+    ]);
+    $prompt = implode("\n", $L);
+
+    $url = $settings['base_url'] . '/models/' . rawurlencode($settings['model']) . ':generateContent';
+    $payload = [
+        'contents'         => [['role' => 'user', 'parts' => [['text' => $prompt]]]],
+        'tools'            => [['google_search' => new stdClass()]],
+        'generationConfig' => ['temperature' => 0.2, 'maxOutputTokens' => 8192],
+    ];
+    $res = ai_http_post_json($url, ['x-goog-api-key: ' . $settings['api_key']], $payload);
+    if ($res['error'] !== '') return ['ok' => false, 'reason' => 'error', 'error' => $res['error']];
+    if (!$res['ok']) {
+        $msg = ai_extract_api_error($res['body'], $res['status']);
+        // คีย์ฟรีหลายรุ่นยังใช้เครื่องมือค้นเว็บไม่ได้ (ต้องเปิด billing) — เจอ 400/403 ถือว่า "ใช้ไม่ได้"
+        // ไม่ใช่ error ที่ต้องแจ้งผู้ใช้ตรง ๆ ให้ผู้เรียกใช้ไปสร้างลิงก์ค้นหาแทน
+        $reason = ($res['status'] === 400 || $res['status'] === 403) ? 'unsupported' : 'error';
+        return ['ok' => false, 'reason' => $reason, 'error' => $msg];
+    }
+
+    $obj = json_decode($res['body'], true);
+    $text = '';
+    if (isset($obj['candidates'][0]['content']['parts']) && is_array($obj['candidates'][0]['content']['parts'])) {
+        foreach ($obj['candidates'][0]['content']['parts'] as $part) {
+            if (isset($part['text'])) $text .= $part['text'];
+        }
+    }
+    // มีก้อนอ้างอิงจากผลค้นเว็บจริงกลับมาหรือไม่ — ใช้ยืนยันว่า "ค้นเว็บจริง" ไม่ใช่ตอบจากความจำเดิม
+    $grounded = !empty($obj['candidates'][0]['groundingMetadata']['groundingChunks']);
+
+    $parsed = ai_extract_json($text);
+    if (!is_array($parsed) || !isset($parsed['items']) || !is_array($parsed['items'])) {
+        return ['ok' => false, 'reason' => 'error', 'error' => 'ค้นเว็บสำเร็จแต่คำตอบไม่ใช่รูปแบบ JSON ที่อ่านได้'];
+    }
+
+    $srcTypes = ch45_reference_source_types();
+    $items = [];
+    foreach ($parsed['items'] as $it) {
+        if (!is_array($it)) continue;
+        $label   = ch45_clean($it['citation_label'] ?? '', 190);
+        $finding = ch45_clean($it['key_finding'] ?? '', 800);
+        if ($label === '' || $finding === '') continue;
+        $srcType = (string)($it['source_type'] ?? 'other');
+        if (!isset($srcTypes[$srcType])) $srcType = 'other';
+        $items[] = [
+            'finding_key'    => ch45_clean($it['finding_key'] ?? '', 60),
+            'citation_label' => $label,
+            'key_finding'    => $finding,
+            'source_type'    => $srcType,
+            'url'            => trim((string)($it['url'] ?? '')),
+        ];
+    }
+    return ['ok' => true, 'items' => $items, 'grounded' => $grounded];
+}
+
 /* =========================================================================
  * ส่วนที่ 4  สร้างคำสั่งของแต่ละชิ้นงาน
  * ========================================================================= */

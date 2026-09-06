@@ -1043,6 +1043,7 @@ function ch45_save_reference(PDO $pdo, array $in, $by = '') {
     $label = trim((string)($in['citation_label'] ?? ''));
     $finding = trim((string)($in['key_finding'] ?? ''));
     $full = trim((string)($in['full_citation'] ?? ''));
+    $url = trim((string)($in['source_url'] ?? ''));
     $type = (string)($in['source_type'] ?? 'other');
     if (!isset($types[$type])) $type = 'other';
     $id = (int)($in['id'] ?? 0);
@@ -1052,13 +1053,13 @@ function ch45_save_reference(PDO $pdo, array $in, $by = '') {
 
     if ($id > 0) {
         $stmt = $pdo->prepare('UPDATE ch45_references SET citation_label = ?, key_finding = ?,
-                               full_citation = ?, source_type = ? WHERE id = ?');
-        $stmt->execute([$label, $finding, $full, $type, $id]);
+                               full_citation = ?, source_url = ?, source_type = ? WHERE id = ?');
+        $stmt->execute([$label, $finding, $full, $url, $type, $id]);
         return ['ok' => true, 'id' => $id];
     }
-    $stmt = $pdo->prepare('INSERT INTO ch45_references (citation_label, key_finding, full_citation, source_type, created_by)
-                           VALUES (?, ?, ?, ?, ?)');
-    $stmt->execute([$label, $finding, $full, $type, $by]);
+    $stmt = $pdo->prepare('INSERT INTO ch45_references (citation_label, key_finding, full_citation, source_url, source_type, created_by)
+                           VALUES (?, ?, ?, ?, ?, ?)');
+    $stmt->execute([$label, $finding, $full, $url, $type, $by]);
     return ['ok' => true, 'id' => (int)$pdo->lastInsertId()];
 }
 

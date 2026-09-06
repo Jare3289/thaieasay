@@ -4211,6 +4211,49 @@ try {
                              JSON_UNESCAPED_UNICODE);
             break;
 
+        // ให้ระบบช่วยค้นหางานวิจัยที่เกี่ยวข้องจริงจากเว็บ (Gemini + Google Search grounding)
+        // ถ้าผู้ให้บริการที่ตั้งค่าไว้ไม่ใช่ Gemini หรือคีย์ที่ใช้ไม่รองรับ จะคืนลิงก์ค้นหาให้กดค้นเองแทน
+        // ไม่ว่ากรณีใด ผลลัพธ์เป็นเพียง "ข้อเสนอ" — ต้องกดยืนยันเพิ่มลงคลังเองเสมอ ไม่มีการบันทึกอัตโนมัติ
+        case 'ch45_find_references':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้น']);
+                exit;
+            }
+            $c45Used = ai_usage_today($pdo, $_SESSION['user']['id']);
+            if ($c45Used >= CH45_DAILY_LIMIT) {
+                echo json_encode(['success' => false,
+                    'error' => 'วันนี้ใช้ระบบครบ ' . CH45_DAILY_LIMIT . ' ครั้งแล้ว กรุณาลองใหม่ในวันพรุ่งนี้']);
+                exit;
+            }
+            $c45Ctx = ch45_build_context($pdo, [
+                'group'     => isset($request_data['group'])     ? trim((string)$request_data['group'])     : '',
+                'classroom' => isset($request_data['classroom']) ? trim((string)$request_data['classroom']) : '',
+            ]);
+            $c45Findings = ch45_ai_findings($c45Ctx['quant'], $c45Ctx['defects']);
+            $c45Settings = ai_settings($pdo);
+            if (!$c45Settings['enabled'])    { echo json_encode(['success' => false, 'error' => 'คุณครูปิดการใช้งานระบบตรวจอัตโนมัติไว้']); exit; }
+            if (!$c45Settings['configured']) { echo json_encode(['success' => false, 'error' => 'ยังไม่ได้ตั้งค่าระบบตรวจอัตโนมัติ กรุณาใส่ API key ในหน้า "ระบบตรวจอัตโนมัติ" ก่อน']); exit; }
+
+            $c45Search = ch45_ai_search_references($c45Settings, $c45Findings);
+            ai_log_usage($pdo, (string)$_SESSION['user']['id'], (string)$_SESSION['user']['role'], null,
+                         'ch45:find_references', $c45Search['ok'] ? 1 : 0, $c45Search['ok'] ? '' : (string)($c45Search['error'] ?? ''));
+
+            if ($c45Search['ok']) {
+                echo json_encode(['success' => true, 'mode' => 'search',
+                    'grounded' => $c45Search['grounded'], 'items' => $c45Search['items']], JSON_UNESCAPED_UNICODE);
+                break;
+            }
+            if ($c45Search['reason'] === 'unsupported') {
+                $c45Links = array_map(function ($f) {
+                    return ['finding_key' => $f['key'], 'heading' => $f['heading'], 'url' => ch45_scholar_search_url($f)];
+                }, $c45Findings);
+                echo json_encode(['success' => true, 'mode' => 'links',
+                    'note' => $c45Search['error'], 'links' => $c45Links], JSON_UNESCAPED_UNICODE);
+                break;
+            }
+            echo json_encode(['success' => false, 'error' => $c45Search['error']], JSON_UNESCAPED_UNICODE);
+            break;
+
         // ลบรายการอ้างอิงหนึ่งรายการจากคลัง
         case 'ch45_delete_reference':
             if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {

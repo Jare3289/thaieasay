@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS ch45_references (
                                            -- ระบบต้องคัดลอกป้ายนี้คำต่อคำเท่านั้นเมื่ออ้างอิง
     key_finding    TEXT NOT NULL,         -- สิ่งที่งานนี้ค้นพบ/แนวคิดสำคัญโดยย่อ (คำพูดของผู้วิจัยเอง)
     full_citation  TEXT,                  -- รายการอ้างอิงฉบับเต็มสำหรับหน้าบรรณานุกรม (ถ้ามี)
+    source_url     VARCHAR(500) DEFAULT '', -- ลิงก์แหล่งที่มา ไว้กดตรวจสอบซ้ำภายหลัง (ถ้ามี)
     source_type    VARCHAR(20) NOT NULL DEFAULT 'other', -- thesis / journal / book / other
     created_by     VARCHAR(50) DEFAULT NULL,
     created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
