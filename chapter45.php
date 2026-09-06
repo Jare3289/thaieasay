@@ -69,7 +69,7 @@ $c45IsTeacher = ($sessionUser['role'] === 'teacher');
 <?php if ($c45IsTeacher): ?>
           <button id="c45ExportBtn" class="btn btn-sm fw-bold rounded-pill px-3 text-white d-block w-100"
                   style="background:linear-gradient(135deg,#1a1a2e,#4c1d95);" type="button" onclick="sendChapter45ReportToGoogleDocs()">
-            <i class="bi bi-google me-1"></i>ส่งออกหน้านี้ทั้งหมดเป็น Google Doc
+            <i class="bi bi-google me-1"></i>ส่งร่างบทที่ 4-5 เข้า Google Doc
           </button>
           <div id="c45GoogleStatusBox" class="small text-white-50 mt-1"></div>
 <?php endif; ?>
@@ -85,6 +85,51 @@ $c45IsTeacher = ($sessionUser['role'] === 'teacher');
   </div>
 
   <div id="c45Alert" class="alert border-0 rounded-3 small d-none" role="alert"></div>
+
+<?php if ($c45IsTeacher): ?>
+  <!-- ปุ่มหลัก: วิเคราะห์ทั้งบทที่ 4 และบทที่ 5 ในครั้งเดียว (วางไว้บนสุดเพราะเป็นสิ่งที่กดบ่อยที่สุด) -->
+  <div class="card border-0 shadow-lg rounded-4 mb-4" style="border-top:5px solid #6d28d9 !important;">
+    <div class="card-body p-4">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div>
+          <h5 class="fw-bold mb-1"><i class="bi bi-stars me-2" style="color:#6d28d9"></i>วิเคราะห์และเรียบเรียงด้วย AI</h5>
+          <p class="text-muted small mb-0">
+            กดปุ่มเดียว ระบบจะเขียนให้ครบ<strong>ทั้งบทที่ 4 และบทที่ 5</strong> ทุกหัวข้อ
+            เรียงลำดับให้เองตามหัวข้อที่ต้องมีผลก่อน (ตัวบ่งชี้ → สรุปด้าน → ภาพรวม → บทที่ 5)
+            ใช้เวลาประมาณ 5-15 นาที · เปิดหน้านี้ทิ้งไว้จนกว่าจะเสร็จ
+          </p>
+        </div>
+        <div class="d-flex gap-2 flex-wrap align-items-center">
+          <button id="c45RunAllBtn" class="btn btn-lg fw-bold rounded-pill px-4 py-3 text-white"
+                  style="background:linear-gradient(135deg,#6d28d9,#0d7377);" onclick="c45RunAll()">
+            <i class="bi bi-stars me-1"></i>วิเคราะห์ทั้งหมด (บทที่ 4 และ 5)
+          </button>
+          <button id="c45StopBtn" class="btn btn-outline-danger rounded-pill px-3 d-none" onclick="c45Stop()">
+            <i class="bi bi-stop-circle"></i> หยุด
+          </button>
+          <button class="btn btn-outline-secondary rounded-pill px-3" onclick="c45ClearAll()">
+            <i class="bi bi-trash3"></i> ล้างผลทั้งหมด
+          </button>
+        </div>
+      </div>
+      <div id="c45Progress" class="d-none mt-3">
+        <div class="progress rounded-pill mb-2" style="height:10px;">
+          <div id="c45ProgressBar" class="progress-bar" style="width:0%;background:#6d28d9"></div>
+        </div>
+        <div id="c45ProgressLabel" class="small text-muted mb-2"></div>
+        <div id="c45RunLog" class="small bg-light rounded-3 p-2"
+             style="max-height:220px; overflow:auto; font-family:ui-monospace,monospace;"></div>
+      </div>
+      <div class="alert alert-light border rounded-3 small mb-0 mt-3">
+        <i class="bi bi-info-circle me-1"></i>
+        ยังไม่ได้กรอก <strong>บันทึกหลังสอน</strong> หรือ <strong>คลังอ้างอิงงานวิจัยที่เกี่ยวข้อง</strong> ก็กดได้
+        แต่หัวข้อข้อเสนอแนะจะว่าง และอภิปรายผลจะไม่มีการอ้างอิงงานวิจัย —
+        กรอกสองกล่องนั้นท้ายหน้าแล้วกดวิเคราะห์ใหม่ได้ทุกเมื่อ
+      </div>
+    </div>
+  </div>
+<?php endif; ?>
+
 
   <!-- 1) ความพร้อมของข้อมูล -->
   <div class="card border-0 shadow-sm rounded-4 mb-4" style="border-top:4px solid #0f766e !important;">
@@ -121,43 +166,6 @@ $c45IsTeacher = ($sessionUser['role'] === 'teacher');
       <div id="c45MechBox" class="mt-3 small"></div>
     </div>
   </div>
-
-<?php if ($c45IsTeacher): ?>
-  <!-- 4) สั่งให้ระบบวิเคราะห์ -->
-  <div class="card border-0 shadow-sm rounded-4 mb-4" style="border-top:4px solid #6d28d9 !important;">
-    <div class="card-body p-4">
-      <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
-        <div>
-          <h5 class="fw-bold mb-1"><i class="bi bi-file-earmark-check me-2" style="color:#6d28d9"></i>ให้ระบบวิเคราะห์และเรียบเรียง</h5>
-          <p class="text-muted small mb-0">
-            ระบบจะสั่งทีละหัวข้อตามลำดับที่ถูกต้อง (ตัวบ่งชี้ → องค์ประกอบ → ภาพรวม → บทที่ 5)
-            เพราะหัวข้อสรุปต้องอ่านผลของหัวข้อย่อยก่อน
-          </p>
-        </div>
-        <div class="d-flex gap-2 flex-wrap">
-          <button id="c45RunAllBtn" class="btn btn-lg fw-bold rounded-pill px-4 text-white"
-                  style="background:linear-gradient(135deg,#6d28d9,#0d7377);" onclick="c45RunAll()">
-            <i class="bi bi-stars me-1"></i>วิเคราะห์ทั้งหมด
-          </button>
-          <button id="c45StopBtn" class="btn btn-outline-danger rounded-pill px-3 d-none" onclick="c45Stop()">
-            <i class="bi bi-stop-circle"></i> หยุด
-          </button>
-          <button class="btn btn-outline-secondary rounded-pill px-3" onclick="c45ClearAll()">
-            <i class="bi bi-trash3"></i> ล้างผลทั้งหมด
-          </button>
-        </div>
-      </div>
-      <div id="c45Progress" class="d-none">
-        <div class="progress rounded-pill mb-2" style="height:10px;">
-          <div id="c45ProgressBar" class="progress-bar" style="width:0%;background:#6d28d9"></div>
-        </div>
-        <div id="c45ProgressLabel" class="small text-muted mb-2"></div>
-        <div id="c45RunLog" class="small bg-light rounded-3 p-2"
-             style="max-height:220px; overflow:auto; font-family:ui-monospace,monospace;"></div>
-      </div>
-    </div>
-  </div>
-<?php endif; ?>
 
   <!-- 5) ผลวิเคราะห์รายหัวข้อ -->
   <div id="c45Results" class="mb-4"></div>
@@ -228,6 +236,10 @@ $c45IsTeacher = ($sessionUser['role'] === 'teacher');
         <strong>ต้องเปิดลิงก์แหล่งที่มาตรวจสอบและกดยืนยันเพิ่มลงคลังเองเสมอ ระบบจะไม่บันทึกให้อัตโนมัติ</strong>
       </p>
       <div id="c45FindRefResults" class="mb-3"></div>
+
+      <!-- ประเด็นที่ระบบประมวลจากผลจริงที่เก็บมา — บอกว่าต้องการงานอ้างอิงเรื่องอะไรบ้าง -->
+      <div id="c45FindingsBox" class="mb-3"></div>
+
       <div class="row g-2 align-items-end mb-3">
         <div class="col-md-3">
           <label class="form-label small fw-bold mb-1">ป้ายอ้างอิงในเนื้อความ <span class="text-danger">*</span></label>
@@ -238,9 +250,37 @@ $c45IsTeacher = ($sessionUser['role'] === 'teacher');
           <select id="c45RefType" class="form-select form-select-sm"></select>
         </div>
         <div class="col-md-7">
+          <label class="form-label small fw-bold mb-1">ประเด็นที่งานนี้ใช้จับคู่ (ระบบประมวลจากผลจริงให้แล้ว)</label>
+          <select id="c45RefFindingKey" class="form-select form-select-sm"></select>
+        </div>
+
+        <!-- ช่วยเขียนช่อง "สิ่งที่งานนี้ค้นพบโดยย่อ" ที่เขียนเองยากที่สุด -->
+        <div class="col-12">
+          <div class="border rounded-3 p-2" style="background:#f7f7ff;">
+            <label class="form-label small fw-bold mb-1">
+              <i class="bi bi-magic me-1" style="color:#6366f1;"></i>
+              วางข้อความจากงานวิจัยนั้น แล้วให้ระบบย่อให้
+            </label>
+            <textarea id="c45RefSource" class="form-control form-control-sm" rows="3"
+                      placeholder="วางบทคัดย่อ ส่วนผลการวิจัย หรือย่อหน้าที่เขียนถึงงานนี้ในบทที่ 2 ของคุณครูเองก็ได้ (อย่างน้อย 80 ตัวอักษร)"></textarea>
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-2">
+              <span class="small text-muted">
+                ระบบย่อได้เฉพาะจากข้อความที่วางมาเท่านั้น <strong>จะแต่งข้อค้นพบให้งานของคนอื่นเองไม่ได้</strong> —
+                ถ้าเลือกประเด็นไว้ ระบบจะย่อในมุมที่ตรงกับประเด็นนั้นให้
+              </span>
+              <button id="c45DraftFindingBtn" class="btn btn-sm btn-outline-primary rounded-pill px-3"
+                      onclick="c45DraftKeyFinding()">
+                <i class="bi bi-magic me-1"></i>ช่วยสรุปให้
+              </button>
+            </div>
+            <div id="c45DraftFindingMsg" class="small mt-2"></div>
+          </div>
+        </div>
+
+        <div class="col-12">
           <label class="form-label small fw-bold mb-1">สิ่งที่งานนี้ค้นพบโดยย่อ <span class="text-danger">*</span></label>
-          <input id="c45RefFinding" class="form-control form-control-sm"
-                 placeholder="เช่น พบว่ากลวิธีการกำกับตนเองด้านภาษาเป็นกลวิธีที่เปลี่ยนแปลงช้าที่สุดในบรรดาทักษะการเขียน">
+          <textarea id="c45RefFinding" class="form-control form-control-sm" rows="2"
+                 placeholder="เช่น พบว่ากลวิธีการกำกับตนเองด้านภาษาเป็นกลวิธีที่เปลี่ยนแปลงช้าที่สุดในบรรดาทักษะการเขียน"></textarea>
         </div>
         <div class="col-md-6">
           <label class="form-label small fw-bold mb-1">รายการอ้างอิงฉบับเต็ม (สำหรับหน้าบรรณานุกรม ถ้ามี)</label>
@@ -494,8 +534,14 @@ function c45PaintDefects() {
 
 <script>
 /* ---------------------------------------------------------------- ผลวิเคราะห์ */
+/* ลำดับ "ตอนสั่งวิเคราะห์" ต่างจากลำดับที่แสดงบนหน้าจอ
+   หน้าจอเรียงตามลำดับของบทที่ 4-5 ส่วนการสั่งงานต้องเรียงตามชิ้นงานที่ต้องมีผลก่อน (deps)
+   ฝั่งเซิร์ฟเวอร์เรียงลำดับนี้ให้แล้วใน run_order */
 function c45JobsInOrder() {
-  return Object.keys(c45Data.jobs);
+  const order = (c45Data.run_order || []).filter(function (k) { return c45Data.jobs[k]; });
+  if (!order.length) return Object.keys(c45Data.jobs);
+  Object.keys(c45Data.jobs).forEach(function (k) { if (order.indexOf(k) < 0) order.push(k); });
+  return order;
 }
 
 function c45WarnBox(warnings) {
@@ -540,7 +586,8 @@ function c45RenderPayload(jobKey, payload) {
     return c45Para('ย่อหน้าก่อนตาราง 12 (การตรวจสอบข้อตกลงเบื้องต้น)', payload.para_method)
       + c45Para('ย่อหน้าอ่านผลภาพรวม', payload.para_overall)
       + c45Para('ย่อหน้าผลรายด้าน', payload.para_domains)
-      + c45Para('ย่อหน้าเปรียบเทียบขนาดการเปลี่ยนแปลงระหว่างองค์ประกอบ', payload.para_ranking);
+      + c45Para('ย่อหน้าเปรียบเทียบขนาดการเปลี่ยนแปลงระหว่างองค์ประกอบ', payload.para_ranking)
+      + c45Para('ย่อหน้าสรุปปิดตอนที่ 1', payload.para_closing);
   }
 
   if (jobKey.indexOf('ind_') === 0) {
@@ -572,6 +619,7 @@ function c45RenderPayload(jobKey, payload) {
         + '<td>' + c45Esc(r.cell1) + '</td><td>' + c45Esc(r.cell2) + '</td></tr>';
     });
     h += '</tbody></table></div>';
+    h += c45Para('ย่อหน้าสรุปปิดด้านนี้ (อยู่ท้ายสุดของหัวข้อ ต่อจากตัวบ่งชี้ข้อสุดท้าย)', payload.closing);
     return '<div class="small text-muted mb-2">ตาราง ' + c45Esc(d.table || '') + '</div>' + h;
   }
 
@@ -587,6 +635,7 @@ function c45RenderPayload(jobKey, payload) {
         + '<td>' + c45Esc(c.work2) + '</td></tr>';
     });
     h += '</tbody></table></div>';
+    h += c45Para('ย่อหน้าสรุปปิดบทที่ 4 (อยู่ท้ายสุดของบท ต่อจากองค์ประกอบด้านที่ 4)', payload.closing);
     return h;
   }
 
@@ -599,7 +648,8 @@ function c45RenderPayload(jobKey, payload) {
       + c45Para('ด้านเนื้อหาสาระ', payload.part2_d1)
       + c45Para('ด้านองค์ประกอบและการลำดับเรื่อง', payload.part2_d2)
       + c45Para('ด้านการใช้สำนวนภาษา', payload.part2_d3)
-      + c45Para('ด้านอักขรวิธีและกลไกการเขียน', payload.part2_d4);
+      + c45Para('ด้านอักขรวิธีและกลไกการเขียน', payload.part2_d4)
+      + c45Para('ย่อหน้าสรุปปิดส่วนสรุปผลการวิจัย', payload.part2_closing);
   }
 
   if (jobKey === 'ch5_discussion') {
@@ -631,6 +681,7 @@ function c45RenderPayload(jobKey, payload) {
         + citeBox
         + '</div>';
     });
+    if (h) h += c45Para('ย่อหน้าสรุปปิดการอภิปรายผล', payload.closing);
     return h || '<div class="text-muted small">ยังไม่มีประเด็นอภิปรายผล</div>';
   }
 
@@ -643,6 +694,7 @@ function c45RenderPayload(jobKey, payload) {
     (payload.future || []).forEach(function (f, i) {
       h += c45Para('ข้อเสนอแนะสำหรับการวิจัยครั้งต่อไป ข้อที่ ' + (i + 1), f.text);
     });
+    h += c45Para('ย่อหน้าปิดท้ายบทที่ 5', payload.closing);
     if (payload.note) h += '<div class="alert alert-info border-0 rounded-3 py-2 small mb-0">'
       + c45Esc(payload.note) + '</div>';
     return h;
@@ -674,6 +726,12 @@ function c45PaintResults() {
     + 'onkeydown="if(event.key===\' \'||event.key===\'Enter\'){event.preventDefault();c45ToggleRevealNames(!c45RevealNames);}">'
     + '<span class="c45-pwr-track"></span><span class="c45-pwr-knob"><i class="bi bi-power"></i></span>'
     + '</div></div></div>';
+
+  html += '<div class="alert alert-light border rounded-3 small mb-3">'
+    + '<i class="bi bi-list-ol me-1"></i><strong>หัวข้อด้านล่างเรียงตามลำดับของบทที่ 4 และบทที่ 5 จริง ๆ</strong> — '
+    + 'อ่านไล่ลงมาจะได้เนื้อหาตามลำดับของวิทยานิพนธ์ ทุกหัวข้อจบด้วยย่อหน้าสรุปก่อนขึ้นหัวข้อใหม่เสมอ '
+    + 'และเนื้อหาของเรื่องเดียวกัน (ย่อหน้าเปิด ตาราง ตัวบ่งชี้ ย่อหน้าสรุป) อยู่รวมกันในกล่องเดียว '
+    + 'กด &quot;เปิดร่างบทที่ 4-5&quot; ด้านบนเพื่อดูฉบับที่ประกอบเสร็จแล้ว</div>';
 
   Object.keys(groups).forEach(function (gk) {
     const items = Object.keys(jobs).filter(function (k) { return jobs[k].group === gk; });
@@ -783,8 +841,9 @@ async function c45RunOne(jobKey) {
 
 async function c45RunAll() {
   if (c45Running) return;
-  if (!confirm('ระบบจะสั่งให้ระบบวิเคราะห์ทั้ง ' + Object.keys(c45Data.jobs).length
-      + ' หัวข้อตามลำดับ ใช้เวลาประมาณ 5-15 นาที ผลเดิมจะถูกทับ ยืนยันหรือไม่?')) return;
+  if (!confirm('ระบบจะเขียนให้ครบทั้งบทที่ 4 และบทที่ 5 รวม ' + Object.keys(c45Data.jobs).length
+      + ' หัวข้อ ตามลำดับที่ถูกต้อง ใช้เวลาประมาณ 5-15 นาที (เปิดหน้านี้ทิ้งไว้จนกว่าจะเสร็จ) '
+      + 'ผลเดิมจะถูกทับทั้งหมด ยืนยันหรือไม่?')) return;
 
   c45Running = true;
   c45Stopped = false;
@@ -820,7 +879,7 @@ async function c45RunAll() {
   c45PaintResults();
   c45Alert(failed
     ? ('วิเคราะห์เสร็จแล้ว แต่มี ' + failed + ' หัวข้อที่ไม่สำเร็จ — กดวิเคราะห์ซ้ำเฉพาะหัวข้อนั้นได้')
-    : 'วิเคราะห์ครบทุกหัวข้อแล้ว กด "เปิดร่างบทที่ 4-5" ด้านบนเพื่อดูฉบับประกอบเสร็จ',
+    : 'เขียนครบทั้งบทที่ 4 และบทที่ 5 แล้ว กด "เปิดร่างบทที่ 4-5" ด้านบนเพื่อดูฉบับประกอบเสร็จ',
     failed ? 'warning' : 'success');
 }
 
@@ -1030,6 +1089,18 @@ function c45PaintReferences() {
       return '<option value="' + c45Esc(k) + '">' + c45Esc(types[k]) + '</option>';
     }).join('');
   }
+  const findings = c45Data.findings || [];
+  const fsel = document.getElementById('c45RefFindingKey');
+  if (fsel) {
+    const keep = fsel.value;
+    fsel.innerHTML = '<option value="">— ยังไม่ระบุ (ระบบจะจับคู่ให้ตอนเขียนอภิปรายผล) —</option>'
+      + findings.map(function (f) {
+          return '<option value="' + c45Esc(f.key) + '">' + c45Esc(f.heading) + '</option>';
+        }).join('');
+    fsel.value = keep;
+  }
+  c45PaintFindings();
+
   const refs = c45Data.references || [];
   const box = document.getElementById('c45RefList');
   if (!refs.length) {
@@ -1039,15 +1110,19 @@ function c45PaintReferences() {
       + 'จนกว่าจะกรอกไว้ที่นี่</div>';
     return;
   }
+  const headingOf = {};
+  findings.forEach(function (f) { headingOf[f.key] = f.heading; });
+
   box.innerHTML = '<div class="table-responsive"><table class="table table-sm align-middle mb-0">'
     + '<thead class="table-light"><tr><th>ป้ายอ้างอิง</th><th>ประเภท</th><th>สิ่งที่ค้นพบโดยย่อ</th>'
-    + '<th class="text-end">จัดการ</th></tr></thead><tbody>'
+    + '<th>ประเด็นที่จับคู่</th><th class="text-end">จัดการ</th></tr></thead><tbody>'
     + refs.map(function (r) {
         return '<tr><td class="small fw-bold">' + c45Esc(r.citation_label)
           + (r.source_url ? ' <a href="' + c45Esc(r.source_url) + '" target="_blank" rel="noopener" title="เปิดแหล่งที่มา">'
               + '<i class="bi bi-box-arrow-up-right"></i></a>' : '') + '</td>'
           + '<td class="small">' + c45Esc(types[r.source_type] || r.source_type) + '</td>'
           + '<td class="small">' + c45Esc(r.key_finding) + '</td>'
+          + '<td class="small text-muted">' + (headingOf[r.finding_key] ? c45Esc(headingOf[r.finding_key]) : '—') + '</td>'
           + '<td class="text-end text-nowrap">'
           + '<button class="btn btn-sm btn-outline-secondary rounded-pill me-1" onclick="c45EditReference(' + r.id + ')">'
           + '<i class="bi bi-pencil"></i></button>'
@@ -1057,6 +1132,100 @@ function c45PaintReferences() {
     + '</tbody></table></div>';
 }
 
+/* ---------------------------------------------------------------- ประเด็นที่ต้องการงานอ้างอิง */
+/* ประเด็นเหล่านี้ระบบประมวลจาก "ผลจริงที่เก็บมาแล้ว" (ตาราง 12 และตาราง 14) ไม่ใช่ข้อสันนิษฐาน
+   มีไว้บอกผู้วิจัยว่าต้องไปหางานวิจัยเรื่องอะไรมาอ้าง และควรย่อข้อค้นพบของงานนั้นในมุมไหน */
+function c45PaintFindings() {
+  const box = document.getElementById('c45FindingsBox');
+  if (!box) return;
+  const findings = c45Data.findings || [];
+  const refs = c45Data.references || [];
+  if (!findings.length) {
+    box.innerHTML = '<div class="alert alert-light border rounded-3 small mb-0">'
+      + 'ยังประมวลประเด็นจากผลจริงไม่ได้ — ต้องมีคะแนนก่อนเรียน/หลังเรียน และคะแนนผลงาน 2 ครั้งครบก่อน</div>';
+    return;
+  }
+  const covered = {};
+  refs.forEach(function (r) { if (r.finding_key) covered[r.finding_key] = (covered[r.finding_key] || 0) + 1; });
+  const missing = findings.filter(function (f) { return !covered[f.key]; }).length;
+
+  box.innerHTML = '<div class="border rounded-3 p-3" style="background:#fbfbff;">'
+    + '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">'
+    + '<div class="fw-bold small"><i class="bi bi-clipboard-data me-1" style="color:#6366f1;"></i>'
+    + 'ประเด็นที่ระบบประมวลจากผลจริง — ต้องการงานอ้างอิงเรื่องเหล่านี้</div>'
+    + '<span class="badge ' + (missing ? 'bg-warning text-dark' : 'bg-success') + ' px-3 py-2">'
+    + (missing ? 'ยังไม่มีงานอ้างอิง ' + missing + ' ประเด็น' : 'มีงานอ้างอิงครบทุกประเด็นแล้ว') + '</span></div>'
+    + '<div class="small text-muted mb-2">กดปุ่ม &quot;หางานให้ประเด็นนี้&quot; เพื่อเลือกประเด็นลงในฟอร์มด้านล่าง '
+    + 'แล้ววางข้อความจากงานวิจัยที่หามาได้ ระบบจะย่อเป็นช่อง &quot;สิ่งที่งานนี้ค้นพบโดยย่อ&quot; ให้ในมุมของประเด็นนั้น</div>'
+    + findings.map(function (f) {
+        const n = covered[f.key] || 0;
+        return '<div class="border rounded-3 p-2 mb-2 bg-white">'
+          + '<div class="d-flex justify-content-between align-items-start flex-wrap gap-2">'
+          + '<div class="pe-2"><div class="fw-bold small">' + c45Esc(f.heading) + '</div>'
+          + '<div class="small text-muted">' + c45Esc(f.summary) + '</div>'
+          + (f.genre_bound ? '<div class="small text-warning-emphasis mt-1">'
+              + '<i class="bi bi-exclamation-triangle me-1"></i>ตัวบ่งชี้นี้ผูกกับประเภทของงานเขียน '
+              + 'ควรหางานที่พูดถึงการปรับกลวิธีตามประเภทงานเขียน ไม่ใช่พัฒนาการจากการสอนล้วน ๆ</div>' : '')
+          + '</div>'
+          + '<div class="text-nowrap">'
+          + '<span class="badge ' + (n ? 'bg-success-subtle text-success-emphasis' : 'bg-light text-secondary') + ' me-1">'
+          + (n ? 'มีแล้ว ' + n + ' งาน' : 'ยังไม่มีงานอ้างอิง') + '</span>'
+          + '<button class="btn btn-sm btn-outline-primary rounded-pill" '
+          + 'onclick="c45UseFinding(\'' + c45Esc(f.key) + '\')">'
+          + '<i class="bi bi-arrow-down-square me-1"></i>หางานให้ประเด็นนี้</button>'
+          + '</div></div></div>';
+      }).join('')
+    + '</div>';
+}
+
+function c45UseFinding(key) {
+  const sel = document.getElementById('c45RefFindingKey');
+  if (sel) sel.value = key;
+  const src = document.getElementById('c45RefSource');
+  if (src) { src.scrollIntoView({ behavior: 'smooth', block: 'center' }); src.focus(); }
+}
+
+/* ---------------------------------------------------------------- ช่วยย่อ "สิ่งที่งานนี้ค้นพบโดยย่อ" */
+/* ย่อจากข้อความต้นฉบับที่ผู้วิจัยวางมาเท่านั้น — ไม่สร้างข้อค้นพบให้งานของคนอื่นขึ้นเอง
+   และตรวจซ้ำฝั่งเซิร์ฟเวอร์ว่าไม่ได้เติมตัวเลขหรือปีที่ไม่มีในต้นฉบับ */
+async function c45DraftKeyFinding() {
+  const btn = document.getElementById('c45DraftFindingBtn');
+  const msg = document.getElementById('c45DraftFindingMsg');
+  const src = document.getElementById('c45RefSource').value.trim();
+  if (src.length < 80) {
+    msg.innerHTML = '<span class="text-danger">กรุณาวางข้อความจากงานวิจัยนั้นอย่างน้อย 80 ตัวอักษรก่อน '
+      + '(บทคัดย่อ ส่วนผลการวิจัย หรือย่อหน้าที่เขียนถึงงานนี้ในบทที่ 2 ก็ได้)</span>';
+    return;
+  }
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>กำลังย่อ...';
+  msg.innerHTML = '';
+  try {
+    const d = await c45Api(Object.assign({
+      action: 'ch45_draft_key_finding',
+      source_text: src,
+      citation_label: document.getElementById('c45RefLabel').value.trim(),
+      finding_key: document.getElementById('c45RefFindingKey').value
+    }, c45Params()));
+    if (!d.success) {
+      msg.innerHTML = '<span class="text-danger">' + c45Esc(d.error || 'ย่อไม่สำเร็จ') + '</span>';
+      return;
+    }
+    document.getElementById('c45RefFinding').value = d.key_finding || '';
+    if (d.finding_key) document.getElementById('c45RefFindingKey').value = d.finding_key;
+    let h = '<span class="text-success"><i class="bi bi-check2-circle me-1"></i>'
+      + 'ย่อให้แล้ว — <strong>อ่านทวนและแก้ให้เป็นสำนวนของคุณครูเองก่อนบันทึกเสมอ</strong></span>';
+    if (d.warnings && d.warnings.length) {
+      h += '<ul class="mb-0 ps-3 mt-1 text-danger">'
+        + d.warnings.map(function (w) { return '<li>' + c45Esc(w) + '</li>'; }).join('') + '</ul>';
+    }
+    msg.innerHTML = h;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-magic me-1"></i>ช่วยสรุปให้';
+  }
+}
+
 function c45EditReference(id) {
   const r = (c45Data.references || []).find(function (x) { return Number(x.id) === Number(id); });
   if (!r) return;
@@ -1064,6 +1233,7 @@ function c45EditReference(id) {
   document.getElementById('c45RefLabel').value = r.citation_label || '';
   document.getElementById('c45RefType').value = r.source_type || 'other';
   document.getElementById('c45RefFinding').value = r.key_finding || '';
+  document.getElementById('c45RefFindingKey').value = r.finding_key || '';
   document.getElementById('c45RefFull').value = r.full_citation || '';
   document.getElementById('c45RefUrl').value = r.source_url || '';
   document.getElementById('c45RefBtnText').textContent = 'บันทึกการแก้ไข';
@@ -1076,6 +1246,7 @@ async function c45SaveReference() {
     citation_label: document.getElementById('c45RefLabel').value.trim(),
     source_type: document.getElementById('c45RefType').value,
     key_finding: document.getElementById('c45RefFinding').value.trim(),
+    finding_key: document.getElementById('c45RefFindingKey').value,
     full_citation: document.getElementById('c45RefFull').value.trim(),
     source_url: document.getElementById('c45RefUrl').value.trim()
   };
@@ -1084,9 +1255,11 @@ async function c45SaveReference() {
   const d = await c45Api({ action: 'ch45_save_reference', reference: ref });
   if (!d.success) { c45Alert(c45Esc(d.error || 'บันทึกไม่สำเร็จ'), 'danger'); return; }
   c45Data.references = d.references || [];
-  ['c45RefLabel', 'c45RefFinding', 'c45RefFull', 'c45RefUrl'].forEach(function (i) {
+  ['c45RefLabel', 'c45RefFinding', 'c45RefFull', 'c45RefUrl', 'c45RefSource'].forEach(function (i) {
     document.getElementById(i).value = '';
   });
+  document.getElementById('c45RefFindingKey').value = '';
+  document.getElementById('c45DraftFindingMsg').innerHTML = '';
   document.getElementById('c45RefId').value = '0';
   document.getElementById('c45RefBtnText').textContent = 'เพิ่มอ้างอิง';
   c45PaintReferences();
@@ -1110,6 +1283,7 @@ function c45FillReferenceForm(i) {
   document.getElementById('c45RefLabel').value = it.citation_label || '';
   document.getElementById('c45RefType').value = it.source_type || 'other';
   document.getElementById('c45RefFinding').value = it.key_finding || '';
+  document.getElementById('c45RefFindingKey').value = it.finding_key || '';
   document.getElementById('c45RefFull').value = '';
   document.getElementById('c45RefUrl').value = it.url || '';
   document.getElementById('c45RefBtnText').textContent = 'เพิ่มอ้างอิง';
@@ -1159,9 +1333,20 @@ async function c45FindReferences() {
 }
 
 /* ============================================================
-   ส่งออกข้อมูลทั้งหมดของหน้านี้ (ความพร้อมข้อมูล, ตาราง 12, ความเที่ยงระหว่างผู้ประเมิน,
-   ตาราง 14, ผลวิเคราะห์รายหัวข้อทุกหัวข้อที่วิเคราะห์แล้ว, บันทึกหลังสอน, ข้อมูลประจำงานวิจัย)
-   เป็น Google Doc — ใช้ c45Data ที่โหลดไว้ในหน่วยความจำอยู่แล้ว ต่อกับ google_upload_doc.php
+   ส่งร่างบทที่ 4 และบทที่ 5 เข้า Google Doc
+   ------------------------------------------------------------
+   เอกสารที่ได้ "เรียงตามลำดับของวิทยานิพนธ์" ไม่ใช่เรียงตามชนิดของข้อมูล
+   ความเรียงกับตารางของเรื่องเดียวกันจึงอยู่ติดกันเสมอ ไม่ต้องไล่หาคนละที่
+
+     บทที่ 4  ตอนที่ 1 เกริ่นข้อตกลงเบื้องต้น → ตาราง 12 → อ่านผล → ย่อหน้าสรุปปิดตอน
+              ตอนที่ 2 ย่อหน้านำ → ตาราง 13 → ตาราง 14 → รายองค์ประกอบทีละด้าน
+                       (ด้านละ เกริ่น → ตารางของด้าน → ตัวบ่งชี้ทีละข้อ → ย่อหน้าสรุปปิดด้าน)
+                       → ย่อหน้าสรุปปิดบทที่ 4
+     บทที่ 5  สรุปผลการวิจัย → อภิปรายผล → ข้อเสนอแนะ (แต่ละส่วนปิดด้วยย่อหน้าสรุปของตนเอง)
+     ภาคผนวก  ความพร้อมข้อมูล ความเที่ยงระหว่างผู้ประเมิน กลไกการเขียน บันทึกหลังสอน
+              คลังอ้างอิง ข้อมูลประจำงานวิจัย และจุดที่ต้องตรวจสอบ (ไม่ต้องพิมพ์ลงวิทยานิพนธ์)
+
+   ใช้ c45Data ที่โหลดไว้ในหน่วยความจำอยู่แล้ว ต่อกับ google_upload_doc.php
    ตัวเดียวกับหน้าวิเคราะห์สถิติงานวิจัยและหน้าตรวจเรียงความอัตโนมัติ
    ============================================================ */
 const C45_REPORT_AUTHOR = <?php echo json_encode($sessionUser['name'] ?? 'ครูผู้สอน'); ?>;
@@ -1177,124 +1362,303 @@ function c45WrTable(headers, rows) {
   return h + '</tbody></table>';
 }
 
+/* ---------------------------------------------------------------- ตัวช่วยจัดหน้าเอกสาร */
+
+/** ย่อหน้าเนื้อความ (ถ้ายังไม่ได้วิเคราะห์จะขึ้นเป็นช่องว่างพร้อมบอกว่าต้องไปกดอะไร) */
+function c45DocP(text, todoLabel) {
+  const t = (text === null || text === undefined) ? '' : String(text).trim();
+  if (t === '') {
+    return '<p class="para"><span class="todo">[ยังไม่มี' + c45Esc(todoLabel || 'เนื้อหาส่วนนี้')
+      + ' — กดวิเคราะห์หัวข้อที่เกี่ยวข้องในหน้าวิเคราะห์บทที่ 4-5]</span></p>';
+  }
+  return '<p class="para">' + c45Esc(t) + '</p>';
+}
+
+/** ย่อหน้าเนื้อความที่ไม่ต้องย่อหน้าแรก (ใช้กับข้อความกำกับ) */
+function c45DocNote(text) {
+  const t = (text === null || text === undefined) ? '' : String(text).trim();
+  return t === '' ? '' : '<p class="note">' + c45Esc(t) + '</p>';
+}
+
+/** ข้อความตัวอย่างที่ยกมาจากผลงานจริง — อ้างด้วย "นักเรียนคนที่ N" เสมอ ไม่ใส่ชื่อจริงลงเอกสาร */
+function c45DocQuote(exNo, ex, roundLabel) {
+  if (!ex || !ex.text) {
+    return '<p class="quote"><span class="todo">[ตัวอย่าง (' + exNo + ') ยังไม่มีข้อความที่ยกมา'
+      + (ex && ex.reason ? ' — ' + c45Esc(ex.reason) : '') + ']</span></p>';
+  }
+  const warn = ex.verified === true
+    ? (ex.reason ? '<span class="todo">' + c45Esc(ex.reason) + '</span>' : '')
+    : '<span class="todo">⚠ ระบบตรวจไม่พบข้อความนี้ในผลงานจริง — ต้องตรวจสอบกับต้นฉบับก่อนนำไปใช้</span>';
+  return '<p class="quote">' + c45Esc(ex.text) + '</p>'
+    + '<p class="quote-src">(นักเรียนคนที่ ' + c45Esc(ex.student_no) + ' ' + c45Esc(roundLabel) + ')'
+    + (warn ? ' ' + warn : '') + '</p>';
+}
+
+/** ผลวิเคราะห์ของชิ้นงานหนึ่ง (คืน {} ถ้ายังไม่ได้วิเคราะห์) */
+function c45Payload(jobKey) {
+  const r = (c45Data.results || {})[jobKey];
+  return (r && r.payload) ? r.payload : {};
+}
+
 function buildChapter45ReportHtml() {
   const now    = new Date();
   const thDate = now.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
   const P = [];
   const d = c45Data || {};
+  const meta    = d.meta || {};
+  const doms    = d.domains || {};
+  const inds    = d.indicators || {};
+  const q       = d.quant || {};
+  const def     = d.defects || {};
+  const jobs    = d.jobs || {};
+  const results = d.results || {};
+  const w1 = meta.work1_label || 'ผลงานครั้งที่ 1';
+  const w2 = meta.work2_label || 'ผลงานครั้งที่ 2';
 
-  // ---------- ส่วนที่ 1: ความพร้อมของข้อมูล ----------
-  P.push('<h1 class="secn" id="s1">ส่วนที่ 1 ความพร้อมของข้อมูล</h1>');
-  const items = (d.readiness && d.readiness.items) || [];
-  P.push(c45WrTable(['รายการ', 'สถานะ', 'รายละเอียด'], items.map(function (it) {
-    const statusLabel = it.status === 'ok' ? 'พร้อม' : (it.status === 'warn' ? 'ควรตรวจสอบ' : 'ยังขาด');
-    return [it.label, statusLabel, it.detail || ''];
-  })));
+  /* =====================================================================
+     บทที่ 4 — ผลการวิจัย
+     ลำดับของบท: ย่อหน้านำบท → ตอนที่ 1 (เกริ่น → ตาราง 12 → อ่านผล → สรุปปิดตอน)
+                 → ตอนที่ 2 (เกริ่น → ตาราง 13 → ตาราง 14 → รายองค์ประกอบทีละด้าน) → สรุปปิดบท
+     ===================================================================== */
+  P.push('<h1 class="chap" id="ch4">บทที่ 4 ผลการวิจัย</h1>');
+  P.push(c45DocP('ผลการวิจัย เรื่องผลการจัดการเรียนการสอนเขียนตามแนวคิด POA ที่มีต่อความสามารถ'
+    + 'ในการเขียนเรียงความของนักเรียนมัธยมศึกษาตอนปลาย ผู้วิจัยนำเสนอผลการวิจัยเป็น 2 ตอน '
+    + 'ตามวัตถุประสงค์ในการวิจัย ดังนี้'));
+  P.push(c45DocP('ตอนที่ 1 ผลการเปรียบเทียบความสามารถในการเขียนเรียงความของนักเรียนมัธยมศึกษาตอนปลาย'
+    + 'ก่อนและหลังได้รับการจัดการเรียนการสอนเขียนตามแนวคิด POA'));
+  P.push(c45DocP('ตอนที่ 2 ผลการวิเคราะห์การเปลี่ยนแปลงความสามารถในการเขียนเรียงความของนักเรียน'
+    + 'มัธยมศึกษาตอนปลายระหว่างที่ได้รับการจัดการเรียนการสอนเขียนตามแนวคิด POA'));
 
-  // ---------- ส่วนที่ 2: ตาราง 12 + ความเที่ยงระหว่างผู้ประเมิน ----------
-  P.push('<div class="pagebreak"></div>');
-  P.push('<h1 class="secn" id="s2">ส่วนที่ 2 ตาราง 12 ผลการเปรียบเทียบก่อนเรียนและหลังเรียน</h1>');
-  const q = d.quant || {};
-  P.push('<p>n = ' + c45Esc(q.n) + ' คน · df = ' + c45Esc(q.df) + ' · ทดสอบด้วย Paired-samples t-test สองทาง</p>');
-  P.push(c45WrTable(['ความสามารถในการเขียนเรียงความ', 'คะแนนเต็ม', 'ก่อนเรียน M', 'SD', 'หลังเรียน M', 'SD', 't', 'p', 'dz', 'ขนาดอิทธิพล'],
+  /* ---------- ตอนที่ 1 ---------- */
+  const qp = c45Payload('quant_narrative');
+  P.push('<h2 class="part" id="ch4-p1">ตอนที่ 1 ผลการเปรียบเทียบความสามารถในการเขียนเรียงความ'
+    + 'ก่อนและหลังได้รับการจัดการเรียนการสอนเขียนตามแนวคิด POA</h2>');
+  P.push(c45DocP(qp.para_method, 'ย่อหน้าตรวจสอบข้อตกลงเบื้องต้น (ก่อนตาราง 12)'));
+
+  P.push('<p class="tbl-cap">ตาราง 12</p>');
+  P.push('<p class="tbl-title">ผลการเปรียบเทียบความสามารถในการเขียนเรียงความของนักเรียนมัธยมศึกษาตอนปลาย '
+    + 'ก่อนและหลังได้รับการจัดการเรียนการสอนเขียนตามแนวคิด POA</p>');
+  P.push(c45WrTable(['ความสามารถในการเขียนเรียงความ', 'คะแนนเต็ม', 'ก่อนเรียน M', 'SD', 'หลังเรียน M', 'SD', 't', 'p', 'd'],
     (q.rows || []).map(function (r) {
       return [r.label, c45Num(r.max, 0), c45Num(r.pre_mean), c45Num(r.pre_sd), c45Num(r.post_mean), c45Num(r.post_sd),
-        c45Num(r.t, 3) + (r.sig ? '*' : ''), c45P(r.p), c45Num(r.dz), r.effect];
+        c45Num(r.t, 3) + (r.sig ? '*' : ''), c45P(r.p), c45Num(r.dz)];
+    })));
+  P.push('<p class="tbl-note">หมายเหตุ. n = ' + c45Esc(q.n) + ', df = ' + c45Esc(q.df)
+    + ', *p &lt; .05 · d = ขนาดอิทธิพลแบบ Cohen\'s d<sub>z</sub> สำหรับข้อมูลจับคู่</p>');
+
+  P.push(c45DocP(qp.para_overall, 'ย่อหน้าอ่านผลภาพรวมจากตาราง 12'));
+  P.push(c45DocP(qp.para_domains, 'ย่อหน้าผลรายด้าน'));
+  P.push(c45DocP(qp.para_ranking, 'ย่อหน้าเปรียบเทียบขนาดการเปลี่ยนแปลงระหว่างองค์ประกอบ'));
+  P.push(c45DocP(qp.para_closing, 'ย่อหน้าสรุปปิดตอนที่ 1'));
+
+  /* ---------- ตอนที่ 2 ---------- */
+  const ov = c45Payload('overview');
+  P.push('<h2 class="part" id="ch4-p2">ตอนที่ 2 ผลการวิเคราะห์การเปลี่ยนแปลงความสามารถในการเขียนเรียงความ'
+    + 'ระหว่างที่ได้รับการจัดการเรียนการสอนเขียนตามแนวคิด POA</h2>');
+  P.push(c45DocP(ov.intro, 'ย่อหน้านำของตอนที่ 2'));
+  P.push(c45DocP(ov.genre_note, 'ย่อหน้าชี้แจงเรื่องประเภทของงานเขียน'));
+
+  P.push('<p class="tbl-cap">ตาราง 13</p>');
+  P.push('<p class="tbl-title">สรุปภาพรวมของการเปลี่ยนแปลงของความสามารถในการเขียนเรียงความ</p>');
+  P.push(c45WrTable(['องค์ประกอบ', w1, w2], Object.keys(doms).map(function (dk) {
+    const c = (ov.cells || {})[dk] || {};
+    return [doms[dk].name, c.work1 || '— ยังไม่ได้วิเคราะห์ —', c.work2 || '— ยังไม่ได้วิเคราะห์ —'];
+  })));
+
+  P.push(c45DocP('นอกจากนี้ ผู้วิจัยได้นับจำนวนนักเรียนที่ปรากฏข้อบกพร่องในแต่ละตัวบ่งชี้จากผลงานทั้ง 2 ครั้ง '
+    + 'เพื่อแสดงการเปลี่ยนแปลงในเชิงปริมาณควบคู่ไปกับการวิเคราะห์เนื้อหา ดังตาราง 14'));
+  P.push('<p class="tbl-cap">ตาราง 14</p>');
+  P.push('<p class="tbl-title">จำนวนและร้อยละของนักเรียนที่ปรากฏข้อบกพร่องในผลงานเรียงความ จำนวน 2 ครั้ง</p>');
+  let t14 = '<table class="data"><thead><tr><th>ข้อบกพร่องที่พบในผลงานเรียงความ</th>'
+    + '<th>' + c45Esc(w1) + ' n</th><th>' + c45Esc(w1) + ' %</th>'
+    + '<th>' + c45Esc(w2) + ' n</th><th>' + c45Esc(w2) + ' %</th></tr></thead><tbody>';
+  Object.keys(doms).forEach(function (dk) {
+    t14 += '<tr><td colspan="5" class="grp">ด้าน' + c45Esc(doms[dk].name) + '</td></tr>';
+    (doms[dk].indicators || []).forEach(function (id) {
+      const r = (def.rows || {})[id];
+      if (!r) return;
+      t14 += '<tr><td>' + c45Esc(r.no) + '. ' + c45Esc(r.defect) + '</td>'
+        + '<td class="c">' + c45Esc(r.n1) + '</td><td class="c">' + c45Num(r.pct1, 1) + '</td>'
+        + '<td class="c">' + c45Esc(r.n2) + '</td><td class="c">' + c45Num(r.pct2, 1) + '</td></tr>';
+    });
+  });
+  P.push(t14 + '</tbody></table>');
+  P.push('<p class="tbl-note">หมายเหตุ. n = ' + c45Esc(def.n) + ' คน (ผู้ที่มีคะแนนครบทั้งสองครั้ง) · '
+    + c45Esc(def.rule || '') + '</p>');
+  P.push(c45DocP(c45Payload('defect_narrative').para, 'ย่อหน้าอ่านผลใต้ตาราง 14'));
+
+  P.push(c45DocP('เมื่อผู้วิจัยวิเคราะห์การเปลี่ยนแปลงความสามารถในการเขียนเรียงความแบบจำแนกตามองค์ประกอบ 4 ด้าน '
+    + 'จากผลงานเรียงความของนักเรียน จำนวน 2 ครั้ง ผู้วิจัยวิเคราะห์เนื้อหาและนำเสนอข้อมูลตามองค์ประกอบต่าง ๆ ดังนี้'));
+
+  /* ---------- รายองค์ประกอบ: ด้านละหนึ่งชุด เกริ่น → ตาราง → ตัวบ่งชี้ → สรุปปิดด้าน ---------- */
+  Object.keys(doms).forEach(function (dk) {
+    const dom = doms[dk];
+    const dp  = c45Payload('domain_' + dk);
+    P.push('<h3 class="sub" id="ch4-' + dk + '">' + c45Esc(dom.section) + ' ด้าน' + c45Esc(dom.name) + '</h3>');
+    P.push(c45DocP('เมื่อผู้วิจัยตรวจงานเรียงความของนักเรียนมัธยมศึกษาตอนปลายองค์ประกอบด้าน' + dom.name
+      + ' จำนวน 2 ครั้ง ผู้วิจัยได้ข้อค้นพบว่า ' + (String(dp.finding || '').trim() || '…')
+      + ' ปรากฏผลสรุปการเปลี่ยนแปลงด้าน' + dom.name + ' ดังนี้'));
+
+    P.push('<p class="tbl-cap">ตาราง ' + c45Esc(dom.table) + '</p>');
+    P.push('<p class="tbl-title">ผลการเปลี่ยนแปลงความสามารถในการเขียนเรียงความด้าน' + c45Esc(dom.name) + '</p>');
+    P.push(c45WrTable(['การเปลี่ยนแปลง', w1, w2], (dom.indicators || []).map(function (id, i) {
+      let tr = null;
+      (dp.table_rows || []).forEach(function (row) { if (row.indicator === id) tr = row; });
+      return [(i + 1) + '. ' + ((inds[id] || {}).name || id),
+        (tr && tr.cell1) || '— ยังไม่ได้วิเคราะห์ —',
+        (tr && tr.cell2) || '— ยังไม่ได้วิเคราะห์ —'];
     })));
 
-  const n2 = q.normality && q.normality.overall;
-  if (n2 && n2.W !== null) {
-    P.push('<p class="analysis">การแจกแจงของคะแนนผลต่าง (Shapiro-Wilk): W = ' + c45R(n2.W) + ', p = ' + c45P(n2.p) + ' — '
-      + (n2.normal ? 'ไม่แตกต่างจากการแจกแจงปกติ จึงใช้ Paired-samples t-test ได้'
-                   : 'แตกต่างจากการแจกแจงปกติอย่างมีนัยสำคัญ ควรรายงานผลอย่างระมัดระวัง หรือเพิ่ม Wilcoxon signed-rank') + '</p>');
+    (dom.indicators || []).forEach(function (id) {
+      const ind = inds[id] || {};
+      const ip  = c45Payload('ind_' + id.replace('.', '_'));
+      const ex  = ip.ex_no || ind.ex || [0, 0];
+      P.push('<h4 class="sub2">' + c45Esc(ind.sub || '') + ' ' + c45Esc(ind.name || id) + '</h4>');
+      P.push(c45DocP((String(ip.finding || '').trim() ? ip.finding + ' ดังตัวอย่าง (' + ex[0] + ')–(' + ex[1] + ')' : ''),
+        'ย่อหน้าเปิดหัวข้อ ' + (ind.sub || id)));
+      P.push(c45DocQuote(ex[0], ip.excerpt1, w1));
+      P.push(c45DocQuote(ex[1], ip.excerpt2, w2));
+      P.push(c45DocP((String(ip.analysis1 || '').trim() ? 'ตัวอย่าง (' + ex[0] + ') ' + ip.analysis1 : ''),
+        'บทวิเคราะห์ตัวอย่าง (' + ex[0] + ')'));
+      P.push(c45DocP((String(ip.analysis2 || '').trim() ? 'ตัวอย่าง (' + ex[1] + ') ' + ip.analysis2 : ''),
+        'บทวิเคราะห์ตัวอย่าง (' + ex[1] + ')'));
+      P.push(c45DocP(ip.synthesis, 'ข้อสรุปจากคู่ตัวอย่างของหัวข้อนี้'));
+      P.push(c45DocNote(ip.caution));
+    });
+
+    P.push(c45DocP(dp.closing, 'ย่อหน้าสรุปปิดด้าน' + dom.name));
+  });
+
+  P.push(c45DocP(ov.closing, 'ย่อหน้าสรุปปิดบทที่ 4'));
+
+  /* =====================================================================
+     บทที่ 5 — สรุปผลการวิจัย อภิปรายผล และข้อเสนอแนะ
+     ===================================================================== */
+  const s5 = c45Payload('ch5_summary');
+  const d5 = c45Payload('ch5_discussion');
+  const r5 = c45Payload('ch5_recommend');
+
+  P.push('<div class="pagebreak"></div>');
+  P.push('<h1 class="chap" id="ch5">บทที่ 5 สรุปผลการวิจัย อภิปรายผล และข้อเสนอแนะ</h1>');
+  P.push(c45DocP(s5.opening, 'ย่อหน้าเปิดบทที่ 5'));
+
+  P.push('<h2 class="part" id="ch5-1">สรุปผลการวิจัย</h2>');
+  P.push(c45DocP((String(s5.part1 || '').trim() ? 'ตอนที่ 1 ' + s5.part1 : ''), 'สรุปผลตอนที่ 1'));
+  P.push(c45DocP((String(s5.part2_intro || '').trim() ? 'ตอนที่ 2 ' + s5.part2_intro : ''), 'ประโยคนำสรุปผลตอนที่ 2'));
+  Object.keys(doms).forEach(function (dk) {
+    const t = s5['part2_' + dk];
+    P.push(c45DocP((String(t || '').trim() ? 'ด้าน' + doms[dk].name + ' ' + t : ''), 'สรุปด้าน' + doms[dk].name));
+  });
+  P.push(c45DocP(s5.part2_closing, 'ย่อหน้าสรุปปิดส่วนสรุปผลการวิจัย'));
+
+  P.push('<h2 class="part" id="ch5-2">อภิปรายผล</h2>');
+  P.push(c45DocNote('ทุกประเด็นสร้างขึ้นจากผลจริงที่คำนวณได้ในระบบเท่านั้น '
+    + 'การอ้างอิงงานวิจัยที่ปรากฏล้วนตรวจสอบแล้วว่ามีอยู่ในคลังอ้างอิงที่ผู้วิจัยกรอกไว้จริง '
+    + 'ข้อความที่ทำเครื่องหมายไว้คือจุดที่ต้องตรวจสอบก่อนนำไปใช้'));
+  const pts = d5.points || [];
+  if (!pts.length) {
+    P.push(c45DocP('', 'ประเด็นอภิปรายผล'));
+  } else {
+    pts.forEach(function (pt) {
+      const cite = pt.citation || {};
+      P.push('<h3 class="sub">' + c45Esc(pt.heading) + '</h3>');
+      if (pt.suspect_citation) {
+        P.push('<p class="note"><span class="todo">⚠ พบข้อความคล้ายการอ้างอิงงานวิจัยอื่นปะปนอยู่ในเนื้อหา'
+          + 'ที่ไม่ได้แจ้งไว้ — ตรวจสอบว่าเป็นการอ้างอิงจริงหรือระบบแต่งขึ้นเองก่อนใช้</span></p>');
+      }
+      P.push(c45DocP(pt.text, 'ย่อหน้าอภิปรายผลของประเด็นนี้'));
+      if (cite.label) {
+        P.push(cite.verified === false
+          ? '<p class="note"><span class="todo">⚠ อ้างอิง "' + c45Esc(cite.label) + '" — ' + c45Esc(cite.reason) + '</span></p>'
+          : '<p class="note"><em>อ้างอิง: ' + c45Esc(cite.label) + ' (ตรวจสอบแล้วว่ามีอยู่ในคลังอ้างอิงจริง)</em></p>');
+      } else {
+        P.push(c45DocNote('ประเด็นนี้ไม่ได้อ้างอิงงานวิจัย เพราะไม่มีงานในคลังอ้างอิงที่ตรงกับประเด็นนี้'));
+      }
+    });
+    P.push(c45DocP(d5.closing, 'ย่อหน้าสรุปปิดการอภิปรายผล'));
   }
 
-  P.push('<h2>ความเที่ยงระหว่างผู้ประเมิน (ICC — Inter-rater Reliability)</h2>');
+  P.push('<h2 class="part" id="ch5-3">ข้อเสนอแนะ</h2>');
+  P.push('<h3 class="sub">ข้อเสนอแนะสำหรับการนำผลการวิจัยไปใช้</h3>');
+  const recs = r5.items || [];
+  if (!recs.length) {
+    P.push('<p class="para"><span class="todo">[ยังไม่มีข้อเสนอแนะ — ต้องบันทึก "บันทึกหลังสอน" '
+      + 'ในหน้าวิเคราะห์บทที่ 4-5 ก่อน เพราะข้อเสนอแนะส่วนนี้ต้องเขียนจากปัญหาที่พบจริง]</span></p>');
+  } else {
+    recs.forEach(function (it) { P.push(c45DocP(it.text)); });
+  }
+  if (r5.institution) P.push(c45DocP(r5.institution));
+  P.push('<h3 class="sub">ข้อเสนอแนะสำหรับการทำวิจัยครั้งต่อไป</h3>');
+  const futs = r5.future || [];
+  if (!futs.length) {
+    P.push(c45DocP('', 'ข้อเสนอแนะสำหรับการทำวิจัยครั้งต่อไป'));
+  } else {
+    futs.forEach(function (f) { P.push(c45DocP(f.text)); });
+  }
+  P.push(c45DocP(r5.closing, 'ย่อหน้าปิดท้ายบทที่ 5'));
+
+  /* =====================================================================
+     ภาคผนวกของรายงาน — ข้อมูลประกอบที่ใช้ตรวจสอบ ไม่ต้องพิมพ์ลงวิทยานิพนธ์
+     ===================================================================== */
+  P.push('<div class="pagebreak"></div>');
+  P.push('<h1 class="chap" id="app">ภาคผนวกของรายงาน</h1>');
+  P.push(c45DocNote('ส่วนนี้เป็นข้อมูลประกอบที่ใช้ตรวจสอบความถูกต้องของบทที่ 4 และบทที่ 5 '
+    + 'ไม่ได้มีไว้พิมพ์ลงในวิทยานิพนธ์'));
+
+  P.push('<h2 class="part" id="app-a">ก. ความพร้อมของข้อมูล</h2>');
+  P.push(c45WrTable(['รายการ', 'สถานะ', 'รายละเอียด'], ((d.readiness && d.readiness.items) || []).map(function (it) {
+    return [it.label, it.status === 'ok' ? 'พร้อม' : (it.status === 'warn' ? 'ควรตรวจสอบ' : 'ยังขาด'), it.detail || ''];
+  })));
+
+  P.push('<h2 class="part" id="app-b">ข. การตรวจสอบข้อตกลงเบื้องต้นและความเที่ยงระหว่างผู้ประเมิน</h2>');
+  const n2 = q.normality && q.normality.overall;
+  if (n2 && n2.W !== null && n2.W !== undefined) {
+    P.push(c45DocNote('การแจกแจงของคะแนนผลต่าง (Shapiro-Wilk): W = ' + c45R(n2.W) + ', p = ' + c45P(n2.p) + ' — '
+      + (n2.normal ? 'ไม่แตกต่างจากการแจกแจงปกติ จึงใช้ Paired-samples t-test ได้'
+                   : 'แตกต่างจากการแจกแจงปกติอย่างมีนัยสำคัญ ควรรายงานผลอย่างระมัดระวัง หรือเพิ่ม Wilcoxon signed-rank')));
+  }
   const ir = q.interrater || {};
   const irKeys = Object.keys(ir);
   if (irKeys.length) {
-    P.push('<p>ใช้ ICC แบบสองทางผสม ความสอดคล้องสัมบูรณ์ (two-way mixed effects, absolute agreement) เป็นค่าหลักในการสรุปผล '
-      + 'ตามเกณฑ์แปลผลของ Koo &amp; Li (2016) — Pearson r แสดงประกอบเป็นค่าความสัมพันธ์รายคู่เท่านั้น</p>');
+    P.push(c45DocNote('ใช้ ICC แบบสองทางผสม ความสอดคล้องสัมบูรณ์ (two-way mixed effects, absolute agreement) '
+      + 'เป็นค่าหลักในการสรุปผล ตามเกณฑ์แปลผลของ Koo & Li (2016) — Pearson r แสดงประกอบเป็นค่าความสัมพันธ์รายคู่เท่านั้น'));
     P.push(c45WrTable(['รอบ', 'ผู้ประเมิน (k)', 'n', 'ICC(3,1)', 'ICC(3,k)', 'p', 'แปลผล (ยึดตาม ICC)', 'Pearson r รายคู่ (ประกอบ)'],
       irKeys.map(function (k) {
         const v = ir[k];
         return [v.label, v.k, v.n, c45R(v.icc.icc1), c45R(v.icc.iccK), c45P(v.icc.p), v.icc_label,
-          v.pearson.map(function (p) { return 'r = ' + c45R(p.r); }).join(', ')];
+          v.pearson.map(function (pp) { return 'r = ' + c45R(pp.r); }).join(', ')];
       })));
   } else {
-    P.push('<p style="color:#888">ยังคำนวณความเที่ยงระหว่างผู้ประเมินไม่ได้ — ต้องมีผู้ประเมินตั้งแต่ 2 คนขึ้นไปให้คะแนนผลงานชุดเดียวกันในรอบเดียวกัน</p>');
+    P.push(c45DocNote('ยังคำนวณความเที่ยงระหว่างผู้ประเมินไม่ได้ — ต้องมีผู้ประเมินตั้งแต่ 2 คนขึ้นไป'
+      + 'ให้คะแนนผลงานชุดเดียวกันในรอบเดียวกัน'));
   }
 
-  // ---------- ส่วนที่ 3: ตาราง 14 ----------
-  P.push('<div class="pagebreak"></div>');
-  P.push('<h1 class="secn" id="s3">ส่วนที่ 3 ตาราง 14 จำนวนและร้อยละของนักเรียนที่ปรากฏข้อบกพร่อง</h1>');
-  const def = d.defects || {};
-  P.push('<p>n = ' + c45Esc(def.n) + ' คน (ผู้ที่มีคะแนนครบทั้งสองครั้ง) · ' + c45Esc(def.rule || '') + '</p>');
-  Object.keys(d.domains || {}).forEach(function (dk) {
-    const dom = d.domains[dk];
-    P.push('<h3>ด้าน' + c45Esc(dom.name) + '</h3>');
-    P.push(c45WrTable(['ข้อบกพร่องที่พบในผลงานเรียงความ', 'ครั้งที่ 1 n', 'ครั้งที่ 1 %', 'ครั้งที่ 2 n', 'ครั้งที่ 2 %', 'เปลี่ยนแปลง'],
-      (dom.indicators || []).map(function (id) {
-        const r = (def.rows || {})[id];
-        if (!r) return null;
-        return [r.no + '. ' + r.defect, r.n1, c45Num(r.pct1, 1), r.n2, c45Num(r.pct2, 1),
-          (r.diff_pct === null ? '—' : (r.diff_pct > 0 ? '+' : '') + c45Num(r.diff_pct, 1) + '%')];
-      }).filter(Boolean)));
-  });
+  P.push('<h2 class="part" id="app-c">ค. ข้อมูลกลไกการเขียนที่นับจากตัวบทจริง</h2>');
+  const mech = d.mechanics || {};
+  P.push(c45WrTable(['ผลงาน', 'จำนวนฉบับ', 'สะกดผิดเฉลี่ย (แห่ง/ชิ้น)', 'SD', 'ผลงานที่สะกดผิด ≥ 3 แห่ง', 'ความยาวเฉลี่ย (คำ)'],
+    ['work1', 'work2'].filter(function (k) { return mech[k]; }).map(function (k) {
+      const m = mech[k];
+      return [m.label, m.pieces, c45Num(m.spell_mean), c45Num(m.spell_sd), m.spell_ge3, c45Num(m.word_mean, 0)];
+    })));
+  P.push(c45DocNote(mech.note || ''));
 
-  // ---------- ส่วนที่ 4: ผลวิเคราะห์รายหัวข้อ ----------
-  P.push('<div class="pagebreak"></div>');
-  P.push('<h1 class="secn" id="s4">ส่วนที่ 4 ผลวิเคราะห์รายหัวข้อจากระบบตรวจอัตโนมัติ</h1>');
-  const jobs = d.jobs || {};
-  const groups = d.job_groups || {};
-  const results = d.results || {};
-  const doneJobs = Object.keys(jobs).filter(function (k) { return results[k]; });
-  if (!doneJobs.length) {
-    P.push('<p style="color:#888">— ยังไม่เคยให้ระบบวิเคราะห์หัวข้อใดเลย —</p>');
-  } else {
-    Object.keys(groups).forEach(function (gk) {
-      const gItems = Object.keys(jobs).filter(function (k) { return jobs[k].group === gk && results[k]; });
-      if (!gItems.length) return;
-      P.push('<h2>' + c45Esc(groups[gk]) + '</h2>');
-      gItems.forEach(function (k) {
-        const job = jobs[k];
-        const res = results[k];
-        P.push('<h3>' + c45Esc(job.label) + '</h3>');
-        if (res.warnings && res.warnings.length) {
-          P.push('<p class="analysis"><strong>ต้องตรวจสอบก่อนนำไปใช้:</strong> ' + res.warnings.map(c45Esc).join(' · ') + '</p>');
-        }
-        P.push(c45RenderPayload(k, res.payload));
-      });
-    });
-    const pending = Object.keys(jobs).filter(function (k) { return !results[k]; });
-    if (pending.length) {
-      P.push('<p style="color:#888">หัวข้อที่ยังไม่ได้วิเคราะห์ (' + pending.length + ' หัวข้อ): '
-        + pending.map(function (k) { return c45Esc(jobs[k].label); }).join(' · ') + '</p>');
-    }
-  }
-
-  // ---------- ส่วนที่ 5: บันทึกหลังสอน ----------
-  P.push('<div class="pagebreak"></div>');
-  P.push('<h1 class="secn" id="s5">ส่วนที่ 5 บันทึกหลังสอน</h1>');
+  P.push('<h2 class="part" id="app-d">ง. บันทึกหลังสอน (ที่มาของข้อเสนอแนะในบทที่ 5)</h2>');
   const stages = d.poa_stages || {};
-  const logs = d.logs || [];
   P.push(c45WrTable(['ขั้นของ POA', 'ขั้นย่อย', 'หน่วย', 'ปัญหาที่พบจริง', 'แนวทางแก้ไข', 'ข้อสังเกต/หลักฐานประกอบ'],
-    logs.map(function (l) {
-      return [stages[l.poa_stage] || l.poa_stage, l.poa_substep || '—', (Number(l.task_unit) > 0 ? l.task_unit : '—'), l.problem, l.solution || '—', l.evidence || '—'];
+    (d.logs || []).map(function (l) {
+      return [stages[l.poa_stage] || l.poa_stage, l.poa_substep || '—',
+        (Number(l.task_unit) > 0 ? l.task_unit : '—'), l.problem, l.solution || '—', l.evidence || '—'];
     })));
 
-  // ---------- ส่วนที่ 5.1: คลังอ้างอิงงานวิจัยที่เกี่ยวข้อง ----------
-  P.push('<h2 id="s5-1">คลังอ้างอิงงานวิจัยที่เกี่ยวข้อง (ใช้เขียนอภิปรายผล)</h2>');
+  P.push('<h2 class="part" id="app-e">จ. คลังอ้างอิงงานวิจัยที่เกี่ยวข้อง (ที่มาของการอ้างอิงในอภิปรายผล)</h2>');
   const refTypes = d.reference_source_types || {};
-  const refs = d.references || [];
   P.push(c45WrTable(['ป้ายอ้างอิง', 'ประเภท', 'สิ่งที่ค้นพบโดยย่อ'],
-    refs.map(function (r) { return [r.citation_label, refTypes[r.source_type] || r.source_type, r.key_finding]; })));
+    (d.references || []).map(function (r) {
+      return [r.citation_label, refTypes[r.source_type] || r.source_type, r.key_finding];
+    })));
 
-  // ---------- ส่วนที่ 6: ข้อมูลประจำงานวิจัย ----------
-  P.push('<div class="pagebreak"></div>');
-  P.push('<h1 class="secn" id="s6">ส่วนที่ 6 ข้อมูลประจำงานวิจัย</h1>');
+  P.push('<h2 class="part" id="app-f">ฉ. ข้อมูลประจำงานวิจัย</h2>');
   const metaFields = d.meta_fields || {};
-  const meta = d.meta || {};
   const phases = d.phases || {};
   P.push(c45WrTable(['รายการ', 'ค่าที่ตั้งไว้'], Object.keys(metaFields).map(function (k) {
     const f = metaFields[k];
@@ -1303,47 +1667,77 @@ function buildChapter45ReportHtml() {
     return [f.label, v];
   })));
 
+  P.push('<h2 class="part" id="app-g">ช. สิ่งที่ต้องตรวจสอบก่อนนำไปใช้</h2>');
+  const jobKeys = (d.run_order && d.run_order.length ? d.run_order : Object.keys(jobs))
+    .filter(function (k) { return jobs[k]; });
+  const doneJobs = jobKeys.filter(function (k) { return results[k]; });
+  const pending  = jobKeys.filter(function (k) { return !results[k]; });
+  const warnRows = [];
+  Object.keys(jobs).forEach(function (k) {
+    const res = results[k];
+    if (res && res.warnings && res.warnings.length) warnRows.push([jobs[k].label, res.warnings.join(' · ')]);
+  });
+  P.push(c45DocNote('วิเคราะห์แล้ว ' + doneJobs.length + ' จาก ' + jobKeys.length + ' หัวข้อ'
+    + (pending.length ? ' · ยังไม่ได้วิเคราะห์: ' + pending.map(function (k) { return jobs[k].label; }).join(' · ') : '')));
+  P.push(c45WrTable(['หัวข้อ', 'จุดที่ต้องตรวจสอบ'], warnRows));
+
+  /* ---------------------------------------------------------------- ประกอบเป็นเอกสาร */
   const body = P.join('\n');
-  const secLabels = ['ส่วนที่ 1 ความพร้อมของข้อมูล', 'ส่วนที่ 2 ตาราง 12 ผลการเปรียบเทียบก่อนเรียนและหลังเรียน',
-    'ส่วนที่ 3 ตาราง 14 จำนวนและร้อยละของนักเรียนที่ปรากฏข้อบกพร่อง', 'ส่วนที่ 4 ผลวิเคราะห์รายหัวข้อจากระบบตรวจอัตโนมัติ',
-    'ส่วนที่ 5 บันทึกหลังสอน', 'ส่วนที่ 6 ข้อมูลประจำงานวิจัย'];
-  const toc = '<div class="toc"><h1 class="secn nonum">สารบัญ</h1>'
-    + secLabels.map(function (s) { return '<div class="tocitem"><span>' + c45Esc(s) + '</span></div>'; }).join('')
+  const secLabels = [
+    'บทที่ 4 ผลการวิจัย',
+    '    ตอนที่ 1 ผลการเปรียบเทียบก่อนและหลังเรียน (ตาราง 12)',
+    '    ตอนที่ 2 ผลการวิเคราะห์การเปลี่ยนแปลง (ตาราง 13 ตาราง 14 และรายองค์ประกอบ 4 ด้าน)',
+    'บทที่ 5 สรุปผลการวิจัย อภิปรายผล และข้อเสนอแนะ',
+    '    สรุปผลการวิจัย · อภิปรายผล · ข้อเสนอแนะ',
+    'ภาคผนวกของรายงาน (ข้อมูลประกอบ ไม่ต้องพิมพ์ลงวิทยานิพนธ์)'
+  ];
+  const toc = '<div class="toc"><h1 class="chap nonum">สารบัญ</h1>'
+    + secLabels.map(function (s) { return '<div class="tocitem">' + c45Esc(s) + '</div>'; }).join('')
     + '</div>';
   const cover = '<div class="cover">'
-    + '<div class="cover-top">รายงานวิเคราะห์บทที่ 4 และบทที่ 5</div>'
-    + '<div class="cover-title">ข้อมูลทั้งหมดในหน้าวิเคราะห์บทที่ 4-5</div>'
-    + '<div class="cover-box">วิเคราะห์แล้ว ' + doneJobs.length + ' / ' + Object.keys(jobs).length + ' หัวข้อ</div>'
+    + '<div class="cover-top">ร่างบทที่ 4 และบทที่ 5</div>'
+    + '<div class="cover-title">ผลการวิจัย สรุปผลการวิจัย อภิปรายผล และข้อเสนอแนะ</div>'
+    + '<div class="cover-box">วิเคราะห์แล้ว ' + doneJobs.length + ' / ' + jobKeys.length + ' หัวข้อ</div>'
+    + '<div class="cover-note">ร่างนี้เรียงตามลำดับของวิทยานิพนธ์ ผู้วิจัยต้องอ่านทวน ตรวจสอบตัวเลข '
+    + 'และเกลาสำนวนให้เป็นเสียงของตนเองก่อนนำไปใช้เสมอ</div>'
     + '<div class="cover-foot">จัดทำโดย ' + c45Esc(C45_REPORT_AUTHOR) + '<br>วันที่ ' + c45Esc(thDate) + '</div>'
     + '</div>';
   const css = '@page { size: A4; margin: 2.54cm 2.2cm; }'
-    + 'body { font-family: "TH Sarabun New","Sarabun","Angsana New","Cordia New",serif; font-size: 16pt; color:#000; line-height:1.5; }'
-    + 'h1.secn { font-size: 20pt; color:#4c1d95; border-bottom:2pt solid #4c1d95; padding-bottom:4pt; margin:0 0 12pt; }'
-    + 'h2 { font-size: 17pt; color:#4c1d95; margin:14pt 0 6pt; }'
-    + 'h3 { font-size: 16pt; color:#333; margin:10pt 0 4pt; }'
-    + 'p { margin: 0 0 8pt; text-align: justify; } ul { margin: 0 0 8pt 0; }'
+    + 'body { font-family: "TH Sarabun New","Sarabun","Angsana New","Cordia New",serif; font-size: 16pt; color:#000; line-height:1.6; }'
+    + 'h1.chap { font-size: 22pt; color:#111; text-align:center; margin:0 0 16pt; }'
+    + 'h2.part { font-size: 18pt; color:#4c1d95; margin:18pt 0 8pt; }'
+    + 'h3.sub { font-size: 17pt; color:#111; margin:14pt 0 6pt; }'
+    + 'h4.sub2 { font-size: 16pt; color:#111; margin:12pt 0 4pt; }'
+    + 'p.para { margin: 0 0 8pt; text-indent: 2.5em; text-align: justify; }'
+    + 'p.note { margin: 0 0 8pt; text-align: justify; color:#333; }'
+    + 'p.quote { margin: 6pt 0 2pt 2.5em; padding-left: 10pt; border-left: 2pt solid #bbb; text-align: justify; }'
+    + 'p.quote-src { margin: 0 0 8pt 2.5em; font-size: 14pt; color:#555; }'
+    + 'p.tbl-cap { margin: 14pt 0 0; font-weight: bold; }'
+    + 'p.tbl-title { margin: 0 0 6pt; font-style: italic; }'
+    + 'p.tbl-note { margin: 0 0 12pt; font-size: 14pt; }'
+    + '.todo { background:#fff3cd; color:#7a5b00; }'
     + 'table.data { border-collapse: collapse; width: 100%; margin: 6pt 0 12pt; font-size: 14pt; }'
     + 'table.data th { background:#4c1d95; color:#fff; border:0.75pt solid #33455f; padding:4pt 6pt; text-align:center; }'
     + 'table.data td { border:0.75pt solid #999; padding:3pt 6pt; vertical-align:top; }'
-    + 'table.table { border-collapse: collapse; width: 100%; margin: 6pt 0 12pt; font-size: 14pt; }'
-    + 'table.table th, table.table td { border:0.75pt solid #999; padding:3pt 6pt; vertical-align:top; }'
-    + 'table.table th { background:#f3f4f6; }'
-    + 'p.analysis { background:#faf7ff; border-left:3pt solid #4c1d95; padding:6pt 10pt; margin:6pt 0 12pt; }'
+    + 'table.data td.c { text-align:center; }'
+    + 'table.data td.grp { background:#f0edf7; font-weight:bold; }'
     + '.pagebreak { page-break-before: always; }'
     + '.cover { text-align:center; padding-top:110pt; }'
     + '.cover-top { font-size:22pt; color:#4c1d95; letter-spacing:1pt; margin-bottom:30pt; }'
     + '.cover-title { font-size:26pt; font-weight:bold; color:#111; margin-bottom:16pt; }'
-    + '.cover-box { display:inline-block; border:1.5pt solid #4c1d95; border-radius:6pt; padding:8pt 20pt; font-size:16pt; color:#4c1d95; margin-bottom:60pt; }'
+    + '.cover-box { display:inline-block; border:1.5pt solid #4c1d95; border-radius:6pt; padding:8pt 20pt; font-size:16pt; color:#4c1d95; margin-bottom:24pt; }'
+    + '.cover-note { font-size:15pt; color:#555; margin:0 40pt 50pt; }'
     + '.cover-foot { font-size:17pt; color:#333; }'
-    + '.toc .tocitem { font-size:16pt; padding:5pt 0; border-bottom:0.5pt dotted #bbb; }'
-    + 'h1.nonum { text-align:center; border-bottom:none; }';
+    + '.toc .tocitem { font-size:16pt; padding:5pt 0; border-bottom:0.5pt dotted #bbb; white-space:pre; }'
+    + 'h1.nonum { text-align:center; }';
+
   const doc = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">'
-    + '<head><meta charset="utf-8"><title>รายงานวิเคราะห์บทที่ 4-5</title>'
+    + '<head><meta charset="utf-8"><title>ร่างบทที่ 4 และบทที่ 5</title>'
     + '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->'
     + '<style>' + css + '</style></head><body>'
     + cover + toc + '<div class="pagebreak"></div>' + body + '</body></html>';
 
-  return { doc, filename: 'รายงานวิเคราะห์บทที่4-5_' + now.toISOString().slice(0, 10) };
+  return { doc, filename: 'ร่างบทที่4-5_' + now.toISOString().slice(0, 10) };
 }
 
 async function sendChapter45ReportToGoogleDocs() {

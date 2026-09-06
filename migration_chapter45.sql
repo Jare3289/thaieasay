@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS ch45_references (
     full_citation  TEXT,                  -- รายการอ้างอิงฉบับเต็มสำหรับหน้าบรรณานุกรม (ถ้ามี)
     source_url     VARCHAR(500) DEFAULT '', -- ลิงก์แหล่งที่มา ไว้กดตรวจสอบซ้ำภายหลัง (ถ้ามี)
     source_type    VARCHAR(20) NOT NULL DEFAULT 'other', -- thesis / journal / book / other
+    finding_key    VARCHAR(60) DEFAULT NULL, -- ประเด็นจากผลจริงที่งานนี้ใช้จับคู่ (คีย์จาก ch45_ai_findings)
     created_by     VARCHAR(50) DEFAULT NULL,
     created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -63,3 +64,7 @@ CREATE TABLE IF NOT EXISTS ch45_references (
 --   ('ch45_academic_year', '2568'), ('ch45_classroom', '5/6'),
 --   ('ch45_population_n', '280'),   ('ch45_sample_n', '40')
 -- ON DUPLICATE KEY UPDATE svalue = VALUES(svalue);
+
+-- 5) ฐานข้อมูลที่สร้าง ch45_references ไว้ก่อนมีคอลัมน์ finding_key ให้เพิ่มคอลัมน์นี้
+--    (ระบบเพิ่มให้อัตโนมัติอยู่แล้วใน db_config.php สั่งเองก็ได้ถ้าต้องการ)
+-- ALTER TABLE ch45_references ADD COLUMN finding_key VARCHAR(60) DEFAULT NULL AFTER source_type;

@@ -979,11 +979,23 @@ try {
                 full_citation  TEXT,                   -- รายการอ้างอิงฉบับเต็มสำหรับหน้าบรรณานุกรม (ถ้ามี)
                 source_url     VARCHAR(500) DEFAULT '', -- ลิงก์แหล่งที่มา ไว้กดตรวจสอบซ้ำภายหลัง (ถ้ามี)
                 source_type    VARCHAR(20) NOT NULL DEFAULT 'other', -- thesis / journal / book / other
+                finding_key    VARCHAR(60) DEFAULT NULL, -- ประเด็นจากผลจริงที่งานนี้ใช้จับคู่ (ch45_ai_findings)
                 created_by     VARCHAR(50) DEFAULT NULL,
                 created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         ");
+    }
+} catch (Exception $e) {
+    // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
+}
+
+// เพิ่มคอลัมน์ finding_key ให้ตาราง ch45_references ที่สร้างไว้ก่อนหน้านี้แล้ว
+// (บอกว่ารายการอ้างอิงนี้มีไว้จับคู่กับ "ประเด็นจากผลจริง" ข้อไหน ใช้ชี้ว่าประเด็นใดยังไม่มีงานอ้างอิง)
+try {
+    $colRefKey = $pdo->query("SHOW COLUMNS FROM ch45_references LIKE 'finding_key'");
+    if ($colRefKey && $colRefKey->rowCount() === 0) {
+        safe_ddl($pdo, "ALTER TABLE ch45_references ADD COLUMN finding_key VARCHAR(60) DEFAULT NULL AFTER source_type");
     }
 } catch (Exception $e) {
     // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
