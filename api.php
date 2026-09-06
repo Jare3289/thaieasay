@@ -4087,6 +4087,7 @@ try {
                 'poa_stages' => ch45_poa_stages(),
                 'references' => $c45['ds']['references'],
                 'reference_source_types' => ch45_reference_source_types(),
+                'findings'   => ch45_ai_findings($c45['quant'], $c45['defects']),
                 'input_hash' => $c45Hash,
             ], JSON_UNESCAPED_UNICODE);
             break;
@@ -4244,6 +4245,48 @@ try {
             }
             echo json_encode(['success' => true,
                 'grounded' => $c45Search['grounded'], 'items' => $c45Search['items']], JSON_UNESCAPED_UNICODE);
+            break;
+
+        // ช่วยย่อข้อความจากงานวิจัยที่ผู้วิจัย "วางมาให้" เป็นช่อง "สิ่งที่งานนี้ค้นพบโดยย่อ"
+        // ระบบย่อได้เฉพาะจากข้อความต้นฉบับที่ส่งมาเท่านั้น — สร้างข้อค้นพบให้งานของคนอื่นเองไม่ได้
+        case 'ch45_draft_key_finding':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้น']);
+                exit;
+            }
+            $c45Used = ai_usage_today($pdo, $_SESSION['user']['id']);
+            if ($c45Used >= CH45_DAILY_LIMIT) {
+                echo json_encode(['success' => false,
+                    'error' => 'วันนี้ใช้ระบบครบ ' . CH45_DAILY_LIMIT . ' ครั้งแล้ว กรุณาลองใหม่ในวันพรุ่งนี้']);
+                exit;
+            }
+            $c45Settings = ai_settings($pdo);
+            if (!$c45Settings['enabled'])    { echo json_encode(['success' => false, 'error' => 'คุณครูปิดการใช้งานระบบตรวจอัตโนมัติไว้']); exit; }
+            if (!$c45Settings['configured']) { echo json_encode(['success' => false, 'error' => 'ยังไม่ได้ตั้งค่าระบบตรวจอัตโนมัติ กรุณาใส่ API key ในหน้า "ระบบตรวจอัตโนมัติ" ก่อน']); exit; }
+
+            $c45Ctx = ch45_build_context($pdo, [
+                'group'     => isset($request_data['group'])     ? trim((string)$request_data['group'])     : '',
+                'classroom' => isset($request_data['classroom']) ? trim((string)$request_data['classroom']) : '',
+            ]);
+            $c45Draft = ch45_ai_draft_key_finding(
+                $c45Settings,
+                isset($request_data['source_text']) ? (string)$request_data['source_text'] : '',
+                isset($request_data['citation_label']) ? (string)$request_data['citation_label'] : '',
+                ch45_ai_findings($c45Ctx['quant'], $c45Ctx['defects']),
+                isset($request_data['finding_key']) ? (string)$request_data['finding_key'] : ''
+            );
+            ai_log_usage($pdo, (string)$_SESSION['user']['id'], (string)$_SESSION['user']['role'], null,
+                         'ch45:draft_key_finding', $c45Draft['ok'] ? 1 : 0,
+                         $c45Draft['ok'] ? '' : (string)($c45Draft['error'] ?? ''));
+            if (!$c45Draft['ok']) {
+                echo json_encode(['success' => false, 'error' => $c45Draft['error']], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            echo json_encode(['success' => true,
+                'key_finding' => $c45Draft['key_finding'],
+                'finding_key' => $c45Draft['finding_key'],
+                'related'     => $c45Draft['related'],
+                'warnings'    => $c45Draft['warnings']], JSON_UNESCAPED_UNICODE);
             break;
 
         // ลบรายการอ้างอิงหนึ่งรายการจากคลัง

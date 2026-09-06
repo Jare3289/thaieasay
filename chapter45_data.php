@@ -1048,6 +1048,8 @@ function ch45_save_reference(PDO $pdo, array $in, $by = '') {
     $url = trim((string)($in['source_url'] ?? ''));
     $type = (string)($in['source_type'] ?? 'other');
     if (!isset($types[$type])) $type = 'other';
+    // ประเด็นจากผลจริงที่รายการนี้มีไว้จับคู่ (ว่างได้ — เป็นตัวช่วยจัดระเบียบ ไม่ใช่เงื่อนไขบังคับ)
+    $fkey = substr(trim((string)($in['finding_key'] ?? '')), 0, 60);
     $id = (int)($in['id'] ?? 0);
 
     if ($label === '') return ['ok' => false, 'error' => 'กรุณาระบุป้ายอ้างอิงที่ใช้ในเนื้อความ เช่น "Shi (2023)"'];
@@ -1055,13 +1057,13 @@ function ch45_save_reference(PDO $pdo, array $in, $by = '') {
 
     if ($id > 0) {
         $stmt = $pdo->prepare('UPDATE ch45_references SET citation_label = ?, key_finding = ?,
-                               full_citation = ?, source_url = ?, source_type = ? WHERE id = ?');
-        $stmt->execute([$label, $finding, $full, $url, $type, $id]);
+                               full_citation = ?, source_url = ?, source_type = ?, finding_key = ? WHERE id = ?');
+        $stmt->execute([$label, $finding, $full, $url, $type, $fkey, $id]);
         return ['ok' => true, 'id' => $id];
     }
-    $stmt = $pdo->prepare('INSERT INTO ch45_references (citation_label, key_finding, full_citation, source_url, source_type, created_by)
-                           VALUES (?, ?, ?, ?, ?, ?)');
-    $stmt->execute([$label, $finding, $full, $url, $type, $by]);
+    $stmt = $pdo->prepare('INSERT INTO ch45_references (citation_label, key_finding, full_citation, source_url, source_type, finding_key, created_by)
+                           VALUES (?, ?, ?, ?, ?, ?, ?)');
+    $stmt->execute([$label, $finding, $full, $url, $type, $fkey, $by]);
     return ['ok' => true, 'id' => (int)$pdo->lastInsertId()];
 }
 

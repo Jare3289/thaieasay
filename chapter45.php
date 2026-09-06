@@ -86,6 +86,51 @@ $c45IsTeacher = ($sessionUser['role'] === 'teacher');
 
   <div id="c45Alert" class="alert border-0 rounded-3 small d-none" role="alert"></div>
 
+<?php if ($c45IsTeacher): ?>
+  <!-- ปุ่มหลัก: วิเคราะห์ทั้งบทที่ 4 และบทที่ 5 ในครั้งเดียว (วางไว้บนสุดเพราะเป็นสิ่งที่กดบ่อยที่สุด) -->
+  <div class="card border-0 shadow-lg rounded-4 mb-4" style="border-top:5px solid #6d28d9 !important;">
+    <div class="card-body p-4">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div>
+          <h5 class="fw-bold mb-1"><i class="bi bi-stars me-2" style="color:#6d28d9"></i>วิเคราะห์และเรียบเรียงด้วย AI</h5>
+          <p class="text-muted small mb-0">
+            กดปุ่มเดียว ระบบจะเขียนให้ครบ<strong>ทั้งบทที่ 4 และบทที่ 5</strong> ทุกหัวข้อ
+            เรียงลำดับให้เองตามหัวข้อที่ต้องมีผลก่อน (ตัวบ่งชี้ → สรุปด้าน → ภาพรวม → บทที่ 5)
+            ใช้เวลาประมาณ 5-15 นาที · เปิดหน้านี้ทิ้งไว้จนกว่าจะเสร็จ
+          </p>
+        </div>
+        <div class="d-flex gap-2 flex-wrap align-items-center">
+          <button id="c45RunAllBtn" class="btn btn-lg fw-bold rounded-pill px-4 py-3 text-white"
+                  style="background:linear-gradient(135deg,#6d28d9,#0d7377);" onclick="c45RunAll()">
+            <i class="bi bi-stars me-1"></i>วิเคราะห์ทั้งหมด (บทที่ 4 และ 5)
+          </button>
+          <button id="c45StopBtn" class="btn btn-outline-danger rounded-pill px-3 d-none" onclick="c45Stop()">
+            <i class="bi bi-stop-circle"></i> หยุด
+          </button>
+          <button class="btn btn-outline-secondary rounded-pill px-3" onclick="c45ClearAll()">
+            <i class="bi bi-trash3"></i> ล้างผลทั้งหมด
+          </button>
+        </div>
+      </div>
+      <div id="c45Progress" class="d-none mt-3">
+        <div class="progress rounded-pill mb-2" style="height:10px;">
+          <div id="c45ProgressBar" class="progress-bar" style="width:0%;background:#6d28d9"></div>
+        </div>
+        <div id="c45ProgressLabel" class="small text-muted mb-2"></div>
+        <div id="c45RunLog" class="small bg-light rounded-3 p-2"
+             style="max-height:220px; overflow:auto; font-family:ui-monospace,monospace;"></div>
+      </div>
+      <div class="alert alert-light border rounded-3 small mb-0 mt-3">
+        <i class="bi bi-info-circle me-1"></i>
+        ยังไม่ได้กรอก <strong>บันทึกหลังสอน</strong> หรือ <strong>คลังอ้างอิงงานวิจัยที่เกี่ยวข้อง</strong> ก็กดได้
+        แต่หัวข้อข้อเสนอแนะจะว่าง และอภิปรายผลจะไม่มีการอ้างอิงงานวิจัย —
+        กรอกสองกล่องนั้นท้ายหน้าแล้วกดวิเคราะห์ใหม่ได้ทุกเมื่อ
+      </div>
+    </div>
+  </div>
+<?php endif; ?>
+
+
   <!-- 1) ความพร้อมของข้อมูล -->
   <div class="card border-0 shadow-sm rounded-4 mb-4" style="border-top:4px solid #0f766e !important;">
     <div class="card-body p-4">
@@ -121,43 +166,6 @@ $c45IsTeacher = ($sessionUser['role'] === 'teacher');
       <div id="c45MechBox" class="mt-3 small"></div>
     </div>
   </div>
-
-<?php if ($c45IsTeacher): ?>
-  <!-- 4) สั่งให้ระบบวิเคราะห์ -->
-  <div class="card border-0 shadow-sm rounded-4 mb-4" style="border-top:4px solid #6d28d9 !important;">
-    <div class="card-body p-4">
-      <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
-        <div>
-          <h5 class="fw-bold mb-1"><i class="bi bi-file-earmark-check me-2" style="color:#6d28d9"></i>ให้ระบบวิเคราะห์และเรียบเรียง</h5>
-          <p class="text-muted small mb-0">
-            หัวข้อด้านล่างเรียงตามลำดับของบทที่ 4 และบทที่ 5 จริง ๆ (ตอนที่ 1 → ตอนที่ 2 → รายองค์ประกอบทีละด้าน → บทที่ 5)
-            ส่วนตอนสั่งวิเคราะห์ ระบบจะไล่ลำดับให้เองตามหัวข้อที่ต้องมีผลก่อน (ตัวบ่งชี้ → สรุปด้าน → ภาพรวม → บทที่ 5)
-          </p>
-        </div>
-        <div class="d-flex gap-2 flex-wrap">
-          <button id="c45RunAllBtn" class="btn btn-lg fw-bold rounded-pill px-4 text-white"
-                  style="background:linear-gradient(135deg,#6d28d9,#0d7377);" onclick="c45RunAll()">
-            <i class="bi bi-stars me-1"></i>วิเคราะห์ทั้งหมด
-          </button>
-          <button id="c45StopBtn" class="btn btn-outline-danger rounded-pill px-3 d-none" onclick="c45Stop()">
-            <i class="bi bi-stop-circle"></i> หยุด
-          </button>
-          <button class="btn btn-outline-secondary rounded-pill px-3" onclick="c45ClearAll()">
-            <i class="bi bi-trash3"></i> ล้างผลทั้งหมด
-          </button>
-        </div>
-      </div>
-      <div id="c45Progress" class="d-none">
-        <div class="progress rounded-pill mb-2" style="height:10px;">
-          <div id="c45ProgressBar" class="progress-bar" style="width:0%;background:#6d28d9"></div>
-        </div>
-        <div id="c45ProgressLabel" class="small text-muted mb-2"></div>
-        <div id="c45RunLog" class="small bg-light rounded-3 p-2"
-             style="max-height:220px; overflow:auto; font-family:ui-monospace,monospace;"></div>
-      </div>
-    </div>
-  </div>
-<?php endif; ?>
 
   <!-- 5) ผลวิเคราะห์รายหัวข้อ -->
   <div id="c45Results" class="mb-4"></div>
@@ -228,6 +236,10 @@ $c45IsTeacher = ($sessionUser['role'] === 'teacher');
         <strong>ต้องเปิดลิงก์แหล่งที่มาตรวจสอบและกดยืนยันเพิ่มลงคลังเองเสมอ ระบบจะไม่บันทึกให้อัตโนมัติ</strong>
       </p>
       <div id="c45FindRefResults" class="mb-3"></div>
+
+      <!-- ประเด็นที่ระบบประมวลจากผลจริงที่เก็บมา — บอกว่าต้องการงานอ้างอิงเรื่องอะไรบ้าง -->
+      <div id="c45FindingsBox" class="mb-3"></div>
+
       <div class="row g-2 align-items-end mb-3">
         <div class="col-md-3">
           <label class="form-label small fw-bold mb-1">ป้ายอ้างอิงในเนื้อความ <span class="text-danger">*</span></label>
@@ -238,9 +250,37 @@ $c45IsTeacher = ($sessionUser['role'] === 'teacher');
           <select id="c45RefType" class="form-select form-select-sm"></select>
         </div>
         <div class="col-md-7">
+          <label class="form-label small fw-bold mb-1">ประเด็นที่งานนี้ใช้จับคู่ (ระบบประมวลจากผลจริงให้แล้ว)</label>
+          <select id="c45RefFindingKey" class="form-select form-select-sm"></select>
+        </div>
+
+        <!-- ช่วยเขียนช่อง "สิ่งที่งานนี้ค้นพบโดยย่อ" ที่เขียนเองยากที่สุด -->
+        <div class="col-12">
+          <div class="border rounded-3 p-2" style="background:#f7f7ff;">
+            <label class="form-label small fw-bold mb-1">
+              <i class="bi bi-magic me-1" style="color:#6366f1;"></i>
+              วางข้อความจากงานวิจัยนั้น แล้วให้ระบบย่อให้
+            </label>
+            <textarea id="c45RefSource" class="form-control form-control-sm" rows="3"
+                      placeholder="วางบทคัดย่อ ส่วนผลการวิจัย หรือย่อหน้าที่เขียนถึงงานนี้ในบทที่ 2 ของคุณครูเองก็ได้ (อย่างน้อย 80 ตัวอักษร)"></textarea>
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-2">
+              <span class="small text-muted">
+                ระบบย่อได้เฉพาะจากข้อความที่วางมาเท่านั้น <strong>จะแต่งข้อค้นพบให้งานของคนอื่นเองไม่ได้</strong> —
+                ถ้าเลือกประเด็นไว้ ระบบจะย่อในมุมที่ตรงกับประเด็นนั้นให้
+              </span>
+              <button id="c45DraftFindingBtn" class="btn btn-sm btn-outline-primary rounded-pill px-3"
+                      onclick="c45DraftKeyFinding()">
+                <i class="bi bi-magic me-1"></i>ช่วยสรุปให้
+              </button>
+            </div>
+            <div id="c45DraftFindingMsg" class="small mt-2"></div>
+          </div>
+        </div>
+
+        <div class="col-12">
           <label class="form-label small fw-bold mb-1">สิ่งที่งานนี้ค้นพบโดยย่อ <span class="text-danger">*</span></label>
-          <input id="c45RefFinding" class="form-control form-control-sm"
-                 placeholder="เช่น พบว่ากลวิธีการกำกับตนเองด้านภาษาเป็นกลวิธีที่เปลี่ยนแปลงช้าที่สุดในบรรดาทักษะการเขียน">
+          <textarea id="c45RefFinding" class="form-control form-control-sm" rows="2"
+                 placeholder="เช่น พบว่ากลวิธีการกำกับตนเองด้านภาษาเป็นกลวิธีที่เปลี่ยนแปลงช้าที่สุดในบรรดาทักษะการเขียน"></textarea>
         </div>
         <div class="col-md-6">
           <label class="form-label small fw-bold mb-1">รายการอ้างอิงฉบับเต็ม (สำหรับหน้าบรรณานุกรม ถ้ามี)</label>
@@ -801,8 +841,9 @@ async function c45RunOne(jobKey) {
 
 async function c45RunAll() {
   if (c45Running) return;
-  if (!confirm('ระบบจะสั่งให้ระบบวิเคราะห์ทั้ง ' + Object.keys(c45Data.jobs).length
-      + ' หัวข้อตามลำดับ ใช้เวลาประมาณ 5-15 นาที ผลเดิมจะถูกทับ ยืนยันหรือไม่?')) return;
+  if (!confirm('ระบบจะเขียนให้ครบทั้งบทที่ 4 และบทที่ 5 รวม ' + Object.keys(c45Data.jobs).length
+      + ' หัวข้อ ตามลำดับที่ถูกต้อง ใช้เวลาประมาณ 5-15 นาที (เปิดหน้านี้ทิ้งไว้จนกว่าจะเสร็จ) '
+      + 'ผลเดิมจะถูกทับทั้งหมด ยืนยันหรือไม่?')) return;
 
   c45Running = true;
   c45Stopped = false;
@@ -838,7 +879,7 @@ async function c45RunAll() {
   c45PaintResults();
   c45Alert(failed
     ? ('วิเคราะห์เสร็จแล้ว แต่มี ' + failed + ' หัวข้อที่ไม่สำเร็จ — กดวิเคราะห์ซ้ำเฉพาะหัวข้อนั้นได้')
-    : 'วิเคราะห์ครบทุกหัวข้อแล้ว กด "เปิดร่างบทที่ 4-5" ด้านบนเพื่อดูฉบับประกอบเสร็จ',
+    : 'เขียนครบทั้งบทที่ 4 และบทที่ 5 แล้ว กด "เปิดร่างบทที่ 4-5" ด้านบนเพื่อดูฉบับประกอบเสร็จ',
     failed ? 'warning' : 'success');
 }
 
@@ -1048,6 +1089,18 @@ function c45PaintReferences() {
       return '<option value="' + c45Esc(k) + '">' + c45Esc(types[k]) + '</option>';
     }).join('');
   }
+  const findings = c45Data.findings || [];
+  const fsel = document.getElementById('c45RefFindingKey');
+  if (fsel) {
+    const keep = fsel.value;
+    fsel.innerHTML = '<option value="">— ยังไม่ระบุ (ระบบจะจับคู่ให้ตอนเขียนอภิปรายผล) —</option>'
+      + findings.map(function (f) {
+          return '<option value="' + c45Esc(f.key) + '">' + c45Esc(f.heading) + '</option>';
+        }).join('');
+    fsel.value = keep;
+  }
+  c45PaintFindings();
+
   const refs = c45Data.references || [];
   const box = document.getElementById('c45RefList');
   if (!refs.length) {
@@ -1057,15 +1110,19 @@ function c45PaintReferences() {
       + 'จนกว่าจะกรอกไว้ที่นี่</div>';
     return;
   }
+  const headingOf = {};
+  findings.forEach(function (f) { headingOf[f.key] = f.heading; });
+
   box.innerHTML = '<div class="table-responsive"><table class="table table-sm align-middle mb-0">'
     + '<thead class="table-light"><tr><th>ป้ายอ้างอิง</th><th>ประเภท</th><th>สิ่งที่ค้นพบโดยย่อ</th>'
-    + '<th class="text-end">จัดการ</th></tr></thead><tbody>'
+    + '<th>ประเด็นที่จับคู่</th><th class="text-end">จัดการ</th></tr></thead><tbody>'
     + refs.map(function (r) {
         return '<tr><td class="small fw-bold">' + c45Esc(r.citation_label)
           + (r.source_url ? ' <a href="' + c45Esc(r.source_url) + '" target="_blank" rel="noopener" title="เปิดแหล่งที่มา">'
               + '<i class="bi bi-box-arrow-up-right"></i></a>' : '') + '</td>'
           + '<td class="small">' + c45Esc(types[r.source_type] || r.source_type) + '</td>'
           + '<td class="small">' + c45Esc(r.key_finding) + '</td>'
+          + '<td class="small text-muted">' + (headingOf[r.finding_key] ? c45Esc(headingOf[r.finding_key]) : '—') + '</td>'
           + '<td class="text-end text-nowrap">'
           + '<button class="btn btn-sm btn-outline-secondary rounded-pill me-1" onclick="c45EditReference(' + r.id + ')">'
           + '<i class="bi bi-pencil"></i></button>'
@@ -1075,6 +1132,100 @@ function c45PaintReferences() {
     + '</tbody></table></div>';
 }
 
+/* ---------------------------------------------------------------- ประเด็นที่ต้องการงานอ้างอิง */
+/* ประเด็นเหล่านี้ระบบประมวลจาก "ผลจริงที่เก็บมาแล้ว" (ตาราง 12 และตาราง 14) ไม่ใช่ข้อสันนิษฐาน
+   มีไว้บอกผู้วิจัยว่าต้องไปหางานวิจัยเรื่องอะไรมาอ้าง และควรย่อข้อค้นพบของงานนั้นในมุมไหน */
+function c45PaintFindings() {
+  const box = document.getElementById('c45FindingsBox');
+  if (!box) return;
+  const findings = c45Data.findings || [];
+  const refs = c45Data.references || [];
+  if (!findings.length) {
+    box.innerHTML = '<div class="alert alert-light border rounded-3 small mb-0">'
+      + 'ยังประมวลประเด็นจากผลจริงไม่ได้ — ต้องมีคะแนนก่อนเรียน/หลังเรียน และคะแนนผลงาน 2 ครั้งครบก่อน</div>';
+    return;
+  }
+  const covered = {};
+  refs.forEach(function (r) { if (r.finding_key) covered[r.finding_key] = (covered[r.finding_key] || 0) + 1; });
+  const missing = findings.filter(function (f) { return !covered[f.key]; }).length;
+
+  box.innerHTML = '<div class="border rounded-3 p-3" style="background:#fbfbff;">'
+    + '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">'
+    + '<div class="fw-bold small"><i class="bi bi-clipboard-data me-1" style="color:#6366f1;"></i>'
+    + 'ประเด็นที่ระบบประมวลจากผลจริง — ต้องการงานอ้างอิงเรื่องเหล่านี้</div>'
+    + '<span class="badge ' + (missing ? 'bg-warning text-dark' : 'bg-success') + ' px-3 py-2">'
+    + (missing ? 'ยังไม่มีงานอ้างอิง ' + missing + ' ประเด็น' : 'มีงานอ้างอิงครบทุกประเด็นแล้ว') + '</span></div>'
+    + '<div class="small text-muted mb-2">กดปุ่ม &quot;หางานให้ประเด็นนี้&quot; เพื่อเลือกประเด็นลงในฟอร์มด้านล่าง '
+    + 'แล้ววางข้อความจากงานวิจัยที่หามาได้ ระบบจะย่อเป็นช่อง &quot;สิ่งที่งานนี้ค้นพบโดยย่อ&quot; ให้ในมุมของประเด็นนั้น</div>'
+    + findings.map(function (f) {
+        const n = covered[f.key] || 0;
+        return '<div class="border rounded-3 p-2 mb-2 bg-white">'
+          + '<div class="d-flex justify-content-between align-items-start flex-wrap gap-2">'
+          + '<div class="pe-2"><div class="fw-bold small">' + c45Esc(f.heading) + '</div>'
+          + '<div class="small text-muted">' + c45Esc(f.summary) + '</div>'
+          + (f.genre_bound ? '<div class="small text-warning-emphasis mt-1">'
+              + '<i class="bi bi-exclamation-triangle me-1"></i>ตัวบ่งชี้นี้ผูกกับประเภทของงานเขียน '
+              + 'ควรหางานที่พูดถึงการปรับกลวิธีตามประเภทงานเขียน ไม่ใช่พัฒนาการจากการสอนล้วน ๆ</div>' : '')
+          + '</div>'
+          + '<div class="text-nowrap">'
+          + '<span class="badge ' + (n ? 'bg-success-subtle text-success-emphasis' : 'bg-light text-secondary') + ' me-1">'
+          + (n ? 'มีแล้ว ' + n + ' งาน' : 'ยังไม่มีงานอ้างอิง') + '</span>'
+          + '<button class="btn btn-sm btn-outline-primary rounded-pill" '
+          + 'onclick="c45UseFinding(\'' + c45Esc(f.key) + '\')">'
+          + '<i class="bi bi-arrow-down-square me-1"></i>หางานให้ประเด็นนี้</button>'
+          + '</div></div></div>';
+      }).join('')
+    + '</div>';
+}
+
+function c45UseFinding(key) {
+  const sel = document.getElementById('c45RefFindingKey');
+  if (sel) sel.value = key;
+  const src = document.getElementById('c45RefSource');
+  if (src) { src.scrollIntoView({ behavior: 'smooth', block: 'center' }); src.focus(); }
+}
+
+/* ---------------------------------------------------------------- ช่วยย่อ "สิ่งที่งานนี้ค้นพบโดยย่อ" */
+/* ย่อจากข้อความต้นฉบับที่ผู้วิจัยวางมาเท่านั้น — ไม่สร้างข้อค้นพบให้งานของคนอื่นขึ้นเอง
+   และตรวจซ้ำฝั่งเซิร์ฟเวอร์ว่าไม่ได้เติมตัวเลขหรือปีที่ไม่มีในต้นฉบับ */
+async function c45DraftKeyFinding() {
+  const btn = document.getElementById('c45DraftFindingBtn');
+  const msg = document.getElementById('c45DraftFindingMsg');
+  const src = document.getElementById('c45RefSource').value.trim();
+  if (src.length < 80) {
+    msg.innerHTML = '<span class="text-danger">กรุณาวางข้อความจากงานวิจัยนั้นอย่างน้อย 80 ตัวอักษรก่อน '
+      + '(บทคัดย่อ ส่วนผลการวิจัย หรือย่อหน้าที่เขียนถึงงานนี้ในบทที่ 2 ก็ได้)</span>';
+    return;
+  }
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>กำลังย่อ...';
+  msg.innerHTML = '';
+  try {
+    const d = await c45Api(Object.assign({
+      action: 'ch45_draft_key_finding',
+      source_text: src,
+      citation_label: document.getElementById('c45RefLabel').value.trim(),
+      finding_key: document.getElementById('c45RefFindingKey').value
+    }, c45Params()));
+    if (!d.success) {
+      msg.innerHTML = '<span class="text-danger">' + c45Esc(d.error || 'ย่อไม่สำเร็จ') + '</span>';
+      return;
+    }
+    document.getElementById('c45RefFinding').value = d.key_finding || '';
+    if (d.finding_key) document.getElementById('c45RefFindingKey').value = d.finding_key;
+    let h = '<span class="text-success"><i class="bi bi-check2-circle me-1"></i>'
+      + 'ย่อให้แล้ว — <strong>อ่านทวนและแก้ให้เป็นสำนวนของคุณครูเองก่อนบันทึกเสมอ</strong></span>';
+    if (d.warnings && d.warnings.length) {
+      h += '<ul class="mb-0 ps-3 mt-1 text-danger">'
+        + d.warnings.map(function (w) { return '<li>' + c45Esc(w) + '</li>'; }).join('') + '</ul>';
+    }
+    msg.innerHTML = h;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-magic me-1"></i>ช่วยสรุปให้';
+  }
+}
+
 function c45EditReference(id) {
   const r = (c45Data.references || []).find(function (x) { return Number(x.id) === Number(id); });
   if (!r) return;
@@ -1082,6 +1233,7 @@ function c45EditReference(id) {
   document.getElementById('c45RefLabel').value = r.citation_label || '';
   document.getElementById('c45RefType').value = r.source_type || 'other';
   document.getElementById('c45RefFinding').value = r.key_finding || '';
+  document.getElementById('c45RefFindingKey').value = r.finding_key || '';
   document.getElementById('c45RefFull').value = r.full_citation || '';
   document.getElementById('c45RefUrl').value = r.source_url || '';
   document.getElementById('c45RefBtnText').textContent = 'บันทึกการแก้ไข';
@@ -1094,6 +1246,7 @@ async function c45SaveReference() {
     citation_label: document.getElementById('c45RefLabel').value.trim(),
     source_type: document.getElementById('c45RefType').value,
     key_finding: document.getElementById('c45RefFinding').value.trim(),
+    finding_key: document.getElementById('c45RefFindingKey').value,
     full_citation: document.getElementById('c45RefFull').value.trim(),
     source_url: document.getElementById('c45RefUrl').value.trim()
   };
@@ -1102,9 +1255,11 @@ async function c45SaveReference() {
   const d = await c45Api({ action: 'ch45_save_reference', reference: ref });
   if (!d.success) { c45Alert(c45Esc(d.error || 'บันทึกไม่สำเร็จ'), 'danger'); return; }
   c45Data.references = d.references || [];
-  ['c45RefLabel', 'c45RefFinding', 'c45RefFull', 'c45RefUrl'].forEach(function (i) {
+  ['c45RefLabel', 'c45RefFinding', 'c45RefFull', 'c45RefUrl', 'c45RefSource'].forEach(function (i) {
     document.getElementById(i).value = '';
   });
+  document.getElementById('c45RefFindingKey').value = '';
+  document.getElementById('c45DraftFindingMsg').innerHTML = '';
   document.getElementById('c45RefId').value = '0';
   document.getElementById('c45RefBtnText').textContent = 'เพิ่มอ้างอิง';
   c45PaintReferences();
@@ -1128,6 +1283,7 @@ function c45FillReferenceForm(i) {
   document.getElementById('c45RefLabel').value = it.citation_label || '';
   document.getElementById('c45RefType').value = it.source_type || 'other';
   document.getElementById('c45RefFinding').value = it.key_finding || '';
+  document.getElementById('c45RefFindingKey').value = it.finding_key || '';
   document.getElementById('c45RefFull').value = '';
   document.getElementById('c45RefUrl').value = it.url || '';
   document.getElementById('c45RefBtnText').textContent = 'เพิ่มอ้างอิง';
