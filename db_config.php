@@ -948,3 +948,31 @@ try {
 } catch (Exception $e) {
     // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
 }
+
+// ---------------------------------------------------------------------------
+// ch45_references : คลังอ้างอิงงานวิจัยที่เกี่ยวข้องที่ผู้วิจัยกรอกเอง (ตรวจสอบมาแล้วว่ามีอยู่จริง)
+// ใช้ให้ระบบ "จับคู่" กับผลจริงตอนเขียนอภิปรายผลบทที่ 5 เท่านั้น — ระบบห้ามอ้างอิงชื่อ/ปี
+// ที่ไม่อยู่ในคลังนี้โดยเด็ดขาด กันไม่ให้เกิดการอ้างอิงที่ไม่มีอยู่จริง (hallucination)
+// เพิ่มทีหลัง ch45_teaching_logs จึงต้องตรวจแยกจากตารางนั้น มิฉะนั้นเซิร์ฟเวอร์ที่มีตารางเดิมอยู่แล้ว
+// จะข้ามการสร้างตารางนี้ไป
+try {
+    $tCh45Ref = $pdo->query("SHOW TABLES LIKE 'ch45_references'");
+    if (!$tCh45Ref || $tCh45Ref->rowCount() === 0) {
+        safe_ddl($pdo, "
+            CREATE TABLE IF NOT EXISTS ch45_references (
+                id             INT AUTO_INCREMENT PRIMARY KEY,
+                citation_label VARCHAR(190) NOT NULL, -- เช่น \"Shi (2023)\" หรือ \"อรุณี ใจเที่ยง (2565)\"
+                                                       -- ระบบต้องคัดลอกป้ายนี้คำต่อคำเท่านั้นเมื่ออ้างอิง
+                key_finding    TEXT NOT NULL,          -- สิ่งที่งานนี้ค้นพบ/แนวคิดสำคัญโดยย่อ (คำพูดของผู้วิจัยเอง)
+                                                       -- ใช้ให้ระบบจับคู่กับผลจริงเท่านั้น ไม่ใช่คำพูดของงานต้นฉบับ
+                full_citation  TEXT,                   -- รายการอ้างอิงฉบับเต็มสำหรับหน้าบรรณานุกรม (ถ้ามี)
+                source_type    VARCHAR(20) NOT NULL DEFAULT 'other', -- thesis / journal / book / other
+                created_by     VARCHAR(50) DEFAULT NULL,
+                created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+    }
+} catch (Exception $e) {
+    // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
+}

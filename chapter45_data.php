@@ -277,7 +277,8 @@ function ch45_dataset(PDO $pdo, array $opt = []) {
     }
     if (!$sids) {
         return ['meta' => $meta, 'students' => [], 'sids' => [], 'evals' => [],
-                'essays' => [], 'topics' => [], 'ai' => [], 'reflect' => [], 'logs' => []];
+                'essays' => [], 'topics' => [], 'ai' => [], 'reflect' => [], 'logs' => [],
+                'references' => ch45_references($pdo)];
     }
 
     $ph = implode(',', array_fill(0, count($sids), '?'));
@@ -397,17 +398,21 @@ function ch45_dataset(PDO $pdo, array $opt = []) {
     // ---- 7) บันทึกหลังสอนของผู้วิจัย (ใช้เขียนข้อเสนอแนะในบทที่ 5) ----
     $logs = ch45_teaching_logs($pdo);
 
+    // ---- 8) คลังอ้างอิงงานวิจัยที่เกี่ยวข้อง (ใช้จับคู่ตอนเขียนอภิปรายผลในบทที่ 5) ----
+    $references = ch45_references($pdo);
+
     return [
-        'meta'     => $meta,
-        'students' => $students,
-        'sids'     => $sids,
-        'evals'    => $evals,
-        'essays'   => $essays,
-        'topics'   => $topics,
-        'ai'       => $ai,
-        'reflect'  => $reflect,
-        'logs'     => $logs,
-        'filter'   => ['group' => $group, 'classroom' => $classroom],
+        'meta'       => $meta,
+        'students'   => $students,
+        'sids'       => $sids,
+        'evals'      => $evals,
+        'essays'     => $essays,
+        'topics'     => $topics,
+        'ai'         => $ai,
+        'reflect'    => $reflect,
+        'logs'       => $logs,
+        'references' => $references,
+        'filter'     => ['group' => $group, 'classroom' => $classroom],
     ];
 }
 
@@ -1004,6 +1009,67 @@ function ch45_delete_teaching_log(PDO $pdo, $id) {
 }
 
 /* =========================================================================
+ * ส่วนที่ 8.1  คลังอ้างอิงงานวิจัยที่เกี่ยวข้อง (ใช้เขียนอภิปรายผลบทที่ 5)
+ *
+ * ผู้วิจัยเป็นผู้กรอกเองหลังตรวจสอบมาแล้วว่ามีอยู่จริง (เช่นเดียวกับตัวบทเรียงความจริงที่ใช้
+ * ยกเป็นตัวอย่างในบทที่ 4) ระบบใช้รายการนี้ "จับคู่" กับผลจริงเท่านั้น ห้ามอ้างอิงชื่อ/ปี
+ * ที่ไม่อยู่ในคลังนี้โดยเด็ดขาด — ดู ch45_ai_findings() และ ch45_ai_parse('ch5_discussion', ...)
+ * ใน chapter45_engine.php ที่ตรวจซ้ำฝั่งเซิร์ฟเวอร์ว่าป้ายอ้างอิงที่ระบบตอบกลับมาตรงกับคลังนี้จริงหรือไม่
+ * ========================================================================= */
+
+/** ประเภทของแหล่งอ้างอิงที่เลือกได้ */
+function ch45_reference_source_types() {
+    return [
+        'thesis'  => 'วิทยานิพนธ์/สารนิพนธ์',
+        'journal' => 'บทความวารสาร',
+        'book'    => 'หนังสือ/ตำรา',
+        'other'   => 'อื่น ๆ',
+    ];
+}
+
+/** อ่านคลังอ้างอิงทั้งหมด เรียงตามวันที่เพิ่มล่าสุดก่อน */
+function ch45_references(PDO $pdo) {
+    try {
+        $stmt = $pdo->query('SELECT * FROM ch45_references ORDER BY id DESC');
+        return $stmt->fetchAll();
+    } catch (Exception $e) {
+        return [];
+    }
+}
+
+/** บันทึก/แก้ไขรายการอ้างอิงหนึ่งรายการ */
+function ch45_save_reference(PDO $pdo, array $in, $by = '') {
+    $types = ch45_reference_source_types();
+    $label = trim((string)($in['citation_label'] ?? ''));
+    $finding = trim((string)($in['key_finding'] ?? ''));
+    $full = trim((string)($in['full_citation'] ?? ''));
+    $type = (string)($in['source_type'] ?? 'other');
+    if (!isset($types[$type])) $type = 'other';
+    $id = (int)($in['id'] ?? 0);
+
+    if ($label === '') return ['ok' => false, 'error' => 'กรุณาระบุป้ายอ้างอิงที่ใช้ในเนื้อความ เช่น "Shi (2023)"'];
+    if ($finding === '') return ['ok' => false, 'error' => 'กรุณาระบุสิ่งที่งานนี้ค้นพบโดยย่อ เพื่อให้ระบบจับคู่กับผลจริงได้'];
+
+    if ($id > 0) {
+        $stmt = $pdo->prepare('UPDATE ch45_references SET citation_label = ?, key_finding = ?,
+                               full_citation = ?, source_type = ? WHERE id = ?');
+        $stmt->execute([$label, $finding, $full, $type, $id]);
+        return ['ok' => true, 'id' => $id];
+    }
+    $stmt = $pdo->prepare('INSERT INTO ch45_references (citation_label, key_finding, full_citation, source_type, created_by)
+                           VALUES (?, ?, ?, ?, ?)');
+    $stmt->execute([$label, $finding, $full, $type, $by]);
+    return ['ok' => true, 'id' => (int)$pdo->lastInsertId()];
+}
+
+/** ลบรายการอ้างอิงหนึ่งรายการ */
+function ch45_delete_reference(PDO $pdo, $id) {
+    $stmt = $pdo->prepare('DELETE FROM ch45_references WHERE id = ?');
+    $stmt->execute([(int)$id]);
+    return $stmt->rowCount() > 0;
+}
+
+/* =========================================================================
  * ส่วนที่ 9  ตรวจความพร้อมของข้อมูล — บอกว่ายังขาดอะไรก่อนเขียนบทที่ 4-5
  * ========================================================================= */
 
@@ -1119,6 +1185,16 @@ function ch45_readiness(array $ds, array $quant, array $defects, array $mech) {
         $nLogs >= 3 ? 'ok' : ($nLogs > 0 ? 'warn' : 'missing'),
         'บันทึกไว้แล้ว ' . $nLogs . ' รายการ',
         'โครงบทที่ 5 กำหนดให้ข้อเสนอแนะต้องเขียนจากปัญหาที่พบจริง ควรบันทึกอย่างน้อยขั้นละ 1 รายการ');
+
+    // 11) คลังอ้างอิงงานวิจัยที่เกี่ยวข้อง (ใช้เขียนอภิปรายผลในบทที่ 5)
+    // ไม่บังคับ (ไม่ใช่ missing) เพราะไม่มีคลังระบบยังเขียนอภิปรายผลด้วยเหตุผลเชิงกลไกได้
+    // แต่จะไม่มีการอ้างอิงงานวิจัยใด ๆ ทั้งสิ้นจนกว่าจะกรอกคลังนี้
+    $nRefs = count($ds['references'] ?? []);
+    $add($items, 'references', 'คลังอ้างอิงงานวิจัยที่เกี่ยวข้อง (ใช้เขียนอภิปรายผลในบทที่ 5)',
+        $nRefs >= 3 ? 'ok' : 'warn',
+        $nRefs ? ('กรอกไว้แล้ว ' . $nRefs . ' รายการ') : 'ยังไม่ได้กรอกไว้เลย',
+        'กรอกงานวิจัยที่เกี่ยวข้องที่ผู้วิจัยตรวจสอบมาแล้วว่ามีอยู่จริงในกล่อง "คลังอ้างอิงงานวิจัยที่เกี่ยวข้อง" '
+        . 'ด้านล่าง — ถ้าไม่กรอกไว้ ระบบจะเขียนอภิปรายผลด้วยเหตุผลเชิงกลไกเท่านั้น ไม่มีการอ้างอิงงานวิจัยใด ๆ');
 
     $counts = ['ok' => 0, 'warn' => 0, 'missing' => 0];
     foreach ($items as $it) $counts[$it['status']]++;

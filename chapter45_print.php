@@ -319,38 +319,34 @@ $scope = implode(' · ', $scopeParts);
   }
   ?>
 
-  <h2 class="sec-title">อภิปรายผล <span>· ตรวจข้อความในร่างกับผลจริง</span></h2>
-  <?php echo c45para('<span class="para-noindent">ส่วนอภิปรายผลเป็นส่วนที่ผู้วิจัยเขียนไว้แล้วบนฐานของการให้เหตุผล'
-    . 'และงานวิจัยที่เกี่ยวข้อง ระบบจึงไม่เขียนแทน แต่ตรวจให้ว่าข้อความในร่างตรงกับผลจริงหรือไม่ ดังนี้</span>'); ?>
-  <?php $chk = $R['ch5_discussion']['payload']['checks'] ?? []; ?>
-  <?php if (!$chk): ?>
-    <p class="para"><span class="todo">[ยังไม่ได้ตรวจ — กดวิเคราะห์หัวข้อ &quot;ประเด็นที่ต้องปรับในส่วนอภิปรายผล&quot;]</span></p>
+  <h2 class="sec-title">อภิปรายผล <span>· สร้างประเด็นจากผลจริงของกลุ่มตัวอย่างนี้ + จับคู่คลังอ้างอิง</span></h2>
+  <?php echo c45para('<span class="para-noindent">แต่ละประเด็นสร้างขึ้นจากผลจริงที่คำนวณได้ในระบบเท่านั้น '
+    . 'การอ้างอิงงานวิจัยที่ปรากฏล้วนตรวจสอบแล้วว่ามีอยู่ในคลังอ้างอิงที่ผู้วิจัยกรอกไว้จริง '
+    . '(กรอบสีแดงหมายถึงจุดที่ต้องตรวจสอบก่อนนำไปใช้เสมอ)</span>'); ?>
+  <?php $pts = $R['ch5_discussion']['payload']['points'] ?? []; ?>
+  <?php if (!$pts): ?>
+    <p class="para"><span class="todo">[ยังไม่ได้วิเคราะห์ — กดวิเคราะห์หัวข้อ &quot;อภิปรายผลรายประเด็น&quot;]</span></p>
   <?php else: ?>
-  <table class="thesis">
-    <thead><tr><th>ข้อ</th><th class="l">ข้อความในร่างอภิปรายผล</th><th>ผลจริง</th>
-      <th class="l">หลักฐาน</th><th class="l">ข้อความที่ควรใช้แทน</th></tr></thead>
-    <tbody>
-      <?php foreach ($chk as $c): ?>
-      <tr>
-        <td class="c"><?php echo rp_esc($c['point']); ?></td>
-        <td class="l"><?php echo rp_esc($c['claim']); ?></td>
-        <td class="c"><?php echo rp_esc($c['verdict']); ?></td>
-        <td class="l"><?php echo rp_esc($c['evidence']); ?></td>
-        <td class="l"><?php echo $c['suggest'] !== '' ? rp_esc($c['suggest']) : '—'; ?></td>
-      </tr>
-      <?php endforeach; ?>
-    </tbody>
-  </table>
-  <?php endif; ?>
-
-  <?php foreach (($R['ch5_discussion']['payload']['new_points'] ?? []) as $np): ?>
-    <h3 class="sub"><?php echo rp_esc($np['heading']); ?></h3>
-    <?php echo c45para(rp_esc($np['text'])); ?>
-  <?php endforeach; ?>
-
-  <?php if (trim((string)($R['ch5_discussion']['payload']['limitation_note'] ?? '')) !== ''): ?>
-    <h2 class="sec-title">ข้อจำกัดของการวิจัย <span>· ข้อความที่ควรเพิ่มจากผลจริง</span></h2>
-    <?php echo c45para(rp_esc($R['ch5_discussion']['payload']['limitation_note'])); ?>
+    <?php foreach ($pts as $p): ?>
+      <?php $cite = $p['citation'] ?? []; $bad = ($cite['verified'] ?? null) === false; ?>
+      <h3 class="sub"><?php echo rp_esc($p['heading']); ?></h3>
+      <?php if (!empty($p['suspect_citation'])): ?>
+        <div class="quote quote-bad">
+          <div class="quote-warn">⚠ พบข้อความคล้ายการอ้างอิงงานวิจัยอื่นปะปนอยู่ในเนื้อหาที่ไม่ได้แจ้งไว้ —
+            ตรวจสอบว่าเป็นการอ้างอิงจริงหรือระบบแต่งขึ้นเองก่อนใช้</div>
+        </div>
+      <?php endif; ?>
+      <?php echo c45para(rp_esc($p['text'])); ?>
+      <?php if (!empty($cite['label'])): ?>
+        <p class="para para-noindent" style="font-size:14pt;">
+          <?php if ($bad): ?>
+            <span class="todo">⚠ อ้างอิง &quot;<?php echo rp_esc($cite['label']); ?>&quot; — <?php echo rp_esc($cite['reason']); ?></span>
+          <?php else: ?>
+            <em>อ้างอิง: <?php echo rp_esc($cite['label']); ?> (ตรวจสอบแล้วว่ามีอยู่ในคลังอ้างอิงจริง)</em>
+          <?php endif; ?>
+        </p>
+      <?php endif; ?>
+    <?php endforeach; ?>
   <?php endif; ?>
 
   <h2 class="sec-title">ข้อเสนอแนะ</h2>

@@ -35,7 +35,22 @@ CREATE TABLE IF NOT EXISTS ch45_teaching_logs (
     INDEX idx_ch45_log_stage (poa_stage, task_unit)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 3) ข้อมูลประจำงานวิจัยเก็บในตาราง app_settings เดิม (คีย์ขึ้นต้นด้วย ch45_)
+-- 3) คลังอ้างอิงงานวิจัยที่เกี่ยวข้องที่ผู้วิจัยกรอกเอง (ตรวจสอบมาแล้วว่ามีอยู่จริง)
+--    ใช้ให้ระบบ "จับคู่" กับผลจริงตอนเขียนอภิปรายผลบทที่ 5 เท่านั้น
+--    ระบบห้ามอ้างอิงชื่อ/ปีที่ไม่อยู่ในตารางนี้โดยเด็ดขาด กันไม่ให้เกิดการอ้างอิงที่ไม่มีอยู่จริง
+CREATE TABLE IF NOT EXISTS ch45_references (
+    id             INT AUTO_INCREMENT PRIMARY KEY,
+    citation_label VARCHAR(190) NOT NULL, -- เช่น "Shi (2023)" หรือ "อรุณี ใจเที่ยง (2565)"
+                                           -- ระบบต้องคัดลอกป้ายนี้คำต่อคำเท่านั้นเมื่ออ้างอิง
+    key_finding    TEXT NOT NULL,         -- สิ่งที่งานนี้ค้นพบ/แนวคิดสำคัญโดยย่อ (คำพูดของผู้วิจัยเอง)
+    full_citation  TEXT,                  -- รายการอ้างอิงฉบับเต็มสำหรับหน้าบรรณานุกรม (ถ้ามี)
+    source_type    VARCHAR(20) NOT NULL DEFAULT 'other', -- thesis / journal / book / other
+    created_by     VARCHAR(50) DEFAULT NULL,
+    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 4) ข้อมูลประจำงานวิจัยเก็บในตาราง app_settings เดิม (คีย์ขึ้นต้นด้วย ch45_)
 --    ไม่ต้องสร้างตารางเพิ่ม — ตัวอย่างการตั้งค่าด้วยมือ:
 -- INSERT INTO app_settings (skey, svalue) VALUES
 --   ('ch45_academic_year', '2568'), ('ch45_classroom', '5/6'),
