@@ -118,12 +118,13 @@
    https://easay.โดเมนของคุณ/google_auth.php?action=callback
    ```
    (ดูค่าที่ถูกต้องได้จากหน้า `google_auth.php?action=status` บนเว็บใหม่)
-3. บนเซิร์ฟเวอร์ สร้างไฟล์ `google_secrets.php` (คัดจากที่ตั้งไว้เดิม) ใส่ Client ID/Secret:
+3. บนเซิร์ฟเวอร์ **คัดลอก** `google_secrets.sample.php` → เปลี่ยนชื่อเป็น `google_secrets.php` แล้วใส่ Client ID/Secret:
    ```php
    <?php
    define('GOOGLE_CLIENT_ID',     'xxxx.apps.googleusercontent.com');
    define('GOOGLE_CLIENT_SECRET', 'xxxx');
    ```
+   ไฟล์นี้ไม่ถูกอัปขึ้น git (อยู่ใน .gitignore) — ถ้ายังไม่สร้าง ปุ่ม "ส่งเข้า Google Docs" จะขึ้นว่ายังไม่ได้ตั้งค่า
 
 ---
 

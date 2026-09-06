@@ -14,6 +14,7 @@
 
 // ====== ค่าลับ (Client ID/Secret) ======
 // เก็บไว้ในไฟล์ google_secrets.php ที่ไม่ถูก commit ขึ้น git (ดู .gitignore)
+// สร้างไฟล์นี้โดยคัดลอกจาก google_secrets.sample.php แล้วกรอกค่าจริง
 // ถ้าไม่มีไฟล์นั้น ให้ปล่อยค่าว่างไว้ (ระบบจะแจ้งว่ายังไม่ได้ตั้งค่า)
 if (file_exists(__DIR__ . '/google_secrets.php')) {
     require_once __DIR__ . '/google_secrets.php';
