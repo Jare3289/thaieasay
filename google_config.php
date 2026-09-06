@@ -26,15 +26,19 @@ if (!defined('GOOGLE_CLIENT_SECRET')) define('GOOGLE_CLIENT_SECRET', '');
 // ขอบเขตสิทธิ์: สร้างไฟล์ใน Drive ของผู้ใช้ (drive.file = เข้าถึงเฉพาะไฟล์ที่แอปสร้างเอง — ปลอดภัยสุด)
 define('GOOGLE_SCOPES', 'https://www.googleapis.com/auth/drive.file');
 
+/** ตรวจว่าเว็บกำลังรันผ่าน HTTPS หรือไม่ (รองรับกรณีอยู่หลัง reverse proxy ด้วย) */
+function google_is_https() {
+    return (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on')
+        || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
+        || (isset($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443);
+}
+
 /**
  * คำนวณ redirect URI แบบอัตโนมัติจากโดเมนที่กำลังรันอยู่
  * (ต้องนำค่านี้ไปลงทะเบียนใน Google Cloud Console → Authorized redirect URIs ให้ตรงกันเป๊ะ)
  */
 function google_redirect_uri() {
-    $https = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on')
-        || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
-        || (isset($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443);
-    $scheme = $https ? 'https' : 'http';
+    $scheme = google_is_https() ? 'https' : 'http';
     $host = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'localhost';
     // โฟลเดอร์ที่ไฟล์นี้ตั้งอยู่ (เผื่อระบบอยู่ในซับไดเรกทอรี)
     $dir = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/')), '/');
