@@ -48,6 +48,34 @@ if (!function_exists('google_store_tokens')) {
     }
 }
 
+if (!function_exists('google_set_short_cookie')) {
+    /**
+     * ตั้งคุกกี้อายุสั้น (ใช้คู่ขนานกับ session ระหว่างขั้นตอน OAuth)
+     * เผื่อกรณี session ฝั่งเซิร์ฟเวอร์ไม่เสถียร/เก็บไม่ทันตอนหน้า Google เด้งกลับมา
+     */
+    function google_set_short_cookie($name, $value, $ttlSeconds = 600) {
+        $opts = [
+            'expires'  => time() + $ttlSeconds,
+            'path'     => '/',
+            'secure'   => google_is_https(),
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ];
+        if (PHP_VERSION_ID >= 70300) {
+            setcookie($name, $value, $opts);
+        } else {
+            setcookie($name, $value, $opts['expires'], $opts['path'], '', $opts['secure'], $opts['httponly']);
+        }
+    }
+}
+
+if (!function_exists('google_clear_short_cookie')) {
+    function google_clear_short_cookie($name) {
+        google_set_short_cookie($name, '', -3600);
+        unset($_COOKIE[$name]);
+    }
+}
+
 if (!function_exists('google_get_access_token')) {
     /** คืน access token ที่ใช้งานได้ (refresh อัตโนมัติถ้าหมดอายุ) หรือ null */
     function google_get_access_token() {

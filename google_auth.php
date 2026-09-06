@@ -54,6 +54,10 @@ if ($action === 'connect') {
     if (!google_is_configured()) { die('ยังไม่ได้ตั้งค่า Google API — โปรดกรอก Client ID/Secret ใน google_config.php'); }
     $_SESSION['google_oauth_state']  = bin2hex(random_bytes(16));
     $_SESSION['google_oauth_return'] = isset($_GET['return']) ? $_GET['return'] : 'research_analysis.php';
+    // เก็บสำรองไว้ในคุกกี้ด้วย (อายุ 10 นาที) เผื่อ session ฝั่งเซิร์ฟเวอร์เก็บไม่ทัน
+    // ตอนหน้า Google เด้งกลับมาที่ callback (พบได้บนบางโฮสติ้ง)
+    google_set_short_cookie('google_oauth_state', $_SESSION['google_oauth_state']);
+    google_set_short_cookie('google_oauth_return', $_SESSION['google_oauth_return']);
     $params = http_build_query([
         'client_id'     => GOOGLE_CLIENT_ID,
         'redirect_uri'  => google_redirect_uri(),
@@ -73,7 +77,13 @@ if ($action === 'callback') {
     if (!is_teacher()) { header('Location: login.php'); exit; }
     if (isset($_GET['error'])) { die('การเชื่อมต่อถูกยกเลิก: ' . htmlspecialchars($_GET['error'])); }
     $state = $_GET['state'] ?? '';
-    if (!$state || !isset($_SESSION['google_oauth_state']) || !hash_equals($_SESSION['google_oauth_state'], $state)) {
+    // ตรวจกับ session ก่อน ถ้าไม่ตรง (เช่น session เก็บไม่ทันตอนหน้า Google เด้งกลับมา)
+    // ให้ตรวจกับคุกกี้สำรองที่ตั้งไว้ตอน connect แทน
+    $stateOk = $state !== '' && (
+        (isset($_SESSION['google_oauth_state']) && hash_equals($_SESSION['google_oauth_state'], $state)) ||
+        (isset($_COOKIE['google_oauth_state']) && $_COOKIE['google_oauth_state'] !== '' && hash_equals($_COOKIE['google_oauth_state'], $state))
+    );
+    if (!$stateOk) {
         die('สถานะความปลอดภัย (state) ไม่ถูกต้อง โปรดลองเชื่อมต่อใหม่');
     }
     $code = $_GET['code'] ?? '';
@@ -87,9 +97,10 @@ if ($action === 'callback') {
     ]);
     if (!$r['ok']) { die('แลกโทเคนไม่สำเร็จ: ' . htmlspecialchars($r['error'])); }
     google_store_tokens($r['data']);
-    unset($_SESSION['google_oauth_state']);
-    $return = $_SESSION['google_oauth_return'] ?? 'research_analysis.php';
-    unset($_SESSION['google_oauth_return']);
+    $return = $_SESSION['google_oauth_return'] ?? ($_COOKIE['google_oauth_return'] ?? 'research_analysis.php');
+    unset($_SESSION['google_oauth_state'], $_SESSION['google_oauth_return']);
+    google_clear_short_cookie('google_oauth_state');
+    google_clear_short_cookie('google_oauth_return');
     // กันการ redirect ออกนอกโดเมน — อนุญาตเฉพาะ path ภายใน
     if (!preg_match('#^/[^/\\\\]#', $return) && strpos($return, 'research_analysis.php') !== 0) {
         $return = 'research_analysis.php#section-export';
