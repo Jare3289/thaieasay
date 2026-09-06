@@ -4081,6 +4081,7 @@ try {
                 'readiness'  => $c45['readiness'],
                 'jobs'       => ch45_ai_jobs(),
                 'job_groups' => ch45_ai_job_groups(),
+                'run_order'  => ch45_ai_jobs_run_order(),
                 'results'    => $c45Res,
                 'logs'       => $c45['ds']['logs'],
                 'poa_stages' => ch45_poa_stages(),

@@ -186,6 +186,7 @@ $scope = implode(' · ', $scopeParts);
   echo c45para(c45p($R, 'quant_narrative', 'para_overall', 'ย่อหน้าอ่านผลภาพรวม'));
   echo c45para(c45p($R, 'quant_narrative', 'para_domains', 'ย่อหน้าผลรายด้าน'));
   echo c45para(c45p($R, 'quant_narrative', 'para_ranking', 'ย่อหน้าเปรียบเทียบขนาดการเปลี่ยนแปลง'));
+  echo c45para(c45p($R, 'quant_narrative', 'para_closing', 'ย่อหน้าสรุปปิดตอนที่ 1'));
   ?>
 
   <h2 class="sec-title">ตอนที่ 2 <span>ผลการวิเคราะห์การเปลี่ยนแปลงระหว่างที่ได้รับการจัดการเรียนการสอน</span></h2>
@@ -298,7 +299,12 @@ $scope = implode(' · ', $scopeParts);
       if (trim((string)($ip['caution'] ?? '')) !== '') echo c45para(rp_esc($ip['caution']));
       ?>
     <?php endforeach; ?>
+    <?php // ย่อหน้าสรุปปิดด้านนี้ ก่อนขึ้นองค์ประกอบถัดไป
+    echo c45para(c45p($R, $djob, 'closing', 'ย่อหน้าสรุปปิดด้าน' . $d['name'])); ?>
   <?php endforeach; ?>
+
+  <?php // ย่อหน้าสรุปปิดบทที่ 4 ทั้งบท
+  echo c45para(c45p($R, 'overview', 'closing', 'ย่อหน้าสรุปปิดบทที่ 4')); ?>
 </div>
 
 <div class="sheet">
@@ -317,6 +323,7 @@ $scope = implode(' · ', $scopeParts);
       echo c45para('<strong>ด้าน' . rp_esc($d['name']) . '</strong> '
           . c45p($R, 'ch5_summary', 'part2_' . $dk, 'สรุปด้าน' . $d['name']));
   }
+  echo c45para(c45p($R, 'ch5_summary', 'part2_closing', 'ย่อหน้าสรุปปิดส่วนสรุปผลการวิจัย'));
   ?>
 
   <h2 class="sec-title">อภิปรายผล <span>· สร้างประเด็นจากผลจริงของกลุ่มตัวอย่างนี้ + จับคู่คลังอ้างอิง</span></h2>
@@ -347,6 +354,7 @@ $scope = implode(' · ', $scopeParts);
         </p>
       <?php endif; ?>
     <?php endforeach; ?>
+    <?php echo c45para(c45p($R, 'ch5_discussion', 'closing', 'ย่อหน้าสรุปปิดการอภิปรายผล')); ?>
   <?php endif; ?>
 
   <h2 class="sec-title">ข้อเสนอแนะ</h2>
@@ -370,6 +378,9 @@ $scope = implode(' · ', $scopeParts);
       echo c45para('<span class="todo">[ยังไม่ได้วิเคราะห์หัวข้อข้อเสนอแนะ]</span>');
   } else {
       foreach ($fut as $f) echo c45para(rp_esc($f['text']));
+  }
+  if (trim((string)($R['ch5_recommend']['payload']['closing'] ?? '')) !== '') {
+      echo c45para(rp_esc($R['ch5_recommend']['payload']['closing']));
   }
   ?>
 </div>
