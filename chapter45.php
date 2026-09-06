@@ -210,12 +210,20 @@ $c45IsTeacher = ($sessionUser['role'] === 'teacher');
   <!-- 6.1) คลังอ้างอิงงานวิจัยที่เกี่ยวข้อง -->
   <div class="card border-0 shadow-sm rounded-4 mb-4" style="border-top:4px solid #6366f1 !important;">
     <div class="card-body p-4">
-      <h5 class="fw-bold mb-1"><i class="bi bi-journals me-2" style="color:#6366f1;"></i>คลังอ้างอิงงานวิจัยที่เกี่ยวข้อง</h5>
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-1">
+        <h5 class="fw-bold mb-1"><i class="bi bi-journals me-2" style="color:#6366f1;"></i>คลังอ้างอิงงานวิจัยที่เกี่ยวข้อง</h5>
+        <button class="btn btn-sm btn-outline-primary rounded-pill px-3" onclick="c45FindReferences()" id="c45FindRefBtn">
+          <i class="bi bi-search me-1"></i>ให้ระบบช่วยหางานวิจัยที่เกี่ยวข้อง
+        </button>
+      </div>
       <p class="text-muted small mb-3">
         กรอกเฉพาะงานวิจัยที่ผู้วิจัย<strong>ตรวจสอบมาแล้วว่ามีอยู่จริง</strong> — ระบบจะใช้ "จับคู่" กับผลจริง
         ตอนเขียนอภิปรายผลในบทที่ 5 เท่านั้น และจะ<strong>ไม่มีวันแต่งชื่อผู้แต่ง ปีที่พิมพ์ หรืองานวิจัยที่ไม่อยู่ในคลังนี้ขึ้นเอง</strong>
         — ถ้าไม่มีงานใดในคลังที่เกี่ยวข้องกับประเด็นใด ระบบจะเขียนย่อหน้านั้นด้วยเหตุผลเชิงกลไกเท่านั้น โดยไม่อ้างอิง
+        ปุ่ม &quot;ให้ระบบช่วยหา&quot; ให้ระบบค้นเว็บจริงด้วย Google Search (ใช้ได้เฉพาะเมื่อตั้งค่าผู้ให้บริการเป็น Gemini) —
+        <strong>ต้องเปิดลิงก์แหล่งที่มาตรวจสอบและกดยืนยันเพิ่มลงคลังเองเสมอ ระบบจะไม่บันทึกให้อัตโนมัติ</strong>
       </p>
+      <div id="c45FindRefResults" class="mb-3"></div>
       <div class="row g-2 align-items-end mb-3">
         <div class="col-md-3">
           <label class="form-label small fw-bold mb-1">ป้ายอ้างอิงในเนื้อความ <span class="text-danger">*</span></label>
@@ -230,9 +238,13 @@ $c45IsTeacher = ($sessionUser['role'] === 'teacher');
           <input id="c45RefFinding" class="form-control form-control-sm"
                  placeholder="เช่น พบว่ากลวิธีการกำกับตนเองด้านภาษาเป็นกลวิธีที่เปลี่ยนแปลงช้าที่สุดในบรรดาทักษะการเขียน">
         </div>
-        <div class="col-md-10">
+        <div class="col-md-6">
           <label class="form-label small fw-bold mb-1">รายการอ้างอิงฉบับเต็ม (สำหรับหน้าบรรณานุกรม ถ้ามี)</label>
           <input id="c45RefFull" class="form-control form-control-sm" placeholder="รูปแบบ APA ตามที่สถาบันกำหนด">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small fw-bold mb-1">ลิงก์แหล่งที่มา (ไว้ตรวจสอบซ้ำภายหลัง ถ้ามี)</label>
+          <input id="c45RefUrl" class="form-control form-control-sm" placeholder="https://...">
         </div>
         <div class="col-md-2 d-grid">
           <input type="hidden" id="c45RefId" value="0">
@@ -1024,7 +1036,9 @@ function c45PaintReferences() {
     + '<thead class="table-light"><tr><th>ป้ายอ้างอิง</th><th>ประเภท</th><th>สิ่งที่ค้นพบโดยย่อ</th>'
     + '<th class="text-end">จัดการ</th></tr></thead><tbody>'
     + refs.map(function (r) {
-        return '<tr><td class="small fw-bold">' + c45Esc(r.citation_label) + '</td>'
+        return '<tr><td class="small fw-bold">' + c45Esc(r.citation_label)
+          + (r.source_url ? ' <a href="' + c45Esc(r.source_url) + '" target="_blank" rel="noopener" title="เปิดแหล่งที่มา">'
+              + '<i class="bi bi-box-arrow-up-right"></i></a>' : '') + '</td>'
           + '<td class="small">' + c45Esc(types[r.source_type] || r.source_type) + '</td>'
           + '<td class="small">' + c45Esc(r.key_finding) + '</td>'
           + '<td class="text-end text-nowrap">'
@@ -1044,6 +1058,7 @@ function c45EditReference(id) {
   document.getElementById('c45RefType').value = r.source_type || 'other';
   document.getElementById('c45RefFinding').value = r.key_finding || '';
   document.getElementById('c45RefFull').value = r.full_citation || '';
+  document.getElementById('c45RefUrl').value = r.source_url || '';
   document.getElementById('c45RefBtnText').textContent = 'บันทึกการแก้ไข';
   document.getElementById('c45RefLabel').focus();
 }
@@ -1054,14 +1069,15 @@ async function c45SaveReference() {
     citation_label: document.getElementById('c45RefLabel').value.trim(),
     source_type: document.getElementById('c45RefType').value,
     key_finding: document.getElementById('c45RefFinding').value.trim(),
-    full_citation: document.getElementById('c45RefFull').value.trim()
+    full_citation: document.getElementById('c45RefFull').value.trim(),
+    source_url: document.getElementById('c45RefUrl').value.trim()
   };
   if (!ref.citation_label) { c45Alert('กรุณาระบุป้ายอ้างอิงที่ใช้ในเนื้อความ', 'warning'); return; }
   if (!ref.key_finding) { c45Alert('กรุณาระบุสิ่งที่งานนี้ค้นพบโดยย่อ', 'warning'); return; }
   const d = await c45Api({ action: 'ch45_save_reference', reference: ref });
   if (!d.success) { c45Alert(c45Esc(d.error || 'บันทึกไม่สำเร็จ'), 'danger'); return; }
   c45Data.references = d.references || [];
-  ['c45RefLabel', 'c45RefFinding', 'c45RefFull'].forEach(function (i) {
+  ['c45RefLabel', 'c45RefFinding', 'c45RefFull', 'c45RefUrl'].forEach(function (i) {
     document.getElementById(i).value = '';
   });
   document.getElementById('c45RefId').value = '0';
@@ -1075,6 +1091,64 @@ async function c45DeleteReference(id) {
   if (!d.success) { c45Alert('ลบไม่สำเร็จ', 'danger'); return; }
   c45Data.references = d.references || [];
   c45PaintReferences();
+}
+
+/* ---------------------------------------------------------------- ให้ระบบช่วยหางานวิจัยที่เกี่ยวข้อง */
+let c45FoundItems = [];
+
+function c45FillReferenceForm(i) {
+  const it = c45FoundItems[i];
+  if (!it) return;
+  document.getElementById('c45RefId').value = '0';
+  document.getElementById('c45RefLabel').value = it.citation_label || '';
+  document.getElementById('c45RefType').value = it.source_type || 'other';
+  document.getElementById('c45RefFinding').value = it.key_finding || '';
+  document.getElementById('c45RefFull').value = '';
+  document.getElementById('c45RefUrl').value = it.url || '';
+  document.getElementById('c45RefBtnText').textContent = 'เพิ่มอ้างอิง';
+  document.getElementById('c45RefLabel').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  document.getElementById('c45RefLabel').focus();
+}
+
+async function c45FindReferences() {
+  const btn = document.getElementById('c45FindRefBtn');
+  const box = document.getElementById('c45FindRefResults');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>กำลังค้นหา...';
+  box.innerHTML = '';
+  try {
+    const d = await c45Api(Object.assign({ action: 'ch45_find_references' }, c45Params()));
+    if (!d.success) {
+      box.innerHTML = '<div class="alert alert-danger border-0 rounded-3 small mb-0">'
+        + c45Esc(d.error || 'ค้นหาไม่สำเร็จ') + '</div>';
+      return;
+    }
+    c45FoundItems = d.items || [];
+    let h = '<div class="alert ' + (d.grounded ? 'alert-success' : 'alert-warning') + ' border-0 rounded-3 py-2 small">'
+      + '<i class="bi ' + (d.grounded ? 'bi-globe2' : 'bi-exclamation-triangle-fill') + ' me-1"></i>'
+      + (d.grounded
+          ? 'ระบบค้นเว็บจริงแล้ว พบรายการต่อไปนี้ — เปิดลิงก์ตรวจสอบก่อนกดเพิ่มลงคลังเสมอ'
+          : 'ไม่ยืนยันว่าค้นเว็บจริงสำเร็จ รายการด้านล่างอาจไม่แม่นยำ ต้องเปิดลิงก์ตรวจสอบก่อนใช้ทุกรายการ')
+      + '</div>';
+    if (!c45FoundItems.length) {
+      h += '<div class="text-muted small">ค้นแล้วไม่พบงานวิจัยที่เกี่ยวข้องจริงกับประเด็นใดเลย</div>';
+    } else {
+      c45FoundItems.forEach(function (it, i) {
+        h += '<div class="border rounded-3 p-2 mb-2">'
+          + '<div class="fw-bold small">' + c45Esc(it.citation_label) + '</div>'
+          + '<div class="small">' + c45Esc(it.key_finding) + '</div>'
+          + (it.url ? '<div class="small"><a href="' + c45Esc(it.url) + '" target="_blank" rel="noopener">'
+              + '<i class="bi bi-box-arrow-up-right me-1"></i>เปิดแหล่งที่มาเพื่อตรวจสอบ</a></div>' : '')
+          + '<button class="btn btn-sm btn-outline-primary rounded-pill mt-1" onclick="c45FillReferenceForm(' + i + ')">'
+          + '<i class="bi bi-arrow-down-square me-1"></i>ใช้ข้อมูลนี้กรอกฟอร์มด้านล่าง</button>'
+          + '</div>';
+      });
+    }
+    box.innerHTML = h;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-search me-1"></i>ให้ระบบช่วยหางานวิจัยที่เกี่ยวข้อง';
+  }
 }
 
 /* ============================================================
