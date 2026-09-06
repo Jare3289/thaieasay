@@ -472,16 +472,6 @@ function ch45_ai_findings(array $quant, array $defects) {
 }
 
 /**
- * ลิงก์ค้นหา Google Scholar สำหรับประเด็นหนึ่ง — ใช้เป็นทางเลือกสำรองเมื่อค้นเว็บจริงด้วย AI ไม่ได้
- * (ผู้ให้บริการที่ตั้งค่าไว้ไม่ใช่ Gemini หรือคีย์ที่ใช้ไม่รองรับฟีเจอร์ค้นเว็บ)
- * ผู้วิจัยกดเปิดแล้วค้นหาเอง คัดลอกรายการที่พบจริงมากรอกในคลังอ้างอิงตามปกติ
- */
-function ch45_scholar_search_url(array $finding) {
-    $q = 'process-oriented approach POA essay writing ' . $finding['heading'];
-    return 'https://scholar.google.com/scholar?q=' . rawurlencode($q);
-}
-
-/**
  * ให้ Gemini ค้นเว็บจริงด้วย Google Search grounding เพื่อหางานวิจัยที่เกี่ยวข้องกับประเด็นอภิปรายผล
  * ใช้ได้เฉพาะผู้ให้บริการ Gemini เท่านั้น (ผู้ให้บริการอื่นไม่มีเครื่องมือค้นเว็บให้เรียกใช้)
  * แยกออกมาจาก ai_call_model() เพราะ Gemini API ไม่รองรับการส่ง responseMimeType บังคับ JSON

@@ -220,8 +220,8 @@ $c45IsTeacher = ($sessionUser['role'] === 'teacher');
         กรอกเฉพาะงานวิจัยที่ผู้วิจัย<strong>ตรวจสอบมาแล้วว่ามีอยู่จริง</strong> — ระบบจะใช้ "จับคู่" กับผลจริง
         ตอนเขียนอภิปรายผลในบทที่ 5 เท่านั้น และจะ<strong>ไม่มีวันแต่งชื่อผู้แต่ง ปีที่พิมพ์ หรืองานวิจัยที่ไม่อยู่ในคลังนี้ขึ้นเอง</strong>
         — ถ้าไม่มีงานใดในคลังที่เกี่ยวข้องกับประเด็นใด ระบบจะเขียนย่อหน้านั้นด้วยเหตุผลเชิงกลไกเท่านั้น โดยไม่อ้างอิง
-        ปุ่ม &quot;ให้ระบบช่วยหา&quot; จะลองค้นเว็บจริงให้ก่อน ถ้าใช้ไม่ได้จะเปลี่ยนเป็นลิงก์ค้นหาให้กดค้นเอง —
-        <strong>ไม่ว่าแบบใด ต้องตรวจสอบและกดยืนยันเพิ่มลงคลังเองเสมอ ระบบจะไม่บันทึกให้อัตโนมัติ</strong>
+        ปุ่ม &quot;ให้ระบบช่วยหา&quot; ให้ระบบค้นเว็บจริงด้วย Google Search (ใช้ได้เฉพาะเมื่อตั้งค่าผู้ให้บริการเป็น Gemini) —
+        <strong>ต้องเปิดลิงก์แหล่งที่มาตรวจสอบและกดยืนยันเพิ่มลงคลังเองเสมอ ระบบจะไม่บันทึกให้อัตโนมัติ</strong>
       </p>
       <div id="c45FindRefResults" class="mb-3"></div>
       <div class="row g-2 align-items-end mb-3">
@@ -1123,42 +1123,28 @@ async function c45FindReferences() {
         + c45Esc(d.error || 'ค้นหาไม่สำเร็จ') + '</div>';
       return;
     }
-    if (d.mode === 'search') {
-      c45FoundItems = d.items || [];
-      let h = '<div class="alert ' + (d.grounded ? 'alert-success' : 'alert-warning') + ' border-0 rounded-3 py-2 small">'
-        + '<i class="bi ' + (d.grounded ? 'bi-globe2' : 'bi-exclamation-triangle-fill') + ' me-1"></i>'
-        + (d.grounded
-            ? 'ระบบค้นเว็บจริงแล้ว พบรายการต่อไปนี้ — เปิดลิงก์ตรวจสอบก่อนกดเพิ่มลงคลังเสมอ'
-            : 'ไม่ยืนยันว่าค้นเว็บจริงสำเร็จ รายการด้านล่างอาจไม่แม่นยำ ต้องเปิดลิงก์ตรวจสอบก่อนใช้ทุกรายการ')
-        + '</div>';
-      if (!c45FoundItems.length) {
-        h += '<div class="text-muted small">ค้นแล้วไม่พบงานวิจัยที่เกี่ยวข้องจริงกับประเด็นใดเลย ลองกรอกเองหรือค้นด้วยตนเองแทน</div>';
-      } else {
-        c45FoundItems.forEach(function (it, i) {
-          h += '<div class="border rounded-3 p-2 mb-2">'
-            + '<div class="fw-bold small">' + c45Esc(it.citation_label) + '</div>'
-            + '<div class="small">' + c45Esc(it.key_finding) + '</div>'
-            + (it.url ? '<div class="small"><a href="' + c45Esc(it.url) + '" target="_blank" rel="noopener">'
-                + '<i class="bi bi-box-arrow-up-right me-1"></i>เปิดแหล่งที่มาเพื่อตรวจสอบ</a></div>' : '')
-            + '<button class="btn btn-sm btn-outline-primary rounded-pill mt-1" onclick="c45FillReferenceForm(' + i + ')">'
-            + '<i class="bi bi-arrow-down-square me-1"></i>ใช้ข้อมูลนี้กรอกฟอร์มด้านล่าง</button>'
-            + '</div>';
-        });
-      }
-      box.innerHTML = h;
-    } else if (d.mode === 'links') {
-      let h = '<div class="alert alert-warning border-0 rounded-3 py-2 small">'
-        + '<i class="bi bi-exclamation-triangle-fill me-1"></i>ระบบค้นเว็บจริงให้ไม่ได้ในตอนนี้ '
-        + '(' + c45Esc(d.note || 'ผู้ให้บริการที่ตั้งค่าไว้ไม่รองรับ') + ') '
-        + 'กดลิงก์ด้านล่างเพื่อค้นหาด้วยตนเองในแต่ละประเด็น แล้วนำรายการที่พบจริงมากรอกในฟอร์มด้านล่าง</div>';
-      (d.links || []).forEach(function (l) {
-        h += '<div class="d-flex justify-content-between align-items-center border rounded-3 p-2 mb-1">'
-          + '<span class="small">' + c45Esc(l.heading) + '</span>'
-          + '<a class="btn btn-sm btn-outline-secondary rounded-pill" href="' + c45Esc(l.url) + '" target="_blank" rel="noopener">'
-          + '<i class="bi bi-search me-1"></i>ค้นหาใน Google Scholar</a></div>';
+    c45FoundItems = d.items || [];
+    let h = '<div class="alert ' + (d.grounded ? 'alert-success' : 'alert-warning') + ' border-0 rounded-3 py-2 small">'
+      + '<i class="bi ' + (d.grounded ? 'bi-globe2' : 'bi-exclamation-triangle-fill') + ' me-1"></i>'
+      + (d.grounded
+          ? 'ระบบค้นเว็บจริงแล้ว พบรายการต่อไปนี้ — เปิดลิงก์ตรวจสอบก่อนกดเพิ่มลงคลังเสมอ'
+          : 'ไม่ยืนยันว่าค้นเว็บจริงสำเร็จ รายการด้านล่างอาจไม่แม่นยำ ต้องเปิดลิงก์ตรวจสอบก่อนใช้ทุกรายการ')
+      + '</div>';
+    if (!c45FoundItems.length) {
+      h += '<div class="text-muted small">ค้นแล้วไม่พบงานวิจัยที่เกี่ยวข้องจริงกับประเด็นใดเลย</div>';
+    } else {
+      c45FoundItems.forEach(function (it, i) {
+        h += '<div class="border rounded-3 p-2 mb-2">'
+          + '<div class="fw-bold small">' + c45Esc(it.citation_label) + '</div>'
+          + '<div class="small">' + c45Esc(it.key_finding) + '</div>'
+          + (it.url ? '<div class="small"><a href="' + c45Esc(it.url) + '" target="_blank" rel="noopener">'
+              + '<i class="bi bi-box-arrow-up-right me-1"></i>เปิดแหล่งที่มาเพื่อตรวจสอบ</a></div>' : '')
+          + '<button class="btn btn-sm btn-outline-primary rounded-pill mt-1" onclick="c45FillReferenceForm(' + i + ')">'
+          + '<i class="bi bi-arrow-down-square me-1"></i>ใช้ข้อมูลนี้กรอกฟอร์มด้านล่าง</button>'
+          + '</div>';
       });
-      box.innerHTML = h;
     }
+    box.innerHTML = h;
   } finally {
     btn.disabled = false;
     btn.innerHTML = '<i class="bi bi-search me-1"></i>ให้ระบบช่วยหางานวิจัยที่เกี่ยวข้อง';
