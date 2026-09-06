@@ -4084,6 +4084,8 @@ try {
                 'results'    => $c45Res,
                 'logs'       => $c45['ds']['logs'],
                 'poa_stages' => ch45_poa_stages(),
+                'references' => $c45['ds']['references'],
+                'reference_source_types' => ch45_reference_source_types(),
                 'input_hash' => $c45Hash,
             ], JSON_UNESCAPED_UNICODE);
             break;
@@ -4190,6 +4192,34 @@ try {
             $c45Id = isset($request_data['id']) ? (int)$request_data['id'] : 0;
             $c45Ok = ($c45Id > 0) ? ch45_delete_teaching_log($pdo, $c45Id) : false;
             echo json_encode(['success' => $c45Ok, 'logs' => ch45_teaching_logs($pdo)], JSON_UNESCAPED_UNICODE);
+            break;
+
+        // บันทึก/แก้ไขรายการในคลังอ้างอิงงานวิจัยที่เกี่ยวข้อง (ใช้เขียนอภิปรายผลในบทที่ 5)
+        case 'ch45_save_reference':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้น']);
+                exit;
+            }
+            $c45Ref = isset($request_data['reference']) && is_array($request_data['reference'])
+                ? $request_data['reference'] : [];
+            $c45R = ch45_save_reference($pdo, $c45Ref, (string)$_SESSION['user']['id']);
+            if (!$c45R['ok']) {
+                echo json_encode(['success' => false, 'error' => $c45R['error']], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            echo json_encode(['success' => true, 'id' => $c45R['id'], 'references' => ch45_references($pdo)],
+                             JSON_UNESCAPED_UNICODE);
+            break;
+
+        // ลบรายการอ้างอิงหนึ่งรายการจากคลัง
+        case 'ch45_delete_reference':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้น']);
+                exit;
+            }
+            $c45Id = isset($request_data['id']) ? (int)$request_data['id'] : 0;
+            $c45Ok = ($c45Id > 0) ? ch45_delete_reference($pdo, $c45Id) : false;
+            echo json_encode(['success' => $c45Ok, 'references' => ch45_references($pdo)], JSON_UNESCAPED_UNICODE);
             break;
 
         // ดูคลังผลงานจริงที่ระบบคัดไว้ให้โมเดลยกเป็นตัวอย่างของตัวบ่งชี้หนึ่ง (ไว้ตรวจสอบย้อนหลัง)

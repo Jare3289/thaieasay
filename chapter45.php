@@ -207,6 +207,44 @@ $c45IsTeacher = ($sessionUser['role'] === 'teacher');
     </div>
   </div>
 
+  <!-- 6.1) คลังอ้างอิงงานวิจัยที่เกี่ยวข้อง -->
+  <div class="card border-0 shadow-sm rounded-4 mb-4" style="border-top:4px solid #6366f1 !important;">
+    <div class="card-body p-4">
+      <h5 class="fw-bold mb-1"><i class="bi bi-journals me-2" style="color:#6366f1;"></i>คลังอ้างอิงงานวิจัยที่เกี่ยวข้อง</h5>
+      <p class="text-muted small mb-3">
+        กรอกเฉพาะงานวิจัยที่ผู้วิจัย<strong>ตรวจสอบมาแล้วว่ามีอยู่จริง</strong> — ระบบจะใช้ "จับคู่" กับผลจริง
+        ตอนเขียนอภิปรายผลในบทที่ 5 เท่านั้น และจะ<strong>ไม่มีวันแต่งชื่อผู้แต่ง ปีที่พิมพ์ หรืองานวิจัยที่ไม่อยู่ในคลังนี้ขึ้นเอง</strong>
+        — ถ้าไม่มีงานใดในคลังที่เกี่ยวข้องกับประเด็นใด ระบบจะเขียนย่อหน้านั้นด้วยเหตุผลเชิงกลไกเท่านั้น โดยไม่อ้างอิง
+      </p>
+      <div class="row g-2 align-items-end mb-3">
+        <div class="col-md-3">
+          <label class="form-label small fw-bold mb-1">ป้ายอ้างอิงในเนื้อความ <span class="text-danger">*</span></label>
+          <input id="c45RefLabel" class="form-control form-control-sm" placeholder="เช่น Shi (2023) หรือ อรุณี ใจเที่ยง (2565)">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small fw-bold mb-1">ประเภท</label>
+          <select id="c45RefType" class="form-select form-select-sm"></select>
+        </div>
+        <div class="col-md-7">
+          <label class="form-label small fw-bold mb-1">สิ่งที่งานนี้ค้นพบโดยย่อ <span class="text-danger">*</span></label>
+          <input id="c45RefFinding" class="form-control form-control-sm"
+                 placeholder="เช่น พบว่ากลวิธีการกำกับตนเองด้านภาษาเป็นกลวิธีที่เปลี่ยนแปลงช้าที่สุดในบรรดาทักษะการเขียน">
+        </div>
+        <div class="col-md-10">
+          <label class="form-label small fw-bold mb-1">รายการอ้างอิงฉบับเต็ม (สำหรับหน้าบรรณานุกรม ถ้ามี)</label>
+          <input id="c45RefFull" class="form-control form-control-sm" placeholder="รูปแบบ APA ตามที่สถาบันกำหนด">
+        </div>
+        <div class="col-md-2 d-grid">
+          <input type="hidden" id="c45RefId" value="0">
+          <button class="btn btn-sm fw-bold text-white" style="background:#6366f1;" onclick="c45SaveReference()">
+            <i class="bi bi-plus-lg"></i> <span id="c45RefBtnText">เพิ่มอ้างอิง</span>
+          </button>
+        </div>
+      </div>
+      <div id="c45RefList"></div>
+    </div>
+  </div>
+
   <!-- 7) ข้อมูลประจำงานวิจัย -->
   <div class="card border-0 shadow-sm rounded-4 mb-4">
     <div class="card-body p-4">
@@ -291,7 +329,7 @@ async function c45Load() {
     c45PaintQuant();
     c45PaintDefects();
     c45PaintResults();
-    if (C45_IS_TEACHER) { c45PaintMeta(); c45PaintLogs(); }
+    if (C45_IS_TEACHER) { c45PaintMeta(); c45PaintLogs(); c45PaintReferences(); }
     document.getElementById('c45Alert').classList.add('d-none');
   } catch (e) {
     c45Alert('เชื่อมต่อไม่สำเร็จ กรุณาลองใหม่', 'danger');
@@ -549,23 +587,35 @@ function c45RenderPayload(jobKey, payload) {
   }
 
   if (jobKey === 'ch5_discussion') {
-    const color = { 'สนับสนุน': 'success', 'ขัดแย้ง': 'danger', 'ไม่มีข้อมูลพอ': 'secondary' };
-    let h = '<div class="table-responsive"><table class="table table-sm"><thead class="table-light"><tr>'
-      + '<th style="width:5%">ข้อ</th><th>ข้อความในร่างอภิปรายผล</th><th class="text-center">ผลจริง</th>'
-      + '<th>หลักฐาน</th><th>ข้อความที่ควรใช้แทน</th></tr></thead><tbody>';
-    (payload.checks || []).forEach(function (c) {
-      h += '<tr><td class="fw-bold">' + c45Esc(c.point) + '</td><td class="small">' + c45Esc(c.claim) + '</td>'
-        + '<td class="text-center"><span class="badge bg-' + (color[c.verdict] || 'secondary') + '">'
-        + c45Esc(c.verdict) + '</span></td>'
-        + '<td class="small">' + c45Esc(c.evidence) + '</td>'
-        + '<td class="small">' + (c.suggest ? c45Esc(c.suggest) : '<span class="text-muted">ไม่ต้องแก้</span>') + '</td></tr>';
+    let h = '';
+    (payload.points || []).forEach(function (p) {
+      const cite = p.citation || {};
+      let citeBox;
+      if (cite.label) {
+        const ok = cite.verified === true;
+        citeBox = '<div class="small mt-1">'
+          + '<span class="badge ' + (ok ? 'bg-success-subtle text-success-emphasis' : 'bg-danger') + '">'
+          + (ok ? '<i class="bi bi-check2-circle"></i> พบในคลังอ้างอิงจริง' : '<i class="bi bi-exclamation-octagon"></i> ไม่พบในคลังอ้างอิง')
+          + '</span> อ้างอิง: ' + c45Esc(cite.label)
+          + (cite.reason ? '<div class="text-danger mt-1">' + c45Esc(cite.reason) + '</div>' : '')
+          + '</div>';
+      } else {
+        citeBox = '<div class="small text-muted mt-1"><i class="bi bi-dash-circle me-1"></i>'
+          + 'ไม่ได้อ้างอิงงานวิจัยในประเด็นนี้ (ไม่มีงานในคลังที่ตรงกับประเด็นนี้จริง ๆ)</div>';
+      }
+      const suspectBox = p.suspect_citation
+        ? '<div class="alert alert-danger border-0 rounded-3 py-1 px-2 small mb-2">'
+          + '<i class="bi bi-exclamation-triangle-fill me-1"></i>พบข้อความคล้ายการอ้างอิงงานวิจัยอื่นปะปนอยู่ในเนื้อหา'
+          + 'ที่ไม่ได้แจ้งไว้ — ตรวจสอบว่าเป็นการอ้างอิงจริงหรือระบบแต่งขึ้นเองก่อนใช้</div>'
+        : '';
+      h += '<div class="border rounded-3 p-2 mb-2 ' + (cite.verified === false || p.suspect_citation ? 'border-danger' : '') + '">'
+        + '<div class="fw-bold small mb-1">' + c45Esc(p.heading) + '</div>'
+        + suspectBox
+        + '<p class="mb-1" style="text-indent:2.5em; line-height:1.9;">' + c45Esc(p.text) + '</p>'
+        + citeBox
+        + '</div>';
     });
-    h += '</tbody></table></div>';
-    (payload.new_points || []).forEach(function (n) {
-      h += c45Para('ประเด็นอภิปรายที่ควรเพิ่ม — ' + n.heading, n.text);
-    });
-    if (payload.limitation_note) h += c45Para('ข้อความเพิ่มเติมสำหรับส่วนข้อจำกัดของการวิจัย', payload.limitation_note);
-    return h;
+    return h || '<div class="text-muted small">ยังไม่มีประเด็นอภิปรายผล</div>';
   }
 
   if (jobKey === 'ch5_recommend') {
@@ -952,6 +1002,81 @@ async function c45DeleteLog(id) {
   c45PaintReadinessAfterLog();
 }
 
+/* ---------------------------------------------------------------- คลังอ้างอิงงานวิจัยที่เกี่ยวข้อง */
+function c45PaintReferences() {
+  const types = c45Data.reference_source_types || {};
+  const sel = document.getElementById('c45RefType');
+  if (sel && !sel.options.length) {
+    sel.innerHTML = Object.keys(types).map(function (k) {
+      return '<option value="' + c45Esc(k) + '">' + c45Esc(types[k]) + '</option>';
+    }).join('');
+  }
+  const refs = c45Data.references || [];
+  const box = document.getElementById('c45RefList');
+  if (!refs.length) {
+    box.innerHTML = '<div class="alert alert-warning border-0 rounded-3 small mb-0">'
+      + '<i class="bi bi-exclamation-triangle-fill me-1"></i>ยังไม่มีงานวิจัยในคลัง — '
+      + 'หัวข้อ "อภิปรายผลรายประเด็น" ในบทที่ 5 จะเขียนได้เฉพาะเหตุผลเชิงกลไก ไม่มีการอ้างอิงงานวิจัยใด ๆ '
+      + 'จนกว่าจะกรอกไว้ที่นี่</div>';
+    return;
+  }
+  box.innerHTML = '<div class="table-responsive"><table class="table table-sm align-middle mb-0">'
+    + '<thead class="table-light"><tr><th>ป้ายอ้างอิง</th><th>ประเภท</th><th>สิ่งที่ค้นพบโดยย่อ</th>'
+    + '<th class="text-end">จัดการ</th></tr></thead><tbody>'
+    + refs.map(function (r) {
+        return '<tr><td class="small fw-bold">' + c45Esc(r.citation_label) + '</td>'
+          + '<td class="small">' + c45Esc(types[r.source_type] || r.source_type) + '</td>'
+          + '<td class="small">' + c45Esc(r.key_finding) + '</td>'
+          + '<td class="text-end text-nowrap">'
+          + '<button class="btn btn-sm btn-outline-secondary rounded-pill me-1" onclick="c45EditReference(' + r.id + ')">'
+          + '<i class="bi bi-pencil"></i></button>'
+          + '<button class="btn btn-sm btn-outline-danger rounded-pill" onclick="c45DeleteReference(' + r.id + ')">'
+          + '<i class="bi bi-trash3"></i></button></td></tr>';
+      }).join('')
+    + '</tbody></table></div>';
+}
+
+function c45EditReference(id) {
+  const r = (c45Data.references || []).find(function (x) { return Number(x.id) === Number(id); });
+  if (!r) return;
+  document.getElementById('c45RefId').value = r.id;
+  document.getElementById('c45RefLabel').value = r.citation_label || '';
+  document.getElementById('c45RefType').value = r.source_type || 'other';
+  document.getElementById('c45RefFinding').value = r.key_finding || '';
+  document.getElementById('c45RefFull').value = r.full_citation || '';
+  document.getElementById('c45RefBtnText').textContent = 'บันทึกการแก้ไข';
+  document.getElementById('c45RefLabel').focus();
+}
+
+async function c45SaveReference() {
+  const ref = {
+    id: Number(document.getElementById('c45RefId').value || 0),
+    citation_label: document.getElementById('c45RefLabel').value.trim(),
+    source_type: document.getElementById('c45RefType').value,
+    key_finding: document.getElementById('c45RefFinding').value.trim(),
+    full_citation: document.getElementById('c45RefFull').value.trim()
+  };
+  if (!ref.citation_label) { c45Alert('กรุณาระบุป้ายอ้างอิงที่ใช้ในเนื้อความ', 'warning'); return; }
+  if (!ref.key_finding) { c45Alert('กรุณาระบุสิ่งที่งานนี้ค้นพบโดยย่อ', 'warning'); return; }
+  const d = await c45Api({ action: 'ch45_save_reference', reference: ref });
+  if (!d.success) { c45Alert(c45Esc(d.error || 'บันทึกไม่สำเร็จ'), 'danger'); return; }
+  c45Data.references = d.references || [];
+  ['c45RefLabel', 'c45RefFinding', 'c45RefFull'].forEach(function (i) {
+    document.getElementById(i).value = '';
+  });
+  document.getElementById('c45RefId').value = '0';
+  document.getElementById('c45RefBtnText').textContent = 'เพิ่มอ้างอิง';
+  c45PaintReferences();
+}
+
+async function c45DeleteReference(id) {
+  if (!confirm('ยืนยันลบรายการอ้างอิงนี้?')) return;
+  const d = await c45Api({ action: 'ch45_delete_reference', id: id });
+  if (!d.success) { c45Alert('ลบไม่สำเร็จ', 'danger'); return; }
+  c45Data.references = d.references || [];
+  c45PaintReferences();
+}
+
 /* ============================================================
    ส่งออกข้อมูลทั้งหมดของหน้านี้ (ความพร้อมข้อมูล, ตาราง 12, ความเที่ยงระหว่างผู้ประเมิน,
    ตาราง 14, ผลวิเคราะห์รายหัวข้อทุกหัวข้อที่วิเคราะห์แล้ว, บันทึกหลังสอน, ข้อมูลประจำงานวิจัย)
@@ -1076,6 +1201,13 @@ function buildChapter45ReportHtml() {
     logs.map(function (l) {
       return [stages[l.poa_stage] || l.poa_stage, (Number(l.task_unit) > 0 ? l.task_unit : '—'), l.problem, l.solution || '—', l.evidence || '—'];
     })));
+
+  // ---------- ส่วนที่ 5.1: คลังอ้างอิงงานวิจัยที่เกี่ยวข้อง ----------
+  P.push('<h2 id="s5-1">คลังอ้างอิงงานวิจัยที่เกี่ยวข้อง (ใช้เขียนอภิปรายผล)</h2>');
+  const refTypes = d.reference_source_types || {};
+  const refs = d.references || [];
+  P.push(c45WrTable(['ป้ายอ้างอิง', 'ประเภท', 'สิ่งที่ค้นพบโดยย่อ'],
+    refs.map(function (r) { return [r.citation_label, refTypes[r.source_type] || r.source_type, r.key_finding]; })));
 
   // ---------- ส่วนที่ 6: ข้อมูลประจำงานวิจัย ----------
   P.push('<div class="pagebreak"></div>');
