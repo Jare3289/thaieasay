@@ -2856,6 +2856,223 @@ try {
             ]);
             break;
 
+        // ------------------------------------------------------------------
+        // ระบบ "จัดเว้นวรรค/แบ่งประโยค" ก่อนนำตัวบทไปวิเคราะห์ในบทที่ 4-5
+        // ------------------------------------------------------------------
+        // ฉบับที่จัดแล้วเก็บไว้ในตาราง essay_normalized ต่างหาก ไม่แสดงแทนต้นฉบับที่ใดทั้งสิ้น
+        // (นักเรียน ครู หน้าพิมพ์ และแฟ้มผลงาน ยังเห็นงานเขียนจริงของนักเรียนเสมอ)
+        // ระบบเปลี่ยนได้เฉพาะ "ช่องว่าง" — ก่อนบันทึกทุกครั้ง โค้ดจะเทียบว่าตัวอักษรทุกตัวเหมือนต้นฉบับเป๊ะ
+        // ถ้าไม่เหมือน แปลว่าโมเดลไปแก้ถ้อยคำของนักเรียน ระบบจะไม่บันทึกและรายงานว่าไม่สำเร็จ
+        case 'ai_normalize_essay':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้นที่สั่งจัดเว้นวรรคได้']);
+                exit;
+            }
+            $nmUser  = $_SESSION['user'];
+            $nmPhase = isset($request_data['essay_phase']) ? trim((string)$request_data['essay_phase']) : '';
+            $nmSid   = isset($request_data['student_id'])  ? trim((string)$request_data['student_id'])  : '';
+            if (!in_array($nmPhase, ai_norm_phases(), true)) {
+                echo json_encode(['success' => false, 'error' => 'รอบงานนี้ไม่ได้ใช้ในการวิเคราะห์บทที่ 4-5 จึงไม่ต้องจัดเว้นวรรค']);
+                exit;
+            }
+            if ($nmSid === '') {
+                echo json_encode(['success' => false, 'error' => 'ไม่ได้ระบุนักเรียน']);
+                exit;
+            }
+
+            $nmSet = ai_settings($pdo);
+            if (!$nmSet['enabled']) {
+                echo json_encode(['success' => false, 'error' => 'คุณครูปิดการใช้งานระบบตรวจอัตโนมัติไว้']);
+                exit;
+            }
+            if (!$nmSet['configured']) {
+                echo json_encode(['success' => false, 'error' => 'ยังไม่ได้ตั้งค่าระบบตรวจอัตโนมัติ กรุณาใส่ API key ก่อน']);
+                exit;
+            }
+
+            // ใช้โควตารายวันร่วมกับการตรวจเรียงความ เพราะเป็นการเรียกผู้ให้บริการโมเดลภาษาเหมือนกัน
+            $nmLimit = ai_daily_limit($pdo);
+            $nmUsed  = ai_usage_today($pdo, $nmUser['id']);
+            if ($nmUsed >= $nmLimit) {
+                ai_log_usage($pdo, $nmUser['id'], 'teacher', $nmSid, 'norm:' . $nmPhase, false,
+                    'วันนี้ใช้ระบบตรวจครบ ' . $nmLimit . ' ครั้งแล้ว');
+                echo json_encode(['success' => false, 'error' => 'วันนี้ใช้ระบบตรวจครบ ' . $nmLimit . ' ครั้งแล้ว กรุณาลองใหม่ในวันพรุ่งนี้']);
+                exit;
+            }
+
+            $stmt = $pdo->prepare('
+                SELECT se.intro_content, se.body_content, se.conclusion_content, s.student_name
+                  FROM student_essays se
+             LEFT JOIN students s ON s.student_id = se.student_id
+                 WHERE se.student_id = ? AND se.essay_phase = ?
+            ');
+            $stmt->execute([$nmSid, $nmPhase]);
+            $nmRow = $stmt->fetch();
+            if (!$nmRow) {
+                echo json_encode(['success' => false, 'error' => 'ยังไม่มีเรียงความของรอบนี้ในระบบ']);
+                exit;
+            }
+
+            $nmIntro = (string)($nmRow['intro_content'] ?? '');
+            $nmBody  = json_decode((string)($nmRow['body_content'] ?? ''), true);
+            if (!is_array($nmBody)) $nmBody = (($nmRow['body_content'] ?? '') !== '') ? [(string)$nmRow['body_content']] : [];
+            $nmBody  = array_values(array_filter(array_map('strval', $nmBody), function ($p) { return trim($p) !== ''; }));
+            $nmConcl = (string)($nmRow['conclusion_content'] ?? '');
+            $nmFull  = trim($nmIntro . "\n" . implode("\n", $nmBody) . "\n" . $nmConcl);
+            if ($nmFull === '') {
+                echo json_encode(['success' => false, 'error' => 'เรียงความฉบับนี้ยังไม่มีเนื้อหา']);
+                exit;
+            }
+            if (mb_strlen($nmFull, 'UTF-8') > AI_MAX_CHARS) {
+                echo json_encode(['success' => false, 'error' => 'เรียงความยาวเกินกว่าที่ระบบจะส่งให้จัดเว้นวรรคได้']);
+                exit;
+            }
+
+            $nmHash = ai_essay_hash($nmIntro, $nmBody, $nmConcl);
+
+            // ต้นฉบับยังเหมือนเดิมและเคยจัดไว้แล้ว → ไม่ต้องเรียกโมเดลซ้ำให้เปลืองโควตา
+            $nmForce = !empty($request_data['force']);
+            if (!$nmForce) {
+                $nmHave = ai_norm_map($pdo, [$nmSid]);
+                $nmOld  = $nmHave[$nmSid][$nmPhase] ?? null;
+                if ($nmOld && $nmOld['hash'] === $nmHash) {
+                    echo json_encode([
+                        'success'    => true,
+                        'skipped'    => true,
+                        'student_id' => $nmSid,
+                        'essay_phase'=> $nmPhase,
+                        'space_edits'=> $nmOld['space_edits'],
+                        'quota_left' => max(0, $nmLimit - $nmUsed),
+                    ]);
+                    exit;
+                }
+            }
+
+            @set_time_limit(150);
+            $nmTopics = essay_topics_map($pdo);
+            $nmTopic  = (string)($nmTopics[essay_topic_phase($nmPhase)] ?? '');
+            $nmCall = ai_call_model($nmSet, ai_norm_system_prompt(),
+                        ai_build_norm_prompt($nmTopic, $nmPhase, $nmIntro, $nmBody, $nmConcl));
+            if (!$nmCall['ok']) {
+                ai_log_usage($pdo, $nmUser['id'], 'teacher', $nmSid, 'norm:' . $nmPhase, false, $nmCall['error']);
+                echo json_encode(['success' => false, 'error' => $nmCall['error']]);
+                exit;
+            }
+
+            $nmParsed = ai_parse_norm($nmCall['text'], $nmIntro, $nmBody, $nmConcl);
+            if (!$nmParsed['ok']) {
+                ai_log_usage($pdo, $nmUser['id'], 'teacher', $nmSid, 'norm:' . $nmPhase, false, $nmParsed['error']);
+                echo json_encode(['success' => false, 'error' => $nmParsed['error']]);
+                exit;
+            }
+
+            try {
+                ai_norm_save($pdo, $nmSid, $nmPhase, $nmParsed['data'], $nmHash,
+                             $nmSet['provider'], $nmSet['model'], $nmUser['id']);
+            } catch (Exception $e) {
+                ai_log_usage($pdo, $nmUser['id'], 'teacher', $nmSid, 'norm:' . $nmPhase, false, 'บันทึกผลไม่สำเร็จ');
+                echo json_encode(['success' => false, 'error' => 'บันทึกฉบับจัดวรรคแล้วไม่สำเร็จ']);
+                exit;
+            }
+
+            ai_log_usage($pdo, $nmUser['id'], 'teacher', $nmSid, 'norm:' . $nmPhase, true);
+            echo json_encode([
+                'success'      => true,
+                'skipped'      => false,
+                'student_id'   => $nmSid,
+                'student_name' => formatNamePrefix((string)($nmRow['student_name'] ?? '')),
+                'essay_phase'  => $nmPhase,
+                'space_before' => $nmParsed['data']['space_before'],
+                'space_after'  => $nmParsed['data']['space_after'],
+                'space_edits'  => $nmParsed['data']['space_edits'],
+                'notes'        => $nmParsed['data']['notes'],
+                'quota_left'   => max(0, $nmLimit - ($nmUsed + 1)),
+            ]);
+            break;
+
+        // ครู: รายชื่อเรียงความที่ยังต้องจัดเว้นวรรค (ทุกรอบที่บทที่ 4-5 ใช้ หรือเจาะจงรอบเดียว)
+        // ฉบับที่นักเรียนแก้ต้นฉบับหลังจัดวรรคไปแล้ว จะถูกจัดเข้ารายการใหม่ให้เอง (เทียบจากลายนิ้วมือต้นฉบับ)
+        case 'get_ai_normalize_targets':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้น']);
+                exit;
+            }
+            $ntPhase = isset($_GET['essay_phase']) ? trim($_GET['essay_phase']) : '';
+            $ntList  = in_array($ntPhase, ai_norm_phases(), true) ? [$ntPhase] : ai_norm_phases();
+            $ntRoom  = isset($_GET['classroom']) ? trim($_GET['classroom']) : '';
+
+            $ntSql = "
+                SELECT se.student_id, se.essay_phase, se.intro_content, se.body_content, se.conclusion_content,
+                       se.word_count, s.student_name, s.classroom
+                  FROM student_essays se
+                  JOIN students s ON s.student_id = se.student_id
+                 WHERE se.essay_phase IN (" . implode(',', array_fill(0, count($ntList), '?')) . ")
+                   AND (COALESCE(se.intro_content,'') <> ''
+                     OR COALESCE(se.body_content,'') <> ''
+                     OR COALESCE(se.conclusion_content,'') <> '')
+            ";
+            $ntParams = $ntList;
+            if ($ntRoom !== '') { $ntSql .= ' AND s.classroom = ?'; $ntParams[] = $ntRoom; }
+            $ntSql .= ' ORDER BY s.classroom ASC, se.student_id ASC';
+            $stmt = $pdo->prepare($ntSql);
+            $stmt->execute($ntParams);
+            $ntRows = $stmt->fetchAll();
+
+            $ntSids = array_values(array_unique(array_map(function ($r) { return (string)$r['student_id']; }, $ntRows)));
+            $ntHave = ai_norm_map($pdo, $ntSids);
+
+            $ntOrder   = array_flip(ai_norm_phases());
+            $ntTargets = [];
+            $ntDone = 0; $ntStale = 0;
+            foreach ($ntRows as $r) {
+                $p     = (string)$r['essay_phase'];
+                $sid   = (string)$r['student_id'];
+                $body  = json_decode((string)($r['body_content'] ?? ''), true);
+                if (!is_array($body)) $body = (($r['body_content'] ?? '') !== '') ? [(string)$r['body_content']] : [];
+                $body  = array_values(array_filter(array_map('strval', $body), function ($x) { return trim($x) !== ''; }));
+                $hash  = ai_essay_hash((string)($r['intro_content'] ?? ''), $body, (string)($r['conclusion_content'] ?? ''));
+
+                $old     = $ntHave[$sid][$p] ?? null;
+                $isDone  = ($old && $old['hash'] === $hash);
+                $isStale = ($old && $old['hash'] !== $hash);
+                if ($isDone)  $ntDone++;
+                if ($isStale) $ntStale++;
+
+                $ntTargets[] = [
+                    'student_id'   => $sid,
+                    'student_name' => formatNamePrefix((string)$r['student_name']),
+                    'classroom'    => (string)($r['classroom'] ?? ''),
+                    'essay_phase'  => $p,
+                    'phase_label'  => ai_phase_label($p),
+                    'phase_short'  => ai_phase_short($p),
+                    'word_count'   => (int)($r['word_count'] ?? 0),
+                    'normalized'   => $isDone,
+                    'stale'        => $isStale,
+                    'space_edits'  => $old ? (int)$old['space_edits'] : 0,
+                    'updated_at'   => $old ? (string)$old['updated_at'] : '',
+                ];
+            }
+            // เรียงตามลำดับการเรียน เพื่อให้ผลที่ไล่ทำเป็นชุดอ่านเข้าใจง่าย
+            usort($ntTargets, function ($a, $b) use ($ntOrder) {
+                $pa = $ntOrder[$a['essay_phase']]; $pb = $ntOrder[$b['essay_phase']];
+                if ($pa !== $pb) return $pa - $pb;
+                if ($a['classroom'] !== $b['classroom']) return strcmp($a['classroom'], $b['classroom']);
+                return strcmp($a['student_id'], $b['student_id']);
+            });
+
+            echo json_encode([
+                'success'     => true,
+                'phases'      => ai_norm_phases(),
+                'phase_labels'=> array_combine(ai_norm_phases(), array_map('ai_phase_label', ai_norm_phases())),
+                'targets'     => $ntTargets,
+                'total'       => count($ntTargets),
+                'done'        => $ntDone,
+                'stale'       => $ntStale,
+                'pending'     => count($ntTargets) - $ntDone,
+                'quota_left'  => max(0, ai_daily_limit($pdo) - ai_usage_today($pdo, $_SESSION['user']['id'])),
+            ]);
+            break;
+
         // ครู: "ตรวจถึงไหนแล้ว" — ดูจากประวัติการเรียกใช้จริงในระบบ ไม่ใช่ความจำของเบราว์เซอร์
         // ใช้ตอบว่า การตรวจครั้งล่าสุดจบลงที่ฉบับไหน หยุดเพราะโควตาครบหรือเปล่า
         // และ "ถ้าจะตรวจต่อจากจุดนั้น" ต้องตรวจฉบับไหนบ้าง (เรียงตามลำดับการเรียน)
@@ -2878,6 +3095,8 @@ try {
                     FROM ai_usage_log l
                     LEFT JOIN students s ON s.student_id = l.student_id
                     WHERE l.user_id = ?
+                      -- ประวัติการ "จัดเว้นวรรค" ไม่ใช่การตรวจเรียงความ จึงต้องไม่ถูกนับเป็นจุดที่ค้างไว้
+                      AND (l.essay_phase IS NULL OR l.essay_phase NOT LIKE \'norm:%\')
                     ORDER BY l.created_at DESC, l.id DESC
                     LIMIT 1000
                 ');

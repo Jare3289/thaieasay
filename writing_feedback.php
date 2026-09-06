@@ -17,6 +17,8 @@ $aiRole      = $sessionUser['role'];
 $aiIsTeacher = ($aiRole === 'teacher');
 $aiIsStudent = ($aiRole === 'student');
 $aiPhases    = ai_all_phases();
+// รอบงานที่บทที่ 4-5 หยิบตัวบทไปวิเคราะห์ — ต้องจัดเว้นวรรคไว้ก่อน
+$aiNormPhases = ai_norm_phases();
 ?>
 
 <div id="view-ai-feedback" class="text-start">
@@ -264,6 +266,13 @@ $aiPhases    = ai_all_phases();
         ค้าง <span id="aiBatchResumeBadgeCount">0</span>
       </span>
     </button>
+    <button id="aiNormToggleBtn" class="btn btn-outline-success btn-sm rounded-pill px-3" type="button"
+            data-bs-toggle="collapse" data-bs-target="#aiNormCard">
+      <i class="bi bi-text-paragraph me-1"></i>จัดเว้นวรรคก่อนวิเคราะห์
+      <span id="aiNormPendingBadge" class="badge rounded-pill bg-danger ms-1 d-none">
+        ค้าง <span id="aiNormPendingBadgeCount">0</span>
+      </span>
+    </button>
     <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" type="button"
             data-bs-toggle="collapse" data-bs-target="#aiSettingsCard">
       <i class="bi bi-sliders me-1"></i>ตั้งค่าระบบตรวจอัตโนมัติ
@@ -389,6 +398,81 @@ $aiPhases    = ai_all_phases();
       </div>
 
       <div id="batchLog" class="mt-3 d-none border rounded-3" style="max-height:320px; overflow:auto;"></div>
+    </div>
+  </div>
+  </div>
+  <div class="collapse" id="aiNormCard">
+  <!-- ============ จัดเว้นวรรค/แบ่งประโยคก่อนนำไปวิเคราะห์ในบทที่ 4-5 (ครูเท่านั้น) ============ -->
+  <div class="card border-0 shadow-sm rounded-4 mb-4" style="border-top:4px solid #0f766e !important;">
+    <div class="card-header bg-white border-bottom py-3 px-4 rounded-top-4">
+      <h6 class="fw-bold text-dark mb-0">
+        <i class="bi bi-text-paragraph text-success me-2"></i>จัดเว้นวรรค/แบ่งประโยคก่อนนำไปวิเคราะห์
+      </h6>
+      <div class="text-muted small mt-1">
+        ภาษาไทยเขียนติดกันไม่เว้นวรรคระหว่างคำ การเว้นวรรคจึงเป็นตัวบอกขอบเขตของความ —
+        งานเขียนที่เว้นวรรคผิดที่ทำให้ตัวตัดคำอัตโนมัติแบ่งคำผิด และทำให้การวิเคราะห์ในบทที่ 4-5 คลาดเคลื่อน
+      </div>
+    </div>
+    <div class="card-body p-4">
+      <div class="alert alert-success border-0 rounded-3 small">
+        <div class="fw-bold mb-1"><i class="bi bi-shield-check me-1"></i>ฉบับจัดวรรคแล้วใช้เพื่อการวิเคราะห์เท่านั้น</div>
+        <ul class="mb-0 ps-3">
+          <li><strong>ไม่แสดงแทนต้นฉบับที่ใดทั้งสิ้น</strong> — นักเรียน คุณครู หน้าพิมพ์ และแฟ้มผลงาน
+              ยังเห็นงานเขียนจริงของนักเรียนเสมอ</li>
+          <li>ระบบเปลี่ยนได้เฉพาะ <strong>ช่องว่าง</strong> เท่านั้น ก่อนบันทึกทุกครั้งระบบจะเทียบว่า
+              ตัวอักษรทุกตัวเหมือนต้นฉบับเป๊ะ ถ้าไม่เหมือนจะไม่บันทึกและรายงานว่าไม่สำเร็จ</li>
+          <li>จำนวนย่อหน้าคงเดิมเสมอ และการนับข้อผิดพลาดเรื่องการเว้นวรรคในบทที่ 4
+              ยังนับจาก<strong>ต้นฉบับที่นักเรียนพิมพ์เอง</strong></li>
+          <li>ใช้โควตาการเรียกระบบรายวันร่วมกับการตรวจเรียงความ (1 ฉบับ = 1 ครั้ง)</li>
+        </ul>
+      </div>
+
+      <div class="row g-3 align-items-end">
+        <div class="col-md-4">
+          <label class="form-label fw-bold small">ห้องเรียน</label>
+          <select id="normRoom" class="form-select border-2 rounded-3" onchange="loadNormTargets()">
+            <option value="">ทุกห้องเรียน</option>
+          </select>
+        </div>
+        <div class="col-md-8">
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="normRedoAll" onchange="paintNormSummary()">
+            <label class="form-check-label small" for="normRedoAll">
+              จัดใหม่ทุกฉบับ <span class="text-muted">(ปกติระบบจะข้ามฉบับที่จัดไว้แล้วและต้นฉบับยังไม่ถูกแก้ เพื่อประหยัดโควตา)</span>
+            </label>
+          </div>
+          <div class="d-flex gap-2">
+            <button id="normStartBtn" class="btn fw-bold rounded-pill px-4 text-white flex-grow-1"
+                    style="background:linear-gradient(135deg,#0f766e,#15803d);" onclick="startNormalizeAll()">
+              <i class="bi bi-magic me-1"></i>แก้ทั้งหมด (<?php echo count($aiNormPhases); ?> รอบที่ใช้วิเคราะห์)
+            </button>
+            <button id="normStopBtn" class="btn btn-outline-danger rounded-pill px-3 d-none" onclick="stopNormalize()">
+              <i class="bi bi-stop-fill me-1"></i>หยุด
+            </button>
+          </div>
+          <div class="small text-muted mt-2">
+            ครอบคลุม <strong><?php
+              echo htmlspecialchars(implode(' · ', array_map('ai_phase_label', $aiNormPhases)));
+            ?></strong>
+          </div>
+        </div>
+      </div>
+
+      <div id="normSummary" class="mt-3 small text-muted">กำลังโหลดรายการ...</div>
+      <div id="normPhaseChips" class="d-flex flex-wrap gap-2 mt-2"></div>
+
+      <div id="normProgressWrap" class="mt-3 d-none">
+        <div class="d-flex justify-content-between small fw-bold mb-1">
+          <span id="normProgressLabel">กำลังจัดเว้นวรรค...</span>
+          <span id="normProgressCount">0 / 0</span>
+        </div>
+        <div class="progress" style="height:10px;">
+          <div id="normProgressBar" class="progress-bar" role="progressbar"
+               style="width:0%; background:linear-gradient(90deg,#0f766e,#15803d);"></div>
+        </div>
+      </div>
+
+      <div id="normLog" class="mt-3 d-none border rounded-3" style="max-height:320px; overflow:auto;"></div>
     </div>
   </div>
   </div>
@@ -2241,9 +2325,12 @@ async function loadBatchRooms() {
     const data = await res.json();
     if (!data.success || !Array.isArray(data.students)) return;
     const rooms = [...new Set(data.students.map(s => s.classroom).filter(Boolean))].sort();
-    const sel = document.getElementById('batchRoom');
-    sel.innerHTML = '<option value="">ทุกห้องเรียน</option>'
+    const opts = '<option value="">ทุกห้องเรียน</option>'
       + rooms.map(r => `<option value="${esc(r)}">ห้อง ${esc(r)}</option>`).join('');
+    document.getElementById('batchRoom').innerHTML = opts;
+    // แผงจัดเว้นวรรคใช้รายการห้องชุดเดียวกัน ไม่ต้องยิงซ้ำอีกรอบ
+    const normSel = document.getElementById('normRoom');
+    if (normSel) normSel.innerHTML = opts;
   } catch (err) { /* ไม่มีตัวกรองห้องก็ยังตรวจทั้งรอบได้ */ }
 }
 
@@ -2440,7 +2527,7 @@ function discardBatchResume() {
 
 // ตรวจต่อจากจุดที่ค้างไว้ — ใช้รายการเดิมที่บันทึกไว้ ไม่เริ่มนับหนึ่งใหม่
 async function resumeBatchReview() {
-  if (batchRunning) { showToast('กำลังตรวจชุดอื่นอยู่ กรุณารอให้เสร็จก่อน', 'error'); return; }
+  if (batchRunning || normRunning) { showToast('กำลังตรวจชุดอื่นอยู่ กรุณารอให้เสร็จก่อน', 'error'); return; }
   const st = loadBatchResume();
   if (!st) { paintBatchResume(); return; }
 
@@ -2589,7 +2676,7 @@ function paintServerResume() {
 
 // ไล่ตรวจฉบับที่ยังไม่มีผลตรวจทั้งหมด ต่อจากจุดที่ครั้งล่าสุดค้างไว้
 async function startServerResume() {
-  if (batchRunning) { showToast('กำลังตรวจชุดอื่นอยู่ กรุณารอให้เสร็จก่อน', 'error'); return; }
+  if (batchRunning || normRunning) { showToast('กำลังตรวจชุดอื่นอยู่ กรุณารอให้เสร็จก่อน', 'error'); return; }
   if (!serverResume || !serverResume.pending_total) return;
 
   const items = serverResume.pending.map(t => ({
@@ -2775,7 +2862,7 @@ function paintBatchRetry() {
 }
 
 async function retryFailedBatch() {
-  if (batchRunning) { showToast('กำลังตรวจชุดอื่นอยู่ กรุณารอให้เสร็จก่อน', 'error'); return; }
+  if (batchRunning || normRunning) { showToast('กำลังตรวจชุดอื่นอยู่ กรุณารอให้เสร็จก่อน', 'error'); return; }
   const items = batchFailedItems.slice();
   if (!items.length) return;
   if (!confirm(`ให้ระบบตรวจซ้ำ ${items.length} ฉบับที่ตรวจไม่สำเร็จ ใช่ไหม?\n\n`
@@ -2815,7 +2902,7 @@ async function retryFailedBatch() {
 }
 
 async function startBatchReview() {
-  if (batchRunning) return;
+  if (batchRunning || normRunning) return;
   const queue = batchQueue();
   if (!queue.length) return;
 
@@ -2901,7 +2988,7 @@ async function loadAllPhaseTargets(room) {
 }
 
 async function startBatchReviewAllPhases() {
-  if (batchRunning) { showToast('กำลังตรวจชุดอื่นอยู่ กรุณารอให้เสร็จก่อน', 'error'); return; }
+  if (batchRunning || normRunning) { showToast('กำลังตรวจชุดอื่นอยู่ กรุณารอให้เสร็จก่อน', 'error'); return; }
   const allBtn = document.getElementById('batchAllBtn');
   const room   = document.getElementById('batchRoom').value;
 
@@ -2976,9 +3063,196 @@ async function startBatchReviewAllPhases() {
   }
 }
 
+/* ================= จัดเว้นวรรค/แบ่งประโยคก่อนนำไปวิเคราะห์ในบทที่ 4-5 (ครูเท่านั้น) =================
+   ฉบับจัดวรรคแล้วเก็บแยกไว้ต่างหาก ไม่แสดงแทนต้นฉบับที่ใดทั้งสิ้น ใช้เป็นตัวบทตั้งต้นของบทที่ 4-5 เท่านั้น
+   ทำทีละฉบับจากฝั่งหน้าเว็บด้วยเหตุผลเดียวกับการตรวจทั้งรอบ (เพดานเวลาของ PHP + ลิมิตคำขอต่อนาที) */
+const AI_NORM_PHASES = <?php echo json_encode($aiNormPhases); ?>;
+
+let normTargets       = [];      // รายการเรียงความของรอบที่ใช้วิเคราะห์ พร้อมสถานะการจัดวรรค
+let normRunning       = false;
+let normStopRequested = false;
+
+// รายการที่ยัง "ต้องจัด" ตามตัวเลือกบนหน้าจอ
+function normQueue() {
+  const redoAll = document.getElementById('normRedoAll').checked;
+  return normTargets.filter(t => redoAll || !t.normalized);
+}
+
+async function loadNormTargets() {
+  const box = document.getElementById('normSummary');
+  try {
+    const params = new URLSearchParams({ action: 'get_ai_normalize_targets' });
+    const room   = document.getElementById('normRoom').value;
+    if (room) params.set('classroom', room);
+    const res  = await fetch('api.php?' + params.toString());
+    const data = await res.json();
+    if (!data.success) { box.textContent = data.error || 'โหลดรายการไม่สำเร็จ'; return; }
+    normTargets = data.targets || [];
+    paintNormSummary();
+  } catch (e) {
+    box.textContent = 'โหลดรายการไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
+  }
+}
+
+function paintNormSummary() {
+  const total   = normTargets.length;
+  const done    = normTargets.filter(t => t.normalized).length;
+  const stale   = normTargets.filter(t => t.stale).length;
+  const queue   = normQueue().length;
+  const redoAll = document.getElementById('normRedoAll').checked;
+
+  document.getElementById('normSummary').innerHTML =
+    `พบเรียงความที่ใช้วิเคราะห์ <strong>${total}</strong> ฉบับ · จัดเว้นวรรคแล้ว <strong>${done}</strong> ฉบับ`
+    + (stale ? ` · <span class="text-warning-emphasis">ต้นฉบับถูกแก้หลังจัด ${stale} ฉบับ (ต้องจัดใหม่)</span>` : '')
+    + ` · <strong>${queue}</strong> ฉบับที่จะทำในรอบนี้`
+    + (redoAll ? ' <span class="text-danger">(จัดใหม่ทุกฉบับ)</span>' : '');
+
+  // สรุปรายรอบงาน ครูจะได้เห็นว่ารอบไหนยังไม่ครบ
+  const chips = AI_NORM_PHASES.map(ph => {
+    const inPh   = normTargets.filter(t => t.essay_phase === ph);
+    const okPh   = inPh.filter(t => t.normalized).length;
+    const cls    = (!inPh.length) ? 'bg-light text-muted'
+                 : (okPh === inPh.length ? 'bg-success-subtle text-success-emphasis'
+                                         : 'bg-warning-subtle text-warning-emphasis');
+    return `<span class="badge rounded-pill ${cls} border">`
+         + `${esc(AI_PHASE_LABELS[ph] || ph)} ${okPh}/${inPh.length}</span>`;
+  }).join('');
+  document.getElementById('normPhaseChips').innerHTML = chips;
+
+  // ป้ายเตือนบนปุ่มลิ้นชัก ครูจะได้เห็นแม้การ์ดนี้พับอยู่
+  const pending = total - done;
+  const badge   = document.getElementById('aiNormPendingBadge');
+  document.getElementById('aiNormPendingBadgeCount').textContent = pending;
+  badge.classList.toggle('d-none', pending === 0);
+
+  document.getElementById('normStartBtn').disabled = (queue === 0 || normRunning);
+}
+
+function normLogLine(icon, cls, name, msg) {
+  const box = document.getElementById('normLog');
+  box.classList.remove('d-none');
+  const row = document.createElement('div');
+  row.className = 'px-3 py-2 border-bottom small';
+  row.innerHTML = `<i class="bi ${icon} ${cls} me-2"></i><strong>${esc(name)}</strong> `
+                + `<span class="text-muted">${esc(msg)}</span>`;
+  box.appendChild(row);
+  box.scrollTop = box.scrollHeight;
+}
+
+function setNormProgress(done, total, label) {
+  document.getElementById('normProgressWrap').classList.remove('d-none');
+  document.getElementById('normProgressCount').textContent = `${done} / ${total}`;
+  document.getElementById('normProgressLabel').textContent = label;
+  document.getElementById('normProgressBar').style.width =
+    (total ? Math.round(done * 100 / total) : 0) + '%';
+}
+
+function stopNormalize() {
+  normStopRequested = true;
+  document.getElementById('normStopBtn').disabled = true;
+  document.getElementById('normStopBtn').innerHTML =
+    '<span class="spinner-border spinner-border-sm me-1"></span>กำลังหยุด...';
+}
+
+async function normalizeOne(sid, phase, force) {
+  try {
+    const res = await fetch('api.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'ai_normalize_essay', student_id: sid, essay_phase: phase, force: !!force }),
+    });
+    return await res.json();
+  } catch (e) {
+    return { success: false, error: 'เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ' };
+  }
+}
+
+async function startNormalizeAll() {
+  if (normRunning || batchRunning) { showToast('กำลังทำงานชุดอื่นอยู่ กรุณารอให้เสร็จก่อน', 'error'); return; }
+  const queue   = normQueue();
+  const redoAll = document.getElementById('normRedoAll').checked;
+  if (!queue.length) { showToast('ทุกฉบับจัดเว้นวรรคเรียบร้อยแล้ว', 'success'); return; }
+
+  const mins  = Math.max(1, Math.round(queue.length * (20000 + BATCH_GAP_MS) / 60000));
+  const quota = (aiStatus && typeof aiStatus.quota_left === 'number') ? aiStatus.quota_left : null;
+  if (!confirm(`ให้ระบบจัดเว้นวรรค/แบ่งประโยค ${queue.length} ฉบับ ใช่ไหม?\n\n`
+      + `• ครอบคลุมรอบ: ${AI_NORM_PHASES.map(p => AI_PHASE_LABELS[p] || p).join(' · ')}\n`
+      + `• ฉบับที่จัดแล้วใช้เพื่อการวิเคราะห์ในบทที่ 4-5 เท่านั้น ไม่แสดงแทนต้นฉบับของนักเรียน\n`
+      + `• ระบบเปลี่ยนได้เฉพาะช่องว่าง ถ้าถ้อยคำถูกแก้ ระบบจะไม่บันทึกและรายงานว่าไม่สำเร็จ\n`
+      + (redoAll ? `• จัดใหม่ทุกฉบับ รวมฉบับที่เคยจัดไว้แล้ว\n` : '')
+      + (quota !== null && quota < queue.length
+          ? `• โควตาวันนี้เหลือ ${quota} ครั้ง ไม่พอครบทุกฉบับ ระบบจะทำเท่าที่เหลือแล้วหยุด\n` : '')
+      + `\nใช้เวลาประมาณ ${mins} นาที กรุณาเปิดหน้านี้ค้างไว้จนกว่าจะเสร็จ`)) return;
+
+  normRunning = true;
+  normStopRequested = false;
+  const startBtn = document.getElementById('normStartBtn');
+  const stopBtn  = document.getElementById('normStopBtn');
+  startBtn.disabled = true;
+  stopBtn.disabled  = false;
+  stopBtn.innerHTML = '<i class="bi bi-stop-fill me-1"></i>หยุด';
+  stopBtn.classList.remove('d-none');
+  document.getElementById('normRoom').disabled = true;
+  document.getElementById('normLog').innerHTML = '';
+
+  let ok = 0, skipped = 0, failed = 0, i = 0;
+  try {
+    for (const t of queue) {
+      if (normStopRequested) {
+        normLogLine('bi-stop-circle', 'text-secondary', 'หยุดตามคำสั่ง', `ทำไปแล้ว ${i} ฉบับ`);
+        break;
+      }
+      const who = `${t.student_name} · ${t.phase_short}`;
+      setNormProgress(i, queue.length, `กำลังจัดเว้นวรรค: ${who}`);
+
+      const data = await normalizeOne(t.student_id, t.essay_phase, redoAll);
+      i++;
+      if (data.success) {
+        t.normalized = true;
+        t.stale = false;
+        if (data.skipped) {
+          skipped++;
+          normLogLine('bi-dash-circle', 'text-secondary', who, 'จัดไว้แล้วและต้นฉบับยังไม่ถูกแก้ — ข้าม');
+        } else {
+          ok++;
+          t.space_edits = data.space_edits || 0;
+          normLogLine('bi-check-circle-fill', 'text-success', who,
+            `ปรับจุดเว้นวรรค ${data.space_before} → ${data.space_after} จุด`);
+        }
+        if (typeof data.quota_left === 'number' && aiStatus) {
+          aiStatus.quota_left = data.quota_left;
+          aiStatus.quota_used = aiStatus.quota_limit - data.quota_left;
+        }
+      } else {
+        failed++;
+        normLogLine('bi-x-circle-fill', 'text-danger', who, data.error || 'ทำไม่สำเร็จ');
+        // โควตารายวันหมด = ฉบับต่อไปก็ไม่ผ่าน หยุดทั้งชุดดีกว่าปล่อยให้พังทีละฉบับ
+        if (/ใช้ระบบตรวจครบ/.test(data.error || '')) {
+          normLogLine('bi-battery', 'text-danger', 'หยุดอัตโนมัติ',
+            'โควตารายวันหมดแล้ว — กด "แก้ทั้งหมด" อีกครั้งเมื่อโควตากลับมา ระบบจะทำต่อเฉพาะฉบับที่ยังไม่ได้จัด');
+          break;
+        }
+      }
+      setNormProgress(i, queue.length, `ทำแล้ว ${i} จาก ${queue.length} ฉบับ`);
+      if (i < queue.length && !normStopRequested) await sleep(BATCH_GAP_MS);
+    }
+  } finally {
+    normRunning = false;
+    stopBtn.classList.add('d-none');
+    document.getElementById('normRoom').disabled = false;
+    document.getElementById('normProgressLabel').textContent =
+      `เสร็จสิ้น — สำเร็จ ${ok} ฉบับ` + (skipped ? ` · ข้าม ${skipped} ฉบับ` : '')
+      + (failed ? ` · ไม่สำเร็จ ${failed} ฉบับ` : '');
+    showToast(`จัดเว้นวรรคเสร็จแล้ว: สำเร็จ ${ok} ฉบับ`
+      + (failed ? `, ไม่สำเร็จ ${failed} ฉบับ — กดซ้ำได้เลย ระบบจะทำเฉพาะฉบับที่ยังไม่ได้จัด` : ''),
+      failed ? 'error' : 'success');
+    await loadNormTargets();
+  }
+}
+
 // --------------------------------------- ตรวจใหม่ทั้งคิว (ต้นฉบับถูกแก้หลังตรวจ)
 async function startRecheckQueue() {
-  if (batchRunning) { showToast('กำลังตรวจชุดอื่นอยู่ กรุณารอให้เสร็จก่อน', 'error'); return; }
+  if (batchRunning || normRunning) { showToast('กำลังตรวจชุดอื่นอยู่ กรุณารอให้เสร็จก่อน', 'error'); return; }
   const items = aiRecheckList.filter(r => !r.too_short);
   if (!items.length) { showToast('ไม่มีฉบับที่พร้อมตรวจใหม่', 'error'); return; }
   if (!confirm(`ให้ระบบตรวจใหม่ ${items.length} ฉบับที่นักเรียนแก้ไขต้นฉบับแล้ว ใช่ไหม?\n\n`
@@ -3368,6 +3642,8 @@ async function loadWritingGoogleStatus() {
   paintBatchResume(true);
   // และตรวจสอบจากข้อมูลจริงในระบบด้วยว่าครั้งล่าสุดตรวจถึงไหน เหลืออะไรบ้าง
   loadServerResume();
+  loadNormTargets();           // ฉบับไหนยังไม่ได้จัดเว้นวรรคก่อนนำไปวิเคราะห์บทที่ 4-5
+                               // (รายการห้องเรียนใช้ชุดเดียวกับ loadBatchRooms ด้านบนแล้ว)
   loadWritingGoogleStatus();   // สถานะการเชื่อมต่อ Google Docs สำหรับปุ่มส่งออกรายงาน
 <?php endif; ?>
   await loadFeedback();

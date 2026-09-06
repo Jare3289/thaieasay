@@ -333,10 +333,41 @@ function ch45_dataset(PDO $pdo, array $opt = []) {
             'body'       => $body,
             'conclusion' => $concl,
             'text'       => $full,
+            // ต้นฉบับตามที่นักเรียนพิมพ์จริง — เก็บไว้เสมอ ใช้กับตัวชี้วัดที่ต้องนับ "ความผิดพลาดของนักเรียนเอง"
+            // เช่น การเว้นวรรคไม้ยมก ซึ่งถ้าไปนับจากฉบับจัดวรรคแล้วจะได้ศูนย์เสมอ (ระบบจัดให้ถูกไปแล้ว)
+            'raw_intro'      => $intro,
+            'raw_body'       => $body,
+            'raw_conclusion' => $concl,
+            'raw_text'       => $full,
+            'normalized' => false,
+            'space_edits'=> 0,
             'word_count' => (int)($row['word_count'] ?? 0),
             'updated_at' => (string)($row['updated_at'] ?? ''),
             'has'        => ($full !== ''),
         ];
+    }
+
+    // ---- 3.1) ฉบับ "จัดเว้นวรรค/แบ่งประโยคแล้ว" ----
+    // ภาษาไทยเขียนติดกัน การเว้นวรรคจึงเป็นตัวบอกขอบเขตของความ งานเขียนที่เว้นวรรคผิดที่
+    // ทำให้ตัวตัดคำอัตโนมัติแบ่งคำผิดและทำให้ระบบที่อ่านตัวบทตีความใจความคลาดเคลื่อน
+    // บทที่ 4-5 จึงวิเคราะห์จากฉบับจัดวรรคแล้วเมื่อมี (ถ้อยคำทุกตัวเหมือนต้นฉบับเป๊ะ ต่างกันแค่ช่องว่าง)
+    // ฉบับที่นักเรียนแก้ต้นฉบับหลังจัดวรรค (ลายนิ้วมือไม่ตรง) ถือว่าใช้ไม่ได้ ให้กลับไปใช้ต้นฉบับ
+    $normMap = [];
+    try { $normMap = ai_norm_map($pdo, $sids); } catch (Exception $e) { $normMap = []; }
+    foreach ($normMap as $nSid => $byPhase) {
+        foreach ($byPhase as $nPhase => $n) {
+            if (!isset($essays[$nSid][$nPhase]) || !$essays[$nSid][$nPhase]['has']) continue;
+            $cur = $essays[$nSid][$nPhase];
+            $srcHash = ai_essay_hash($cur['raw_intro'], $cur['raw_body'], $cur['raw_conclusion']);
+            if ($n['hash'] === '' || $n['hash'] !== $srcHash) continue;   // ต้นฉบับเปลี่ยนไปแล้ว ใช้ไม่ได้
+            if (trim($n['text']) === '') continue;
+            $essays[$nSid][$nPhase]['intro']       = $n['intro'];
+            $essays[$nSid][$nPhase]['body']        = $n['body'];
+            $essays[$nSid][$nPhase]['conclusion']  = $n['conclusion'];
+            $essays[$nSid][$nPhase]['text']        = $n['text'];
+            $essays[$nSid][$nPhase]['normalized']  = true;
+            $essays[$nSid][$nPhase]['space_edits'] = (int)$n['space_edits'];
+        }
     }
 
     // ---- 4) หัวข้อเรียงความที่ครูกำหนดแต่ละรอบ ----
@@ -794,12 +825,14 @@ function ch45_mechanics(PDO $pdo, array $ds) {
         $spellCounts = []; $spellTypes = []; $wordCounts = []; $paraCounts = [];
         $maiyamok = []; $wordFreq = [];
         $pieces = 0;
+        $normPieces = 0; $spaceFix = [];
         foreach ($ds['sids'] as $sid) {
             $e = $ds['essays'][$sid][$phase] ?? null;
             if (!$e || !$e['has']) continue;
             $pieces++;
             $wordCounts[] = $e['word_count'] ?: count_thai_words($e['text']);
             $paraCounts[] = 1 + count($e['body']) + 1;
+            if (!empty($e['normalized'])) { $normPieces++; $spaceFix[] = (int)$e['space_edits']; }
 
             $occ = 0; $types = [];
             if ($dict) {
@@ -822,7 +855,9 @@ function ch45_mechanics(PDO $pdo, array $ds) {
             $spellCounts[] = $occ;
             $spellTypes[]  = count($types);
             try {
-                $maiyamok[] = count(find_maiyamok_spacing_errors($e['text'], $confirmed, 50));
+                // ต้องนับจาก "ต้นฉบับที่นักเรียนพิมพ์เอง" เท่านั้น ถ้านับจากฉบับจัดวรรคแล้วจะได้ศูนย์เสมอ
+                // เพราะระบบจัดเว้นวรรคไม้ยมกให้ถูกไปแล้ว ซึ่งไม่ใช่ความสามารถของนักเรียน
+                $maiyamok[] = count(find_maiyamok_spacing_errors($e['raw_text'] ?? $e['text'], $confirmed, 50));
             } catch (Exception $ex) { /* ข้ามได้ */ }
         }
         arsort($wordFreq);
@@ -842,13 +877,24 @@ function ch45_mechanics(PDO $pdo, array $ds) {
             'para_mean'    => ch45_mean($paraCounts),
             'maiyamok_mean'=> ch45_mean($maiyamok),
             'dict_ok'      => (bool)$dict,
+            // จำนวนฉบับที่วิเคราะห์จาก "ฉบับจัดวรรคแล้ว" และจุดเว้นวรรคที่ระบบปรับเฉลี่ยต่อชิ้น
+            'norm_pieces'  => $normPieces,
+            'space_fix_mean' => ch45_mean($spaceFix),
         ];
     }
 
     $out['spell_change'] = ($out['work1']['spell_mean'] !== null && $out['work2']['spell_mean'] !== null)
         ? $out['work2']['spell_mean'] - $out['work1']['spell_mean'] : null;
+    $normAll = (int)$out['work1']['norm_pieces'] + (int)$out['work2']['norm_pieces'];
+    $out['norm_pieces'] = $normAll;
     $out['note'] = 'จำนวนคำที่สะกดผิดนับด้วยพจนานุกรมอัตโนมัติ คำวิสามานยนามและคำเฉพาะบางคำ'
-                 . 'อาจถูกนับเกินจริง ผู้วิจัยควรสุ่มตรวจยืนยันก่อนรายงานเป็นตัวเลขในวิทยานิพนธ์';
+                 . 'อาจถูกนับเกินจริง ผู้วิจัยควรสุ่มตรวจยืนยันก่อนรายงานเป็นตัวเลขในวิทยานิพนธ์'
+                 . ($normAll > 0
+                    ? ' · การนับคำและการอ่านใจความใช้ "ฉบับจัดเว้นวรรคแล้ว" ' . $normAll . ' ฉบับ '
+                      . 'ซึ่งมีถ้อยคำทุกตัวเหมือนต้นฉบับของนักเรียน ต่างกันเฉพาะตำแหน่งการเว้นวรรค '
+                      . 'เพื่อให้เครื่องมือตัดคำอัตโนมัติแบ่งคำได้ถูกต้อง ส่วนการนับข้อผิดพลาดเรื่องการเว้นวรรค'
+                      . 'ยังนับจากต้นฉบับที่นักเรียนพิมพ์เองเสมอ'
+                    : '');
     return $out;
 }
 
@@ -1155,6 +1201,27 @@ function ch45_readiness(array $ds, array $quant, array $defects, array $mech) {
         ($c1 >= 3 && $c2 >= 3) ? (($need && ($c1 < $need || $c2 < $need)) ? 'warn' : 'ok') : 'missing',
         'ครั้งที่ 1 มี ' . $c1 . ' ฉบับ · ครั้งที่ 2 มี ' . $c2 . ' ฉบับ',
         'ให้นักเรียนบันทึกเรียงความในระบบ หรือครูพิมพ์แทนได้ที่หน้า "เรียงความนักเรียน"');
+
+    // 6.1) ฉบับจัดเว้นวรรคแล้ว — ตัวบทตั้งต้นของการวิเคราะห์เชิงคุณภาพในบทที่ 4-5
+    //      ภาษาไทยเขียนติดกัน ถ้าเว้นวรรคผิดที่ ตัวตัดคำอัตโนมัติจะแบ่งคำผิดและระบบจะอ่านใจความคลาดเคลื่อน
+    $nmHave = 0; $nmTotal = 0;
+    foreach (ai_norm_phases() as $nmPh) {
+        foreach ($ds['sids'] as $sid) {
+            if (empty($ds['essays'][$sid][$nmPh]['has'])) continue;
+            $nmTotal++;
+            if (!empty($ds['essays'][$sid][$nmPh]['normalized'])) $nmHave++;
+        }
+    }
+    $add($items, 'spacing', 'ฉบับจัดเว้นวรรคแล้ว (ตัวบทตั้งต้นของการวิเคราะห์)',
+        // ยังไม่จัดก็วิเคราะห์ได้จากต้นฉบับ จึงเป็นแค่ "ควรทำก่อน" ไม่ใช่ "ขาดข้อมูล"
+        ($nmTotal > 0 && $nmHave >= $nmTotal) ? 'ok' : 'warn',
+        ($nmTotal === 0)
+            ? 'ยังไม่มีเรียงความในรอบที่ใช้วิเคราะห์'
+            : ('จัดแล้ว ' . $nmHave . ' จาก ' . $nmTotal . ' ฉบับ'
+               . ' (ก่อนเรียน · ร่างที่ 2 ของทั้งสองหน่วย · หลังเรียน)'
+               . ($nmHave < $nmTotal ? ' — ฉบับที่ยังไม่จัดจะวิเคราะห์จากต้นฉบับตามเดิม' : '')),
+        'กดปุ่ม "จัดเว้นวรรคก่อนวิเคราะห์ → แก้ทั้งหมด" ในหน้า "ระบบตรวจเรียงความอัตโนมัติ" '
+        . '(ฉบับที่จัดแล้วมีถ้อยคำเหมือนต้นฉบับทุกตัว ต่างกันเฉพาะการเว้นวรรค และไม่แสดงแทนงานเขียนของนักเรียน)');
 
     // 7) หัวข้อเรียงความที่ครูกำหนด
     $t1 = trim((string)($ds['topics'][essay_topic_phase($meta['work1_phase'])] ?? ''));

@@ -128,3 +128,30 @@ CREATE TABLE IF NOT EXISTS essay_ai_phase_summary (
     created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- ฉบับ "จัดเว้นวรรค/แบ่งประโยคแล้ว" ของเรียงความ
+-- ใช้เป็นตัวบทตั้งต้นของการวิเคราะห์ในบทที่ 4-5 เท่านั้น ไม่แสดงแทนต้นฉบับที่ใดทั้งสิ้น
+-- ระบบเปลี่ยนได้เฉพาะช่องว่าง — ตัวอักษรทุกตัวต้องเหมือนต้นฉบับเป๊ะ (โค้ดตรวจก่อนบันทึกทุกครั้ง)
+-- (db_config.php รันให้อัตโนมัติเมื่อเปิดเว็บ — คำสั่งด้านล่างไว้รันมือกรณีจำเป็น)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS essay_normalized (
+    id                 INT AUTO_INCREMENT PRIMARY KEY,
+    student_id         VARCHAR(10) NOT NULL,
+    essay_phase        VARCHAR(20) NOT NULL,
+    intro_content      TEXT NULL,
+    body_content       LONGTEXT NULL,      -- JSON array ของย่อหน้าเนื้อเรื่อง (จำนวนย่อหน้าเท่าต้นฉบับเสมอ)
+    conclusion_content TEXT NULL,
+    source_hash        CHAR(40) DEFAULT NULL,  -- ลายนิ้วมือต้นฉบับ ณ ตอนจัดวรรค
+    word_count         INT NOT NULL DEFAULT 0,
+    space_before       INT NOT NULL DEFAULT 0,
+    space_after        INT NOT NULL DEFAULT 0,
+    space_edits        INT NOT NULL DEFAULT 0,
+    notes              TEXT NULL,
+    provider           VARCHAR(30)  DEFAULT NULL,
+    model              VARCHAR(100) DEFAULT NULL,
+    requested_by       VARCHAR(50)  DEFAULT NULL,
+    created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_essay_normalized (student_id, essay_phase)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

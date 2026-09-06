@@ -860,6 +860,39 @@ try {
     // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
 }
 
+// ตาราง "ฉบับจัดวรรคแล้ว" ของเรียงความ — ใช้เป็นตัวบทตั้งต้นของการวิเคราะห์ในบทที่ 4-5 เท่านั้น
+// ไม่แสดงแทนต้นฉบับที่ไหนทั้งสิ้น นักเรียนและครูยังเห็นงานเขียนจริงของนักเรียนเสมอ
+// ระบบจัดเฉพาะ "ช่องว่าง" ตัวอักษรทุกตัวต้องเหมือนต้นฉบับเป๊ะ (โค้ดตรวจสอบก่อนบันทึกทุกครั้ง)
+try {
+    $tNm = $pdo->query("SHOW TABLES LIKE 'essay_normalized'");
+    if (!$tNm || $tNm->rowCount() === 0) {
+        safe_ddl($pdo, "
+            CREATE TABLE IF NOT EXISTS essay_normalized (
+                id                 INT AUTO_INCREMENT PRIMARY KEY,
+                student_id         VARCHAR(10) NOT NULL,
+                essay_phase        VARCHAR(20) NOT NULL,
+                intro_content      TEXT NULL,
+                body_content       LONGTEXT NULL,      -- JSON array ของย่อหน้าเนื้อเรื่อง (จำนวนย่อหน้าเท่าต้นฉบับเสมอ)
+                conclusion_content TEXT NULL,
+                source_hash        CHAR(40) DEFAULT NULL,  -- ลายนิ้วมือต้นฉบับ ณ ตอนจัดวรรค (ต้นฉบับเปลี่ยน = ต้องจัดใหม่)
+                word_count         INT NOT NULL DEFAULT 0,
+                space_before       INT NOT NULL DEFAULT 0, -- จำนวนจุดเว้นวรรคในต้นฉบับ
+                space_after        INT NOT NULL DEFAULT 0, -- จำนวนจุดเว้นวรรคหลังจัด
+                space_edits        INT NOT NULL DEFAULT 0, -- ผลต่างของสองค่าข้างบน
+                notes              TEXT NULL,              -- JSON array ข้อสังเกตของระบบ
+                provider           VARCHAR(30)  DEFAULT NULL,
+                model              VARCHAR(100) DEFAULT NULL,
+                requested_by       VARCHAR(50)  DEFAULT NULL,
+                created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY unique_essay_normalized (student_id, essay_phase)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+    }
+} catch (Exception $e) {
+    // เงียบไว้ ไม่ให้กระทบการทำงานหลักของระบบ
+}
+
 // ตาราง "ภาพรวมเชิงคุณภาพของข้อมูลสะท้อนคิด" — ระบบสังเคราะห์ปัญหาการเขียน/การตรวจสอบตนเอง/
 // การประเมินเพื่อน/การสะท้อนการเรียนรู้ ของทั้งชั้นในหน่วยการเรียนหนึ่งเป็นข้อมูลเชิงคุณภาพ
 // 1 หน่วยการเรียน = 1 แถว (สร้างใหม่ทับของเดิม)

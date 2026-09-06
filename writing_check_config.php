@@ -2738,3 +2738,259 @@ function ai_feedback_row_to_array(array $row, ?array $evalManual = null, ?array 
 
     return ai_attach_manual($out, $tScores, $tTotal, $tBy, $tAt, $tSource);
 }
+
+/* =========================================================================
+ * ระบบ "จัดเว้นวรรค/แบ่งประโยค" ก่อนนำไปวิเคราะห์ในบทที่ 4-5
+ * -------------------------------------------------------------------------
+ * ทำไมต้องมี
+ *   ภาษาไทยเขียนติดกันไม่เว้นวรรคระหว่างคำ การเว้นวรรคจึงเป็นตัวบอก "ขอบเขตของความ"
+ *   งานเขียนของนักเรียนหลายฉบับเว้นวรรคผิดที่หรือไม่เว้นเลย ทำให้เครื่องมือตัดคำอัตโนมัติ
+ *   แบ่งคำผิด และทำให้ระบบที่อ่านตัวบทไปวิเคราะห์ในบทที่ 4-5 ตีความใจความคลาดเคลื่อน
+ *   ระบบนี้จึงสร้าง "ฉบับจัดวรรคแล้ว" เก็บแยกไว้ต่างหาก
+ *
+ * กติกาสำคัญ (บังคับด้วยโค้ด ไม่ได้เชื่อคำสัญญาของโมเดล)
+ *   1. ฉบับจัดวรรคแล้วต้องมีตัวอักษรทุกตัว "เหมือนต้นฉบับเป๊ะ" เมื่อลบช่องว่างออกทั้งหมด
+ *      ถ้าต่างแม้ตัวเดียว = โมเดลไปแก้ถ้อยคำของนักเรียน ระบบจะไม่บันทึกและแจ้งว่าตรวจไม่สำเร็จ
+ *   2. จำนวนย่อหน้าของเนื้อเรื่องต้องเท่าเดิม เพราะจำนวนย่อหน้าเป็นข้อมูลของงานวิจัย
+ *   3. ฉบับนี้ "ไม่แสดงให้ใครเห็นแทนต้นฉบับ" — นักเรียน/ครูยังเห็นงานเขียนจริงเสมอ
+ *      ใช้เฉพาะเป็นตัวบทตั้งต้นของการวิเคราะห์ในบทที่ 4-5 เท่านั้น
+ * ========================================================================= */
+
+/**
+ * รอบงานที่ต้องจัดวรรคไว้ล่วงหน้า — ตรงกับรอบที่บทที่ 4-5 หยิบตัวบทไปวิเคราะห์
+ * (ก่อนเรียน · ร่างที่ 2 ของทั้งสองหน่วย · หลังเรียน)
+ */
+function ai_norm_phases() {
+    return ['pretest', 'task1_d2', 'task2_d2', 'posttest'];
+}
+
+/** ลบช่องว่างทุกชนิดออกจากข้อความ ใช้พิสูจน์ว่า "ถ้อยคำไม่ถูกแก้" */
+function ai_norm_signature($text) {
+    $t = (string)$text;
+    // ช่องว่างปกติ + ช่องว่างไม่ตัดคำ + ช่องว่างความกว้างศูนย์ที่มักติดมากับการคัดลอกจากเว็บ
+    $t = preg_replace('/[\s\x{00A0}\x{200B}\x{200C}\x{200D}\x{FEFF}]+/u', '', $t);
+    return (string)$t;
+}
+
+/** เก็บกวาดช่องว่างขั้นต้น: รวบช่องว่างซ้ำ ตัดช่องว่างหัวท้าย (ไม่ยุ่งกับถ้อยคำ) */
+function ai_norm_tidy($text) {
+    $t = preg_replace('/[\x{00A0}\x{200B}\x{200C}\x{200D}\x{FEFF}]/u', ' ', (string)$text);
+    $t = preg_replace('/[ \t\r\n]+/u', ' ', $t);
+    return trim((string)$t);
+}
+
+/** นับ "จุดเว้นวรรค" ในข้อความ ใช้บอกว่าฉบับจัดวรรคแล้วต่างจากต้นฉบับมากน้อยเพียงใด */
+function ai_norm_space_count($text) {
+    $t = ai_norm_tidy($text);
+    if ($t === '') return 0;
+    return preg_match_all('/ /u', $t);
+}
+
+/** คำสั่งประจำตัวของระบบจัดวรรค */
+function ai_norm_system_prompt() {
+    return "คุณเป็นผู้ช่วยจัดรูปแบบข้อความภาษาไทยของครูภาษาไทยระดับมัธยมศึกษา\n"
+         . "หน้าที่เดียวของคุณคือ \"จัดการเว้นวรรคและการแบ่งประโยค\" ของงานเขียนนักเรียน\n"
+         . "เพื่อให้เครื่องมือวิเคราะห์อ่านขอบเขตของประโยคได้ถูกต้อง\n\n"
+         . "ข้อห้ามเด็ดขาด (ผิดข้อใดข้อหนึ่ง ถือว่างานเสีย):\n"
+         . "- ห้ามเพิ่ม ลบ หรือเปลี่ยนตัวอักษร สระ วรรณยุกต์ ตัวเลข หรือเครื่องหมายใด ๆ แม้แต่ตัวเดียว\n"
+         . "- ห้ามแก้คำที่สะกดผิด ห้ามแก้ไวยากรณ์ ห้ามเรียบเรียงใหม่ ห้ามสรุปย่อ ห้ามเติมคำเชื่อม\n"
+         . "- ห้ามเพิ่มหรือลดจำนวนย่อหน้าของเนื้อเรื่อง ต้องส่งกลับเท่าจำนวนที่ได้รับพอดี\n"
+         . "- ห้ามย้ายข้อความข้ามส่วน (คำนำ / เนื้อเรื่อง / สรุป)\n"
+         . "สิ่งเดียวที่คุณเปลี่ยนได้คือ \"ช่องว่าง\" — จะเพิ่มช่องว่าง ลบช่องว่าง หรือย้ายตำแหน่งช่องว่างก็ได้\n"
+         . "เมื่อลบช่องว่างออกจากข้อความที่คุณส่งกลับทั้งหมด ต้องได้ตัวอักษรเรียงเหมือนต้นฉบับเป๊ะทุกตัว\n\n"
+         . "หลักการเว้นวรรคที่ใช้ (ตามหลักเกณฑ์การเว้นวรรคของสำนักงานราชบัณฑิตยสภา):\n"
+         . "- เว้นวรรคเมื่อจบประโยคหรือจบใจความหนึ่ง แล้วขึ้นความใหม่\n"
+         . "- เว้นวรรคหน้าคำสันธานที่เชื่อมประโยค เช่น และ หรือ แต่ เพราะ จึง ดังนั้น เมื่อ ถ้า\n"
+         . "- เว้นวรรคหลังข้อความที่เป็นส่วนขยายยาว ๆ ก่อนขึ้นประธานหรือกริยาใหม่\n"
+         . "- เว้นวรรคหน้าและหลังตัวเลข เครื่องหมายไปยาลน้อย (ฯ) และคำภาษาต่างประเทศที่เขียนด้วยอักษรโรมัน\n"
+         . "- ไม้ยมก (ๆ) ต้องเว้นวรรคหลังไม้ยมก แต่ไม่เว้นวรรคหน้าไม้ยมก\n"
+         . "- ห้ามเว้นวรรคกลางคำ กลางชื่อเฉพาะ หรือระหว่างคำกับสระ/วรรณยุกต์ของคำนั้น\n"
+         . "- ไม่ต้องเว้นวรรคทุกคำ เว้นเฉพาะจุดที่ช่วยให้อ่านแล้วแบ่งความได้ถูกต้อง\n\n"
+         . "ตอบกลับเป็น JSON เท่านั้น ไม่ต้องมีคำอธิบายอื่นใดนอกก้อน JSON\n"
+         . "{\n"
+         . "  \"intro\": \"คำนำที่จัดวรรคแล้ว\",\n"
+         . "  \"body\": [\"ย่อหน้าเนื้อเรื่องที่ 1 ที่จัดวรรคแล้ว\", \"...\"],\n"
+         . "  \"conclusion\": \"สรุปที่จัดวรรคแล้ว\",\n"
+         . "  \"notes\": [\"ข้อสังเกตสั้น ๆ ว่าปรับการเว้นวรรคตรงไหนบ้าง ไม่เกิน 5 ข้อ\"]\n"
+         . "}";
+}
+
+/** คำสั่งรายฉบับของระบบจัดวรรค */
+function ai_build_norm_prompt($topic, $phase, $intro, array $bodyArr, $conclusion) {
+    $p  = "รอบงาน: " . ai_phase_label($phase) . "\n";
+    if (trim((string)$topic) !== '') $p .= "หัวข้อที่ครูกำหนด: " . trim((string)$topic) . "\n";
+    $p .= "จำนวนย่อหน้าของเนื้อเรื่อง: " . count($bodyArr) . " ย่อหน้า (ต้องส่งกลับเท่านี้พอดี)\n\n";
+    $p .= "=== คำนำ ===\n" . trim((string)$intro) . "\n\n";
+    foreach ($bodyArr as $i => $para) {
+        $p .= "=== เนื้อเรื่อง ย่อหน้าที่ " . ($i + 1) . " ===\n" . trim((string)$para) . "\n\n";
+    }
+    $p .= "=== สรุป ===\n" . trim((string)$conclusion) . "\n\n";
+    $p .= "จัดการเว้นวรรคของทุกส่วนข้างต้นตามหลักเกณฑ์ แล้วส่งกลับเป็น JSON ตามรูปแบบที่กำหนด\n"
+        . "ย้ำอีกครั้ง: เปลี่ยนได้เฉพาะช่องว่างเท่านั้น ตัวอักษรทุกตัวต้องคงเดิม";
+    return $p;
+}
+
+/**
+ * อ่านคำตอบของระบบจัดวรรค พร้อม "ตรวจสอบว่าถ้อยคำไม่ถูกแก้" ทีละส่วน
+ * คืนค่า ['ok'=>bool, 'error'=>string, 'data'=>['intro','body','conclusion','notes','space_edits']]
+ */
+function ai_parse_norm($rawText, $intro, array $bodyArr, $conclusion) {
+    $obj = ai_extract_json($rawText);
+    if (!is_array($obj)) {
+        return ['ok' => false, 'error' => 'ระบบตอบกลับมาในรูปแบบที่ไม่ใช่ JSON จึงอ่านผลไม่ได้', 'data' => []];
+    }
+
+    $newIntro = ai_norm_tidy($obj['intro'] ?? '');
+    $newConcl = ai_norm_tidy($obj['conclusion'] ?? '');
+    $newBody  = (isset($obj['body']) && is_array($obj['body'])) ? array_values($obj['body']) : [];
+    $newBody  = array_map('ai_norm_tidy', array_map('strval', $newBody));
+
+    if (count($newBody) !== count($bodyArr)) {
+        return ['ok' => false, 'data' => [],
+                'error' => 'ระบบส่งย่อหน้าเนื้อเรื่องกลับมา ' . count($newBody) . ' ย่อหน้า '
+                         . 'แต่ต้นฉบับมี ' . count($bodyArr) . ' ย่อหน้า — จำนวนย่อหน้าต้องเท่าเดิม'];
+    }
+
+    // ตรวจทีละส่วน: ลบช่องว่างออกแล้วต้องได้ตัวอักษรเหมือนต้นฉบับเป๊ะ
+    $checks = [['คำนำ', $intro, $newIntro], ['สรุป', $conclusion, $newConcl]];
+    foreach ($bodyArr as $i => $para) {
+        $checks[] = ['เนื้อเรื่องย่อหน้าที่ ' . ($i + 1), $para, $newBody[$i]];
+    }
+    foreach ($checks as $c) {
+        if (ai_norm_signature($c[1]) !== ai_norm_signature($c[2])) {
+            return ['ok' => false, 'data' => [],
+                    'error' => 'ระบบแก้ถ้อยคำใน "' . $c[0] . '" เกินกว่าการเว้นวรรค '
+                             . 'จึงไม่บันทึกผล (ต้นฉบับของนักเรียนไม่ถูกแตะต้อง) — กดสั่งใหม่อีกครั้งได้'];
+        }
+    }
+
+    $notes = [];
+    if (isset($obj['notes']) && is_array($obj['notes'])) {
+        foreach (array_slice($obj['notes'], 0, 5) as $n) {
+            $n = ai_clean_text($n, 300);
+            if ($n !== '') $notes[] = $n;
+        }
+    }
+
+    // จำนวนจุดเว้นวรรคที่ต่างจากต้นฉบับ — ใช้เป็นตัวชี้ว่าฉบับนี้เว้นวรรคคลาดเคลื่อนมากน้อยแค่ไหน
+    $before = ai_norm_space_count($intro) + ai_norm_space_count($conclusion);
+    $after  = ai_norm_space_count($newIntro) + ai_norm_space_count($newConcl);
+    foreach ($bodyArr as $i => $para) {
+        $before += ai_norm_space_count($para);
+        $after  += ai_norm_space_count($newBody[$i]);
+    }
+
+    return ['ok' => true, 'error' => '', 'data' => [
+        'intro'       => $newIntro,
+        'body'        => $newBody,
+        'conclusion'  => $newConcl,
+        'notes'       => $notes,
+        'space_before'=> $before,
+        'space_after' => $after,
+        'space_edits' => abs($after - $before),
+    ]];
+}
+
+/** สร้างตารางเก็บ "ฉบับจัดวรรคแล้ว" ถ้ายังไม่มี (โฮสต์ที่ยังไม่ได้รัน auto-migration) */
+function ai_norm_ensure_table(PDO $pdo) {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS essay_normalized (
+                id                 INT AUTO_INCREMENT PRIMARY KEY,
+                student_id         VARCHAR(10) NOT NULL,
+                essay_phase        VARCHAR(20) NOT NULL,
+                intro_content      TEXT NULL,
+                body_content       LONGTEXT NULL,
+                conclusion_content TEXT NULL,
+                source_hash        CHAR(40) DEFAULT NULL,
+                word_count         INT NOT NULL DEFAULT 0,
+                space_before       INT NOT NULL DEFAULT 0,
+                space_after        INT NOT NULL DEFAULT 0,
+                space_edits        INT NOT NULL DEFAULT 0,
+                notes              TEXT NULL,
+                provider           VARCHAR(30)  DEFAULT NULL,
+                model              VARCHAR(100) DEFAULT NULL,
+                requested_by       VARCHAR(50)  DEFAULT NULL,
+                created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY unique_essay_normalized (student_id, essay_phase)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        ");
+    } catch (PDOException $e) { /* มีอยู่แล้ว หรือสิทธิ์ไม่พอ — ไม่ควรทำให้ทั้งหน้าพัง */ }
+}
+
+/** บันทึกฉบับจัดวรรคแล้ว 1 ฉบับ (ทับของเดิมเสมอ) */
+function ai_norm_save(PDO $pdo, $studentId, $phase, array $data, $sourceHash, $provider, $model, $userId) {
+    ai_norm_ensure_table($pdo);
+    $full = trim($data['intro'] . "\n" . implode("\n", $data['body']) . "\n" . $data['conclusion']);
+    $stmt = $pdo->prepare('
+        INSERT INTO essay_normalized
+            (student_id, essay_phase, intro_content, body_content, conclusion_content,
+             source_hash, word_count, space_before, space_after, space_edits, notes,
+             provider, model, requested_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+            intro_content      = VALUES(intro_content),
+            body_content       = VALUES(body_content),
+            conclusion_content = VALUES(conclusion_content),
+            source_hash        = VALUES(source_hash),
+            word_count         = VALUES(word_count),
+            space_before       = VALUES(space_before),
+            space_after        = VALUES(space_after),
+            space_edits        = VALUES(space_edits),
+            notes              = VALUES(notes),
+            provider           = VALUES(provider),
+            model              = VALUES(model),
+            requested_by       = VALUES(requested_by),
+            updated_at         = CURRENT_TIMESTAMP
+    ');
+    $stmt->execute([
+        $studentId, $phase, $data['intro'],
+        json_encode($data['body'], JSON_UNESCAPED_UNICODE), $data['conclusion'],
+        $sourceHash, ai_count_words($full),
+        (int)($data['space_before'] ?? 0), (int)($data['space_after'] ?? 0), (int)($data['space_edits'] ?? 0),
+        json_encode($data['notes'], JSON_UNESCAPED_UNICODE),
+        $provider, $model, $userId,
+    ]);
+}
+
+/**
+ * อ่านฉบับจัดวรรคแล้วของนักเรียนหลายคนพร้อมกัน (ใช้ในบทที่ 4-5)
+ * คืนค่า [student_id][essay_phase] => ['intro','body','conclusion','text','hash','space_edits',...]
+ */
+function ai_norm_map(PDO $pdo, array $studentIds) {
+    if (!$studentIds) return [];
+    // ไม่ต้องสร้างตารางตอนอ่าน — ยังไม่เคยจัดวรรคก็คืนค่าว่างแล้วใช้ต้นฉบับไปตามปกติ
+    // (ตารางถูกสร้างโดย auto-migration ใน db_config.php หรือตอนบันทึกครั้งแรก)
+    $ph = implode(',', array_fill(0, count($studentIds), '?'));
+    $out = [];
+    try {
+        $stmt = $pdo->prepare('SELECT student_id, essay_phase, intro_content, body_content, conclusion_content,
+                                      source_hash, word_count, space_before, space_after, space_edits, updated_at
+                                 FROM essay_normalized WHERE student_id IN (' . $ph . ')');
+        $stmt->execute(array_values($studentIds));
+        foreach ($stmt->fetchAll() as $row) {
+            $body = json_decode((string)($row['body_content'] ?? ''), true);
+            if (!is_array($body)) $body = [];
+            $body = array_values(array_map('strval', $body));
+            $intro = (string)($row['intro_content'] ?? '');
+            $concl = (string)($row['conclusion_content'] ?? '');
+            $out[(string)$row['student_id']][(string)$row['essay_phase']] = [
+                'intro'       => $intro,
+                'body'        => $body,
+                'conclusion'  => $concl,
+                'text'        => trim($intro . "\n" . implode("\n", $body) . "\n" . $concl),
+                'hash'        => (string)($row['source_hash'] ?? ''),
+                'word_count'  => (int)($row['word_count'] ?? 0),
+                'space_before'=> (int)($row['space_before'] ?? 0),
+                'space_after' => (int)($row['space_after'] ?? 0),
+                'space_edits' => (int)($row['space_edits'] ?? 0),
+                'updated_at'  => (string)($row['updated_at'] ?? ''),
+            ];
+        }
+    } catch (Exception $e) { /* ยังไม่มีตาราง = ยังไม่เคยจัดวรรค ใช้ต้นฉบับไปก่อน */ }
+    return $out;
+}
