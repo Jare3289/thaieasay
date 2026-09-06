@@ -176,13 +176,17 @@ $c45IsTeacher = ($sessionUser['role'] === 'teacher');
           <label class="form-label small fw-bold mb-1">ขั้นของ POA</label>
           <select id="c45LogStage" class="form-select form-select-sm"></select>
         </div>
+        <div class="col-md-1">
+          <label class="form-label small fw-bold mb-1">ขั้นย่อย</label>
+          <input id="c45LogSubstep" class="form-control form-control-sm" placeholder="เช่น 1.1" maxlength="10">
+        </div>
         <div class="col-md-2">
           <label class="form-label small fw-bold mb-1">หน่วยการเรียนรู้</label>
           <select id="c45LogUnit" class="form-select form-select-sm">
             <option value="0">ไม่ระบุ</option><option value="1">หน่วยที่ 1</option><option value="2">หน่วยที่ 2</option>
           </select>
         </div>
-        <div class="col-md-7">
+        <div class="col-md-6">
           <label class="form-label small fw-bold mb-1">ปัญหาที่พบจริง <span class="text-danger">*</span></label>
           <input id="c45LogProblem" class="form-control form-control-sm"
                  placeholder="เช่น นักเรียนบางส่วนลังเลที่จะเขียนร่างแรก เพราะรู้สึกว่ายังไม่ได้รับความรู้">
@@ -942,10 +946,11 @@ function c45PaintLogs() {
     return;
   }
   box.innerHTML = '<div class="table-responsive"><table class="table table-sm align-middle mb-0">'
-    + '<thead class="table-light"><tr><th>ขั้นของ POA</th><th>หน่วย</th><th>ปัญหาที่พบ</th>'
+    + '<thead class="table-light"><tr><th>ขั้นของ POA</th><th>ขั้นย่อย</th><th>หน่วย</th><th>ปัญหาที่พบ</th>'
     + '<th>แนวทางแก้ไข</th><th class="text-end">จัดการ</th></tr></thead><tbody>'
     + logs.map(function (l) {
         return '<tr><td class="small">' + c45Esc(stages[l.poa_stage] || l.poa_stage) + '</td>'
+          + '<td class="small">' + c45Esc(l.poa_substep || '—') + '</td>'
           + '<td class="small text-center">' + (Number(l.task_unit) > 0 ? l.task_unit : '—') + '</td>'
           + '<td class="small">' + c45Esc(l.problem) + '</td>'
           + '<td class="small">' + c45Esc(l.solution || '—') + '</td>'
@@ -963,6 +968,7 @@ function c45EditLog(id) {
   if (!l) return;
   document.getElementById('c45LogId').value = l.id;
   document.getElementById('c45LogStage').value = l.poa_stage;
+  document.getElementById('c45LogSubstep').value = l.poa_substep || '';
   document.getElementById('c45LogUnit').value = l.task_unit;
   document.getElementById('c45LogProblem').value = l.problem || '';
   document.getElementById('c45LogSolution').value = l.solution || '';
@@ -975,6 +981,7 @@ async function c45SaveLog() {
   const log = {
     id: Number(document.getElementById('c45LogId').value || 0),
     poa_stage: document.getElementById('c45LogStage').value,
+    poa_substep: document.getElementById('c45LogSubstep').value.trim(),
     task_unit: Number(document.getElementById('c45LogUnit').value || 0),
     problem: document.getElementById('c45LogProblem').value.trim(),
     solution: document.getElementById('c45LogSolution').value.trim(),
@@ -984,7 +991,7 @@ async function c45SaveLog() {
   const d = await c45Api({ action: 'ch45_save_log', log: log });
   if (!d.success) { c45Alert(c45Esc(d.error || 'บันทึกไม่สำเร็จ'), 'danger'); return; }
   c45Data.logs = d.logs || [];
-  ['c45LogProblem', 'c45LogSolution', 'c45LogEvidence'].forEach(function (i) {
+  ['c45LogSubstep', 'c45LogProblem', 'c45LogSolution', 'c45LogEvidence'].forEach(function (i) {
     document.getElementById(i).value = '';
   });
   document.getElementById('c45LogId').value = '0';
@@ -1271,9 +1278,9 @@ function buildChapter45ReportHtml() {
   P.push('<h1 class="secn" id="s5">ส่วนที่ 5 บันทึกหลังสอน</h1>');
   const stages = d.poa_stages || {};
   const logs = d.logs || [];
-  P.push(c45WrTable(['ขั้นของ POA', 'หน่วย', 'ปัญหาที่พบจริง', 'แนวทางแก้ไข', 'ข้อสังเกต/หลักฐานประกอบ'],
+  P.push(c45WrTable(['ขั้นของ POA', 'ขั้นย่อย', 'หน่วย', 'ปัญหาที่พบจริง', 'แนวทางแก้ไข', 'ข้อสังเกต/หลักฐานประกอบ'],
     logs.map(function (l) {
-      return [stages[l.poa_stage] || l.poa_stage, (Number(l.task_unit) > 0 ? l.task_unit : '—'), l.problem, l.solution || '—', l.evidence || '—'];
+      return [stages[l.poa_stage] || l.poa_stage, l.poa_substep || '—', (Number(l.task_unit) > 0 ? l.task_unit : '—'), l.problem, l.solution || '—', l.evidence || '—'];
     })));
 
   // ---------- ส่วนที่ 5.1: คลังอ้างอิงงานวิจัยที่เกี่ยวข้อง ----------

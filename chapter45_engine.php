@@ -862,6 +862,7 @@ function ch45_ai_build_prompt($jobKey, array $ctx) {
         } else {
             foreach ($ds['logs'] as $i => $log) {
                 $L[] = ($i + 1) . ') ' . ($stages[(string)$log['poa_stage']] ?? 'ภาพรวม')
+                     . (trim((string)($log['poa_substep'] ?? '')) !== '' ? ' (ขั้นย่อย ' . $log['poa_substep'] . ')' : '')
                      . ((int)$log['task_unit'] > 0 ? ' หน่วยที่ ' . (int)$log['task_unit'] : '');
                 $L[] = '   ปัญหาที่พบ: ' . (string)$log['problem'];
                 if (trim((string)$log['solution']) !== '') $L[] = '   สิ่งที่ผู้วิจัยทำแล้วได้ผล: ' . (string)$log['solution'];
