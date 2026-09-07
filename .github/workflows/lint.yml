@@ -1,0 +1,29 @@
+name: PHP Lint
+
+# ตรวจไวยากรณ์ไฟล์ PHP ทุกไฟล์อัตโนมัติเมื่อเปิด/อัปเดต pull request หรือ push เข้าสาขาใดก็ตาม
+# ต่างจาก deploy.yml ที่รันเฉพาะตอน push เข้า main เพื่ออัปโหลดขึ้นเซิร์ฟเวอร์จริง —
+# workflow นี้แค่เช็คว่าโค้ดพังไหม ไม่แตะเซิร์ฟเวอร์หรือ secrets ใด ๆ ทั้งสิ้น
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  php-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+
+      - name: Lint all PHP files
+        run: |
+          status=0
+          while IFS= read -r -d '' file; do
+            php -l "$file" || status=1
+          done < <(find . -name '*.php' -not -path './.git/*' -print0)
+          exit $status
