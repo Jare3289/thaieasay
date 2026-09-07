@@ -1145,7 +1145,19 @@ function ch45_ai_build_prompt($jobKey, array $ctx) {
         $ind = ch45_indicators()[$id] ?? null;
         if (!$ind) return ['prompt' => '', 'evidence' => null];
         $row = $defects['rows'][$id];
-        $evidence = ch45_evidence($ds, $id, $defects, 3);
+
+        // รวมหมายเลขนักเรียนที่ถูกยกเป็นตัวอย่างในหัวข้ออื่นไปแล้ว (จากผลวิเคราะห์ที่มีอยู่ก่อนหน้า)
+        // เพื่อให้ ch45_evidence() หลีกเลี่ยงการยกตัวอย่างคนเดิมซ้ำทุกหัวข้อเมื่อยังมีทางเลือกอื่น
+        $usedW1 = []; $usedW2 = [];
+        foreach ($results as $rk => $rv) {
+            if (strpos($rk, 'ind_') !== 0 || $rk === $jobKey) continue;
+            $pl = $rv['payload'] ?? [];
+            $n1 = (int)($pl['excerpt1']['student_no'] ?? 0);
+            $n2 = (int)($pl['excerpt2']['student_no'] ?? 0);
+            if ($n1 > 0) $usedW1[] = $n1;
+            if ($n2 > 0) $usedW2[] = $n2;
+        }
+        $evidence = ch45_evidence($ds, $id, $defects, 3, $usedW1, $usedW2);
 
         $extra = [];
         if ($id === '4.1') {

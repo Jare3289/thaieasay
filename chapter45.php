@@ -336,6 +336,24 @@ let c45Data = null;
 let c45Stopped = false;
 let c45Running = false;
 
+// นับว่าตัวอย่างของนักเรียนคนไหนถูกยกไปใช้ซ้ำในหลายหัวข้อบ้าง (แยกครั้งที่ 1 / ครั้งที่ 2)
+// เซิร์ฟเวอร์พยายามคัดให้หลากหลายอยู่แล้ว แต่ถ้าคะแนนใกล้เคียงกันจนต้องใช้คนเดิมซ้ำ
+// อย่างน้อยก็ต้องเห็นชัด ๆ บนหน้าจอว่าซ้ำ จะได้ไม่เข้าใจผิดว่าเป็นความหลากหลาย
+let c45ExcerptUsage = { w1: {}, w2: {} };
+function c45ComputeExcerptUsage() {
+  const usage = { w1: {}, w2: {} };
+  const results = (c45Data && c45Data.results) || {};
+  Object.keys(results).forEach(function (k) {
+    if (k.indexOf('ind_') !== 0) return;
+    const pl = (results[k] && results[k].payload) || {};
+    const n1 = pl.excerpt1 && pl.excerpt1.student_no;
+    const n2 = pl.excerpt2 && pl.excerpt2.student_no;
+    if (n1) usage.w1[n1] = (usage.w1[n1] || 0) + 1;
+    if (n2) usage.w2[n2] = (usage.w2[n2] || 0) + 1;
+  });
+  c45ExcerptUsage = usage;
+}
+
 // สลับแสดง/ซ่อนชื่อจริงของนักเรียนในตัวอย่างที่ยกมา — ใช้ไล่หาต้นฉบับเท่านั้น
 // (ค่าเริ่มต้นคือซ่อน เพราะบทที่ 4 ฉบับจริงต้องอ้างด้วยหมายเลขนักเรียนเสมอ ห้ามใช้ชื่อจริง)
 let c45RevealNames = (function () {
@@ -567,7 +585,7 @@ function c45Para(label, text) {
     + '<p class="mb-0" style="text-indent:2.5em; line-height:1.9;">' + c45Esc(text) + '</p></div>';
 }
 
-function c45Excerpt(exNo, ex, roundLabel) {
+function c45Excerpt(exNo, ex, roundLabel, usageCount) {
   if (!ex || !ex.text) {
     return '<div class="border rounded-3 p-2 mb-2 bg-light small text-muted">'
       + 'ตัวอย่าง (' + exNo + ') — ยังไม่มีข้อความที่ยกมา' + (ex && ex.reason ? ' (' + c45Esc(ex.reason) + ')' : '')
@@ -576,6 +594,12 @@ function c45Excerpt(exNo, ex, roundLabel) {
   const ok = ex.verified === true;
   const who = 'นักเรียนคนที่ ' + c45Esc(ex.student_no)
     + (c45RevealNames && ex.student_name ? ' (ชื่อจริง: ' + c45Esc(ex.student_name) + ')' : '');
+  // ถ้านักเรียนคนนี้ถูกยกเป็นตัวอย่างในหัวข้ออื่นซ้ำอีก ให้ขึ้นป้ายเตือนชัด ๆ
+  // เพราะเป็นการยกตัวอย่างซ้ำคน แม้ระบบจะพยายามคัดให้หลากหลายก่อนแล้วก็ตาม
+  const dup = (usageCount || 0) > 1
+    ? '<span class="badge bg-info-subtle text-info-emphasis ms-2">'
+      + '<i class="bi bi-arrow-repeat"></i> คนเดิมกับอีก ' + (usageCount - 1) + ' หัวข้อ</span>'
+    : '';
   return '<div class="border rounded-3 p-2 mb-2 ' + (ok ? 'border-success-subtle' : 'border-danger') + '">'
     + '<div class="d-flex justify-content-between align-items-center mb-1">'
     + '<span class="badge ' + (ok ? 'bg-success-subtle text-success-emphasis' : 'bg-danger') + '">'
@@ -583,7 +607,7 @@ function c45Excerpt(exNo, ex, roundLabel) {
     + '</span>'
     + '<span class="small text-muted">ตัวอย่าง (' + exNo + ')</span></div>'
     + '<div style="line-height:1.9;">' + c45Esc(ex.text) + '</div>'
-    + '<div class="small text-muted mt-1">(' + who + ' ' + c45Esc(roundLabel) + ')</div>'
+    + '<div class="small text-muted mt-1">(' + who + ' ' + c45Esc(roundLabel) + ')' + dup + '</div>'
     + (ex.reason ? '<div class="small text-danger mt-1">' + c45Esc(ex.reason) + '</div>' : '')
     + '</div>';
 }
@@ -610,8 +634,10 @@ function c45RenderPayload(jobKey, payload) {
       + c45Esc(meta.work2_label) + '</div><div class="small">' + c45Esc(payload.cell2) + '</div></div></div>'
       + '</div>'
       + c45Para('ย่อหน้าเปิดหัวข้อ ' + (ind.sub || ''), payload.finding)
-      + c45Excerpt(ex[0], payload.excerpt1, meta.work1_label)
-      + c45Excerpt(ex[1], payload.excerpt2, meta.work2_label)
+      + c45Excerpt(ex[0], payload.excerpt1, meta.work1_label,
+                   c45ExcerptUsage.w1[(payload.excerpt1 || {}).student_no])
+      + c45Excerpt(ex[1], payload.excerpt2, meta.work2_label,
+                   c45ExcerptUsage.w2[(payload.excerpt2 || {}).student_no])
       + c45Para('ตัวอย่าง (' + ex[0] + ') วิเคราะห์', payload.analysis1)
       + c45Para('ตัวอย่าง (' + ex[1] + ') วิเคราะห์', payload.analysis2)
       + c45Para('ข้อสรุปจากคู่ตัวอย่าง', payload.synthesis)
@@ -717,6 +743,7 @@ function c45PaintResults() {
   const jobs = c45Data.jobs;
   const groups = c45Data.job_groups;
   const results = c45Data.results || {};
+  c45ComputeExcerptUsage();
   let html = '';
 
   html += '<div class="alert ' + (c45RevealNames ? 'alert-danger' : 'alert-warning')
