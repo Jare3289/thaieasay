@@ -224,9 +224,15 @@ $c45IsTeacher = ($sessionUser['role'] === 'teacher');
     <div class="card-body p-4">
       <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-1">
         <h5 class="fw-bold mb-1"><i class="bi bi-journals me-2" style="color:#6366f1;"></i>คลังอ้างอิงงานวิจัยที่เกี่ยวข้อง</h5>
-        <button class="btn btn-sm btn-outline-primary rounded-pill px-3" onclick="c45FindReferences()" id="c45FindRefBtn">
-          <i class="bi bi-search me-1"></i>ให้ระบบช่วยหางานวิจัยที่เกี่ยวข้อง
-        </button>
+        <div class="d-flex gap-2 flex-wrap">
+          <button class="btn btn-sm btn-outline-primary rounded-pill px-3" onclick="c45FindReferences()" id="c45FindRefBtn">
+            <i class="bi bi-search me-1"></i>ให้ระบบช่วยหางานวิจัยที่เกี่ยวข้อง
+          </button>
+          <button class="btn btn-sm fw-bold text-white rounded-pill px-3" style="background:#6366f1;"
+                  onclick="c45SynthesizeReferences()" id="c45SynthBtn">
+            <i class="bi bi-diagram-3 me-1"></i>ประมวลคลังอ้างอิง
+          </button>
+        </div>
       </div>
       <p class="text-muted small mb-3">
         กรอกเฉพาะงานวิจัยที่ผู้วิจัย<strong>ตรวจสอบมาแล้วว่ามีอยู่จริง</strong> — ระบบจะใช้ "จับคู่" กับผลจริง
@@ -298,6 +304,10 @@ $c45IsTeacher = ($sessionUser['role'] === 'teacher');
         </div>
       </div>
       <div id="c45RefList"></div>
+
+      <!-- บทประมวลงานวิจัยที่เกี่ยวข้อง — เห็นว่างานทั้งคลังพูดตรงกันเรื่องใด ต่างกันตรงไหน
+           และเรื่องใดยังไม่มีงานรองรับ พร้อมข้อความหลักฐานที่ตรวจแล้วว่าคัดมาจากคลังจริง -->
+      <div id="c45SynthBox" class="mt-4"></div>
     </div>
   </div>
 
@@ -1100,6 +1110,7 @@ function c45PaintReferences() {
     fsel.value = keep;
   }
   c45PaintFindings();
+  c45PaintSynthesis();
 
   const refs = c45Data.references || [];
   const box = document.getElementById('c45RefList');
@@ -1255,6 +1266,7 @@ async function c45SaveReference() {
   const d = await c45Api({ action: 'ch45_save_reference', reference: ref });
   if (!d.success) { c45Alert(c45Esc(d.error || 'บันทึกไม่สำเร็จ'), 'danger'); return; }
   c45Data.references = d.references || [];
+  if (c45Data.ref_synthesis) c45Data.ref_synthesis.stale = true;
   ['c45RefLabel', 'c45RefFinding', 'c45RefFull', 'c45RefUrl', 'c45RefSource'].forEach(function (i) {
     document.getElementById(i).value = '';
   });
@@ -1270,6 +1282,7 @@ async function c45DeleteReference(id) {
   const d = await c45Api({ action: 'ch45_delete_reference', id: id });
   if (!d.success) { c45Alert('ลบไม่สำเร็จ', 'danger'); return; }
   c45Data.references = d.references || [];
+  if (c45Data.ref_synthesis) c45Data.ref_synthesis.stale = true;
   c45PaintReferences();
 }
 
@@ -1330,6 +1343,219 @@ async function c45FindReferences() {
     btn.disabled = false;
     btn.innerHTML = '<i class="bi bi-search me-1"></i>ให้ระบบช่วยหางานวิจัยที่เกี่ยวข้อง';
   }
+}
+
+/* ---------------------------------------------------------------- ประมวลงานวิจัยที่เกี่ยวข้อง */
+/* คลังอ้างอิงเดิมเป็นเพียง "รายการ" ที่รอให้ระบบหยิบไปจับคู่ตอนเขียนอภิปรายผลทีละประเด็น
+   ส่วนนี้ประมวลทั้งคลังออกมาให้เห็นภาพรวมว่า งานที่หามาได้พูดตรงกันเรื่องใด ต่างกันตรงไหน
+   ตรงหรือต่างกับผลจริงของงานวิจัยนี้อย่างไร และผลจริงข้อใดยังไม่มีงานรองรับเลย
+
+   ทุกข้อที่ระบบกล่าวอ้างถึงงานชิ้นใด ต้องมี "ข้อความหลักฐาน" ที่คัดมาคำต่อคำจากช่อง
+   "สิ่งที่งานนี้ค้นพบโดยย่อ" ของงานชิ้นนั้น และเซิร์ฟเวอร์ตรวจซ้ำแล้วว่าคัดมาจริงหรือไม่
+   ก้อนที่ตรวจไม่ผ่านจะขึ้นกรอบแดงเสมอ ไม่ถูกซ่อน */
+
+const C45_STANCE_STYLE = {
+  support:  { cls: 'bg-success-subtle text-success-emphasis',   icon: 'bi-check2-circle' },
+  contrast: { cls: 'bg-danger-subtle text-danger-emphasis',     icon: 'bi-arrow-left-right' },
+  extend:   { cls: 'bg-info-subtle text-info-emphasis',         icon: 'bi-arrows-angle-expand' },
+  mixed:    { cls: 'bg-secondary-subtle text-secondary-emphasis', icon: 'bi-shuffle' }
+};
+
+function c45PaintSynthesis() {
+  const box = document.getElementById('c45SynthBox');
+  if (!box) return;
+  const syn = c45Data.ref_synthesis;
+  const nRefs = (c45Data.references || []).length;
+
+  if (!syn || !syn.payload) {
+    box.innerHTML = '<div class="border rounded-3 p-3 small" style="background:#fbfbff;">'
+      + '<div class="fw-bold mb-1"><i class="bi bi-diagram-3 me-1" style="color:#6366f1;"></i>'
+      + 'ประมวลงานวิจัยที่เกี่ยวข้อง (ยังไม่ได้ประมวล)</div>'
+      + '<div class="text-muted">กดปุ่ม <strong>&quot;ประมวลคลังอ้างอิง&quot;</strong> ด้านบน '
+      + 'ระบบจะอ่านงานทั้งคลังแล้วบอกว่า <strong>งานชิ้นใดพูดตรงกันเรื่องใด ต่างกันตรงไหน '
+      + 'ตรงหรือต่างกับผลจริงของงานวิจัยนี้อย่างไร และผลจริงข้อใดยังไม่มีงานรองรับเลย</strong> '
+      + 'พร้อมเขียนความเรียงประมวลให้ โดยทุกข้อกล่าวอ้างต้องมีข้อความหลักฐานที่คัดมาจากคลังกำกับเสมอ'
+      + (nRefs < 2 ? '<br><span class="text-warning-emphasis"><i class="bi bi-exclamation-triangle me-1"></i>'
+          + 'ต้องมีงานในคลังอย่างน้อย 2 รายการก่อน (ตอนนี้มี ' + nRefs + ') '
+          + 'เพราะการประมวลคือการดูว่างานเหล่านั้นตรงกันหรือต่างกันตรงไหน</span>' : '')
+      + '</div></div>';
+    return;
+  }
+
+  const pl = syn.payload || {};
+  const themes = pl.themes || [];
+  const gaps = pl.gaps || [];
+  const paras = pl.paragraphs || [];
+  const matrix = pl.matrix || {};
+  const stances = c45Data.synthesis_stances || {};
+
+  let h = '<div class="border rounded-3 p-3" style="background:#fbfbff;">';
+  h += '<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">'
+    + '<div class="fw-bold"><i class="bi bi-diagram-3 me-1" style="color:#6366f1;"></i>'
+    + 'ประมวลงานวิจัยที่เกี่ยวข้อง</div>'
+    + '<div class="text-nowrap">'
+    + '<button class="btn btn-sm btn-outline-secondary rounded-pill me-1" onclick="c45CopySynthesis()">'
+    + '<i class="bi bi-clipboard me-1"></i>คัดลอกความเรียง</button>'
+    + '<button class="btn btn-sm btn-outline-danger rounded-pill" onclick="c45DeleteSynthesis()">'
+    + '<i class="bi bi-trash3"></i></button></div></div>';
+
+  h += '<div class="small text-muted mb-2">ประมวลจากงานในคลัง ' + (pl.ref_count || 0) + ' รายการ · '
+    + 'จับเป็นกลุ่มประเด็นร่วมได้ ' + themes.length + ' กลุ่ม · '
+    + (gaps.length ? '<span class="text-warning-emphasis fw-bold">ผลจริงที่ยังไม่มีงานรองรับ '
+        + gaps.length + ' ประเด็น</span>' : 'ผลจริงทุกประเด็นมีงานรองรับแล้ว')
+    + (syn.updated_at ? ' · ประมวลเมื่อ ' + c45Esc(syn.updated_at) : '')
+    + (syn.model ? ' · ' + c45Esc(syn.model) : '') + '</div>';
+
+  if (syn.stale) {
+    h += '<div class="alert alert-warning border-0 rounded-3 py-2 small">'
+      + '<i class="bi bi-exclamation-triangle-fill me-1"></i>'
+      + '<strong>คลังอ้างอิงหรือผลจริงเปลี่ยนไปหลังจากประมวลครั้งนี้</strong> — '
+      + 'บทประมวลด้านล่างยังเป็นของคลังชุดเดิม กดประมวลใหม่ก่อนนำไปใช้</div>';
+  }
+  if (syn.warnings && syn.warnings.length) {
+    h += '<div class="alert alert-danger border-0 rounded-3 py-2 small mb-2">'
+      + '<div class="fw-bold mb-1"><i class="bi bi-exclamation-octagon-fill me-1"></i>'
+      + 'จุดที่ต้องตรวจสอบก่อนนำไปใช้</div><ul class="mb-0 ps-3">'
+      + syn.warnings.map(function (w) { return '<li>' + c45Esc(w) + '</li>'; }).join('')
+      + '</ul></div>';
+  }
+
+  /* ---- กลุ่มประเด็นร่วม พร้อมข้อความหลักฐานรายชิ้น ---- */
+  themes.forEach(function (t, i) {
+    const st = C45_STANCE_STYLE[t.stance] || C45_STANCE_STYLE.mixed;
+    h += '<div class="border rounded-3 p-3 mb-2 bg-white">'
+      + '<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-1">'
+      + '<div class="fw-bold small pe-2">ประเด็นร่วมที่ ' + (i + 1) + ' · ' + c45Esc(t.title) + '</div>'
+      + '<span class="badge ' + st.cls + ' text-nowrap"><i class="bi ' + st.icon + ' me-1"></i>'
+      + c45Esc(t.stance_label || stances[t.stance] || t.stance) + '</span></div>';
+
+    if (t.finding_head) {
+      h += '<div class="small text-muted mb-2"><i class="bi bi-link-45deg me-1"></i>'
+        + 'เกี่ยวกับผลจริงข้อ: ' + c45Esc(t.finding_head) + '</div>';
+    }
+
+    h += '<div class="table-responsive mb-2"><table class="table table-sm align-middle mb-0">'
+      + '<thead class="table-light"><tr><th style="width:28%">งานในคลัง</th>'
+      + '<th>ข้อความหลักฐาน (คัดจากช่อง &quot;สิ่งที่งานนี้ค้นพบ&quot; ในคลัง)</th>'
+      + '<th class="text-end" style="width:16%">ผลตรวจสอบ</th></tr></thead><tbody>'
+      + (t.members || []).map(function (m) {
+          return '<tr' + (m.verified ? '' : ' class="table-danger"') + '>'
+            + '<td class="small fw-bold">' + c45Esc(m.label) + '</td>'
+            + '<td class="small">' + (m.quote ? '&ldquo;' + c45Esc(m.quote) + '&rdquo;' : '—')
+            + (m.verified ? '' : '<div class="small text-danger mt-1">ในคลังกรอกไว้ว่า: '
+                + c45Esc(m.key_finding) + '</div>') + '</td>'
+            + '<td class="text-end small text-nowrap">'
+            + (m.verified
+                ? '<span class="text-success"><i class="bi bi-check2-circle me-1"></i>ตรงกับคลังจริง</span>'
+                : '<span class="text-danger fw-bold"><i class="bi bi-exclamation-octagon me-1"></i>ไม่ตรงกับคลัง</span>')
+            + '</td></tr>';
+        }).join('')
+      + '</tbody></table></div>';
+
+    if (t.agreement) {
+      h += '<div class="small mb-1"><span class="fw-bold text-success-emphasis">ตรงกันตรงที่ </span>'
+        + c45Esc(t.agreement) + '</div>';
+    }
+    if (t.difference) {
+      h += '<div class="small mb-1"><span class="fw-bold text-danger-emphasis">ต่างกันตรงที่ </span>'
+        + c45Esc(t.difference) + '</div>';
+    }
+    if (t.link_to_result) {
+      h += '<div class="small"><span class="fw-bold" style="color:#6366f1;">เกี่ยวกับผลของงานวิจัยนี้ </span>'
+        + c45Esc(t.link_to_result) + '</div>';
+    }
+    h += '</div>';
+  });
+
+  /* ---- ช่องว่างของคลัง — ระบบคำนวณเองจากคลังจริง ไม่ได้ให้ AI เดา ---- */
+  if (gaps.length) {
+    h += '<div class="border rounded-3 p-3 mb-2" style="background:#fff8e6;">'
+      + '<div class="fw-bold small mb-1"><i class="bi bi-search me-1 text-warning-emphasis"></i>'
+      + 'ผลจริงที่ยังไม่มีงานวิจัยในคลังรองรับ (นับจากคลังจริง ไม่ใช่ระบบเดา)</div>'
+      + '<div class="small text-muted mb-2">ประเด็นเหล่านี้จะเขียนอภิปรายผลได้ด้วยเหตุผลเชิงกลไกเท่านั้น '
+      + 'จนกว่าจะมีงานในคลังที่ตรงประเด็น</div><ul class="mb-0 ps-3 small">'
+      + gaps.map(function (g) {
+          return '<li><span class="fw-bold">' + c45Esc(g.heading) + '</span>'
+            + '<div class="text-muted">' + c45Esc(g.summary) + '</div>'
+            + (g.genre_bound ? '<div class="text-warning-emphasis">'
+                + 'ตัวบ่งชี้นี้ผูกกับประเภทของงานเขียน ควรหางานที่พูดถึงการปรับกลวิธีตามประเภทงานเขียน</div>' : '')
+            + (g.suggested && g.suggested.length ? '<div class="text-success-emphasis">'
+                + '<i class="bi bi-lightbulb me-1"></i>ระบบเห็นว่างานในคลังที่น่าจะตรงกับประเด็นนี้คือ '
+                + c45Esc(g.suggested.join(' · ')) + ' — ถ้าตรงจริง ให้กด "แก้ไข" ที่งานชิ้นนั้น '
+                + 'แล้วตั้งช่อง "ประเด็นที่งานนี้ใช้จับคู่" ให้ตรงกับประเด็นนี้</div>' : '')
+            + '</li>';
+        }).join('')
+      + '</ul></div>';
+  }
+
+  /* ---- ความเรียงประมวล ---- */
+  if (paras.length) {
+    h += '<div class="border rounded-3 p-3 bg-white">'
+      + '<div class="fw-bold small mb-2"><i class="bi bi-file-text me-1" style="color:#6366f1;"></i>'
+      + 'ความเรียงประมวล (ร่าง — อ่านทวนและเกลาเป็นสำนวนของคุณครูเองก่อนใช้เสมอ)</div>';
+    paras.forEach(function (p) {
+      const bad = p.suspect || (p.bad_numbers && p.bad_numbers.length);
+      h += '<div class="' + (bad ? 'border border-danger rounded-3 p-2 mb-2' : 'mb-2') + '">'
+        + (p.suspect ? '<div class="small text-danger fw-bold mb-1">'
+            + '<i class="bi bi-exclamation-octagon-fill me-1"></i>'
+            + 'ย่อหน้านี้มีร่องรอยการอ้างอิงงานที่ไม่อยู่ในคลัง — ตรวจก่อนใช้</div>' : '')
+        + (p.bad_numbers && p.bad_numbers.length ? '<div class="small text-danger fw-bold mb-1">'
+            + '<i class="bi bi-exclamation-octagon-fill me-1"></i>ตัวเลข ' + c45Esc(p.bad_numbers.join(', '))
+            + ' ไม่พบทั้งในผลจริงและในคลังอ้างอิง</div>' : '')
+        + '<div style="text-indent:2.5em;line-height:1.9;">' + c45Esc(p.text) + '</div></div>';
+    });
+    h += '</div>';
+  }
+
+  h += '</div>';
+  box.innerHTML = h;
+}
+
+function c45CopySynthesis() {
+  const paras = ((c45Data.ref_synthesis || {}).payload || {}).paragraphs || [];
+  if (!paras.length) { c45Alert('ยังไม่มีความเรียงประมวลให้คัดลอก', 'warning'); return; }
+  const text = paras.map(function (p) { return p.text; }).join('\n\n');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function () {
+      c45Alert('คัดลอกความเรียงประมวลแล้ว — อย่าลืมอ่านทวนและเกลาเป็นสำนวนของคุณครูเองก่อนใช้', 'success');
+    });
+  } else {
+    c45Alert('เบราว์เซอร์นี้คัดลอกอัตโนมัติไม่ได้ กรุณาลากคลุมข้อความแล้วคัดลอกเอง', 'warning');
+  }
+}
+
+async function c45SynthesizeReferences() {
+  const btn = document.getElementById('c45SynthBtn');
+  const refs = c45Data.references || [];
+  if (refs.length < 2) {
+    c45Alert('ต้องมีงานวิจัยในคลังอย่างน้อย 2 รายการก่อนจึงจะประมวลได้ '
+      + '(การประมวลคือการดูว่างานเหล่านั้นพูดตรงกันหรือต่างกันตรงไหน)', 'warning');
+    return;
+  }
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>กำลังประมวล...';
+  try {
+    const d = await c45Api(Object.assign({ action: 'ch45_synthesize_references' }, c45Params()));
+    if (!d.success) { c45Alert(c45Esc(d.error || 'ประมวลไม่สำเร็จ'), 'danger'); return; }
+    c45Data.ref_synthesis = d.synthesis;
+    c45PaintSynthesis();
+    document.getElementById('c45SynthBox').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const nw = (d.synthesis.warnings || []).length;
+    c45Alert(nw ? 'ประมวลเสร็จแล้ว แต่มีจุดที่ต้องตรวจสอบ ' + nw + ' ข้อ — อ่านกรอบแดงก่อนนำไปใช้'
+                : 'ประมวลคลังอ้างอิงเสร็จแล้ว — อ่านทวนและเกลาเป็นสำนวนของคุณครูเองก่อนใช้เสมอ',
+             nw ? 'warning' : 'success');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-diagram-3 me-1"></i>ประมวลคลังอ้างอิง';
+  }
+}
+
+async function c45DeleteSynthesis() {
+  if (!confirm('ยืนยันลบบทประมวลคลังอ้างอิง? (รายการในคลังอ้างอิงไม่ถูกลบ)')) return;
+  const d = await c45Api({ action: 'ch45_delete_synthesis' });
+  if (!d.success) { c45Alert('ลบไม่สำเร็จ', 'danger'); return; }
+  c45Data.ref_synthesis = null;
+  c45PaintSynthesis();
 }
 
 /* ============================================================
@@ -1652,10 +1878,56 @@ function buildChapter45ReportHtml() {
 
   P.push('<h2 class="part" id="app-e">จ. คลังอ้างอิงงานวิจัยที่เกี่ยวข้อง (ที่มาของการอ้างอิงในอภิปรายผล)</h2>');
   const refTypes = d.reference_source_types || {};
+  P.push('<h3 class="sub">จ.1 รายการในคลังอ้างอิง</h3>');
   P.push(c45WrTable(['ป้ายอ้างอิง', 'ประเภท', 'สิ่งที่ค้นพบโดยย่อ'],
     (d.references || []).map(function (r) {
       return [r.citation_label, refTypes[r.source_type] || r.source_type, r.key_finding];
     })));
+
+  // จ.2 บทประมวลคลังอ้างอิง — ตารางจับกลุ่ม + ข้อความหลักฐานที่ตรวจแล้ว + ความเรียงประมวล
+  const syn = d.ref_synthesis;
+  if (syn && syn.payload) {
+    const sp = syn.payload;
+    P.push('<h3 class="sub">จ.2 ประมวลงานวิจัยที่เกี่ยวข้อง '
+      + '(งานชิ้นใดพูดตรงกัน · ต่างกันตรงไหน · เรื่องใดยังไม่มีงานรองรับ)</h3>');
+    P.push(c45DocNote('ประมวลจากงานในคลัง ' + (sp.ref_count || 0) + ' รายการ '
+      + (syn.stale ? '— คลังอ้างอิงเปลี่ยนไปหลังประมวลครั้งนี้ ควรกดประมวลใหม่ก่อนนำไปใช้ ' : '')
+      + '· ข้อความหลักฐานทุกก้อนตรวจแล้วว่าคัดมาจากช่อง "สิ่งที่งานนี้ค้นพบโดยย่อ" ในคลังจริงคำต่อคำ'));
+
+    (sp.themes || []).forEach(function (t, i) {
+      P.push('<p class="note"><strong>ประเด็นร่วมที่ ' + (i + 1) + ' · ' + c45Esc(t.title) + '</strong> — '
+        + c45Esc(t.stance_label || '') + (t.finding_head ? ' · ผลจริงข้อ: ' + c45Esc(t.finding_head) : '') + '</p>');
+      P.push(c45WrTable(['งานในคลัง', 'ข้อความหลักฐานที่คัดมาจากคลัง', 'ผลตรวจสอบ'],
+        (t.members || []).map(function (m) {
+          return [m.label, m.quote || '—',
+            m.verified ? 'ตรงกับคลังจริง' : '⚠ ไม่ตรงกับคลัง — ต้องตรวจสอบ'];
+        })));
+      if (t.agreement)      P.push(c45DocNote('ตรงกันตรงที่ ' + t.agreement));
+      if (t.difference)     P.push(c45DocNote('ต่างกันตรงที่ ' + t.difference));
+      if (t.link_to_result) P.push(c45DocNote('เกี่ยวกับผลของงานวิจัยนี้ ' + t.link_to_result));
+    });
+
+    if ((sp.gaps || []).length) {
+      P.push('<p class="note"><strong>ผลจริงที่ยังไม่มีงานวิจัยในคลังรองรับ</strong> '
+        + '(นับจากคลังจริง ไม่ใช่ระบบเดา) — ประเด็นเหล่านี้จะเขียนอภิปรายผลได้ด้วยเหตุผลเชิงกลไกเท่านั้น</p>');
+      P.push(c45WrTable(['ประเด็นจากผลจริง', 'ข้อเท็จจริงที่คำนวณได้', 'งานในคลังที่ระบบเห็นว่าน่าจะตรง'],
+        sp.gaps.map(function (g) {
+          return [g.heading, g.summary, (g.suggested || []).join(' · ') || '—'];
+        })));
+    }
+
+    if ((sp.paragraphs || []).length) {
+      P.push('<p class="note"><strong>ความเรียงประมวล</strong> (ร่าง — ต้องอ่านทวนและเกลาเป็นสำนวนของผู้วิจัยเองก่อนใช้)</p>');
+      sp.paragraphs.forEach(function (pp) {
+        P.push('<p class="para">' + (pp.suspect || (pp.bad_numbers || []).length
+            ? '<span class="todo">[ย่อหน้านี้มีจุดที่ต้องตรวจสอบก่อนใช้]</span> ' : '')
+          + c45Esc(pp.text) + '</p>');
+      });
+    }
+    (syn.warnings || []).forEach(function (w) {
+      P.push('<p class="note"><span class="todo">⚠ ' + c45Esc(w) + '</span></p>');
+    });
+  }
 
   P.push('<h2 class="part" id="app-f">ฉ. ข้อมูลประจำงานวิจัย</h2>');
   const metaFields = d.meta_fields || {};

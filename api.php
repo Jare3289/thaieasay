@@ -4281,8 +4281,23 @@ try {
             }, $c45Defects['ranked']);
 
             $c45Hash = ch45_input_hash($c45['ds'], $c45['quant'], $c45['defects']);
+            $c45Findings = ch45_ai_findings($c45['quant'], $c45['defects']);
+
+            // บทประมวลคลังอ้างอิงเก็บอยู่ในตารางเดียวกับผลวิเคราะห์รายหัวข้อ แต่ไม่ใช่หัวข้อวิเคราะห์
+            // และไม่ได้ล้าสมัยตามคะแนนรายคน แต่ล้าสมัยเมื่อ "คลังอ้างอิงหรือผลจริง" เปลี่ยน จึงแยกออกมา
+            $c45SynthRow  = $c45['results'][CH45_SYNTH_KEY] ?? null;
+            $c45SynthHash = ch45_reference_synthesis_hash($c45Findings, $c45['ds']['references']);
+            $c45Synthesis = $c45SynthRow ? [
+                'payload'    => $c45SynthRow['payload'],
+                'warnings'   => $c45SynthRow['warnings'],
+                'model'      => $c45SynthRow['model'],
+                'updated_at' => $c45SynthRow['updated_at'],
+                'stale'      => ($c45SynthRow['input_hash'] !== '' && $c45SynthRow['input_hash'] !== $c45SynthHash),
+            ] : null;
+
             $c45Res  = [];
             foreach ($c45['results'] as $k => $r) {
+                if ($k === CH45_SYNTH_KEY) continue;
                 $c45Res[$k] = [
                     'payload'    => $r['payload'],
                     'warnings'   => $r['warnings'],
@@ -4313,7 +4328,9 @@ try {
                 'poa_stages' => ch45_poa_stages(),
                 'references' => $c45['ds']['references'],
                 'reference_source_types' => ch45_reference_source_types(),
-                'findings'   => ch45_ai_findings($c45['quant'], $c45['defects']),
+                'findings'   => $c45Findings,
+                'ref_synthesis' => $c45Synthesis,
+                'synthesis_stances' => ch45_synthesis_stances(),
                 'input_hash' => $c45Hash,
             ], JSON_UNESCAPED_UNICODE);
             break;
@@ -4369,7 +4386,9 @@ try {
             }
             $c45Job = isset($request_data['job']) ? trim((string)$request_data['job']) : '';
             if ($c45Job === '__all__') {
-                $pdo->exec('DELETE FROM ch45_analysis');
+                // เว้นบทประมวลคลังอ้างอิงไว้ — ไม่ใช่ผลวิเคราะห์บทที่ 4-5 และมีปุ่มลบของตัวเองในกล่องคลังอ้างอิง
+                $stmt = $pdo->prepare('DELETE FROM ch45_analysis WHERE job_key <> ?');
+                $stmt->execute([CH45_SYNTH_KEY]);
                 echo json_encode(['success' => true, 'deleted' => 'all']);
                 break;
             }
@@ -4471,6 +4490,65 @@ try {
             }
             echo json_encode(['success' => true,
                 'grounded' => $c45Search['grounded'], 'items' => $c45Search['items']], JSON_UNESCAPED_UNICODE);
+            break;
+
+        // ประมวลคลังอ้างอิงทั้งคลัง — จับกลุ่มงานที่พูดตรงกัน/ต่างกัน แล้วเขียนความเรียงประมวล
+        // พร้อม "ข้อความหลักฐาน" ที่ตรวจแล้วว่าคัดมาจากช่องในคลังจริงคำต่อคำ
+        case 'ch45_synthesize_references':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้น']);
+                exit;
+            }
+            $c45Used = ai_usage_today($pdo, $_SESSION['user']['id']);
+            if ($c45Used >= CH45_DAILY_LIMIT) {
+                echo json_encode(['success' => false,
+                    'error' => 'วันนี้ใช้ระบบครบ ' . CH45_DAILY_LIMIT . ' ครั้งแล้ว กรุณาลองใหม่ในวันพรุ่งนี้']);
+                exit;
+            }
+            $c45Settings = ai_settings($pdo);
+            if (!$c45Settings['enabled'])    { echo json_encode(['success' => false, 'error' => 'คุณครูปิดการใช้งานระบบตรวจอัตโนมัติไว้']); exit; }
+            if (!$c45Settings['configured']) { echo json_encode(['success' => false, 'error' => 'ยังไม่ได้ตั้งค่าระบบตรวจอัตโนมัติ กรุณาใส่ API key ในหน้า "ระบบตรวจอัตโนมัติ" ก่อน']); exit; }
+
+            $c45Ctx = ch45_build_context($pdo, [
+                'group'     => isset($request_data['group'])     ? trim((string)$request_data['group'])     : '',
+                'classroom' => isset($request_data['classroom']) ? trim((string)$request_data['classroom']) : '',
+            ]);
+            $c45Findings = ch45_ai_findings($c45Ctx['quant'], $c45Ctx['defects']);
+            $c45Refs     = $c45Ctx['ds']['references'];
+
+            $c45Synth = ch45_ai_synthesize_references($c45Settings, $c45Findings, $c45Refs);
+            ai_log_usage($pdo, (string)$_SESSION['user']['id'], (string)$_SESSION['user']['role'], null,
+                         'ch45:synthesize_references', $c45Synth['ok'] ? 1 : 0,
+                         $c45Synth['ok'] ? '' : (string)($c45Synth['error'] ?? ''));
+            if (!$c45Synth['ok']) {
+                echo json_encode(['success' => false, 'error' => $c45Synth['error']], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+
+            $c45SynthHash = ch45_reference_synthesis_hash($c45Findings, $c45Refs);
+            ch45_save_result($pdo, CH45_SYNTH_KEY, $c45Synth['payload'], [
+                'raw'        => (string)($c45Synth['raw'] ?? ''),
+                'provider'   => (string)$c45Settings['provider'],
+                'model'      => (string)$c45Settings['model'],
+                'by'         => (string)$_SESSION['user']['id'],
+                'input_hash' => $c45SynthHash,
+                'warnings'   => $c45Synth['warnings'],
+            ]);
+            echo json_encode(['success' => true,
+                'synthesis' => ['payload'  => $c45Synth['payload'],
+                                'warnings' => $c45Synth['warnings'],
+                                'model'    => (string)$c45Settings['model'],
+                                'stale'    => false,
+                                'updated_at' => date('Y-m-d H:i:s')]], JSON_UNESCAPED_UNICODE);
+            break;
+
+        // ลบบทประมวลคลังอ้างอิงที่เก็บไว้ (คลังอ้างอิงเองไม่ถูกลบ)
+        case 'ch45_delete_synthesis':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้น']);
+                exit;
+            }
+            echo json_encode(['success' => true, 'deleted' => ch45_delete_result($pdo, CH45_SYNTH_KEY)]);
             break;
 
         // ช่วยย่อข้อความจากงานวิจัยที่ผู้วิจัย "วางมาให้" เป็นช่อง "สิ่งที่งานนี้ค้นพบโดยย่อ"
