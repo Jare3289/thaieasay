@@ -20,15 +20,11 @@
 if (!defined('AI_FEEDBACK_LOADED')) {
     define('AI_FEEDBACK_LOADED', true);
 
-    // โควตากันการกดรัวจนเปลืองโควตาฟรีของผู้ให้บริการ (ต่อคน ต่อวัน)
-    // ครูเป็นผู้สั่งตรวจเพียงผู้เดียว และตรวจทีละทั้งรอบได้ (39 คน/รอบ × 6 รอบ = 234)
-    // จึงตั้งค่าเริ่มต้นไว้ให้พอตรวจทั้งชั้นครบทุกรอบในวันเดียวแล้วยังเหลือสำหรับตรวจซ้ำบางฉบับ
-    // ค่านี้เป็นเพียง "ค่าเริ่มต้น" — ครูปรับได้เองในหน้าตั้งค่าระบบตรวจอัตโนมัติ (ดู ai_daily_limit())
-    define('AI_DAILY_LIMIT_TEACHER', 400);
-    // ขอบเขตที่ยอมให้ครูปรับโควตารายวัน (กันการตั้งค่าพลาดจนเปลืองโควตาฟรีของผู้ให้บริการ)
-    define('AI_DAILY_LIMIT_MIN', 50);
-    define('AI_DAILY_LIMIT_MAX', 5000);
-    // ความยาวขั้นต่ำที่ยอมให้ส่งตรวจ (กันการส่งงานเปล่า ๆ ไปเปลืองโควตา)
+    // ไม่มีเพดานการเรียกใช้รายวันฝั่งระบบเรา — ครูสั่งตรวจได้เท่าที่ต้องการ
+    // (ระบบยังบันทึกจำนวนครั้งที่ใช้ลง ai_usage_log ไว้ให้ดูย้อนหลังเสมอ ดู ai_usage_today())
+    // เพดานที่เหลืออยู่จริงคือเพดานของผู้ให้บริการโมเดลภาษาเอง ซึ่งตอบกลับมาเป็น 429
+    // และระบบแสดงข้อความนั้นให้ครูเห็นตรง ๆ อยู่แล้ว
+    // ความยาวขั้นต่ำที่ยอมให้ส่งตรวจ (กันการส่งงานเปล่า ๆ ไปโดยเปล่าประโยชน์)
     define('AI_MIN_WORDS', 40);
     // ตัดข้อความที่ยาวเกินไปก่อนส่ง (กันค่าใช้จ่าย/ข้อจำกัด token)
     define('AI_MAX_CHARS', 12000);
@@ -176,7 +172,6 @@ function ai_settings(PDO $pdo) {
         'api_key'         => '',
         'key_source'      => 'none',   // none | file | db
         'enabled'         => true,     // เปิดใช้ฟีเจอร์ตรวจอัตโนมัติทั้งระบบหรือไม่
-        'daily_limit'     => AI_DAILY_LIMIT_TEACHER,  // โควตาการตรวจต่อครู ต่อวัน (ครูปรับได้)
     ];
 
     // 1) ค่าที่ครูกรอกผ่านหน้าเว็บ (ตาราง app_settings)
@@ -191,12 +186,6 @@ function ai_settings(PDO $pdo) {
                     if ((string)$r['svalue'] !== '') { $s['api_key'] = (string)$r['svalue']; $s['key_source'] = 'db'; }
                     break;
                 case 'ai_enabled':         $s['enabled']  = ((string)$r['svalue'] !== '0'); break;
-                case 'ai_daily_limit':
-                    $lim = (int)$r['svalue'];
-                    if ($lim > 0) {
-                        $s['daily_limit'] = max(AI_DAILY_LIMIT_MIN, min(AI_DAILY_LIMIT_MAX, $lim));
-                    }
-                    break;
             }
         }
     } catch (Exception $e) { /* ตารางอาจยังไม่ถูกสร้าง — ใช้ค่าเริ่มต้น */ }
@@ -231,23 +220,13 @@ function ai_settings(PDO $pdo) {
 
 /** บันทึกการตั้งค่าระบบตรวจอัตโนมัติ (เฉพาะคีย์ที่ส่งมา) แล้วล้าง cache ในหน่วยความจำ */
 function ai_save_setting(PDO $pdo, $key, $value) {
-    $allowed = ['ai_provider', 'ai_model', 'ai_base_url', 'ai_api_key', 'ai_enabled', 'ai_daily_limit'];
+    $allowed = ['ai_provider', 'ai_model', 'ai_base_url', 'ai_api_key', 'ai_enabled'];
     if (!in_array($key, $allowed, true)) return false;
     $stmt = $pdo->prepare('
         INSERT INTO app_settings (skey, svalue) VALUES (?, ?)
         ON DUPLICATE KEY UPDATE svalue = VALUES(svalue), updated_at = CURRENT_TIMESTAMP
     ');
     return $stmt->execute([$key, (string)$value]);
-}
-
-/**
- * โควตาการตรวจต่อครู ต่อวัน ที่ใช้จริงในขณะนี้
- * ครูปรับได้ในหน้าตั้งค่า (เก็บใน app_settings) ถ้าไม่เคยตั้ง จะใช้ AI_DAILY_LIMIT_TEACHER
- * โควตานี้เป็นเพดานของ "ระบบเรา" เท่านั้น — ผู้ให้บริการโมเดลภาษายังมีเพดานของตัวเองอีกชั้นหนึ่ง
- */
-function ai_daily_limit(PDO $pdo) {
-    $s = ai_settings($pdo);
-    return (int)($s['daily_limit'] ?? AI_DAILY_LIMIT_TEACHER);
 }
 
 /** ปิดบัง API key ก่อนส่งกลับหน้าเว็บ (ไม่ส่งคีย์จริงออกไปเด็ดขาด) */
@@ -2622,10 +2601,11 @@ function ai_mark_essay_recheck(PDO $pdo, $studentId, $phase, $hash) {
     }
 }
 
-/** นับจำนวนครั้งที่ผู้ใช้คนนี้เรียกระบบไปแล้ววันนี้ (กันการกดรัวจนโควตาฟรีหมด) */
+/** นับจำนวนครั้งที่ผู้ใช้คนนี้เรียกระบบไปแล้ววันนี้ (ไว้แสดงให้ครูเห็น ไม่ได้ใช้ปิดกั้นการใช้งาน) */
 function ai_usage_today(PDO $pdo, $userId) {
     try {
-        // นับเฉพาะครั้งที่ตรวจสำเร็จ — ครั้งที่ตรวจไม่ผ่านถือว่ายังไม่ได้ตรวจ จึงไม่ควรกินโควตาของครู
+        // นับเฉพาะครั้งที่ตรวจสำเร็จ — ครั้งที่ตรวจไม่ผ่านถือว่ายังไม่ได้ตรวจ จึงไม่ควรนับ
+        // ตัวเลขนี้ใช้ "แสดงให้ครูเห็นว่าวันนี้ใช้ไปกี่ครั้ง" เท่านั้น ไม่ได้ใช้ปิดกั้นการใช้งาน
         $stmt = $pdo->prepare('SELECT COUNT(*) AS c FROM ai_usage_log
                                 WHERE user_id = ? AND success = 1 AND created_at >= CURDATE()');
         $stmt->execute([$userId]);

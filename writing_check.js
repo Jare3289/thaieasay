@@ -111,7 +111,7 @@ function aiCombinedOf(fb) {
 
 /* ---- เรียก API ---- */
 
-// สถานะฟีเจอร์ตรวจอัตโนมัติของผู้ใช้ปัจจุบัน (เปิดใช้ไหม / ตั้งค่าแล้วหรือยัง / โควตาเหลือเท่าไร)
+// สถานะฟีเจอร์ตรวจอัตโนมัติของผู้ใช้ปัจจุบัน (เปิดใช้ไหม / ตั้งค่าแล้วหรือยัง / วันนี้ใช้ไปกี่ครั้ง)
 async function aiGetStatus() {
   try {
     const res  = await fetch('api.php?action=get_ai_status');
@@ -137,7 +137,7 @@ async function aiGetFeedback(studentId, phase) {
   }
 }
 
-// สั่งให้ระบบตรวจ — คืน {success, feedback, error, quota_left}
+// สั่งให้ระบบตรวจ — คืน {success, feedback, error, usage_today}
 async function aiRequestReview(studentId, phase) {
   try {
     const body = { action: 'ai_review_essay', essay_phase: phase };

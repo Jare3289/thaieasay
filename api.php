@@ -2340,7 +2340,6 @@ try {
             $aiSet  = ai_settings($pdo);
             // เฉพาะครูเท่านั้นที่สั่งให้ระบบตรวจได้ นักเรียนและผู้เชี่ยวชาญดูผลได้อย่างเดียว
             $isTeacher = ($aiUser['role'] === 'teacher');
-            $limit     = ai_daily_limit($pdo);
             $used      = $isTeacher ? ai_usage_today($pdo, $aiUser['id']) : 0;
             echo json_encode([
                 'success'        => true,
@@ -2348,9 +2347,8 @@ try {
                 'configured'     => (bool)$aiSet['configured'],
                 'can_review'     => (bool)($isTeacher && $aiSet['enabled'] && $aiSet['configured']),
                 'allowed_phases' => ai_all_phases(),
-                'quota_limit'    => $limit,
-                'quota_used'     => $used,
-                'quota_left'     => max(0, $limit - $used),
+                // ไม่มีเพดานรายวันของระบบเราแล้ว — ส่งไปเฉพาะ "วันนี้ใช้ไปกี่ครั้ง" ไว้แสดงให้ครูเห็น
+                'usage_today'    => $used,
                 'min_words'      => AI_MIN_WORDS,
                 'rubric_max'     => ai_rubric_max(),
             ]);
@@ -2371,7 +2369,7 @@ try {
                     'key_url' => $pv['key_url'],
                 ];
             }
-            // สรุปการใช้งานย้อนหลัง 7 วัน ไว้ให้ครูดูว่าโควตาฟรีถูกใช้ไปเท่าไร
+            // สรุปการใช้งานย้อนหลัง 7 วัน ไว้ให้ครูดูว่าเรียกระบบไปมากน้อยแค่ไหน
             $usageRows = [];
             try {
                 $usageRows = $pdo->query("
@@ -2394,11 +2392,6 @@ try {
                     'locked_by_file'  => ($aiSet['key_source'] === 'file'),
                     'enabled'         => (bool)$aiSet['enabled'],
                     'configured'      => (bool)$aiSet['configured'],
-                    // โควตาการตรวจต่อวันของครู (ปรับได้ในหน้าตั้งค่า)
-                    'daily_limit'     => ai_daily_limit($pdo),
-                    'daily_limit_default' => AI_DAILY_LIMIT_TEACHER,
-                    'daily_limit_min' => AI_DAILY_LIMIT_MIN,
-                    'daily_limit_max' => AI_DAILY_LIMIT_MAX,
                 ],
                 'usage'     => $usageRows,
                 'all_phases'=> ai_all_phases(),
@@ -2428,16 +2421,6 @@ try {
                 elseif ($newKey !== '')       ai_save_setting($pdo, 'ai_api_key', $newKey);
             }
             if (isset($request_data['enabled'])) ai_save_setting($pdo, 'ai_enabled', !empty($request_data['enabled']) ? '1' : '0');
-            // โควตาการตรวจต่อวัน — จำกัดช่วงไว้กันตั้งค่าพลาดจนเปลืองโควตาฟรีของผู้ให้บริการ
-            if (isset($request_data['daily_limit']) && $request_data['daily_limit'] !== '') {
-                $dl = (int)$request_data['daily_limit'];
-                if ($dl < AI_DAILY_LIMIT_MIN || $dl > AI_DAILY_LIMIT_MAX) {
-                    echo json_encode(['success' => false,
-                        'error' => 'โควตาต่อวันต้องอยู่ระหว่าง ' . AI_DAILY_LIMIT_MIN . ' ถึง ' . AI_DAILY_LIMIT_MAX . ' ครั้ง']);
-                    exit;
-                }
-                ai_save_setting($pdo, 'ai_daily_limit', (string)$dl);
-            }
             echo json_encode(['success' => true]);
             break;
 
@@ -2474,18 +2457,6 @@ try {
             }
             if (!$aiSet['configured']) {
                 echo json_encode(['success' => false, 'error' => 'ยังไม่ได้ตั้งค่าระบบตรวจอัตโนมัติกรุณาใส่ API key ในหน้า "ระบบตรวจอัตโนมัติ" ก่อน']);
-                exit;
-            }
-
-            // โควตารายวัน (กันการกดรัวจนโควตาฟรีของผู้ให้บริการหมด)
-            $aiLimit = ai_daily_limit($pdo);
-            $aiUsed  = ai_usage_today($pdo, $aiUser['id']);
-            if ($aiUsed >= $aiLimit) {
-                // บันทึกไว้ในประวัติด้วย (success = 0 จึงไม่กินโควตา) เพื่อให้ระบบรู้ทีหลังว่า
-                // การตรวจชุดนั้น "หยุดเพราะโควตาครบ" และตรวจต่อจากจุดนี้ได้ถูกฉบับ
-                ai_log_usage($pdo, $aiUser['id'], $aiRole, $aiSid, $aiPhase, false,
-                    'วันนี้ใช้ระบบตรวจครบ ' . $aiLimit . ' ครั้งแล้ว');
-                echo json_encode(['success' => false, 'error' => 'วันนี้ใช้ระบบตรวจครบ ' . $aiLimit . ' ครั้งแล้ว กรุณาลองใหม่ในวันพรุ่งนี้']);
                 exit;
             }
 
@@ -2767,7 +2738,7 @@ try {
             echo json_encode([
                 'success'    => true,
                 'feedback'   => $aiData,
-                'quota_left' => max(0, $aiLimit - ($aiUsed + 1)),
+                'usage_today' => ai_usage_today($pdo, $aiUser['id']),
             ]);
             break;
 
@@ -2842,7 +2813,7 @@ try {
                 ];
             }
 
-            $bQuotaUsed = ai_usage_today($pdo, $_SESSION['user']['id']);
+            $bUsageToday = ai_usage_today($pdo, $_SESSION['user']['id']);
             echo json_encode([
                 'success'     => true,
                 'phase'       => $bPhase,
@@ -2852,7 +2823,7 @@ try {
                 'recheck'     => $bRecheck,
                 'failed_before' => $bFailedBefore,
                 'min_words'   => AI_MIN_WORDS,
-                'quota_left'  => max(0, ai_daily_limit($pdo) - $bQuotaUsed),
+                'usage_today' => $bUsageToday,
             ]);
             break;
 
@@ -2890,16 +2861,6 @@ try {
                 exit;
             }
 
-            // ใช้โควตารายวันร่วมกับการตรวจเรียงความ เพราะเป็นการเรียกผู้ให้บริการโมเดลภาษาเหมือนกัน
-            $nmLimit = ai_daily_limit($pdo);
-            $nmUsed  = ai_usage_today($pdo, $nmUser['id']);
-            if ($nmUsed >= $nmLimit) {
-                ai_log_usage($pdo, $nmUser['id'], 'teacher', $nmSid, 'norm:' . $nmPhase, false,
-                    'วันนี้ใช้ระบบตรวจครบ ' . $nmLimit . ' ครั้งแล้ว');
-                echo json_encode(['success' => false, 'error' => 'วันนี้ใช้ระบบตรวจครบ ' . $nmLimit . ' ครั้งแล้ว กรุณาลองใหม่ในวันพรุ่งนี้']);
-                exit;
-            }
-
             $stmt = $pdo->prepare('
                 SELECT se.intro_content, se.body_content, se.conclusion_content, s.student_name
                   FROM student_essays se
@@ -2930,7 +2891,7 @@ try {
 
             $nmHash = ai_essay_hash($nmIntro, $nmBody, $nmConcl);
 
-            // ต้นฉบับยังเหมือนเดิมและเคยจัดไว้แล้ว → ไม่ต้องเรียกโมเดลซ้ำให้เปลืองโควตา
+            // ต้นฉบับยังเหมือนเดิมและเคยจัดไว้แล้ว → ไม่ต้องเรียกโมเดลซ้ำโดยไม่จำเป็น
             $nmForce = !empty($request_data['force']);
             if (!$nmForce) {
                 $nmHave = ai_norm_map($pdo, [$nmSid]);
@@ -2942,7 +2903,7 @@ try {
                         'student_id' => $nmSid,
                         'essay_phase'=> $nmPhase,
                         'space_edits'=> $nmOld['space_edits'],
-                        'quota_left' => max(0, $nmLimit - $nmUsed),
+                        'usage_today' => ai_usage_today($pdo, $nmUser['id']),
                     ]);
                     exit;
                 }
@@ -2993,7 +2954,7 @@ try {
                 'space_edits'  => $nmParsed['data']['space_edits'],
                 'repairs'      => $nmParsed['data']['repairs'],
                 'notes'        => $nmParsed['data']['notes'],
-                'quota_left'   => max(0, $nmLimit - ($nmUsed + 1)),
+                'usage_today'  => ai_usage_today($pdo, $nmUser['id']),
             ]);
             break;
 
@@ -3076,12 +3037,12 @@ try {
                 'done'        => $ntDone,
                 'stale'       => $ntStale,
                 'pending'     => count($ntTargets) - $ntDone,
-                'quota_left'  => max(0, ai_daily_limit($pdo) - ai_usage_today($pdo, $_SESSION['user']['id'])),
+                'usage_today' => ai_usage_today($pdo, $_SESSION['user']['id']),
             ]);
             break;
 
         // ครู: "ตรวจถึงไหนแล้ว" — ดูจากประวัติการเรียกใช้จริงในระบบ ไม่ใช่ความจำของเบราว์เซอร์
-        // ใช้ตอบว่า การตรวจครั้งล่าสุดจบลงที่ฉบับไหน หยุดเพราะโควตาครบหรือเปล่า
+        // ใช้ตอบว่า การตรวจครั้งล่าสุดจบลงที่ฉบับไหน
         // และ "ถ้าจะตรวจต่อจากจุดนั้น" ต้องตรวจฉบับไหนบ้าง (เรียงตามลำดับการเรียน)
         case 'get_ai_resume_point':
             if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
@@ -3119,6 +3080,8 @@ try {
             } catch (Exception $e) { /* ตารางอาจยังไม่ถูกสร้าง — ถือว่ายังไม่เคยตรวจ */ }
 
             $rpLast = null;   // ฉบับสุดท้ายที่ตรวจ "สำเร็จ" ในครั้งล่าสุด = จุดที่ค้างไว้
+            // $rpLimitHit เป็นจริงได้เฉพาะกับประวัติเก่าที่บันทึกไว้ตอนระบบยังมีเพดานรายวัน
+            // (ตอนนี้ไม่มีเพดานแล้ว การตรวจชุดใหม่จึงไม่มีทางหยุดด้วยเหตุนี้อีก)
             $rpOk = 0; $rpFailed = 0; $rpLimitHit = false;
             $rpPhasesTouched = [];
             $rpRoomsTouched  = [];
@@ -3139,18 +3102,6 @@ try {
                     $rpRoomsTouched[] = $lg['classroom'];
                 }
             }
-            // ประวัติเก่าที่บันทึกก่อนระบบจะจดว่า "โควตาครบ" — เดาจากยอดของวันนั้นแทน
-            if (!$rpLimitHit && $rpRun) {
-                try {
-                    $rpDay = date('Y-m-d', strtotime((string)$rpRun[0]['created_at']));
-                    $stmt = $pdo->prepare('SELECT COUNT(*) AS c FROM ai_usage_log
-                                            WHERE user_id = ? AND success = 1 AND DATE(created_at) = ?');
-                    $stmt->execute([$rpUid, $rpDay]);
-                    $rpDayRow = $stmt->fetch();
-                    if ($rpDayRow && (int)$rpDayRow['c'] >= ai_daily_limit($pdo)) $rpLimitHit = true;
-                } catch (Exception $e) { /* เดาไม่ได้ก็ไม่เป็นไร */ }
-            }
-
             // ---- 2) รายชื่อที่ "ยังไม่มีผลตรวจที่ใช้ได้" ทุกรอบ = คิวที่ต้องตรวจต่อ ----
             // นับรวมฉบับที่เคยตรวจแล้วผลไม่สมบูรณ์ และฉบับที่นักเรียนแก้ต้นฉบับหลังตรวจ
             $rpSql = "
@@ -3205,7 +3156,6 @@ try {
                 return strcmp((string)$a['student_id'], (string)$b['student_id']);
             });
 
-            $rpLimit = ai_daily_limit($pdo);
             $rpUsed  = ai_usage_today($pdo, $rpUid);
             echo json_encode([
                 'success'  => true,
@@ -3231,8 +3181,7 @@ try {
                 'reviewed_total'=> $rpDone,
                 'too_short'     => $rpTooShort,
                 'min_words'     => AI_MIN_WORDS,
-                'quota_limit'   => $rpLimit,
-                'quota_left'    => max(0, $rpLimit - $rpUsed),
+                'usage_today'   => $rpUsed,
             ]);
             break;
 
@@ -3590,7 +3539,7 @@ try {
             break;
 
         // ครูสั่งให้ระบบตรวจ "เฉพาะเกณฑ์ข้อเดียว" ใหม่ พร้อมพิมพ์คำสั่งเพิ่มเติมให้ระบบได้
-        // ใช้โควตา 1 ครั้งเท่ากับการตรวจทั้งฉบับ แต่คำสั่งสั้นกว่ามากและข้ออื่นไม่ขยับ
+        // นับเป็นการเรียกระบบ 1 ครั้งเท่ากับการตรวจทั้งฉบับ แต่คำสั่งสั้นกว่ามากและข้ออื่นไม่ขยับ
         case 'ai_recheck_criterion':
             if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
                 echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้นที่สั่งให้ระบบตรวจได้']);
@@ -3629,13 +3578,6 @@ try {
                 echo json_encode(['success' => false, 'error' => 'ยังไม่ได้ตั้งค่าระบบตรวจอัตโนมัติกรุณาใส่ API key ในหน้า "ระบบตรวจอัตโนมัติ" ก่อน']);
                 exit;
             }
-            $aiLimit = ai_daily_limit($pdo);
-            $aiUsed  = ai_usage_today($pdo, $aiUser['id']);
-            if ($aiUsed >= $aiLimit) {
-                echo json_encode(['success' => false, 'error' => 'วันนี้ใช้ระบบตรวจครบ ' . $aiLimit . ' ครั้งแล้ว กรุณาลองใหม่ในวันพรุ่งนี้']);
-                exit;
-            }
-
             // ต้องเคยตรวจทั้งฉบับมาก่อน — การตรวจรายข้อเป็นการ "แก้ผลเดิมเฉพาะข้อ" ไม่ใช่การตรวจครั้งแรก
             $stmt = $pdo->prepare('SELECT scores, score_overrides FROM essay_ai_feedback
                                     WHERE student_id = ? AND essay_phase = ?');
@@ -3760,7 +3702,7 @@ try {
                 'criterion'  => $aiCrit,
                 'result'     => $aiParsed['data'],
                 'feedback'   => $aiOut,
-                'quota_left' => max(0, $aiLimit - ($aiUsed + 1)),
+                'usage_today' => ai_usage_today($pdo, $aiUser['id']),
             ]);
             break;
 
@@ -3781,7 +3723,7 @@ try {
             break;
 
         // ครู: ให้ระบบเขียนภาพรวมการนำเสนอของทั้งชั้นในรอบงานหนึ่ง (ใช้เมื่อตรวจครบทั้งรอบแล้ว)
-        // ใช้โควตา 1 ครั้งต่อ 1 รอบงาน — ไม่ได้ตรวจเรียงความใหม่ แต่สังเคราะห์จากผลตรวจที่มีอยู่แล้ว
+        // นับเป็นการเรียกระบบ 1 ครั้งต่อ 1 รอบงาน — ไม่ได้ตรวจเรียงความใหม่ แต่สังเคราะห์จากผลตรวจที่มีอยู่แล้ว
         case 'ai_phase_overview':
             $aiUser = isset($_SESSION['user']) ? $_SESSION['user'] : null;
             $aiRole = $aiUser ? $aiUser['role'] : '';
@@ -3800,13 +3742,6 @@ try {
                 echo json_encode(['success' => false, 'error' => 'ระบบตรวจอัตโนมัติยังไม่พร้อมใช้งาน กรุณาตรวจสอบการตั้งค่า']);
                 exit;
             }
-            $aiLimit = ai_daily_limit($pdo);
-            $aiUsed  = ai_usage_today($pdo, $aiUser['id']);
-            if ($aiUsed >= $aiLimit) {
-                echo json_encode(['success' => false, 'error' => 'วันนี้ใช้ระบบครบ ' . $aiLimit . ' ครั้งแล้ว กรุณาลองใหม่ในวันพรุ่งนี้']);
-                exit;
-            }
-
             // ---- รวบรวมผลตรวจของรอบนี้ทั้งชั้น ----
             $ovRows = [];
             try {
@@ -3985,7 +3920,7 @@ try {
             echo json_encode([
                 'success'    => true,
                 'overview'   => $ovData,
-                'quota_left' => max(0, $aiLimit - ($aiUsed + 1)),
+                'usage_today' => ai_usage_today($pdo, $aiUser['id']),
             ]);
             break;
 
@@ -4006,7 +3941,7 @@ try {
             break;
 
         // ครู: ให้ระบบสังเคราะห์ข้อมูลสะท้อนคิดทั้งชั้นของหน่วยการเรียนหนึ่งเป็นข้อมูลเชิงคุณภาพ
-        // (ปัญหาการเขียน + การตรวจสอบตนเอง + การประเมินเพื่อน + บทสะท้อนการเรียนรู้) ใช้โควตาเดียวกับระบบตรวจอัตโนมัติ
+        // (ปัญหาการเขียน + การตรวจสอบตนเอง + การประเมินเพื่อน + บทสะท้อนการเรียนรู้) นับรวมกับระบบตรวจอัตโนมัติ
         case 'ai_reflection_overview':
             $rfUser = isset($_SESSION['user']) ? $_SESSION['user'] : null;
             $rfRole = $rfUser ? $rfUser['role'] : '';
@@ -4021,13 +3956,6 @@ try {
                 echo json_encode(['success' => false, 'error' => 'ระบบตรวจอัตโนมัติยังไม่พร้อมใช้งาน กรุณาตรวจสอบการตั้งค่า']);
                 exit;
             }
-            $rfLimit = ai_daily_limit($pdo);
-            $rfUsed  = ai_usage_today($pdo, $rfUser['id']);
-            if ($rfUsed >= $rfLimit) {
-                echo json_encode(['success' => false, 'error' => 'วันนี้ใช้ระบบครบ ' . $rfLimit . ' ครั้งแล้ว กรุณาลองใหม่ในวันพรุ่งนี้']);
-                exit;
-            }
-
             // ---- รวบรวมข้อมูลสะท้อนคิดทั้งชั้นของหน่วยนี้ ----
             $rfCritLabels = ai_reflection_criteria_labels();
             $rfCritKeys   = array_keys($rfCritLabels);
@@ -4221,7 +4149,7 @@ try {
             echo json_encode([
                 'success'    => true,
                 'overview'   => $rfData,
-                'quota_left' => max(0, $rfLimit - ($rfUsed + 1)),
+                'usage_today' => ai_usage_today($pdo, $rfUser['id']),
             ]);
             break;
 
@@ -4346,12 +4274,6 @@ try {
                 echo json_encode(['success' => false, 'error' => 'ไม่รู้จักหัวข้อที่สั่งวิเคราะห์']);
                 exit;
             }
-            $c45Used = ai_usage_today($pdo, $_SESSION['user']['id']);
-            if ($c45Used >= CH45_DAILY_LIMIT) {
-                echo json_encode(['success' => false,
-                    'error' => 'วันนี้ใช้ระบบครบ ' . CH45_DAILY_LIMIT . ' ครั้งแล้ว กรุณาลองใหม่ในวันพรุ่งนี้']);
-                exit;
-            }
             $c45Ctx = ch45_build_context($pdo, [
                 'group'     => isset($request_data['group'])     ? trim((string)$request_data['group'])     : '',
                 'classroom' => isset($request_data['classroom']) ? trim((string)$request_data['classroom']) : '',
@@ -4465,12 +4387,6 @@ try {
                 echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้น']);
                 exit;
             }
-            $c45Used = ai_usage_today($pdo, $_SESSION['user']['id']);
-            if ($c45Used >= CH45_DAILY_LIMIT) {
-                echo json_encode(['success' => false,
-                    'error' => 'วันนี้ใช้ระบบครบ ' . CH45_DAILY_LIMIT . ' ครั้งแล้ว กรุณาลองใหม่ในวันพรุ่งนี้']);
-                exit;
-            }
             $c45Ctx = ch45_build_context($pdo, [
                 'group'     => isset($request_data['group'])     ? trim((string)$request_data['group'])     : '',
                 'classroom' => isset($request_data['classroom']) ? trim((string)$request_data['classroom']) : '',
@@ -4497,12 +4413,6 @@ try {
         case 'ch45_synthesize_references':
             if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
                 echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้น']);
-                exit;
-            }
-            $c45Used = ai_usage_today($pdo, $_SESSION['user']['id']);
-            if ($c45Used >= CH45_DAILY_LIMIT) {
-                echo json_encode(['success' => false,
-                    'error' => 'วันนี้ใช้ระบบครบ ' . CH45_DAILY_LIMIT . ' ครั้งแล้ว กรุณาลองใหม่ในวันพรุ่งนี้']);
                 exit;
             }
             $c45Settings = ai_settings($pdo);
@@ -4556,12 +4466,6 @@ try {
         case 'ch45_draft_key_finding':
             if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
                 echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้น']);
-                exit;
-            }
-            $c45Used = ai_usage_today($pdo, $_SESSION['user']['id']);
-            if ($c45Used >= CH45_DAILY_LIMIT) {
-                echo json_encode(['success' => false,
-                    'error' => 'วันนี้ใช้ระบบครบ ' . CH45_DAILY_LIMIT . ' ครั้งแล้ว กรุณาลองใหม่ในวันพรุ่งนี้']);
                 exit;
             }
             $c45Settings = ai_settings($pdo);
