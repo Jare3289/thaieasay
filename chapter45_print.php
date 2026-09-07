@@ -449,6 +449,91 @@ $scope = implode(' · ', $scopeParts);
     </tbody>
   </table>
   <p class="tbl-note"><?php echo rp_esc($mech['note']); ?></p>
+
+  <?php
+  /* ประมวลงานวิจัยที่เกี่ยวข้อง — จับกลุ่มงานในคลังที่พูดตรงกัน/ต่างกัน พร้อมข้อความหลักฐาน
+     ที่ตรวจแล้วว่าคัดมาจากช่อง "สิ่งที่งานนี้ค้นพบโดยย่อ" ในคลังจริงคำต่อคำ
+     ก้อนที่ตรวจไม่ผ่านขึ้นกรอบเตือนเสมอ ไม่ถูกซ่อนออกจากเอกสาร */
+  $synRow = $R[CH45_SYNTH_KEY] ?? null;
+  $syn    = $synRow['payload'] ?? [];
+  $synWarn = $synRow['warnings'] ?? [];
+  $synHash = ch45_reference_synthesis_hash(ch45_ai_findings($quant, $defects), $ds['references']);
+  $synStale = $synRow && (string)($synRow['input_hash'] ?? '') !== '' && $synRow['input_hash'] !== $synHash;
+  ?>
+  <h2 class="sec-title">ประมวลงานวิจัยที่เกี่ยวข้อง <span>· งานชิ้นใดพูดตรงกัน ต่างกันตรงไหน และเรื่องใดยังไม่มีงานรองรับ</span></h2>
+  <?php if (!$syn): ?>
+    <p class="para"><span class="todo">[ยังไม่ได้ประมวลคลังอ้างอิง — กดปุ่ม &quot;ประมวลคลังอ้างอิง&quot;
+      ในกล่องคลังอ้างอิงงานวิจัยที่เกี่ยวข้อง หน้าวิเคราะห์บทที่ 4-5]</span></p>
+  <?php else: ?>
+    <p class="para"><span class="para-noindent">ประมวลจากงานในคลัง <?php echo (int)($syn['ref_count'] ?? 0); ?> รายการ
+      ข้อความหลักฐานทุกก้อนตรวจแล้วว่าคัดมาจากช่อง &quot;สิ่งที่งานนี้ค้นพบโดยย่อ&quot; ที่ผู้วิจัยกรอกไว้ในคลังจริงคำต่อคำ
+      (กรอบสีแดงหมายถึงจุดที่ต้องตรวจสอบก่อนนำไปใช้เสมอ)</span></p>
+    <?php if ($synStale): ?>
+      <div class="quote quote-bad"><div class="quote-warn">⚠ คลังอ้างอิงหรือผลจริงเปลี่ยนไปหลังจากประมวลครั้งนี้ —
+        บทประมวลด้านล่างยังเป็นของคลังชุดเดิม ควรกดประมวลใหม่ก่อนนำไปใช้</div></div>
+    <?php endif; ?>
+
+    <?php foreach (($syn['themes'] ?? []) as $ti => $th): ?>
+      <h3 class="sub">ประเด็นร่วมที่ <?php echo $ti + 1; ?> <?php echo rp_esc($th['title']); ?>
+        <span>· <?php echo rp_esc($th['stance_label'] ?? ''); ?><?php
+          echo $th['finding_head'] ? ' · ผลจริงข้อ: ' . rp_esc($th['finding_head']) : ''; ?></span></h3>
+      <table class="thesis">
+        <thead><tr><th class="l">งานในคลัง</th><th class="l">ข้อความหลักฐานที่คัดมาจากคลัง</th><th>ผลตรวจสอบ</th></tr></thead>
+        <tbody>
+          <?php foreach (($th['members'] ?? []) as $mb): ?>
+          <tr>
+            <td class="l"><?php echo rp_esc($mb['label']); ?></td>
+            <td class="l"><?php echo $mb['quote'] !== '' ? '&ldquo;' . rp_esc($mb['quote']) . '&rdquo;' : '—'; ?>
+              <?php if (empty($mb['verified'])): ?>
+                <br><span class="todo">ในคลังกรอกไว้ว่า: <?php echo rp_esc($mb['key_finding']); ?></span>
+              <?php endif; ?></td>
+            <td class="c"><?php echo !empty($mb['verified']) ? 'ตรงกับคลังจริง'
+              : '<span class="todo">⚠ ไม่ตรงกับคลัง</span>'; ?></td>
+          </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+      <?php
+      if (trim((string)($th['agreement'] ?? '')) !== '')      echo c45para('<strong>ตรงกันตรงที่</strong> ' . rp_esc($th['agreement']));
+      if (trim((string)($th['difference'] ?? '')) !== '')     echo c45para('<strong>ต่างกันตรงที่</strong> ' . rp_esc($th['difference']));
+      if (trim((string)($th['link_to_result'] ?? '')) !== '') echo c45para('<strong>เกี่ยวกับผลของงานวิจัยนี้</strong> ' . rp_esc($th['link_to_result']));
+      ?>
+    <?php endforeach; ?>
+
+    <?php if (!empty($syn['gaps'])): ?>
+      <h3 class="sub">ผลจริงที่ยังไม่มีงานวิจัยในคลังรองรับ <span>· นับจากคลังจริง ไม่ใช่ระบบเดา</span></h3>
+      <p class="para">ประเด็นเหล่านี้จะเขียนอภิปรายผลได้ด้วยเหตุผลเชิงกลไกของ POA เท่านั้น
+        จนกว่าจะมีงานในคลังอ้างอิงที่ตรงประเด็น</p>
+      <table class="thesis">
+        <thead><tr><th class="l">ประเด็นจากผลจริง</th><th class="l">ข้อเท็จจริงที่คำนวณได้</th>
+          <th class="l">งานในคลังที่ระบบเห็นว่าน่าจะตรง</th></tr></thead>
+        <tbody>
+          <?php foreach ($syn['gaps'] as $g): ?>
+          <tr><td class="l"><?php echo rp_esc($g['heading']); ?></td>
+              <td class="l"><?php echo rp_esc($g['summary']); ?></td>
+              <td class="l"><?php echo rp_esc(implode(' · ', $g['suggested'] ?? [])) ?: '—'; ?></td></tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    <?php endif; ?>
+
+    <?php if (!empty($syn['paragraphs'])): ?>
+      <h3 class="sub">ความเรียงประมวล <span>· ร่าง ต้องอ่านทวนและเกลาเป็นสำนวนของผู้วิจัยเองก่อนใช้</span></h3>
+      <?php foreach ($syn['paragraphs'] as $pp): ?>
+        <?php $ppBad = !empty($pp['suspect']) || !empty($pp['bad_numbers']); ?>
+        <?php echo c45para(($ppBad ? '<span class="todo">[ย่อหน้านี้มีจุดที่ต้องตรวจสอบก่อนใช้]</span> ' : '')
+          . rp_esc($pp['text'])); ?>
+      <?php endforeach; ?>
+    <?php endif; ?>
+
+    <?php if ($synWarn): ?>
+      <div class="quote quote-bad">
+        <?php foreach ($synWarn as $w): ?>
+          <div class="quote-warn">⚠ <?php echo rp_esc($w); ?></div>
+        <?php endforeach; ?>
+      </div>
+    <?php endif; ?>
+  <?php endif; ?>
 </div>
 </body>
 </html>
