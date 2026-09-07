@@ -340,17 +340,30 @@ let c45Running = false;
 // เซิร์ฟเวอร์พยายามคัดให้หลากหลายอยู่แล้ว แต่ถ้าคะแนนใกล้เคียงกันจนต้องใช้คนเดิมซ้ำ
 // อย่างน้อยก็ต้องเห็นชัด ๆ บนหน้าจอว่าซ้ำ จะได้ไม่เข้าใจผิดว่าเป็นความหลากหลาย
 let c45ExcerptUsage = { w1: {}, w2: {} };
-function c45ComputeExcerptUsage() {
+// หมายเลขตัวอย่าง (1), (2), ... ของแต่ละคู่ในแต่ละหัวข้อ — คำนวณสด ๆ จากจำนวนคู่ที่วิเคราะห์ไว้จริง
+// ไล่ตามลำดับตัวบ่งชี้ 1.1 → 4.3 (เทียบเท่าฝั่ง PHP: ch45_number_examples() ใน chapter45_data.php)
+// เพราะแต่ละหัวข้อยกตัวอย่างได้ไม่เท่ากันแล้ว (ตั้งแต่ 0 คู่อย่าง 4.3 ถึงหลายคู่ตามข้อมูลจริง)
+let c45ExampleNumbers = {};
+function c45ComputeExampleNumbering() {
   const usage = { w1: {}, w2: {} };
+  const numbers = {};
   const results = (c45Data && c45Data.results) || {};
-  Object.keys(results).forEach(function (k) {
-    if (k.indexOf('ind_') !== 0) return;
-    const pl = (results[k] && results[k].payload) || {};
-    const n1 = pl.excerpt1 && pl.excerpt1.student_no;
-    const n2 = pl.excerpt2 && pl.excerpt2.student_no;
-    if (n1) usage.w1[n1] = (usage.w1[n1] || 0) + 1;
-    if (n2) usage.w2[n2] = (usage.w2[n2] || 0) + 1;
+  const inds = (c45Data && c45Data.indicators) || {};
+  let n = 0;
+  Object.keys(inds).forEach(function (id) {
+    const jobKey = 'ind_' + id.replace('.', '_');
+    const pairs = ((results[jobKey] && results[jobKey].payload) || {}).pairs || [];
+    numbers[jobKey] = pairs.map(function (pr) {
+      n += 1; const a = n;
+      n += 1; const b = n;
+      const n1 = pr.excerpt1 && pr.excerpt1.student_no;
+      const n2 = pr.excerpt2 && pr.excerpt2.student_no;
+      if (n1) usage.w1[n1] = (usage.w1[n1] || 0) + 1;
+      if (n2) usage.w2[n2] = (usage.w2[n2] || 0) + 1;
+      return [a, b];
+    });
   });
+  c45ExampleNumbers = numbers;
   c45ExcerptUsage = usage;
 }
 
@@ -626,22 +639,30 @@ function c45RenderPayload(jobKey, payload) {
 
   if (jobKey.indexOf('ind_') === 0) {
     const ind = c45Data.indicators[payload.indicator] || {};
-    const ex = payload.ex_no || [0, 0];
-    return '<div class="row g-2 mb-2">'
+    const pairs = payload.pairs || [];
+    const nums = c45ExampleNumbers[jobKey] || [];
+    const exAll = nums.reduce(function (a, pr) { return a.concat(pr); }, []);
+    let h = '<div class="row g-2 mb-2">'
       + '<div class="col-md-6"><div class="bg-light rounded-3 p-2 h-100"><div class="small fw-bold">ช่องตาราง — '
       + c45Esc(meta.work1_label) + '</div><div class="small">' + c45Esc(payload.cell1) + '</div></div></div>'
       + '<div class="col-md-6"><div class="bg-light rounded-3 p-2 h-100"><div class="small fw-bold">ช่องตาราง — '
       + c45Esc(meta.work2_label) + '</div><div class="small">' + c45Esc(payload.cell2) + '</div></div></div>'
       + '</div>'
-      + c45Para('ย่อหน้าเปิดหัวข้อ ' + (ind.sub || ''), payload.finding)
-      + c45Excerpt(ex[0], payload.excerpt1, meta.work1_label,
-                   c45ExcerptUsage.w1[(payload.excerpt1 || {}).student_no])
-      + c45Excerpt(ex[1], payload.excerpt2, meta.work2_label,
-                   c45ExcerptUsage.w2[(payload.excerpt2 || {}).student_no])
-      + c45Para('ตัวอย่าง (' + ex[0] + ') วิเคราะห์', payload.analysis1)
-      + c45Para('ตัวอย่าง (' + ex[1] + ') วิเคราะห์', payload.analysis2)
-      + c45Para('ข้อสรุปจากคู่ตัวอย่าง', payload.synthesis)
+      + c45Para('ย่อหน้าเปิดหัวข้อ ' + (ind.sub || '')
+                 + (exAll.length ? ' — ดังตัวอย่าง (' + exAll.join(')–(') + ')' : ''), payload.finding);
+    pairs.forEach(function (pr, i) {
+      const ex = nums[i] || [0, 0];
+      h += (pairs.length > 1 ? '<div class="small text-muted fw-bold mt-2 mb-1">คู่ตัวอย่างที่ ' + (i + 1) + '</div>' : '')
+        + c45Excerpt(ex[0], pr.excerpt1, meta.work1_label,
+                     c45ExcerptUsage.w1[(pr.excerpt1 || {}).student_no])
+        + c45Excerpt(ex[1], pr.excerpt2, meta.work2_label,
+                     c45ExcerptUsage.w2[(pr.excerpt2 || {}).student_no])
+        + c45Para('ตัวอย่าง (' + ex[0] + ') วิเคราะห์', pr.analysis1)
+        + c45Para('ตัวอย่าง (' + ex[1] + ') วิเคราะห์', pr.analysis2);
+    });
+    h += c45Para(pairs.length > 1 ? 'ข้อสรุปจากตัวอย่างทั้งหมด' : 'ข้อสรุปจากคู่ตัวอย่าง', payload.synthesis)
       + (payload.caution ? c45Para('ข้อความกำกับการตีความ', payload.caution) : '');
+    return h;
   }
 
   if (jobKey.indexOf('domain_') === 0) {
@@ -743,7 +764,7 @@ function c45PaintResults() {
   const jobs = c45Data.jobs;
   const groups = c45Data.job_groups;
   const results = c45Data.results || {};
-  c45ComputeExcerptUsage();
+  c45ComputeExampleNumbering();
   let html = '';
 
   html += '<div class="alert ' + (c45RevealNames ? 'alert-danger' : 'alert-warning')
@@ -1647,6 +1668,7 @@ function buildChapter45ReportHtml() {
   const results = d.results || {};
   const w1 = meta.work1_label || 'ผลงานครั้งที่ 1';
   const w2 = meta.work2_label || 'ผลงานครั้งที่ 2';
+  c45ComputeExampleNumbering(); // เลขตัวอย่างต้องคำนวณสด ๆ จากผลวิเคราะห์ล่าสุดเสมอก่อนประกอบเอกสาร
 
   /* =====================================================================
      บทที่ 4 — ผลการวิจัย
@@ -1744,18 +1766,26 @@ function buildChapter45ReportHtml() {
 
     (dom.indicators || []).forEach(function (id) {
       const ind = inds[id] || {};
-      const ip  = c45Payload('ind_' + id.replace('.', '_'));
-      const ex  = ip.ex_no || ind.ex || [0, 0];
+      const jobKey = 'ind_' + id.replace('.', '_');
+      const ip  = c45Payload(jobKey);
+      const pairs = ip.pairs || [];
+      const nums = c45ExampleNumbers[jobKey] || [];
+      const exAll = nums.reduce(function (a, pr) { return a.concat(pr); }, []);
       P.push('<h4 class="sub2">' + c45Esc(ind.sub || '') + ' ' + c45Esc(ind.name || id) + '</h4>');
-      P.push(c45DocP((String(ip.finding || '').trim() ? ip.finding + ' ดังตัวอย่าง (' + ex[0] + ')–(' + ex[1] + ')' : ''),
+      P.push(c45DocP((String(ip.finding || '').trim()
+          ? ip.finding + (exAll.length ? ' ดังตัวอย่าง (' + exAll.join(')–(') + ')' : '') : ''),
         'ย่อหน้าเปิดหัวข้อ ' + (ind.sub || id)));
-      P.push(c45DocQuote(ex[0], ip.excerpt1, w1));
-      P.push(c45DocQuote(ex[1], ip.excerpt2, w2));
-      P.push(c45DocP((String(ip.analysis1 || '').trim() ? 'ตัวอย่าง (' + ex[0] + ') ' + ip.analysis1 : ''),
-        'บทวิเคราะห์ตัวอย่าง (' + ex[0] + ')'));
-      P.push(c45DocP((String(ip.analysis2 || '').trim() ? 'ตัวอย่าง (' + ex[1] + ') ' + ip.analysis2 : ''),
-        'บทวิเคราะห์ตัวอย่าง (' + ex[1] + ')'));
-      P.push(c45DocP(ip.synthesis, 'ข้อสรุปจากคู่ตัวอย่างของหัวข้อนี้'));
+      pairs.forEach(function (pr, i) {
+        const ex = nums[i] || [0, 0];
+        if (pairs.length > 1) P.push('<p class="quote-src"><strong>คู่ตัวอย่างที่ ' + (i + 1) + '</strong></p>');
+        P.push(c45DocQuote(ex[0], pr.excerpt1, w1));
+        P.push(c45DocQuote(ex[1], pr.excerpt2, w2));
+        P.push(c45DocP((String(pr.analysis1 || '').trim() ? 'ตัวอย่าง (' + ex[0] + ') ' + pr.analysis1 : ''),
+          'บทวิเคราะห์ตัวอย่าง (' + ex[0] + ')'));
+        P.push(c45DocP((String(pr.analysis2 || '').trim() ? 'ตัวอย่าง (' + ex[1] + ') ' + pr.analysis2 : ''),
+          'บทวิเคราะห์ตัวอย่าง (' + ex[1] + ')'));
+      });
+      P.push(c45DocP(ip.synthesis, pairs.length > 1 ? 'ข้อสรุปจากตัวอย่างทั้งหมดของหัวข้อนี้' : 'ข้อสรุปจากคู่ตัวอย่างของหัวข้อนี้'));
       P.push(c45DocNote(ip.caution));
     });
 

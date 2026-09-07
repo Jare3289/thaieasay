@@ -4538,7 +4538,7 @@ try {
                 'classroom' => isset($request_data['classroom']) ? trim((string)$request_data['classroom']) : '',
             ]);
             $c45Def = ch45_defects($c45Ds);
-            $c45Ev  = ch45_evidence($c45Ds, $c45Ind, $c45Def, 3);
+            $c45Ev  = ch45_evidence($c45Ds, $c45Ind, $c45Def, CH45_EVIDENCE_PER_SLOT);
             echo json_encode(['success' => true, 'evidence' => $c45Ev], JSON_UNESCAPED_UNICODE);
             break;
 

@@ -36,10 +36,12 @@ $mech    = $ctx['mech'];
 $R       = $ctx['results'];
 $doms    = ch45_domains();
 $inds    = ch45_indicators();
+// เลขตัวอย่าง (1), (2), ... ของแต่ละคู่ในแต่ละหัวข้อ คำนวณสด ๆ จากจำนวนคู่ที่วิเคราะห์ไว้จริง
+// (แต่ละหัวข้อยกตัวอย่างได้ไม่เท่ากันแล้ว ไม่ใช่ค่าตายตัวเหมือนเดิม)
+$exNums  = ch45_number_examples($R);
 
-/** ดึงข้อความจากผลวิเคราะห์ของระบบ — ไม่มีให้ขึ้นช่องว่างที่บอกว่าต้องทำอะไรต่อ */
-function c45p($R, $job, $field, $label = '') {
-    $v = $R[$job]['payload'][$field] ?? '';
+/** ข้อความค่าหนึ่งจากผลวิเคราะห์ของระบบ — ไม่มีให้ขึ้นช่องว่างที่บอกว่าต้องทำอะไรต่อ (ใช้กับค่าที่หยิบมาแล้ว เช่น ในคู่ตัวอย่าง) */
+function c45pv($v, $job, $label = '') {
     if (trim((string)$v) === '') {
         $jobs = ch45_ai_jobs();
         $name = $jobs[$job]['label'] ?? $job;
@@ -47,6 +49,11 @@ function c45p($R, $job, $field, $label = '') {
              . ' · กดวิเคราะห์หัวข้อ &quot;' . rp_esc($name) . '&quot; ในหน้าวิเคราะห์บทที่ 4-5]</span>';
     }
     return rp_esc($v);
+}
+
+/** ดึงข้อความจากผลวิเคราะห์ของระบบ — ไม่มีให้ขึ้นช่องว่างที่บอกว่าต้องทำอะไรต่อ */
+function c45p($R, $job, $field, $label = '') {
+    return c45pv($R[$job]['payload'][$field] ?? '', $job, $label);
 }
 
 /** ย่อหน้าเนื้อความของวิทยานิพนธ์ (ย่อหน้าแรกเว้นวรรค 2.5 em ตามรูปแบบเอกสาร) */
@@ -283,19 +290,27 @@ $scope = implode(' · ', $scopeParts);
     </table>
 
     <?php foreach ($d['indicators'] as $id):
-        $ind  = $inds[$id];
-        $ijob = 'ind_' . str_replace('.', '_', $id);
-        $ip   = $R[$ijob]['payload'] ?? [];
-        $ex   = $ind['ex']; ?>
+        $ind   = $inds[$id];
+        $ijob  = 'ind_' . str_replace('.', '_', $id);
+        $ip    = $R[$ijob]['payload'] ?? [];
+        $pairs = is_array($ip['pairs'] ?? null) ? $ip['pairs'] : [];
+        $nums  = $exNums[$ijob] ?? [];
+        $exAll = array_merge([], ...($nums ?: [[]])); ?>
       <h4 class="sub2"><?php echo rp_esc($ind['sub'] . ' ' . $ind['name']); ?></h4>
       <?php echo c45para(c45p($R, $ijob, 'finding', 'ย่อหน้าเปิดหัวข้อ')
-          . ' ดังตัวอย่าง (' . $ex[0] . ')–(' . $ex[1] . ')'); ?>
+          . ($exAll ? ' ดังตัวอย่าง (' . implode(')–(', $exAll) . ')' : '')); ?>
+      <?php foreach ($pairs as $pi => $pr):
+          $ex = $nums[$pi] ?? [0, 0]; ?>
+        <?php if (count($pairs) > 1): ?><p class="quote-src"><strong>คู่ตัวอย่างที่ <?php echo $pi + 1; ?></strong></p><?php endif; ?>
+        <?php
+        echo c45quote($pr['excerpt1'] ?? null, $meta['work1_label']);
+        echo c45quote($pr['excerpt2'] ?? null, $meta['work2_label']);
+        echo c45para('<strong>ตัวอย่าง (' . $ex[0] . ')</strong> ' . c45pv($pr['analysis1'] ?? '', $ijob, 'บทวิเคราะห์ตัวอย่าง (' . $ex[0] . ')'));
+        echo c45para('<strong>ตัวอย่าง (' . $ex[1] . ')</strong> ' . c45pv($pr['analysis2'] ?? '', $ijob, 'บทวิเคราะห์ตัวอย่าง (' . $ex[1] . ')'));
+        ?>
+      <?php endforeach; ?>
       <?php
-      echo c45quote($ip['excerpt1'] ?? null, $meta['work1_label']);
-      echo c45quote($ip['excerpt2'] ?? null, $meta['work2_label']);
-      echo c45para('<strong>ตัวอย่าง (' . $ex[0] . ')</strong> ' . c45p($R, $ijob, 'analysis1', 'บทวิเคราะห์ตัวอย่างแรก'));
-      echo c45para('<strong>ตัวอย่าง (' . $ex[1] . ')</strong> ' . c45p($R, $ijob, 'analysis2', 'บทวิเคราะห์ตัวอย่างที่สอง'));
-      echo c45para(c45p($R, $ijob, 'synthesis', 'ข้อสรุปจากคู่ตัวอย่าง'));
+      echo c45para(c45p($R, $ijob, 'synthesis', count($pairs) > 1 ? 'ข้อสรุปจากตัวอย่างทั้งหมด' : 'ข้อสรุปจากคู่ตัวอย่าง'));
       if (trim((string)($ip['caution'] ?? '')) !== '') echo c45para(rp_esc($ip['caution']));
       ?>
     <?php endforeach; ?>
