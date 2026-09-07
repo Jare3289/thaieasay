@@ -2456,7 +2456,7 @@ try {
                 exit;
             }
             if (!$aiSet['configured']) {
-                echo json_encode(['success' => false, 'error' => 'ยังไม่ได้ตั้งค่าระบบตรวจอัตโนมัติกรุณาใส่ API key ในหน้า "ระบบตรวจอัตโนมัติ" ก่อน']);
+                echo json_encode(['success' => false, 'error' => 'ยังไม่ได้ตั้งค่าระบบตรวจอัตโนมัติ กรุณาใส่ API key ในหน้า "ตั้งค่าระบบ" ก่อน']);
                 exit;
             }
 
@@ -4319,6 +4319,20 @@ try {
                 exit;
             }
             echo json_encode(['success' => true, 'deleted' => ch45_delete_result($pdo, $c45Job)]);
+            break;
+
+        // อ่านข้อมูลประจำงานวิจัยอย่างเดียว (ใช้ที่หน้าตั้งค่า — ไม่ต้องคำนวณสถิติทั้งชุดเหมือน ch45_get_data)
+        case 'ch45_get_meta':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้น']);
+                exit;
+            }
+            echo json_encode([
+                'success'     => true,
+                'meta'        => ch45_meta($pdo),
+                'meta_fields' => ch45_meta_fields(),
+                'phases'      => array_map('ai_phase_label', array_combine(ai_all_phases(), ai_all_phases())),
+            ], JSON_UNESCAPED_UNICODE);
             break;
 
         // บันทึกข้อมูลประจำงานวิจัย (ปีการศึกษา ประชากร รอบงานที่ใช้ ฯลฯ)

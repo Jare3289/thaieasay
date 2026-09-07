@@ -273,10 +273,9 @@ $aiNormPhases = ai_norm_phases();
         ค้าง <span id="aiNormPendingBadgeCount">0</span>
       </span>
     </button>
-    <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" type="button"
-            data-bs-toggle="collapse" data-bs-target="#aiSettingsCard">
+    <a class="btn btn-outline-secondary btn-sm rounded-pill px-3" href="settings.php#ai">
       <i class="bi bi-sliders me-1"></i>ตั้งค่าระบบตรวจอัตโนมัติ
-    </button>
+    </a>
   </div>
   <div class="collapse" id="aiBatchCard">
   <!-- ตรวจทั้งรอบรวดเดียว (ครูเท่านั้น) -->
@@ -473,88 +472,6 @@ $aiNormPhases = ai_norm_phases();
       </div>
 
       <div id="normLog" class="mt-3 d-none border rounded-3" style="max-height:320px; overflow:auto;"></div>
-    </div>
-  </div>
-  </div>
-  <div class="collapse" id="aiSettingsCard">
-  <!-- ตั้งค่าระบบตรวจอัตโนมัติ (เฉพาะครู) -->
-  <div class="card border-0 shadow-sm rounded-4 mb-4">
-    <div class="card-header bg-white border-bottom py-3 px-4 rounded-top-4">
-      <h6 class="fw-bold text-dark mb-0"><i class="bi bi-sliders text-primary me-2"></i>ตั้งค่าระบบตรวจอัตโนมัติ</h6>
-    </div>
-    <div id="aiSettingsBody">
-      <div class="card-body p-4">
-        <div class="alert alert-primary border-0 rounded-3 small">
-          <i class="bi bi-key-fill me-1"></i>
-          ต้องมี <strong>API key</strong> ของผู้ให้บริการโมเดลภาษาก่อนจึงจะใช้งานได้ —
-          มีหลายเจ้าที่<strong>ให้ใช้ฟรี</strong> ดูวิธีขอทีละขั้นได้ในไฟล์ <code>AUTOCHECK_SETUP.md</code>
-        </div>
-
-        <div class="row g-3">
-          <div class="col-md-6">
-            <label class="form-label fw-bold small">ผู้ให้บริการโมเดลภาษา</label>
-            <select id="aiProvider" class="form-select border-2 rounded-3" onchange="onProviderChange()"></select>
-            <div class="form-text small" id="aiProviderHint"></div>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label fw-bold small">ชื่อโมเดล</label>
-            <div class="input-group">
-              <input type="text" id="aiModel" class="form-control border-2 rounded-start-3" placeholder="เช่น gemini-3.6-flash">
-              <button class="btn btn-outline-secondary rounded-end-3" type="button" onclick="useDefaultModel()"
-                      title="ล้างช่องนี้เพื่อกลับไปใช้โมเดลเริ่มต้นของผู้ให้บริการ">
-                <i class="bi bi-arrow-counterclockwise"></i> ใช้ค่าเริ่มต้น
-              </button>
-            </div>
-            <div class="form-text small">
-              เว้นว่างไว้เพื่อใช้โมเดลเริ่มต้นของผู้ให้บริการ (แนะนำ — ระบบจะตามรุ่นใหม่ให้เองเมื่อผู้ให้บริการเลิกใช้รุ่นเก่า)
-            </div>
-          </div>
-          <div class="col-md-8">
-            <label class="form-label fw-bold small">API key</label>
-            <input type="password" id="aiApiKey" class="form-control border-2 rounded-3" autocomplete="off"
-                   placeholder="วาง API key ที่นี่ (เว้นว่างไว้ = ใช้คีย์เดิม)">
-            <div class="form-text small" id="aiKeyHint"></div>
-          </div>
-          <div class="col-md-4">
-            <label class="form-label fw-bold small">เว็บที่ให้บริการ (Base URL)</label>
-            <input type="text" id="aiBaseUrl" class="form-control border-2 rounded-3" placeholder="ใช้ค่าเริ่มต้น">
-          </div>
-        </div>
-
-        <hr class="my-4">
-
-        <div class="form-check form-switch">
-          <input class="form-check-input" type="checkbox" id="aiEnabled">
-          <label class="form-check-label fw-bold small" for="aiEnabled">เปิดใช้งานระบบตรวจอัตโนมัติ</label>
-        </div>
-        <div class="form-text small">
-          ปิดสวิตช์นี้เมื่อไม่ต้องการให้สั่งตรวจเพิ่ม — ผลตรวจที่บันทึกไว้แล้วยังแสดงให้นักเรียนดูได้ตามปกติ
-        </div>
-
-        <div class="alert alert-light border rounded-3 small mt-3 mb-0">
-          <i class="bi bi-infinity me-1"></i>
-          <strong>ไม่มีเพดานการเรียกใช้รายวันของระบบเรา</strong> — สั่งตรวจได้เท่าที่ต้องการ
-          ระบบยังนับจำนวนครั้งที่ใช้ในแต่ละวันไว้ให้ดูย้อนหลัง (นับเฉพาะครั้งที่สำเร็จ)
-          เพดานที่เหลืออยู่จริงคือของ<strong>ผู้ให้บริการโมเดลภาษาเอง</strong> ซึ่งถ้าเต็มจะตอบกลับมาเป็นข้อผิดพลาด 429
-          และระบบจะแสดงข้อความนั้นให้เห็นตรง ๆ
-        </div>
-        <div class="alert alert-secondary border-0 rounded-3 small mt-3 mb-0">
-          <i class="bi bi-person-lock me-1"></i>
-          <strong>คุณครูเป็นผู้สั่งตรวจเพียงผู้เดียว</strong> — นักเรียนกดให้ระบบตรวจเองไม่ได้
-          เห็นได้เฉพาะผลที่คุณครูตรวจให้แล้วเท่านั้น
-        </div>
-
-        <div class="d-flex justify-content-end gap-2 mt-4">
-          <button class="btn btn-outline-danger rounded-pill px-3" onclick="clearApiKey()">
-            <i class="bi bi-trash me-1"></i>ลบ API key
-          </button>
-          <button class="btn btn-primary rounded-pill px-4 fw-bold" id="aiSaveSettingsBtn" onclick="saveAiSettings()">
-            <i class="bi bi-check2-circle me-1"></i>บันทึกการตั้งค่า
-          </button>
-        </div>
-
-        <div id="aiUsageBox" class="mt-4 small text-muted"></div>
-      </div>
     </div>
   </div>
   </div>
@@ -811,7 +728,6 @@ const AI_RUBRIC_ITEMS = <?php
 ?>;
 
 let aiStatus    = null;   // สถานะฟีเจอร์ตรวจอัตโนมัติของผู้ใช้คนนี้
-let aiProviders = [];     // รายชื่อผู้ให้บริการ (เฉพาะครู)
 
 // ป้ายชื่อรอบงานและตัวหนีอักขระ ใช้ของกลางจาก writing_check.js
 const AI_PHASE_LABELS = AI_PHASE_LABEL_MAP;
@@ -851,7 +767,7 @@ function paintStatusBar() {
   } else if (!aiStatus.configured) {
     cls = 'alert-warning';
     html = AI_IS_TEACHER
-      ? '<i class="bi bi-exclamation-triangle me-1"></i>ยังไม่ได้ตั้งค่า API key — กดปุ่ม "ตั้งค่าระบบตรวจอัตโนมัติ" ด้านล่างเพื่อใส่คีย์ก่อนใช้งาน'
+      ? '<i class="bi bi-exclamation-triangle me-1"></i>ยังไม่ได้ตั้งค่า API key — ใส่คีย์ได้ที่หน้า <a href="settings.php#ai" class="alert-link">ตั้งค่าระบบ</a> ก่อนใช้งาน'
       : '<i class="bi bi-exclamation-triangle me-1"></i>ระบบตรวจอัตโนมัติยังไม่พร้อมใช้งาน กรุณาแจ้งคุณครูให้ตั้งค่าก่อน';
   } else if (!AI_IS_TEACHER) {
     cls = 'alert-info';
@@ -3242,121 +3158,6 @@ async function startRecheckQueue() {
   }
 }
 
-// ------------------------------------------------------- ตั้งค่าระบบตรวจอัตโนมัติ (ครู)
-async function loadAiSettings() {
-  try {
-    const res  = await fetch('api.php?action=get_ai_settings');
-    const data = await res.json();
-    if (!data.success) { showToast(data.error || 'โหลดการตั้งค่าไม่สำเร็จ', 'error'); return; }
-    aiProviders = data.providers;
-
-    const sel = document.getElementById('aiProvider');
-    sel.innerHTML = data.providers.map(p =>
-      `<option value="${esc(p.key)}">${esc(p.label)}</option>`).join('');
-    sel.value = data.settings.provider;
-
-    document.getElementById('aiModel').value    = data.settings.model || '';
-    document.getElementById('aiBaseUrl').value  = data.settings.base_url || '';
-    document.getElementById('aiEnabled').checked = !!data.settings.enabled;
-
-    const hint = document.getElementById('aiKeyHint');
-    if (data.settings.locked_by_file) {
-      hint.innerHTML = '<span class="text-success"><i class="bi bi-shield-lock me-1"></i>ใช้คีย์จากไฟล์ writing_check_secrets.php บนเซิร์ฟเวอร์ '
-        + '(' + esc(data.settings.api_key_masked) + ') — ค่าที่กรอกในหน้านี้จะไม่ถูกใช้</span>';
-    } else if (data.settings.has_key) {
-      hint.innerHTML = 'มีคีย์บันทึกไว้แล้ว: <code>' + esc(data.settings.api_key_masked) + '</code> · เว้นว่างไว้ = ใช้คีย์เดิม';
-    } else {
-      hint.textContent = 'ยังไม่มี API key ในระบบ';
-    }
-
-    onProviderChange(true);
-    renderUsage(data.usage);
-  } catch (err) {
-    console.error(err);
-  }
-}
-
-function onProviderChange(initial) {
-  const key = document.getElementById('aiProvider').value;
-  const p   = aiProviders.find(x => x.key === key);
-  const hint = document.getElementById('aiProviderHint');
-  if (!p) { hint.textContent = ''; return; }
-  hint.innerHTML = p.key_url
-    ? `ขอ API key ฟรีได้ที่ <a href="${esc(p.key_url)}" target="_blank" rel="noopener">${esc(p.key_url)}</a>`
-    : 'กรอก Base URL ของเซิร์ฟเวอร์เองในช่องด้านขวา';
-  // เปลี่ยนผู้ให้บริการ = เสนอโมเดล/URL เริ่มต้นของเจ้านั้นให้ (ไม่ทับตอนโหลดหน้าครั้งแรก)
-  if (!initial) {
-    document.getElementById('aiModel').value   = p.default_model || '';
-    document.getElementById('aiBaseUrl').value = p.default_base_url || '';
-  }
-}
-
-// ล้างชื่อโมเดลที่บันทึกไว้ เพื่อกลับไปใช้ค่าเริ่มต้นของผู้ให้บริการที่กำหนดไว้ในโค้ด
-// (ใช้เมื่อผู้ให้บริการเลิกให้บริการโมเดลรุ่นเดิม แล้วระบบขึ้นว่า "ไม่พบโมเดลที่ตั้งค่าไว้")
-function useDefaultModel() {
-  document.getElementById('aiModel').value = '';
-  showToast('ล้างชื่อโมเดลแล้ว — กด "บันทึกการตั้งค่า" เพื่อใช้โมเดลเริ่มต้นของผู้ให้บริการ');
-}
-
-function renderUsage(usage) {
-  const box = document.getElementById('aiUsageBox');
-  if (!usage || !usage.length) { box.innerHTML = '<i class="bi bi-graph-up me-1"></i>ยังไม่มีการเรียกใช้ระบบ'; return; }
-  const rows = usage.map(u =>
-    `<tr><td>${esc(u.d)}</td><td class="text-center">${u.total}</td><td class="text-center text-success">${u.ok}</td>
-     <td class="text-center text-danger">${u.total - u.ok}</td></tr>`).join('');
-  box.innerHTML = `<div class="fw-bold mb-2"><i class="bi bi-graph-up me-1"></i>การเรียกใช้ระบบย้อนหลัง 7 วัน</div>
-    <table class="table table-sm table-bordered mb-0" style="max-width:420px;">
-      <thead class="table-light"><tr><th>วันที่</th><th class="text-center">รวม</th><th class="text-center">สำเร็จ</th><th class="text-center">ไม่สำเร็จ</th></tr></thead>
-      <tbody>${rows}</tbody></table>`;
-}
-
-async function saveAiSettings() {
-  const btn = document.getElementById('aiSaveSettingsBtn');
-  btn.disabled = true;
-  try {
-    const res = await fetch('api.php', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'save_ai_settings',
-        provider: document.getElementById('aiProvider').value,
-        model: document.getElementById('aiModel').value.trim(),
-        base_url: document.getElementById('aiBaseUrl').value.trim(),
-        api_key: document.getElementById('aiApiKey').value.trim(),
-        enabled: document.getElementById('aiEnabled').checked
-      })
-    });
-    const data = await res.json();
-    if (!data.success) { showToast(data.error || 'บันทึกไม่สำเร็จ', 'error'); return; }
-    document.getElementById('aiApiKey').value = '';
-    showToast('บันทึกการตั้งค่าเรียบร้อยแล้ว');
-    await loadAiSettings();
-    await loadAiStatus();
-  } catch (err) {
-    showToast('เชื่อมต่อไม่สำเร็จ', 'error');
-  } finally {
-    btn.disabled = false;
-  }
-}
-
-async function clearApiKey() {
-  if (!confirm('ยืนยันลบ API key ออกจากระบบ? ระบบตรวจอัตโนมัติจะใช้งานไม่ได้จนกว่าจะใส่คีย์ใหม่')) return;
-  try {
-    const res = await fetch('api.php', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'save_ai_settings', api_key: '__CLEAR__' })
-    });
-    const data = await res.json();
-    if (!data.success) { showToast(data.error || 'ลบไม่สำเร็จ', 'error'); return; }
-    showToast('ลบ API key เรียบร้อยแล้ว');
-    await loadAiSettings();
-    await loadAiStatus();
-  } catch (err) {
-    showToast('เชื่อมต่อไม่สำเร็จ', 'error');
-  }
-}
-
 /* ============================================================
    ส่งออกรายงานภาพรวมทั้งชั้น (3 ส่วนตามแท็บ) เป็น Google Doc
    ใช้ข้อมูลที่โหลดไว้ในหน่วยความจำอยู่แล้ว (aiOverviewList / aiOverviews)
@@ -3566,9 +3367,6 @@ async function loadWritingGoogleStatus() {
     const sel = document.getElementById('aiStudentSelect');
     if (sid && sel) sel.value = sid;
   }
-<?php if ($aiIsTeacher): ?>
-  await loadAiSettings();
-<?php endif; ?>
   await loadAiStatus();
 <?php if ($aiIsTeacher): ?>
   await loadBatchRooms();

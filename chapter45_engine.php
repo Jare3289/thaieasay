@@ -1746,7 +1746,7 @@ function ch45_ai_run(PDO $pdo, $jobKey, array $ctx, array $who) {
 
     $settings = ai_settings($pdo);
     if (!$settings['enabled'])    return ['ok' => false, 'error' => 'คุณครูปิดการใช้งานระบบตรวจอัตโนมัติไว้'];
-    if (!$settings['configured']) return ['ok' => false, 'error' => 'ยังไม่ได้ตั้งค่าระบบตรวจอัตโนมัติกรุณาใส่ API key ในหน้า "ระบบตรวจอัตโนมัติ" ก่อน'];
+    if (!$settings['configured']) return ['ok' => false, 'error' => 'ยังไม่ได้ตั้งค่าระบบตรวจอัตโนมัติ กรุณาใส่ API key ในหน้า "ตั้งค่าระบบ" ก่อน'];
 
     $built = ch45_ai_build_prompt($jobKey, $ctx);
     $prompt = (string)$built['prompt'];
