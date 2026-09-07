@@ -346,10 +346,12 @@ function c45ComputeExcerptUsage() {
   Object.keys(results).forEach(function (k) {
     if (k.indexOf('ind_') !== 0) return;
     const pl = (results[k] && results[k].payload) || {};
-    const n1 = pl.excerpt1 && pl.excerpt1.student_no;
-    const n2 = pl.excerpt2 && pl.excerpt2.student_no;
-    if (n1) usage.w1[n1] = (usage.w1[n1] || 0) + 1;
-    if (n2) usage.w2[n2] = (usage.w2[n2] || 0) + 1;
+    (Array.isArray(pl.pairs) ? pl.pairs : []).forEach(function (pair) {
+      const n1 = pair.excerpt1 && pair.excerpt1.student_no;
+      const n2 = pair.excerpt2 && pair.excerpt2.student_no;
+      if (n1) usage.w1[n1] = (usage.w1[n1] || 0) + 1;
+      if (n2) usage.w2[n2] = (usage.w2[n2] || 0) + 1;
+    });
   });
   c45ExcerptUsage = usage;
 }
@@ -626,22 +628,31 @@ function c45RenderPayload(jobKey, payload) {
 
   if (jobKey.indexOf('ind_') === 0) {
     const ind = c45Data.indicators[payload.indicator] || {};
-    const ex = payload.ex_no || [0, 0];
-    return '<div class="row g-2 mb-2">'
+    const pairs = Array.isArray(payload.pairs) ? payload.pairs : [];
+    const exList = Array.isArray(payload.ex_no) ? payload.ex_no : [];
+    let out = '<div class="row g-2 mb-2">'
       + '<div class="col-md-6"><div class="bg-light rounded-3 p-2 h-100"><div class="small fw-bold">ช่องตาราง — '
       + c45Esc(meta.work1_label) + '</div><div class="small">' + c45Esc(payload.cell1) + '</div></div></div>'
       + '<div class="col-md-6"><div class="bg-light rounded-3 p-2 h-100"><div class="small fw-bold">ช่องตาราง — '
       + c45Esc(meta.work2_label) + '</div><div class="small">' + c45Esc(payload.cell2) + '</div></div></div>'
       + '</div>'
-      + c45Para('ย่อหน้าเปิดหัวข้อ ' + (ind.sub || ''), payload.finding)
-      + c45Excerpt(ex[0], payload.excerpt1, meta.work1_label,
-                   c45ExcerptUsage.w1[(payload.excerpt1 || {}).student_no])
-      + c45Excerpt(ex[1], payload.excerpt2, meta.work2_label,
-                   c45ExcerptUsage.w2[(payload.excerpt2 || {}).student_no])
-      + c45Para('ตัวอย่าง (' + ex[0] + ') วิเคราะห์', payload.analysis1)
-      + c45Para('ตัวอย่าง (' + ex[1] + ') วิเคราะห์', payload.analysis2)
-      + c45Para('ข้อสรุปจากคู่ตัวอย่าง', payload.synthesis)
+      + c45Para('ย่อหน้าเปิดหัวข้อ ' + (ind.sub || ''), payload.finding);
+    if (!pairs.length) {
+      out += '<div class="text-muted small mb-2"><i class="bi bi-dash-circle me-1"></i>ยังไม่มีตัวอย่างที่ยกจากผลงานจริง</div>';
+    }
+    pairs.forEach(function (pair, i) {
+      const ex = exList[i] || [0, 0];
+      out += '<div class="small fw-bold text-secondary mt-2 mb-1">คู่ตัวอย่างที่ ' + (i + 1) + '</div>'
+        + c45Excerpt(ex[0], pair.excerpt1, meta.work1_label,
+                     c45ExcerptUsage.w1[(pair.excerpt1 || {}).student_no])
+        + c45Excerpt(ex[1], pair.excerpt2, meta.work2_label,
+                     c45ExcerptUsage.w2[(pair.excerpt2 || {}).student_no])
+        + c45Para('ตัวอย่าง (' + ex[0] + ') วิเคราะห์', pair.analysis1)
+        + c45Para('ตัวอย่าง (' + ex[1] + ') วิเคราะห์', pair.analysis2);
+    });
+    out += c45Para('ข้อสรุปจากตัวอย่างทั้งหมด', payload.synthesis)
       + (payload.caution ? c45Para('ข้อความกำกับการตีความ', payload.caution) : '');
+    return out;
   }
 
   if (jobKey.indexOf('domain_') === 0) {
@@ -1745,17 +1756,27 @@ function buildChapter45ReportHtml() {
     (dom.indicators || []).forEach(function (id) {
       const ind = inds[id] || {};
       const ip  = c45Payload('ind_' + id.replace('.', '_'));
-      const ex  = ip.ex_no || ind.ex || [0, 0];
+      const pairs = Array.isArray(ip.pairs) ? ip.pairs : [];
+      const exList = Array.isArray(ip.ex_no) ? ip.ex_no : [];
+      const rangeTxt = exList.length
+        ? ('ดังตัวอย่าง (' + exList[0][0] + ')–(' + exList[exList.length - 1][1] + ')')
+        : '';
       P.push('<h4 class="sub2">' + c45Esc(ind.sub || '') + ' ' + c45Esc(ind.name || id) + '</h4>');
-      P.push(c45DocP((String(ip.finding || '').trim() ? ip.finding + ' ดังตัวอย่าง (' + ex[0] + ')–(' + ex[1] + ')' : ''),
+      P.push(c45DocP((String(ip.finding || '').trim() ? ip.finding + (rangeTxt ? ' ' + rangeTxt : '') : ''),
         'ย่อหน้าเปิดหัวข้อ ' + (ind.sub || id)));
-      P.push(c45DocQuote(ex[0], ip.excerpt1, w1));
-      P.push(c45DocQuote(ex[1], ip.excerpt2, w2));
-      P.push(c45DocP((String(ip.analysis1 || '').trim() ? 'ตัวอย่าง (' + ex[0] + ') ' + ip.analysis1 : ''),
-        'บทวิเคราะห์ตัวอย่าง (' + ex[0] + ')'));
-      P.push(c45DocP((String(ip.analysis2 || '').trim() ? 'ตัวอย่าง (' + ex[1] + ') ' + ip.analysis2 : ''),
-        'บทวิเคราะห์ตัวอย่าง (' + ex[1] + ')'));
-      P.push(c45DocP(ip.synthesis, 'ข้อสรุปจากคู่ตัวอย่างของหัวข้อนี้'));
+      if (!pairs.length) {
+        P.push('<p class="para"><span class="todo">[ยังไม่มีตัวอย่างที่ยกจากผลงานจริง]</span></p>');
+      }
+      pairs.forEach(function (pair, i) {
+        const ex = exList[i] || [0, 0];
+        P.push(c45DocQuote(ex[0], pair.excerpt1, w1));
+        P.push(c45DocQuote(ex[1], pair.excerpt2, w2));
+        P.push(c45DocP((String(pair.analysis1 || '').trim() ? 'ตัวอย่าง (' + ex[0] + ') ' + pair.analysis1 : ''),
+          'บทวิเคราะห์ตัวอย่าง (' + ex[0] + ')'));
+        P.push(c45DocP((String(pair.analysis2 || '').trim() ? 'ตัวอย่าง (' + ex[1] + ') ' + pair.analysis2 : ''),
+          'บทวิเคราะห์ตัวอย่าง (' + ex[1] + ')'));
+      });
+      P.push(c45DocP(ip.synthesis, 'ข้อสรุปจากตัวอย่างทั้งหมดของหัวข้อนี้'));
       P.push(c45DocNote(ip.caution));
     });
 
