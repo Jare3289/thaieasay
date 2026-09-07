@@ -40,6 +40,7 @@ require_once __DIR__ . '/thai_text_utils.php';
  * - typhoon   : OpenTyphoon (SCB 10X) — โมเดลที่เก่งภาษาไทยโดยเฉพาะ มีชั้นฟรี
  * - openrouter: รวมหลายโมเดล มีรุ่นลงท้าย :free ให้ใช้ฟรี
  * - groq      : เร็วมาก มีชั้นใช้งานฟรี
+ * - claude    : Anthropic Claude — คุณภาพการให้เหตุผลสูง แต่ไม่มีโควตาฟรี ต้องเติมเครดิตเอง
  * - custom    : เซิร์ฟเวอร์อื่นที่ใช้มาตรฐาน OpenAI (กรอก base URL เอง)
  */
 function ai_providers() {
@@ -57,6 +58,13 @@ function ai_providers() {
             'base_url' => 'https://api.opentyphoon.ai/v1',
             'model'    => 'typhoon-v2.1-12b-instruct',
             'key_url'  => 'https://opentyphoon.ai/',
+        ],
+        'claude' => [
+            'label'    => 'Anthropic Claude — คุณภาพสูง (ไม่มีโควตาฟรี ต้องเติมเครดิต)',
+            'kind'     => 'anthropic',
+            'base_url' => 'https://api.anthropic.com/v1',
+            'model'    => 'claude-opus-5',
+            'key_url'  => 'https://console.anthropic.com/settings/keys',
         ],
         'openrouter' => [
             'label'    => 'OpenRouter — มีโมเดลลงท้าย :free',
@@ -1479,6 +1487,40 @@ function ai_call_model(array $s, $systemPrompt, $userPrompt, array $opts = []) {
             }
         }
         $reason = isset($obj['candidates'][0]['finishReason']) ? (string)$obj['candidates'][0]['finishReason'] : '';
+        if (trim($text) === '') {
+            return ['ok' => false, 'text' => '', 'finish' => $reason,
+                    'error' => 'ระบบไม่ได้ส่งเนื้อหากลับมา' . ($reason !== '' ? " (สาเหตุ: $reason)" : '')];
+        }
+        return ['ok' => true, 'text' => $text, 'error' => '', 'finish' => $reason];
+    }
+
+    if ($s['kind'] === 'anthropic') {
+        $url = $s['base_url'] . '/messages';
+        $payload = [
+            'model'      => $s['model'],
+            // เหตุผลเดียวกับฝั่ง Gemini ด้านบน: โมเดลใช้โทเคนส่วนหนึ่งไป "คิด" ก่อนตอบ
+            // (thinking นับรวมในเพดาน max_tokens) พอเพดานต่ำ JSON จะถูกตัดครึ่งกลางคัน
+            'max_tokens' => max(32768, $maxTok),
+            'temperature'=> $temp,
+            'system'     => $systemPrompt,
+            'messages'   => [['role' => 'user', 'content' => $userPrompt]],
+        ];
+        $head = ['x-api-key: ' . $s['api_key'], 'anthropic-version: 2023-06-01'];
+        $res  = ai_http_post_json($url, $head, $payload, $timeout);
+        if ($res['error'] !== '') return ['ok' => false, 'text' => '', 'error' => $res['error']];
+        if (!$res['ok'])          return ['ok' => false, 'text' => '', 'error' => ai_extract_api_error($res['body'], $res['status'])];
+
+        $obj  = json_decode($res['body'], true);
+        $text = '';
+        if (isset($obj['content']) && is_array($obj['content'])) {
+            foreach ($obj['content'] as $block) {
+                // ข้ามบล็อก thinking — เอาเฉพาะข้อความคำตอบจริง
+                if (isset($block['type']) && $block['type'] === 'text' && isset($block['text'])) {
+                    $text .= $block['text'];
+                }
+            }
+        }
+        $reason = isset($obj['stop_reason']) ? (string)$obj['stop_reason'] : '';
         if (trim($text) === '') {
             return ['ok' => false, 'text' => '', 'finish' => $reason,
                     'error' => 'ระบบไม่ได้ส่งเนื้อหากลับมา' . ($reason !== '' ? " (สาเหตุ: $reason)" : '')];
