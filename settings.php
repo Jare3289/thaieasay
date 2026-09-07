@@ -393,7 +393,9 @@ function paintMeta(meta) {
         + ' value="' + esc(v) + '">';
     }
     h += '<div class="col-md-6 col-lg-4"><label class="form-label small fw-bold mb-1">'
-      + esc(f.label) + '</label>' + input + '</div>';
+      + esc(f.label) + '</label>' + input
+      + (f.hint ? '<div class="form-text small">' + esc(f.hint) + '</div>' : '')
+      + '</div>';
   });
   document.getElementById('stMetaForm').innerHTML = h;
 }
