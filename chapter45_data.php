@@ -917,10 +917,15 @@ function ch45_trim_text($text, $maxChars = 2200) {
  *               "เห็นข้อบกพร่องชัดที่สุด" ตรงกับที่บทที่ 4 ต้องยกเป็นตัวอย่างข้อบกพร่อง
  *   ครั้งที่ 2 — ให้ความสำคัญกับนักเรียนคนเดิมที่เคยมีข้อบกพร่องแล้วแก้ได้ (resolved)
  *               เพื่อให้คู่ตัวอย่างแสดง "การเปลี่ยนแปลงของคนเดียวกัน" ซึ่งหนักแน่นกว่าการเทียบคนละคน
+ *   ความหลากหลายของตัวอย่างตลอด 11 หัวข้อ — ในกลุ่มที่คะแนนเสมอกัน ให้นักเรียนที่ยังไม่เคย
+ *               ถูกยกเป็นตัวอย่างในหัวข้ออื่นมาก่อน (ตามที่ระบุใน $usedW1/$usedW2) ขึ้นก่อนนักเรียน
+ *               ที่ถูกยกไปแล้ว เพื่อไม่ให้บทที่ 4 ยกตัวอย่างคนเดิมซ้ำทุกหัวข้อ แต่ยังคง
+ *               ยึดคะแนน/สถานะ resolved เป็นเกณฑ์หลักเสมอ — ถ้าไม่มีคนอื่นให้เลือกจริง ๆ
+ *               ก็ยังใช้คนเดิมได้ ไม่ตัดออกทั้งหมด
  *
  * ส่งข้อความเรียงความจริงไปด้วย เพื่อให้ระบบยกข้อความจากผลงานจริงเท่านั้น ห้ามแต่งเอง
  */
-function ch45_evidence(array $ds, $indicatorId, array $defects, $perSlot = 3) {
+function ch45_evidence(array $ds, $indicatorId, array $defects, $perSlot = 3, array $usedW1 = [], array $usedW2 = []) {
     $meta = $ds['meta'];
     $row  = $defects['rows'][$indicatorId] ?? null;
     if (!$row) return ['work1' => [], 'work2' => []];
@@ -928,21 +933,23 @@ function ch45_evidence(array $ds, $indicatorId, array $defects, $perSlot = 3) {
     $p1 = $meta['work1_phase']; $p2 = $meta['work2_phase'];
     $e1 = $meta['work1_eval_phase']; $e2 = $meta['work2_eval_phase'];
 
-    $pick = function ($sids, $essayPhase, $evalPhase, $limit, $tag) use ($ds, $indicatorId) {
+    $pick = function ($sids, $essayPhase, $evalPhase, $limit, $tag, $usedNos, $order = 'asc') use ($ds, $indicatorId) {
         $cand = [];
         foreach ($sids as $sid) {
             $essay = $ds['essays'][$sid][$essayPhase] ?? null;
             if (!$essay || !$essay['has']) continue;
             $sc = ch45_scores_of($ds, $sid, $evalPhase);
+            $no = $ds['students'][$sid]['no'];
             $cand[] = [
                 'sid'   => $sid,
-                'no'    => $ds['students'][$sid]['no'],
+                'no'    => $no,
                 // ชื่อจริง — ใช้เฉพาะตอนครู/ผู้เชี่ยวชาญเปิดโหมด "แสดงชื่อจริง" เพื่อไล่หาต้นฉบับ
                 // เท่านั้น ห้ามหลุดเข้าไปในข้อความที่ส่งให้ AI หรือบทที่ 4 ฉบับจริงเด็ดขาด
                 // (ch45_ai_evidence_block ด้านล่างหยิบเฉพาะฟิลด์ที่ต้องใช้ ไม่ได้ dump ทั้งอาร์เรย์
                 // จึงไม่หลุดไปในคำสั่งที่ส่งให้ระบบโดยอัตโนมัติอยู่แล้ว)
                 'name'  => $ds['students'][$sid]['name'],
                 'raw'   => $sc ? $sc['raw'][$indicatorId] : null,
+                'used_elsewhere' => in_array($no, $usedNos, true),
                 'tag'   => $tag,
                 'intro' => ch45_trim_text($essay['intro'], 700),
                 'body'  => array_map(function ($p) { return ch45_trim_text($p, 700); }, $essay['body']),
@@ -951,32 +958,32 @@ function ch45_evidence(array $ds, $indicatorId, array $defects, $perSlot = 3) {
                 'words' => $essay['word_count'],
             ];
         }
-        usort($cand, function ($a, $b) {
+        usort($cand, function ($a, $b) use ($order) {
+            // ให้นักเรียนที่ยังไม่ถูกยกเป็นตัวอย่างในหัวข้ออื่นมาก่อนคนที่ถูกยกไปแล้ว (ความหลากหลาย)
+            // แล้วจึงเรียงตามคะแนนดิบ (ทิศทางตาม $order) เป็นเกณฑ์หลัก
+            if ($a['used_elsewhere'] !== $b['used_elsewhere']) return $a['used_elsewhere'] ? 1 : -1;
             $x = ($a['raw'] === null) ? 99 : $a['raw'];
             $y = ($b['raw'] === null) ? 99 : $b['raw'];
             if ($x == $y) return 0;
-            return ($x < $y) ? -1 : 1;   // คะแนนต่ำสุดขึ้นก่อน = ข้อบกพร่องเด่นชัดที่สุด
+            $cmp = ($x < $y) ? -1 : 1;
+            return $order === 'desc' ? -$cmp : $cmp;
         });
         return array_slice($cand, 0, $limit);
     };
 
-    // ครั้งที่ 1: ผลงานที่ปรากฏข้อบกพร่อง (ถ้าไม่มีเลย ใช้ผลงานที่คะแนนต่ำสุดแทน)
+    // ครั้งที่ 1: ผลงานที่ปรากฏข้อบกพร่อง (ถ้าไม่มีเลย ใช้ผลงานที่คะแนนต่ำสุดแทน) — คะแนนต่ำสุดขึ้นก่อน
     $src1 = $row['students1'] ?: $ds['sids'];
-    $w1 = $pick($src1, $p1, $e1, $perSlot, $row['students1'] ? 'มีข้อบกพร่องในครั้งที่ 1' : 'คะแนนต่ำสุดในครั้งที่ 1');
+    $w1 = $pick($src1, $p1, $e1, $perSlot, $row['students1'] ? 'มีข้อบกพร่องในครั้งที่ 1' : 'คะแนนต่ำสุดในครั้งที่ 1', $usedW1, 'asc');
 
     // ครั้งที่ 2: ให้น้ำหนักนักเรียนที่แก้ข้อบกพร่องได้แล้ว แล้วค่อยเติมด้วยคนอื่น
     $resolved = $row['resolved'];
     $w2 = [];
-    if ($resolved) $w2 = $pick($resolved, $p2, $e2, $perSlot, 'ครั้งที่ 1 มีข้อบกพร่อง ครั้งที่ 2 แก้ได้แล้ว');
+    if ($resolved) $w2 = $pick($resolved, $p2, $e2, $perSlot, 'ครั้งที่ 1 มีข้อบกพร่อง ครั้งที่ 2 แก้ได้แล้ว', $usedW2, 'asc');
     if (count($w2) < $perSlot) {
         $rest = array_values(array_diff($ds['sids'], array_column($w2, 'sid')));
-        // ครั้งที่ 2 ต้องการผลงานที่ "ทำได้ดี" จึงเรียงจากคะแนนสูงลงมา
-        $more = $pick($rest, $p2, $e2, count($rest), 'ผลงานครั้งที่ 2');
-        $more = array_reverse($more);
-        foreach ($more as $m) {
-            if (count($w2) >= $perSlot) break;
-            $w2[] = $m;
-        }
+        // ครั้งที่ 2 ต้องการผลงานที่ "ทำได้ดี" จึงเรียงจากคะแนนสูงลงมา (คนที่ยังไม่ถูกใช้ที่ไหนมาก่อนเสมอ)
+        $more = $pick($rest, $p2, $e2, $perSlot - count($w2), 'ผลงานครั้งที่ 2', $usedW2, 'desc');
+        foreach ($more as $m) $w2[] = $m;
     }
 
     // จับคู่นักเรียนคนเดียวกันไว้ก่อน ถ้ามีผลงานทั้งสองครั้งและเคยมีข้อบกพร่องแล้วแก้ได้
