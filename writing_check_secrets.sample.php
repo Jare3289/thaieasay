@@ -18,9 +18,12 @@
  *   typhoon    : https://opentyphoon.ai/                   โมเดล typhoon-v2.1-12b-instruct
  *   openrouter : https://openrouter.ai/keys                โมเดลที่ลงท้ายด้วย :free
  *   groq       : https://console.groq.com/keys             โมเดล llama-3.3-70b-versatile
+ *
+ * ตัวเลือกคุณภาพสูง (ไม่มีโควตาฟรี ต้องเติมเครดิตเอง)
+ *   claude     : https://console.anthropic.com/settings/keys   โมเดล claude-opus-5
  */
 
-$ai_provider = 'gemini';              // gemini | typhoon | openrouter | groq | custom
+$ai_provider = 'gemini';              // gemini | typhoon | openrouter | groq | claude | custom
 $ai_model    = 'gemini-3.6-flash';    // เว้นว่างไว้ = ใช้โมเดลเริ่มต้นของผู้ให้บริการ
 $ai_api_key  = 'ใส่ API key ของคุณที่นี่';
 $ai_base_url = '';                    // เว้นว่างไว้ = ใช้ค่าเริ่มต้น (ระบุเฉพาะกรณี provider = custom)
