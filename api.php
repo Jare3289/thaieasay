@@ -2948,18 +2948,24 @@ try {
                 }
             }
 
-            @set_time_limit(150);
+            @set_time_limit(200);
             $nmTopics = essay_topics_map($pdo);
             $nmTopic  = (string)($nmTopics[essay_topic_phase($nmPhase)] ?? '');
+            // งานนี้ต่างจากการตรวจอื่น ๆ ตรงที่คำตอบต้องมี "ตัวบททั้งฉบับ" อยู่ในนั้น
+            // ข้อความไทยกินโทเคนมากกว่าอังกฤษหลายเท่า ถ้าใช้เพดานปกติ (8192) เรียงความยาว ๆ
+            // จะถูกตัดกลางคัน แล้วระบบจะเข้าใจผิดว่า "โมเดลแก้ถ้อยคำ" ทั้งที่คำตอบแค่ขาดหาย
+            // อุณหภูมิตั้ง 0 เพราะเป็นงานคัดลอกข้อความเป๊ะ ๆ ไม่ต้องการความสร้างสรรค์
+            $nmBudget = min(32000, max(8192, (int)ceil(mb_strlen($nmFull, 'UTF-8') * 2) + 1500));
             $nmCall = ai_call_model($nmSet, ai_norm_system_prompt(),
-                        ai_build_norm_prompt($nmTopic, $nmPhase, $nmIntro, $nmBody, $nmConcl));
+                        ai_build_norm_prompt($nmTopic, $nmPhase, $nmIntro, $nmBody, $nmConcl),
+                        ['temperature' => 0, 'max_tokens' => $nmBudget, 'timeout' => 150]);
             if (!$nmCall['ok']) {
                 ai_log_usage($pdo, $nmUser['id'], 'teacher', $nmSid, 'norm:' . $nmPhase, false, $nmCall['error']);
                 echo json_encode(['success' => false, 'error' => $nmCall['error']]);
                 exit;
             }
 
-            $nmParsed = ai_parse_norm($nmCall['text'], $nmIntro, $nmBody, $nmConcl);
+            $nmParsed = ai_parse_norm($nmCall['text'], $nmIntro, $nmBody, $nmConcl, (string)($nmCall['finish'] ?? ''));
             if (!$nmParsed['ok']) {
                 ai_log_usage($pdo, $nmUser['id'], 'teacher', $nmSid, 'norm:' . $nmPhase, false, $nmParsed['error']);
                 echo json_encode(['success' => false, 'error' => $nmParsed['error']]);
@@ -2985,6 +2991,7 @@ try {
                 'space_before' => $nmParsed['data']['space_before'],
                 'space_after'  => $nmParsed['data']['space_after'],
                 'space_edits'  => $nmParsed['data']['space_edits'],
+                'repairs'      => $nmParsed['data']['repairs'],
                 'notes'        => $nmParsed['data']['notes'],
                 'quota_left'   => max(0, $nmLimit - ($nmUsed + 1)),
             ]);

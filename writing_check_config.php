@@ -1458,9 +1458,17 @@ function ai_extract_api_error($body, $status) {
 
 /**
  * เรียกโมเดลให้ตอบเป็นข้อความ
- * คืนค่า ['ok' => bool, 'text' => string, 'error' => string]
+ * $opts ปรับได้สามค่า (ไม่ส่งมาก็ใช้ค่าเดิมของระบบตรวจเรียงความ)
+ *   'temperature' → ความสร้างสรรค์ของคำตอบ (งานที่ต้องคัดลอกข้อความเป๊ะ ๆ ควรใช้ 0)
+ *   'max_tokens'  → เพดานความยาวคำตอบ (งานที่ต้องส่งตัวบททั้งฉบับกลับมา ต้องขอเพิ่มจากค่าปกติ)
+ *   'timeout'     → เวลารอคำตอบเป็นวินาที (คำตอบยาวใช้เวลาพิมพ์นานกว่าปกติ)
+ * คืนค่า ['ok' => bool, 'text' => string, 'error' => string, 'finish' => string]
  */
-function ai_call_model(array $s, $systemPrompt, $userPrompt) {
+function ai_call_model(array $s, $systemPrompt, $userPrompt, array $opts = []) {
+    $temp   = isset($opts['temperature']) ? (float)$opts['temperature'] : 0.4;
+    $maxTok = isset($opts['max_tokens'])  ? max(1024, (int)$opts['max_tokens']) : 8192;
+    // คำตอบยิ่งยาว ยิ่งใช้เวลาพิมพ์นาน งานที่ขอคำตอบยาวจึงต้องขอเวลารอเพิ่มด้วย
+    $timeout = isset($opts['timeout']) ? max(30, min(300, (int)$opts['timeout'])) : 90;
     if (!$s['configured']) {
         return ['ok' => false, 'text' => '', 'finish' => '',
                 'error' => 'ยังไม่ได้ตั้งค่าระบบตรวจอัตโนมัติ (ขาด API key หรือชื่อโมเดล) กรุณาตั้งค่าในหน้า "ระบบตรวจอัตโนมัติ"'];
@@ -1472,15 +1480,15 @@ function ai_call_model(array $s, $systemPrompt, $userPrompt) {
             'system_instruction' => ['parts' => [['text' => $systemPrompt]]],
             'contents'           => [['role' => 'user', 'parts' => [['text' => $userPrompt]]]],
             'generationConfig'   => [
-                'temperature'      => 0.4,
+                'temperature'      => $temp,
                 'responseMimeType' => 'application/json',
                 // เดิมตั้งไว้ 4096 ซึ่งน้อยเกินไป: คำตอบเป็นภาษาไทย (กินโทเคนมากกว่าอังกฤษหลายเท่า)
                 // และโมเดลรุ่นใหม่ยังใช้โทเคนส่วนหนึ่งไป "คิด" ก่อนตอบ พอโควตาหมดกลางคัน
                 // JSON จะถูกตัดครึ่งแล้วอ่านไม่ออก ("รูปแบบไม่ใช่ JSON")
-                'maxOutputTokens'  => 32768,
+                'maxOutputTokens'  => max(32768, $maxTok),
             ],
         ];
-        $res = ai_http_post_json($url, ['x-goog-api-key: ' . $s['api_key']], $payload);
+        $res = ai_http_post_json($url, ['x-goog-api-key: ' . $s['api_key']], $payload, $timeout);
         if ($res['error'] !== '') return ['ok' => false, 'text' => '', 'error' => $res['error']];
         if (!$res['ok'])          return ['ok' => false, 'text' => '', 'error' => ai_extract_api_error($res['body'], $res['status'])];
 
@@ -1512,16 +1520,19 @@ function ai_call_model(array $s, $systemPrompt, $userPrompt) {
             ['role' => 'system', 'content' => $systemPrompt],
             ['role' => 'user',   'content' => $userPrompt],
         ],
-        'temperature' => 0.4,
-        'max_tokens'  => 8192,
+        'temperature' => $temp,
+        'max_tokens'  => $maxTok,
     ];
 
     // ลองใช้โหมดบังคับ JSON ก่อน ถ้าโมเดลไม่รองรับค่อยยิงซ้ำแบบธรรมดา
-    $res = ai_http_post_json($url, $head, array_merge($base, ['response_format' => ['type' => 'json_object']]));
-    if ($res['error'] !== '') return ['ok' => false, 'text' => '', 'error' => $res['error']];
-    if (!$res['ok'] && $res['status'] === 400) {
-        $res = ai_http_post_json($url, $head, $base);
+    // และถ้าขอเพดานโทเคนสูงกว่าค่าปกติแล้วผู้ให้บริการไม่รับ ค่อยลดลงมาเป็นค่าปกติในรอบสุดท้าย
+    $attempts = [array_merge($base, ['response_format' => ['type' => 'json_object']]), $base];
+    if ($maxTok > 8192) $attempts[] = array_merge($base, ['max_tokens' => 8192]);
+    $res = ['ok' => false, 'status' => 0, 'body' => '', 'error' => ''];
+    foreach ($attempts as $payload) {
+        $res = ai_http_post_json($url, $head, $payload, $timeout);
         if ($res['error'] !== '') return ['ok' => false, 'text' => '', 'error' => $res['error']];
+        if ($res['ok'] || $res['status'] !== 400) break;
     }
     if (!$res['ok']) return ['ok' => false, 'text' => '', 'error' => ai_extract_api_error($res['body'], $res['status'])];
 
@@ -1532,8 +1543,13 @@ function ai_call_model(array $s, $systemPrompt, $userPrompt) {
     return ['ok' => true, 'text' => $text, 'error' => '', 'finish' => $reason];
 }
 
-/** ดึงก้อน JSON ออกจากข้อความที่ระบบตอบ (เผื่อมี ``` หรือคำอธิบายห่อไว้) */
-function ai_extract_json($text) {
+/**
+ * ดึงก้อน JSON ออกจากข้อความที่ระบบตอบ (เผื่อมี ``` หรือคำอธิบายห่อไว้)
+ * $salvaged จะถูกตั้งเป็น true เมื่ออ่านได้จากการ "กู้ก้อนที่ขาดกลางคัน" เท่านั้น
+ * ผู้เรียกที่ต้องการข้อความครบถ้วน (เช่นระบบจัดวรรค) ควรเช็กค่านี้ก่อนเชื่อผลลัพธ์
+ */
+function ai_extract_json($text, &$salvaged = null) {
+    $salvaged = false;
     $t = trim((string)$text);
     $t = preg_replace('/^```(?:json)?\s*/i', '', $t);
     $t = preg_replace('/\s*```$/', '', $t);
@@ -1547,7 +1563,9 @@ function ai_extract_json($text) {
         if (is_array($obj)) return $obj;
     }
     // ทางสุดท้าย: คำตอบอาจถูกตัดกลางคันเพราะชนเพดานโทเคน — ลองกู้เท่าที่มี
-    return ai_salvage_json($t);
+    $obj = ai_salvage_json($t);
+    if (is_array($obj)) $salvaged = true;
+    return $obj;
 }
 
 /**
@@ -2749,9 +2767,13 @@ function ai_feedback_row_to_array(array $row, ?array $evalManual = null, ?array 
  *   ระบบนี้จึงสร้าง "ฉบับจัดวรรคแล้ว" เก็บแยกไว้ต่างหาก
  *
  * กติกาสำคัญ (บังคับด้วยโค้ด ไม่ได้เชื่อคำสัญญาของโมเดล)
- *   1. ฉบับจัดวรรคแล้วต้องมีตัวอักษรทุกตัว "เหมือนต้นฉบับเป๊ะ" เมื่อลบช่องว่างออกทั้งหมด
- *      ถ้าต่างแม้ตัวเดียว = โมเดลไปแก้ถ้อยคำของนักเรียน ระบบจะไม่บันทึกและแจ้งว่าตรวจไม่สำเร็จ
- *   2. จำนวนย่อหน้าของเนื้อเรื่องต้องเท่าเดิม เพราะจำนวนย่อหน้าเป็นข้อมูลของงานวิจัย
+ *   1. ฉบับจัดวรรคแล้วถูก "ประกอบขึ้นใหม่จากตัวอักษรของนักเรียนเท่านั้น" (ai_norm_align)
+ *      สิ่งที่หยิบมาจากคำตอบของโมเดลมีอย่างเดียวคือ "ตำแหน่งช่องว่าง" ที่พิสูจน์ได้ว่าตรงกัน
+ *      ถ้าโมเดลเผลอแก้คำ ระบบจะเขียนช่วงนั้นกลับเป็นของเดิมแล้วนับไว้เป็นจุดที่ต้องซ่อม
+ *      และถ้าคำตอบเพี้ยนจากต้นฉบับเกิน 10% ของส่วนใดส่วนหนึ่ง จะไม่บันทึกและแจ้งว่าไม่สำเร็จ
+ *      ท้ายสุดยังตรวจซ้ำอีกชั้นว่าลบช่องว่างออกแล้วได้ตัวอักษรเหมือนต้นฉบับเป๊ะ
+ *   2. จำนวนย่อหน้าของเนื้อเรื่องเท่าเดิมเสมอ เพราะผลลัพธ์ประกอบจากย่อหน้าของนักเรียนทีละย่อหน้า
+ *      (จำนวนย่อหน้าเป็นข้อมูลของงานวิจัย โมเดลจึงรวม/แยกย่อหน้าเองไม่ได้)
  *   3. ฉบับนี้ "ไม่แสดงให้ใครเห็นแทนต้นฉบับ" — นักเรียน/ครูยังเห็นงานเขียนจริงเสมอ
  *      ใช้เฉพาะเป็นตัวบทตั้งต้นของการวิเคราะห์ในบทที่ 4-5 เท่านั้น
  * ========================================================================= */
@@ -2830,14 +2852,175 @@ function ai_build_norm_prompt($topic, $phase, $intro, array $bodyArr, $conclusio
     return $p;
 }
 
+/** ตัดข้อความเป็นตัวอักษรทีละตัว (รองรับภาษาไทยแบบ UTF-8) */
+function ai_norm_chars($text) {
+    $a = preg_split('//u', (string)$text, -1, PREG_SPLIT_NO_EMPTY);
+    return is_array($a) ? $a : [];
+}
+
+/** ตัวอักษรนี้เป็นช่องว่างหรือไม่ (รวมช่องว่างล่องหนที่มักติดมากับการคัดลอกจากเว็บ) */
+function ai_norm_is_space($ch) {
+    return preg_match('/^[\s\x{00A0}\x{200B}\x{200C}\x{200D}\x{FEFF}]$/u', (string)$ch) === 1;
+}
+
+/** สระบน-ล่างและวรรณยุกต์ ห้ามมีช่องว่างมาคั่นหน้า ไม่เช่นนั้นคำจะแตกกลางคำ */
+function ai_norm_is_combining($ch) {
+    return preg_match('/^[\x{0E31}\x{0E33}-\x{0E3A}\x{0E47}-\x{0E4E}]$/u', (string)$ch) === 1;
+}
+
+/** สระหน้า (เ แ โ ใ ไ) ห้ามมีช่องว่างตามหลัง เพราะต้องเกาะกับพยัญชนะตัวถัดไป */
+function ai_norm_is_lead_vowel($ch) {
+    return preg_match('/^[\x{0E40}-\x{0E44}]$/u', (string)$ch) === 1;
+}
+
 /**
- * อ่านคำตอบของระบบจัดวรรค พร้อม "ตรวจสอบว่าถ้อยคำไม่ถูกแก้" ทีละส่วน
- * คืนค่า ['ok'=>bool, 'error'=>string, 'data'=>['intro','body','conclusion','notes','space_edits']]
+ * แปลงข้อความที่ระบบส่งกลับให้เป็น "สายตัวอักษรล้วน" พร้อมบันทึกว่าตัวไหนมีช่องว่างนำหน้า
+ * แยกช่องว่างออกจากตัวอักษรแบบนี้ ทำให้เทียบกับต้นฉบับได้ทีละตัวโดยไม่ต้องกังวลเรื่องช่องว่าง
  */
-function ai_parse_norm($rawText, $intro, array $bodyArr, $conclusion) {
-    $obj = ai_extract_json($rawText);
+function ai_norm_stream($text) {
+    $chars = []; $space = []; $pending = false;
+    foreach (ai_norm_chars($text) as $ch) {
+        if (ai_norm_is_space($ch)) { $pending = true; continue; }
+        $chars[] = $ch; $space[] = $pending; $pending = false;
+    }
+    return ['c' => $chars, 's' => $space, 'n' => count($chars)];
+}
+
+/**
+ * หาจุดที่ข้อความสองสายกลับมาตรงกันอีกครั้ง หลังจากเจอตำแหน่งที่ไม่ตรงกัน
+ * คืน [ข้ามต้นฉบับกี่ตัว, ข้ามฉบับที่ระบบส่งกลับกี่ตัว] หรือ null ถ้าหาไม่เจอในระยะที่กำหนด
+ */
+function ai_norm_find_sync(array $oc, $i, array $mc, $j, $window = 160, $need = 5) {
+    $n = count($oc); $m = count($mc);
+    for ($d = 1; $d <= $window; $d++) {
+        for ($di = 0; $di <= $d; $di++) {
+            $dj = $d - $di;
+            $ii = $i + $di; $jj = $j + $dj;
+            if ($ii >= $n || $jj >= $m) continue;
+            $k = 0;
+            while ($k < $need && $ii + $k < $n && $jj + $k < $m && $oc[$ii + $k] === $mc[$jj + $k]) $k++;
+            // ตรงกันยาวพอ หรือ ตรงกันจนหมดต้นฉบับพอดี = ถือว่ากลับมาตรงกันแล้ว
+            if ($k >= $need || ($k > 0 && $ii + $k >= $n)) return [$di, $dj];
+        }
+    }
+    return null;
+}
+
+/**
+ * ตำแหน่ง "ห้ามเว้นวรรค" ของข้อความ (นับเป็นลำดับตัวอักษร) — กันโมเดลเว้นวรรคกลางคำ
+ * -------------------------------------------------------------------------
+ * ใช้ตัวตัดคำแบบพจนานุกรมของ ICU หาขอบเขตคำ แล้วทำเครื่องหมายห้ามเฉพาะ "กลางคำที่มีในพจนานุกรม"
+ * เท่านั้น ตั้งใจให้เข้มแค่นี้เพราะงานเขียนนักเรียนมีคำสะกดผิดเยอะ ตัวตัดคำจะมั่วในช่วงนั้น
+ * ถ้าไปเชื่อขอบเขตของ ICU ทั้งหมด จะกลายเป็นตัดช่องว่างดี ๆ ที่ระบบจัดมาให้ทิ้งไปด้วย
+ * เซิร์ฟเวอร์ที่ไม่มี extension intl หรือไม่มีไฟล์พจนานุกรม จะคืน null = ไม่ตรวจข้อนี้
+ */
+function ai_norm_word_guard(array $chars) {
+    if (!class_exists('IntlBreakIterator') || !function_exists('load_thai_dictionary')) return null;
+    $dict = load_thai_dictionary();
+    if (!$dict) return null;
+    $text = implode('', $chars);
+    if ($text === '') return null;
+
+    try {
+        $it = IntlBreakIterator::createWordInstance('th');
+        $it->setText($text);
+        $inside = [];
+        $prevByte = 0; $prevChar = 0;
+        for ($pos = $it->first(); $pos !== IntlBreakIterator::DONE; $pos = $it->next()) {
+            if ($pos <= $prevByte) continue;
+            $chunk    = substr($text, $prevByte, $pos - $prevByte);
+            $len      = mb_strlen($chunk, 'UTF-8');
+            if ($len > 1 && is_known_thai_word($chunk, $dict)) {
+                for ($k = 1; $k < $len; $k++) $inside[$prevChar + $k] = true;
+            }
+            $prevByte = $pos; $prevChar += $len;
+        }
+        return $inside;
+    } catch (\Throwable $e) {
+        return null;
+    }
+}
+
+/**
+ * ประกอบ "ฉบับจัดวรรคแล้ว" ของข้อความหนึ่งส่วน โดยยึดตัวอักษรของนักเรียนเป็นหลัก
+ * -------------------------------------------------------------------------
+ * หัวใจของวิธีนี้: ผลลัพธ์ถูกเขียนขึ้นจากตัวอักษรในต้นฉบับเท่านั้น เอาจากฉบับที่ระบบส่งกลับ
+ * เฉพาะ "ตำแหน่งช่องว่าง" ที่พิสูจน์ได้ว่าตรงกับต้นฉบับจริง ๆ ถ้อยคำของนักเรียนจึงเปลี่ยนไม่ได้
+ * แม้โมเดลจะเผลอแก้คำ (เช่น แก้ตัวสะกด สลับลำดับวรรณยุกต์ เปลี่ยนเลขไทยเป็นเลขอารบิก
+ * หรือเปลี่ยนอัญประกาศโค้งเป็นตรง) ระบบจะเขียนช่วงนั้นกลับด้วยของเดิมแล้วเดินต่อ
+ * แทนที่จะทิ้งงานทั้งฉบับเหมือนเดิม
+ *
+ * คืนค่า ['text','total','matched','extra','j','sample']
+ *   matched = จำนวนตัวอักษรที่ตรงกับฉบับที่ระบบส่งกลับ (ใช้วัดว่าเชื่อการเว้นวรรคได้แค่ไหน)
+ *   extra   = ตัวอักษรแปลกปลอมที่ระบบเติมเข้ามาแล้วถูกตัดทิ้ง
+ *   j       = ตำแหน่งที่อ่านสายของระบบไปถึง (ส่งต่อให้ส่วนถัดไปอ่านต่อ)
+ */
+function ai_norm_align($original, array $stream, $j = 0) {
+    $oc = [];
+    foreach (ai_norm_chars($original) as $ch) {
+        if (!ai_norm_is_space($ch)) $oc[] = $ch;
+    }
+    $n  = count($oc);
+    $mc = $stream['c']; $sp = $stream['s']; $m = $stream['n'];
+    $noBreak = ai_norm_word_guard($oc);    // null = เซิร์ฟเวอร์ไม่มีตัวตัดคำ ก็ไม่ตรวจข้อนี้
+
+    $out = ''; $prev = ''; $i = 0; $matched = 0; $extra = 0;
+    $pendingSpace = false; $sample = null;
+
+    while ($i < $n) {
+        if ($j < $m && $mc[$j] === $oc[$i]) {
+            // ยอมรับช่องว่างเฉพาะจุดที่ปลอดภัย: ไม่ใช่หัวข้อความ ไม่คั่นสระ/วรรณยุกต์ออกจากพยัญชนะ
+            // และต้องเป็นขอบเขตคำจริงตามพจนานุกรม (กันโมเดลเว้นวรรคกลางคำ เช่น "ประ โย ชน์")
+            $wantSpace = ($pendingSpace || $sp[$j]);
+            if ($wantSpace && $out !== ''
+                && !ai_norm_is_combining($oc[$i]) && !ai_norm_is_lead_vowel($prev)
+                && !($noBreak !== null && isset($noBreak[$i]))) {
+                $out .= ' ';
+            }
+            $out .= $oc[$i]; $prev = $oc[$i];
+            $matched++; $i++; $j++; $pendingSpace = false;
+            continue;
+        }
+
+        // ไม่ตรงกัน — เก็บตัวอย่างจุดแรกไว้อธิบายให้ครูเห็นว่าต่างตรงไหน
+        if ($sample === null) {
+            $sample = [
+                'source' => implode('', array_slice($oc, max(0, $i - 6), 18)),
+                'model'  => ($j < $m) ? implode('', array_slice($mc, max(0, $j - 6), 18)) : '',
+            ];
+        }
+        $sync = ($j < $m) ? ai_norm_find_sync($oc, $i, $mc, $j, 160, 5) : null;
+        if ($sync === null) {
+            // หาทางกลับมาตรงกันไม่ได้แล้ว — ที่เหลือใช้ต้นฉบับล้วน ไม่เติมช่องว่างเดาเอง
+            for (; $i < $n; $i++) { $out .= $oc[$i]; }
+            break;
+        }
+        list($di, $dj) = $sync;
+        // ช่วงที่ระบบทำเพี้ยน เขียนกลับด้วยตัวอักษรของนักเรียนตามเดิม (ไม่แตะช่องว่างในช่วงนี้)
+        for ($k = 0; $k < $di; $k++) { $out .= $oc[$i + $k]; $prev = $oc[$i + $k]; }
+        $i += $di; $j += $dj; $extra += $dj; $pendingSpace = false;
+    }
+
+    return ['text' => trim($out), 'total' => $n, 'matched' => $matched,
+            'extra' => $extra, 'j' => $j, 'sample' => $sample];
+}
+
+/**
+ * อ่านคำตอบของระบบจัดวรรค แล้วประกอบผลลัพธ์ทีละส่วนโดยยึดต้นฉบับของนักเรียนเป็นหลัก
+ * $finish คือเหตุผลที่โมเดลหยุดพิมพ์ (ใช้แยกว่า "คำตอบขาดกลางคัน" ออกจาก "แก้ถ้อยคำจริง")
+ * คืนค่า ['ok'=>bool, 'error'=>string, 'data'=>[...]]
+ */
+function ai_parse_norm($rawText, $intro, array $bodyArr, $conclusion, $finish = '') {
+    $salvaged = false;
+    $obj = ai_extract_json($rawText, $salvaged);
+    $cut = $salvaged || in_array(strtolower((string)$finish), ['length', 'max_tokens', 'maxtokens'], true);
+    $cutHint = 'ตัวบทของฉบับนี้ยาว คำตอบจึงถูกตัดกลางคันเพราะชนเพดานความยาวของโมเดล — '
+             . 'ลองสั่งใหม่อีกครั้ง หรือเปลี่ยนไปใช้โมเดลที่ตอบได้ยาวกว่านี้ในหน้าตั้งค่า';
+
     if (!is_array($obj)) {
-        return ['ok' => false, 'error' => 'ระบบตอบกลับมาในรูปแบบที่ไม่ใช่ JSON จึงอ่านผลไม่ได้', 'data' => []];
+        return ['ok' => false, 'data' => [],
+                'error' => $cut ? ('ระบบตอบกลับมาไม่ครบ — ' . $cutHint)
+                                : 'ระบบตอบกลับมาในรูปแบบที่ไม่ใช่ JSON จึงอ่านผลไม่ได้'];
     }
 
     $newIntro = ai_norm_tidy($obj['intro'] ?? '');
@@ -2845,22 +3028,69 @@ function ai_parse_norm($rawText, $intro, array $bodyArr, $conclusion) {
     $newBody  = (isset($obj['body']) && is_array($obj['body'])) ? array_values($obj['body']) : [];
     $newBody  = array_map('ai_norm_tidy', array_map('strval', $newBody));
 
-    if (count($newBody) !== count($bodyArr)) {
+    // รวมทุกส่วนที่ระบบส่งกลับเป็นสายเดียวตามลำดับของเรียงความ แล้วค่อยอ่านทีละส่วน
+    // ทำแบบนี้เพื่อให้ยังใช้ได้แม้โมเดลเผลอรวมหรือแยกย่อหน้า (จำนวนย่อหน้าของผลลัพธ์
+    // ยึดตามต้นฉบับเสมอ เพราะประกอบขึ้นจากย่อหน้าของนักเรียนทีละย่อหน้า)
+    $stream = ai_norm_stream($newIntro . ' ' . implode(' ', $newBody) . ' ' . $newConcl);
+    if ($stream['n'] === 0) {
         return ['ok' => false, 'data' => [],
-                'error' => 'ระบบส่งย่อหน้าเนื้อเรื่องกลับมา ' . count($newBody) . ' ย่อหน้า '
-                         . 'แต่ต้นฉบับมี ' . count($bodyArr) . ' ย่อหน้า — จำนวนย่อหน้าต้องเท่าเดิม'];
+                'error' => $cut ? ('ระบบตอบกลับมาไม่ครบ — ' . $cutHint)
+                                : 'ระบบไม่ได้ส่งข้อความที่จัดวรรคแล้วกลับมา — กดสั่งใหม่อีกครั้งได้'];
     }
 
-    // ตรวจทีละส่วน: ลบช่องว่างออกแล้วต้องได้ตัวอักษรเหมือนต้นฉบับเป๊ะ
-    $checks = [['คำนำ', $intro, $newIntro], ['สรุป', $conclusion, $newConcl]];
+    $parts = [['คำนำ', (string)$intro]];
     foreach ($bodyArr as $i => $para) {
-        $checks[] = ['เนื้อเรื่องย่อหน้าที่ ' . ($i + 1), $para, $newBody[$i]];
+        $parts[] = ['เนื้อเรื่องย่อหน้าที่ ' . ($i + 1), (string)$para];
+    }
+    $parts[] = ['สรุป', (string)$conclusion];
+
+    $j = 0; $built = []; $repairs = 0; $totalChars = 0;
+    foreach ($parts as $idx => $part) {
+        $r = ai_norm_align($part[1], $stream, $j);
+        $j = $r['j'];
+        $built[$idx] = $r['text'];
+        $totalChars += $r['total'];
+        $repairs    += ($r['total'] - $r['matched']);
+
+        // ส่วนไหนที่ระบบส่งกลับมาไม่ตรงกับต้นฉบับมากเกินไป = เชื่อการเว้นวรรคของฉบับนี้ไม่ได้
+        $cover = ($r['total'] > 0) ? ($r['matched'] / $r['total']) : 1.0;
+        if ($cover < 0.90) {
+            $pct = (int)round($cover * 100);
+            if ($cut) {
+                $why = 'ระบบส่งฉบับจัดวรรคกลับมาไม่ครบ (ส่วน "' . $part[0] . '" ตรงกับต้นฉบับเพียง '
+                     . $pct . '%) — ' . $cutHint;
+            } elseif ($r['matched'] === 0) {
+                $why = 'ระบบไม่ได้ส่งข้อความส่วน "' . $part[0] . '" กลับมา หรือส่งกลับมาเป็นคนละข้อความ '
+                     . 'จึงไม่บันทึกผล (ต้นฉบับของนักเรียนไม่ถูกแตะต้อง) — กดสั่งใหม่อีกครั้งได้';
+            } else {
+                $why = 'ระบบแก้ถ้อยคำใน "' . $part[0] . '" เกินกว่าการเว้นวรรค '
+                     . '(ตรงกับต้นฉบับ ' . $pct . '%) จึงไม่บันทึกผล '
+                     . '(ต้นฉบับของนักเรียนไม่ถูกแตะต้อง) — กดสั่งใหม่อีกครั้งได้';
+            }
+            if (!empty($r['sample']['source'])) {
+                $why .= ' · จุดแรกที่ต่าง: ต้นฉบับ "…' . $r['sample']['source'] . '…"'
+                      . ' แต่ระบบส่งกลับ "…' . $r['sample']['model'] . '…"';
+            }
+            return ['ok' => false, 'data' => [], 'error' => $why];
+        }
+    }
+
+    $outIntro = $built[0];
+    $outConcl = $built[count($parts) - 1];
+    $outBody  = [];
+    for ($k = 1; $k <= count($bodyArr); $k++) { $outBody[] = $built[$k]; }
+
+    // ด่านสุดท้าย: ลบช่องว่างออกแล้วต้องได้ตัวอักษรเหมือนต้นฉบับเป๊ะทุกส่วน
+    // (โดยวิธีประกอบข้างต้นต้องเป็นจริงเสมอ ด่านนี้ไว้กันความผิดพลาดของโค้ดเอง)
+    $checks = [['คำนำ', $intro, $outIntro], ['สรุป', $conclusion, $outConcl]];
+    foreach ($bodyArr as $i => $para) {
+        $checks[] = ['เนื้อเรื่องย่อหน้าที่ ' . ($i + 1), $para, $outBody[$i]];
     }
     foreach ($checks as $c) {
         if (ai_norm_signature($c[1]) !== ai_norm_signature($c[2])) {
             return ['ok' => false, 'data' => [],
-                    'error' => 'ระบบแก้ถ้อยคำใน "' . $c[0] . '" เกินกว่าการเว้นวรรค '
-                             . 'จึงไม่บันทึกผล (ต้นฉบับของนักเรียนไม่ถูกแตะต้อง) — กดสั่งใหม่อีกครั้งได้'];
+                    'error' => 'ระบบตรวจสอบภายในไม่ผ่านที่ส่วน "' . $c[0] . '" จึงไม่บันทึกผล '
+                             . '(ต้นฉบับของนักเรียนไม่ถูกแตะต้อง) — กดสั่งใหม่อีกครั้งได้'];
         }
     }
 
@@ -2871,20 +3101,25 @@ function ai_parse_norm($rawText, $intro, array $bodyArr, $conclusion) {
             if ($n !== '') $notes[] = $n;
         }
     }
+    if ($repairs > 0) {
+        $notes[] = 'ระบบเผลอเปลี่ยนถ้อยคำ ' . $repairs . ' ตัวอักษร '
+                 . 'ระบบเขียนกลับเป็นของนักเรียนตามเดิมแล้ว (ปรับเฉพาะช่องว่างเท่านั้น)';
+    }
 
     // จำนวนจุดเว้นวรรคที่ต่างจากต้นฉบับ — ใช้เป็นตัวชี้ว่าฉบับนี้เว้นวรรคคลาดเคลื่อนมากน้อยแค่ไหน
     $before = ai_norm_space_count($intro) + ai_norm_space_count($conclusion);
-    $after  = ai_norm_space_count($newIntro) + ai_norm_space_count($newConcl);
+    $after  = ai_norm_space_count($outIntro) + ai_norm_space_count($outConcl);
     foreach ($bodyArr as $i => $para) {
         $before += ai_norm_space_count($para);
-        $after  += ai_norm_space_count($newBody[$i]);
+        $after  += ai_norm_space_count($outBody[$i]);
     }
 
     return ['ok' => true, 'error' => '', 'data' => [
-        'intro'       => $newIntro,
-        'body'        => $newBody,
-        'conclusion'  => $newConcl,
+        'intro'       => $outIntro,
+        'body'        => $outBody,
+        'conclusion'  => $outConcl,
         'notes'       => $notes,
+        'repairs'     => $repairs,
         'space_before'=> $before,
         'space_after' => $after,
         'space_edits' => abs($after - $before),

@@ -3178,7 +3178,8 @@ async function startNormalizeAll() {
   if (!confirm(`ให้ระบบจัดเว้นวรรค/แบ่งประโยค ${queue.length} ฉบับ ใช่ไหม?\n\n`
       + `• ครอบคลุมรอบ: ${AI_NORM_PHASES.map(p => AI_PHASE_LABELS[p] || p).join(' · ')}\n`
       + `• ฉบับที่จัดแล้วใช้เพื่อการวิเคราะห์ในบทที่ 4-5 เท่านั้น ไม่แสดงแทนต้นฉบับของนักเรียน\n`
-      + `• ระบบเปลี่ยนได้เฉพาะช่องว่าง ถ้าถ้อยคำถูกแก้ ระบบจะไม่บันทึกและรายงานว่าไม่สำเร็จ\n`
+      + `• ผลลัพธ์ประกอบขึ้นจากตัวอักษรของนักเรียนเอง หยิบจากระบบมาเฉพาะตำแหน่งช่องว่าง\n`
+      + `  ถ้าระบบเผลอแก้ถ้อยคำ จะถูกเขียนกลับเป็นของเดิม และถ้าเพี้ยนมากจะไม่บันทึกทั้งฉบับ\n`
       + (redoAll ? `• จัดใหม่ทุกฉบับ รวมฉบับที่เคยจัดไว้แล้ว\n` : '')
       + (quota !== null && quota < queue.length
           ? `• โควตาวันนี้เหลือ ${quota} ครั้ง ไม่พอครบทุกฉบับ ระบบจะทำเท่าที่เหลือแล้วหยุด\n` : '')
@@ -3217,7 +3218,8 @@ async function startNormalizeAll() {
           ok++;
           t.space_edits = data.space_edits || 0;
           normLogLine('bi-check-circle-fill', 'text-success', who,
-            `ปรับจุดเว้นวรรค ${data.space_before} → ${data.space_after} จุด`);
+            `ปรับจุดเว้นวรรค ${data.space_before} → ${data.space_after} จุด`
+            + (data.repairs ? ` · ระบบเผลอเปลี่ยนถ้อยคำ ${data.repairs} ตัวอักษร เขียนกลับเป็นของนักเรียนแล้ว` : ''));
         }
         if (typeof data.quota_left === 'number' && aiStatus) {
           aiStatus.quota_left = data.quota_left;
