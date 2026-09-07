@@ -102,14 +102,14 @@ require_once 'header.php';
               <div class="card border-0 rounded-3 p-3 bg-white shadow-sm border-start border-3 border-primary h-100">
                 <h6 class="fw-bold text-dark mb-3"><i class="bi bi-info-circle-fill text-primary"></i> การตีความความสอดคล้องผู้ตรวจ (Koo &amp; Li, 2016)</h6>
                 <p class="small text-muted mb-3" style="line-height: 1.6;">
-                  คำนวณค่าสัมประสิทธิ์สหสัมพันธ์ภายในชั้น (Intraclass Correlation Coefficient — ICC) ของคะแนนที่ให้โดยผู้ตรวจ 3 คน คือ <strong>ครูผู้สอน + ผู้เชี่ยวชาญ 2 ท่าน</strong> สำหรับงานของนักเรียน<strong>ห้อง 606 (กลุ่มทดลอง)</strong> เพื่อตรวจสอบความสอดคล้องระหว่างผู้ตรวจ (Inter-rater Reliability) — ใช้โมเดล ICC(3,1) two-way mixed effects, absolute agreement
+                  ตรวจสอบความเชื่อมั่นระหว่างผู้ประเมินโดยใช้ Intraclass Correlation Coefficient (ICC) แบบ two-way mixed-effects, absolute agreement และพิจารณา single measurement เป็นค่าหลัก ตามแนวทางของ Koo and Li (2016) — คำนวณจากคะแนนที่ให้โดยผู้ประเมิน 3 คน คือ <strong>ผู้วิจัย + ครูผู้เชี่ยวชาญ 2 ท่าน</strong> สำหรับงานของนักเรียน<strong>ห้อง 606 (กลุ่มทดลอง)</strong> — ใช้โมเดล <strong>ICC(A,1)</strong> เป็นค่าหลัก และคำนวณ Average Measures ICC ประกอบไว้ด้วย
                 </p>
                 <div class="d-flex flex-column gap-2 small">
                   <div class="d-flex justify-content-between p-2 rounded bg-success bg-opacity-10 text-success fw-semibold">
-                    <span>ICC &ge; 0.90</span><span>ดีเยี่ยม (Excellent)</span>
+                    <span>ICC &gt; 0.90</span><span>ดีเยี่ยม (Excellent)</span>
                   </div>
                   <div class="d-flex justify-content-between p-2 rounded bg-info bg-opacity-10 text-info fw-semibold">
-                    <span>0.75 &le; ICC &lt; 0.90</span><span>ดี (Good)</span>
+                    <span>0.75 &le; ICC &le; 0.90</span><span>ดี (Good)</span>
                   </div>
                   <div class="d-flex justify-content-between p-2 rounded bg-warning bg-opacity-10 text-warning-emphasis fw-semibold">
                     <span>0.50 &le; ICC &lt; 0.75</span><span>ปานกลาง (Moderate)</span>
@@ -119,9 +119,12 @@ require_once 'header.php';
                   </div>
                 </div>
                 <div class="border-top pt-3 mt-3">
-                  <div class="text-secondary small fw-bold">ICC ภาพรวม (คะแนนรวม)</div>
+                  <div class="text-secondary small fw-bold">ค่าความเชื่อมั่นของผู้ประเมินรายบุคคล (Single-measure ICC) — คะแนนรวม</div>
                   <h2 class="fw-bold text-primary font-outfit mt-1" id="overallPearsonResult">-</h2>
                   <span id="overallPearsonInterpretation" class="badge bg-secondary">ไม่มีข้อมูล</span>
+                  <div class="small text-muted mt-2" id="overallIccCI">95% CI: -</div>
+                  <div class="small text-muted" id="overallIccP">p: -</div>
+                  <div class="small text-muted border-top pt-2 mt-2" id="overallIccAverage">Average-measure ICC (ค่าเฉลี่ยผู้ประเมิน 3 คน, ข้อมูลประกอบ): -</div>
                 </div>
               </div>
             </div>
@@ -132,17 +135,23 @@ require_once 'header.php';
                   <table class="table table-sm table-hover align-middle mb-0 small">
                     <thead class="table-light text-secondary">
                       <tr>
-                        <th class="text-nowrap">มิติคะแนน</th>
-                        <th class="text-center text-nowrap">จำนวน (N)</th>
-                        <th class="text-center text-nowrap">ค่า ICC</th>
-                        <th class="text-end text-nowrap">ผลประเมิน</th>
+                        <th class="text-nowrap">รอบ/ภาระงาน</th>
+                        <th class="text-center text-nowrap">ผู้ประเมิน</th>
+                        <th class="text-center text-nowrap">n</th>
+                        <th class="text-center text-nowrap">Single-measure ICC</th>
+                        <th class="text-center text-nowrap">95% CI</th>
+                        <th class="text-center text-nowrap text-muted">Average-measure ICC</th>
+                        <th class="text-center text-nowrap">p</th>
+                        <th class="text-end text-nowrap">แปลผล</th>
                       </tr>
                     </thead>
                     <tbody id="reliabilityTableBody">
-                      <tr><td colspan="4" class="text-center py-4 text-muted">กรุณารอประมวลผลข้อมูล...</td></tr>
+                      <tr><td colspan="8" class="text-center py-4 text-muted">กรุณารอประมวลผลข้อมูล...</td></tr>
                     </tbody>
                   </table>
                 </div>
+                <div class="text-muted mt-2" style="font-size:.72rem;">Model: Two-way mixed-effects | Definition: Absolute agreement | Type: Single measurement</div>
+                <div class="small text-muted mt-1" id="iccMissingDataWarning"></div>
               </div>
             </div>
           </div>
@@ -605,12 +614,14 @@ require_once 'header.php';
       const m = triples.map(tr => tr.evals.map(getter));
       const det = (triples.length >= 2) ? computeICC(m) : null;
       const icc = det ? det.icc : null;
-      return { icc, interp: getICCInterpretation(icc) };
+      const ciText = (det && det.ciLower !== null && det.ciUpper !== null) ? `[${fmtAPA(det.ciLower)}, ${fmtAPA(det.ciUpper)}]` : 'N/A';
+      const pText = (det && det.pValue !== null) ? (det.pValue < 0.001 ? '< .001' : fmtAPA(det.pValue)) : 'N/A';
+      return { icc, iccAvg: det ? det.iccAvg : null, ciText, pText, interp: getICCInterpretation(icc) };
     };
-    // ตาราง ICC ด้านหลัก
-    const iccMainRows = DIM_MAIN.map(d => { const r = iccOf(d.get); return [d.name, triples.length, f4(r.icc), r.interp.text]; });
+    // ตาราง ICC ด้านหลัก: รอบ/ภาระงาน | ผู้ประเมิน | n | Single-measure ICC | 95% CI | Average-measure ICC | p | แปลผล
+    const iccMainRows = DIM_MAIN.map(d => { const r = iccOf(d.get); return ['ภาระงานหน่วยที่ 1 — ' + d.name, 3, triples.length, fmtAPA(r.icc), r.ciText, fmtAPA(r.iccAvg), r.pText, r.interp.text]; });
     // ตาราง ICC ด้านย่อย 11 ตัวชี้วัด
-    const iccSubRows = SUB_KEYS.map(k => { const r = iccOf(e => Number(e['score_' + k])); return [SUB_NAME[k], triples.length, f4(r.icc), r.interp.text]; });
+    const iccSubRows = SUB_KEYS.map(k => { const r = iccOf(e => Number(e['score_' + k])); return ['ภาระงานหน่วยที่ 1 — ' + SUB_NAME[k], 3, triples.length, fmtAPA(r.icc), r.ciText, fmtAPA(r.iccAvg), r.pText, r.interp.text]; });
     const iccOverall = iccOf(e => Number(e.total_score));
     // ตารางคะแนนผู้ตรวจ 3 คน รายบุคคล (คะแนนรวม + 4 ด้านหลัก ของแต่ละผู้ตรวจ)
     const raterNames = ['ครูผู้สอน', 'ผู้เชี่ยวชาญ 1', 'ผู้เชี่ยวชาญ 2'];
@@ -719,21 +730,21 @@ require_once 'header.php';
       '<li><b>แบบบันทึกการสะท้อนการเรียนรู้</b> (Learning Reflection)</li>' +
       '</ul>');
     P.push('<h2>1.5 การตรวจสอบความเที่ยงของเครื่องมือ</h2>');
-    P.push('<p>งานเขียนของกลุ่มทดลองได้รับการตรวจโดยผู้ประเมิน 3 คน คือ <b>ครูผู้สอนและผู้เชี่ยวชาญ 2 ท่าน</b> เพื่อคำนวณค่าความสอดคล้องระหว่างผู้ตรวจ ด้วยสัมประสิทธิ์สหสัมพันธ์ภายในชั้น ICC(3,1) แบบ two-way mixed effects, absolute agreement ตามแนวทางของ Koo &amp; Li (2016)</p>');
+    P.push('<p>งานเขียนของกลุ่มทดลองได้รับการตรวจโดยผู้ประเมิน 3 คน คือ <b>ผู้วิจัยและครูผู้เชี่ยวชาญ 2 ท่าน</b> เพื่อคำนวณค่าความเชื่อมั่นระหว่างผู้ประเมิน ด้วยสัมประสิทธิ์สหสัมพันธ์ภายในชั้น (ICC) แบบ two-way mixed-effects, absolute agreement และพิจารณา single measurement เป็นค่าหลัก [ICC(A,1)] ตามแนวทางของ Koo &amp; Li (2016) โดยคำนวณ Average Measures ICC ประกอบไว้ด้วย</p>');
 
     // ----- ส่วนที่ 2 : ICC (606, หน่วย 1, ละเอียด) -----
     P.push('<div class="pagebreak"></div>');
-    P.push('<h1 class="secn" id="s2">ส่วนที่ 2 ผลการตรวจสอบความสอดคล้องระหว่างผู้ตรวจ (ICC)</h1>');
-    P.push('<p>คำนวณจากคะแนนของผู้ตรวจ 3 คน (ครูผู้สอน + ผู้เชี่ยวชาญ 2 ท่าน) เฉพาะนักเรียน<b>กลุ่มทดลอง (ห้อง ' + esc(EXPERIMENTAL_CLASSROOM) + ')</b> ในภาระงาน<b>หน่วยที่ 1</b> จำนวนนักเรียนที่ผู้ตรวจครบทั้ง 3 คน = <b>' + triples.length + ' คน</b> · เกณฑ์การแปลผล: ≥0.90 ดีเยี่ยม, 0.75–0.89 ดี, 0.50–0.74 ปานกลาง, &lt;0.50 ต่ำ</p>');
+    P.push('<h1 class="secn" id="s2">ส่วนที่ 2 ผลการตรวจสอบความเชื่อมั่นระหว่างผู้ประเมิน (Inter-rater Reliability — ICC)</h1>');
+    P.push('<p>คำนวณจากคะแนนของผู้ประเมิน 3 คน (ผู้วิจัย + ครูผู้เชี่ยวชาญ 2 ท่าน) เฉพาะนักเรียน<b>กลุ่มทดลอง (ห้อง ' + esc(EXPERIMENTAL_CLASSROOM) + ')</b> ในภาระงาน<b>หน่วยที่ 1</b> จำนวนนักเรียนที่ผู้ประเมินครบทั้ง 3 คน = <b>' + triples.length + ' คน</b> · ค่าหลักคือ Single-measure ICC(A,1) ส่วน Average-measure ICC เป็นข้อมูลประกอบ · เกณฑ์การแปลผล (Koo &amp; Li, 2016): &gt;0.90 ดีเยี่ยม, 0.75–0.90 ดี, 0.50–0.74 ปานกลาง, &lt;0.50 ต่ำ</p>');
     P.push('<h2>2.1 ค่า ICC รายด้านหลัก</h2>');
-    P.push(tbl(['มิติคะแนน', 'N', 'ค่า ICC', 'การแปลผล'], iccMainRows, { numCols: [1, 2] }));
+    P.push(tbl(['รอบ/ภาระงาน', 'ผู้ประเมิน', 'n', 'Single-measure ICC', '95% CI', 'Average-measure ICC', 'p', 'แปลผล'], iccMainRows, { numCols: [1, 2, 3, 4, 5, 6] }));
     P.push('<h2>2.2 ค่า ICC รายตัวชี้วัดย่อย (11 ตัวชี้วัด)</h2>');
-    P.push(tbl(['ตัวชี้วัดย่อย', 'N', 'ค่า ICC', 'การแปลผล'], iccSubRows, { numCols: [1, 2] }));
-    P.push('<h2>2.3 คะแนนของผู้ตรวจทั้ง 3 คน รายบุคคล</h2>');
-    P.push('<p>แสดงคะแนน 4 ด้านและคะแนนรวมที่ผู้ตรวจแต่ละคนให้ (ภาระงานหน่วยที่ 1)</p>');
-    P.push(tbl(['ที่', 'ชื่อ-สกุล', 'ผู้ตรวจ', 'ด้านเนื้อหา', 'ด้านองค์ประกอบ', 'ด้านภาษา', 'ด้านอักขรวิธี', 'คะแนนรวม'], raterRows, { numCols: [0, 3, 4, 5, 6, 7] }));
-    P.push('<p class="analysis"><b>บทวิเคราะห์:</b> ค่า ICC ของคะแนนรวม (ภาระงานหน่วยที่ 1) เท่ากับ ' + f4(iccOverall.icc) + ' (' + iccOverall.interp.text + ') ' +
-      'เมื่อพิจารณารายด้านและรายตัวชี้วัดย่อยพบว่าค่าความสอดคล้องอยู่ในระดับที่ยอมรับได้ตามเกณฑ์ของ Koo &amp; Li (2016) แสดงว่าครูผู้สอนและผู้เชี่ยวชาญให้คะแนนสอดคล้องกัน จึงเป็นหลักฐานยืนยันความเที่ยงของเครื่องมือและกระบวนการประเมิน</p>');
+    P.push(tbl(['รอบ/ภาระงาน', 'ผู้ประเมิน', 'n', 'Single-measure ICC', '95% CI', 'Average-measure ICC', 'p', 'แปลผล'], iccSubRows, { numCols: [1, 2, 3, 4, 5, 6] }));
+    P.push('<h2>2.3 คะแนนของผู้ประเมินทั้ง 3 คน รายบุคคล</h2>');
+    P.push('<p>แสดงคะแนน 4 ด้านและคะแนนรวมที่ผู้ประเมินแต่ละคนให้ (ภาระงานหน่วยที่ 1)</p>');
+    P.push(tbl(['ที่', 'ชื่อ-สกุล', 'ผู้ประเมิน', 'ด้านเนื้อหา', 'ด้านองค์ประกอบ', 'ด้านภาษา', 'ด้านอักขรวิธี', 'คะแนนรวม'], raterRows, { numCols: [0, 3, 4, 5, 6, 7] }));
+    P.push('<p class="analysis"><b>บทวิเคราะห์:</b> ผลการตรวจสอบความเชื่อมั่นระหว่างผู้ประเมินของแบบประเมิน โดยใช้ค่าสัมประสิทธิ์สหสัมพันธ์ภายในชั้น (ICC) แบบ two-way mixed-effects, absolute agreement และ single measurement พบว่า มีค่า ICC ของคะแนนรวม (ภาระงานหน่วยที่ 1) เท่ากับ ' + fmtAPA(iccOverall.icc) + ' ช่วงความเชื่อมั่น 95% ' + iccOverall.ciText + ' แสดงว่าคะแนนจากผู้ประเมินมีความเชื่อมั่นระหว่างผู้ประเมินอยู่ในระดับ' + iccOverall.interp.text.split(' (')[0] + ' ตามเกณฑ์ของ Koo &amp; Li (2016) ' +
+      'เมื่อพิจารณารายด้านและรายตัวชี้วัดย่อยพบว่าค่าความสอดคล้องอยู่ในระดับที่ยอมรับได้เช่นเดียวกัน จึงเป็นหลักฐานยืนยันความเที่ยงของเครื่องมือและกระบวนการประเมิน (Average-measure ICC ของคะแนนรวมเท่ากับ ' + fmtAPA(iccOverall.iccAvg) + ' เป็นข้อมูลประกอบ ไม่ใช่ค่าหลักที่ใช้สรุปผล)</p>');
 
     // ----- ส่วนที่ 3 : เชิงปริมาณ (กลุ่มตัวอย่าง) -----
     P.push('<div class="pagebreak"></div>');
@@ -828,7 +839,7 @@ require_once 'header.php';
       sumQuant += 'พบว่าคะแนนเฉลี่ยหลังเรียน (' + f2(tTeacher.meanPost) + ') สูงกว่าก่อนเรียน (' + f2(tTeacher.meanPre) + ') เฉลี่ย ' + f2(tTeacher.meanDiff) + ' คะแนน และจากการทดสอบ Paired-samples t-test พบว่า t(' + tTeacher.df + ') = ' + f4(tTeacher.t) + ', p ' + (tTeacher.p < 0.001 ? '< 0.001' : '= ' + f4(tTeacher.p)) + ' ' + (sig ? 'ซึ่งมีนัยสำคัญทางสถิติที่ระดับ .05 และมีขนาดอิทธิพลในระดับ' + effectSizeLabel(tTeacher.dz) + ' (Cohen\'s d_z = ' + f2(tTeacher.dz) + ') สะท้อนว่าการจัดการเรียนรู้ช่วยพัฒนาความสามารถในการเขียนเรียงความของผู้เรียนได้จริง' : 'ซึ่งยังไม่ถึงระดับนัยสำคัญ .05 จึงควรเพิ่มขนาดตัวอย่างหรือระยะเวลาการทดลอง');
     }
     P.push('<p>' + esc(sumQuant) + '</p>');
-    P.push('<p>ด้านคุณภาพเครื่องมือ ค่าความสอดคล้องระหว่างผู้ตรวจ (ICC) ของคะแนนรวมในภาระงานหน่วยที่ 1 เท่ากับ ' + f4(iccOverall.icc) + ' (' + iccOverall.interp.text + ') โดยเมื่อพิจารณารายด้านหลักและรายตัวชี้วัดย่อยทั้ง 11 ตัวชี้วัด พบว่าค่าความสอดคล้องอยู่ในเกณฑ์ที่ยอมรับได้ แสดงว่าเกณฑ์การประเมินมีความชัดเจนและผู้ตรวจเข้าใจตรงกัน</p>');
+    P.push('<p>ด้านคุณภาพเครื่องมือ ค่าความเชื่อมั่นระหว่างผู้ประเมิน (Single-measure ICC(A,1)) ของคะแนนรวมในภาระงานหน่วยที่ 1 เท่ากับ ' + fmtAPA(iccOverall.icc) + ' (' + iccOverall.interp.text + ') โดยเมื่อพิจารณารายด้านหลักและรายตัวชี้วัดย่อยทั้ง 11 ตัวชี้วัด พบว่าค่าความเชื่อมั่นอยู่ในเกณฑ์ที่ยอมรับได้ แสดงว่าเกณฑ์การประเมินมีความชัดเจนและผู้ประเมินเข้าใจตรงกัน</p>');
     if (sortedCrit[0] && sortedCrit[0][1] > 0) {
       P.push('<p>ด้านข้อมูลเชิงคุณภาพ ปัญหาการเขียนที่พบบ่อยที่สุดคือ <b>' + esc(criteriaMap[sortedCrit[0][0]].name.split(' (')[0]) + '</b>' + (sortedCrit[1] && sortedCrit[1][1] > 0 ? ' และ <b>' + esc(criteriaMap[sortedCrit[1][0]].name.split(' (')[0]) + '</b>' : '') + ' สอดคล้องกับข้อเสนอแนะจากการประเมินเพื่อนและการสะท้อนคิดของผู้เรียน ที่ชี้ให้เห็นจุดที่ควรพัฒนาอย่างเป็นรูปธรรม</p>');
     }
@@ -1110,6 +1121,7 @@ require_once 'header.php';
     });
 
     const raterTriples = [];
+    const incompleteStudents = []; // นักเรียนที่มีผลประเมินบางส่วน แต่ไม่ครบผู้ประเมินทั้ง 3 คน
     studentsList.forEach(s => {
       if (s.classroom !== EXPERIMENTAL_CLASSROOM) return;
       const id = s.student_id;
@@ -1120,23 +1132,113 @@ require_once 'header.php';
 
       if (teacherEval && expert1Eval && expert2Eval) {
         raterTriples.push({ sid: id, name: (studentDB[id] || s.student_name || id), evals: [teacherEval, expert1Eval, expert2Eval] });
+      } else if (teacherEval || expert1Eval || expert2Eval) {
+        // มีการประเมินอย่างน้อย 1 คน แต่ไม่ครบ 3 คน → ไม่ถูกนำไปคำนวณ ICC ต้องแจ้งเตือน
+        incompleteStudents.push({
+          sid: id, name: (studentDB[id] || s.student_name || id),
+          missing: [!teacherEval && 'ครูผู้สอน', !expert1Eval && 'ผู้เชี่ยวชาญ 1', !expert2Eval && 'ผู้เชี่ยวชาญ 2'].filter(Boolean)
+        });
       }
     });
 
-    calculateICCReliability(raterTriples);
+    const phaseLabel = (document.getElementById('iccTaskPhaseSelector') || {}).selectedOptions
+      ? document.getElementById('iccTaskPhaseSelector').selectedOptions[0].textContent.trim()
+      : icctaskPhase;
+
+    calculateICCReliability(raterTriples, { incompleteStudents, phaseLabel });
   }
 
   function getICCInterpretation(icc) {
     if (icc === null || isNaN(icc)) return { text: 'ข้อมูลน้อยเกินไป', css: 'bg-secondary' };
-    if (icc >= 0.90) return { text: 'ดีเยี่ยม (Excellent)', css: 'bg-success' };
+    // เกณฑ์ของ Koo & Li (2016): <.50 ต่ำ, .50–.75 ปานกลาง, .75–.90 ดี, >.90 ดีเยี่ยม
+    if (icc > 0.90) return { text: 'ดีเยี่ยม (Excellent)', css: 'bg-success' };
     if (icc >= 0.75) return { text: 'ดี (Good)', css: 'bg-info text-dark' };
     if (icc >= 0.50) return { text: 'ปานกลาง (Moderate)', css: 'bg-warning text-dark' };
     return { text: 'ต่ำ (Poor)', css: 'bg-danger' };
   }
 
-  // คำนวณ ICC(3,1): two-way mixed effects, absolute agreement, single rater
-  // (ผู้ตรวจเป็นชุดคนตายตัว คือ ครูผู้สอน + ผู้เชี่ยวชาญ 2 ท่านที่เจาะจงไว้ ไม่ได้สุ่มมา
-  // จึงเลือกโมเดล mixed ตามแนวทางของ Koo & Li, 2016 — สูตรคำนวณเหมือน ICC(2,1) ทุกประการ)
+  // แปลงตัวเลขเป็นรูปแบบ APA (3 ตำแหน่งทศนิยม ไม่มีเลข 0 นำหน้า) เช่น .819, -.050
+  function fmtAPA(x, digits) {
+    if (x === null || x === undefined || isNaN(x)) return 'N/A';
+    digits = digits === undefined ? 3 : digits;
+    const s = Number(x).toFixed(digits);
+    return s.replace(/^(-?)0\./, '$1.');
+  }
+  // แปลงค่า p เป็นรูปแบบมาตรฐาน เช่น "< .001" แทนที่จะแสดง ".000"
+  function fmtPValue(p) {
+    if (p === null || p === undefined || isNaN(p)) return 'N/A';
+    if (p < 0.001) return '&lt; .001';
+    return fmtAPA(p, 3);
+  }
+
+  // ---- ฟังก์ชันคณิตศาสตร์สำหรับ F-distribution (ใช้หา p-value และช่วงความเชื่อมั่นของ ICC) ----
+  // อ้างอิงอัลกอริทึมมาตรฐาน (Numerical Recipes): regularized incomplete beta function
+  function logGamma(x) {
+    const cof = [76.18009172947146, -86.50532032941677, 24.01409824083091, -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5];
+    let y = x, tmp = x + 5.5;
+    tmp -= (x + 0.5) * Math.log(tmp);
+    let ser = 1.000000000190015;
+    for (let j = 0; j < 6; j++) { y += 1; ser += cof[j] / y; }
+    return -tmp + Math.log(2.5066282746310005 * ser / x);
+  }
+  function betacf(x, a, b) {
+    const MAXIT = 200, EPS = 3e-9, FPMIN = 1e-30;
+    const qab = a + b, qap = a + 1, qam = a - 1;
+    let c = 1, d = 1 - qab * x / qap;
+    if (Math.abs(d) < FPMIN) d = FPMIN;
+    d = 1 / d;
+    let h = d;
+    for (let m = 1; m <= MAXIT; m++) {
+      const m2 = 2 * m;
+      let aa = m * (b - m) * x / ((qam + m2) * (a + m2));
+      d = 1 + aa * d; if (Math.abs(d) < FPMIN) d = FPMIN;
+      c = 1 + aa / c; if (Math.abs(c) < FPMIN) c = FPMIN;
+      d = 1 / d;
+      h *= d * c;
+      aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2));
+      d = 1 + aa * d; if (Math.abs(d) < FPMIN) d = FPMIN;
+      c = 1 + aa / c; if (Math.abs(c) < FPMIN) c = FPMIN;
+      d = 1 / d;
+      const del = d * c;
+      h *= del;
+      if (Math.abs(del - 1) < EPS) break;
+    }
+    return h;
+  }
+  function betai(x, a, b) {
+    if (x <= 0) return 0;
+    if (x >= 1) return 1;
+    const bt = Math.exp(logGamma(a + b) - logGamma(a) - logGamma(b) + a * Math.log(x) + b * Math.log(1 - x));
+    if (x < (a + 1) / (a + b + 2)) return bt * betacf(x, a, b) / a;
+    return 1 - bt * betacf(1 - x, b, a) / b;
+  }
+  function pf(f, d1, d2) {
+    if (f <= 0) return 0;
+    const x = d1 * f / (d1 * f + d2);
+    return betai(x, d1 / 2, d2 / 2);
+  }
+  function qf(p, d1, d2) {
+    if (d1 <= 0 || d2 <= 0) return NaN;
+    let hi = 1;
+    while (pf(hi, d1, d2) < p && hi < 1e15) hi *= 2;
+    let lo = 0;
+    for (let i = 0; i < 200; i++) {
+      const mid = (lo + hi) / 2;
+      if (pf(mid, d1, d2) < p) lo = mid; else hi = mid;
+    }
+    return (lo + hi) / 2;
+  }
+
+  // คำนวณ ICC(A,1): Two-way mixed-effects, Absolute agreement, Single measurement
+  // (ผู้ตรวจเป็นชุดคนตายตัว คือ ครูผู้สอน + ผู้เชี่ยวชาญ 2 ท่านที่เจาะจงไว้ ไม่ได้สุ่มมาจากประชากรผู้ตรวจ
+  // จึงเลือกโมเดล two-way mixed ตามแนวทางของ Koo & Li (2016)
+  // หมายเหตุสำคัญ: สูตรของ ICC(A,1) แบบ two-way mixed นี้ เหมือนกับสูตร ICC(2,1) แบบ two-way random
+  // ทุกประการทางคณิตศาสตร์ (มีพจน์ (k/n)(MSC-MSE) ในตัวหาร ต่างจาก ICC(C,1)/ICC(3,1) แบบ consistency
+  // ที่ไม่มีพจน์นี้) Koo & Li (2016) จึงแนะนำให้ใช้ notation ICC(A,1) เพื่อไม่ให้สับสนกับ ICC(3,1)
+  // ซึ่งปกติหมายถึง consistency ไม่ใช่ absolute agreement)
+  // นอกจากค่า Single measurement แล้ว ยังคำนวณ Average measures ICC(A,k), การทดสอบนัยสำคัญด้วย
+  // F-test (Shrout & Fleiss, 1979) และช่วงความเชื่อมั่น 95% ของ ICC(A,1) ตามสูตรของ
+  // McGraw & Wong (1996) / Shrout & Fleiss (1979) ด้วย
   function computeICC(matrix) {
     const n = matrix.length;
     if (n < 2) return null;
@@ -1155,11 +1257,37 @@ require_once 'header.php';
     const MSR = SSR / (n - 1);
     const MSC = SSC / (k - 1);
     const MSE = SSE / ((n - 1) * (k - 1));
+
+    // Single measurement, absolute agreement — ICC(A,1)
     const denom = MSR + (k - 1) * MSE + (k / n) * (MSC - MSE);
-    if (denom === 0) return null;
-    const icc = (MSR - MSE) / denom;
+    const icc = denom !== 0 ? (MSR - MSE) / denom : null;
+
+    // Average measures, absolute agreement — ICC(A,k) (ข้อมูลประกอบ ไม่ใช่ค่าหลัก)
+    const denomAvg = MSR + (MSC - MSE) / n;
+    const iccAvg = denomAvg !== 0 ? (MSR - MSE) / denomAvg : null;
+
+    // F-test สำหรับทดสอบ H0: ICC = 0 (Shrout & Fleiss, 1979)
+    const df1 = n - 1, df2 = (n - 1) * (k - 1);
+    const F0 = MSE !== 0 ? MSR / MSE : null;
+    const pValue = (F0 !== null && df1 > 0 && df2 > 0) ? (1 - pf(F0, df1, df2)) : null;
+
+    // ช่วงความเชื่อมั่น 95% ของ ICC(A,1) (McGraw & Wong, 1996; Shrout & Fleiss, 1979)
+    let ciLower = null, ciUpper = null;
+    if (icc !== null && MSE > 0 && MSC > 0) {
+      const Fj = MSC / MSE;
+      const vn = (k - 1) * (n - 1) * Math.pow((k * icc * Fj) + n * (1 + (k - 1) * icc) - k * icc, 2);
+      const vd = (n - 1) * k * k * icc * icc * Fj * Fj + Math.pow(n * (1 + (k - 1) * icc) - k * icc, 2);
+      const v = vd !== 0 ? vn / vd : null;
+      if (v !== null && v > 0 && isFinite(v)) {
+        const F3U = qf(0.975, df1, v);
+        const F3L = qf(0.975, v, df1);
+        ciLower = (n * (MSR - F3U * MSE)) / (F3U * (k * MSC + (k * n - k - n) * MSE) + n * MSR);
+        ciUpper = (n * (F3L * MSR - MSE)) / (k * MSC + (k * n - k - n) * MSE + n * F3L * MSR);
+      }
+    }
+
     // คืนค่ากลางทั้งหมด เพื่อนำไปแสดง "ค่าที่แทนในสูตร" ให้เห็นชัด
-    return { icc, n, k, grand, SSR, SSC, SSE, SST, MSR, MSC, MSE, denom };
+    return { icc, iccAvg, n, k, grand, SSR, SSC, SSE, SST, MSR, MSC, MSE, denom, denomAvg, F0, df1, df2, pValue, ciLower, ciUpper };
   }
 
   // แปลงคะแนนรวม (เต็ม 60) เป็นระดับคุณภาพ — ใช้เกณฑ์เดียวกับหน้าฟอร์มประเมิน
@@ -1213,7 +1341,7 @@ require_once 'header.php';
         <div class="col-6 col-md-3"><div class="border rounded-2 p-2 text-center bg-light"><div class="text-muted" style="font-size:.75rem;">จำนวนนักเรียน (n)</div><div class="fs-5 fw-bold text-dark">${n}</div></div></div>
         <div class="col-6 col-md-3"><div class="border rounded-2 p-2 text-center bg-light"><div class="text-muted" style="font-size:.75rem;">จำนวนผู้ตรวจ (k)</div><div class="fs-5 fw-bold text-dark">${k}</div></div></div>
         <div class="col-6 col-md-3"><div class="border rounded-2 p-2 text-center bg-light"><div class="text-muted" style="font-size:.75rem;">ค่าเฉลี่ยรวม (Grand mean)</div><div class="fs-5 fw-bold text-dark">${f2(d.grand)}</div></div></div>
-        <div class="col-6 col-md-3"><div class="border rounded-2 p-2 text-center bg-light"><div class="text-muted" style="font-size:.75rem;">ผลลัพธ์ ICC(3,1)</div><div class="fs-5 fw-bold text-primary">${f4(d.icc)}</div></div></div>
+        <div class="col-6 col-md-3"><div class="border rounded-2 p-2 text-center bg-light"><div class="text-muted" style="font-size:.75rem;">ผลลัพธ์ Single-measure ICC(A,1)</div><div class="fs-5 fw-bold text-primary">${fmtAPA(d.icc)}</div></div></div>
       </div>
       <div class="table-responsive mb-3">
         <table class="table table-sm table-bordered text-center align-middle mb-0">
@@ -1226,26 +1354,47 @@ require_once 'header.php';
           </tbody>
         </table>
       </div>
-      <div class="p-3 rounded-3" style="background:#eff6ff; line-height:2;">
-        <div class="fw-bold text-dark mb-1">สูตร ICC(3,1) — two-way mixed effects, absolute agreement, single rater</div>
-        <div class="font-mono">ICC = (MSR − MSE) / [ MSR + (k−1)·MSE + (k/n)·(MSC − MSE) ]</div>
+      <div class="p-3 rounded-3 mb-3" style="background:#eff6ff; line-height:2;">
+        <div class="fw-bold text-dark mb-1">สูตร Single-measure ICC(A,1) — two-way mixed-effects, absolute agreement, single measurement</div>
+        <div class="font-mono">ICC(A,1) = (MSR − MSE) / [ MSR + (k−1)·MSE + (k/n)·(MSC − MSE) ]</div>
         <div class="font-mono">= ( ${f3(d.MSR)} − ${f3(d.MSE)} ) / [ ${f3(d.MSR)} + (${k}−1)·${f3(d.MSE)} + (${k}/${n})·( ${f3(d.MSC)} − ${f3(d.MSE)} ) ]</div>
-        <div class="font-mono">= ${f3(num)} / ${f3(d.denom)} = <span class="fw-bold text-primary">${f4(d.icc)}</span></div>
+        <div class="font-mono">= ${f3(num)} / ${f3(d.denom)} = <span class="fw-bold text-primary">${fmtAPA(d.icc)}</span></div>
+        <div class="small text-muted mt-1">95% CI: ${(d.ciLower !== null && d.ciUpper !== null) ? `[${fmtAPA(d.ciLower)}, ${fmtAPA(d.ciUpper)}]` : 'N/A'} · F(${d.df1}, ${d.df2}) = ${d.F0 !== null ? f3(d.F0) : 'N/A'}, p ${d.pValue !== null ? (d.pValue < 0.001 ? '&lt; .001' : '= ' + fmtAPA(d.pValue)) : 'N/A'}</div>
+      </div>
+      <div class="p-3 rounded-3" style="background:#f6f5ff; line-height:2;">
+        <div class="fw-bold text-dark mb-1">สูตร Average-measure ICC(A,${k}) — ข้อมูลประกอบ (ความเชื่อมั่นของค่าเฉลี่ยคะแนนจากผู้ประเมินทั้ง ${k} คนรวมกัน ไม่ใช่ค่าหลัก)</div>
+        <div class="font-mono">ICC(A,${k}) = (MSR − MSE) / [ MSR + (MSC − MSE)/n ]</div>
+        <div class="font-mono">= ( ${f3(d.MSR)} − ${f3(d.MSE)} ) / [ ${f3(d.MSR)} + ( ${f3(d.MSC)} − ${f3(d.MSE)} )/${n} ] = <span class="fw-bold text-primary">${fmtAPA(d.iccAvg)}</span></div>
       </div>
     `;
   }
 
-  function calculateICCReliability(triples) {
+  function calculateICCReliability(triples, opts) {
+    opts = opts || {};
+    const incompleteStudents = opts.incompleteStudents || [];
+    const phaseLabel = opts.phaseLabel || 'ภาระงานที่เลือก';
     const overallEl = document.getElementById('overallPearsonResult');
     const interpEl = document.getElementById('overallPearsonInterpretation');
     const tableBody = document.getElementById('reliabilityTableBody');
     if (!overallEl || !tableBody) return;
 
+    // แจ้งเตือนข้อมูลไม่ครบ (ผู้ประเมินทั้ง 3 คนไม่ได้ประเมินชิ้นงานชุดเดียวกันครบ)
+    const warnEl = document.getElementById('iccMissingDataWarning');
+    if (warnEl) {
+      if (incompleteStudents.length > 0) {
+        warnEl.innerHTML = `<div class="alert alert-warning py-2 px-3 mb-0 small"><i class="bi bi-exclamation-triangle-fill"></i> พบนักเรียน <strong>${incompleteStudents.length} คน</strong> ที่ยังประเมินไม่ครบผู้ประเมินทั้ง 3 คนใน${escapeHtml(phaseLabel)} (ถูกตัดออกจากการคำนวณ ICC): ` +
+          incompleteStudents.map(s => `${escapeHtml(s.name)} (ขาด: ${s.missing.join(', ')})`).join(' · ')
+        + `</div>`;
+      } else {
+        warnEl.innerHTML = '';
+      }
+    }
+
     if (triples.length < 2) {
       overallEl.textContent = "N/A";
       interpEl.textContent = "ต้องมีนักเรียนห้อง 606 ที่ถูกตรวจครบทั้ง 3 คน อย่างน้อย 2 คน";
       interpEl.className = "badge bg-secondary";
-      tableBody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-muted">ต้องการข้อมูลนักเรียน<strong>ห้อง 606</strong>ที่ครูผู้สอน + ผู้เชี่ยวชาญ 2 คน ตรวจครบ อย่างน้อย 2 คน</td></tr>`;
+      tableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-muted">ต้องการข้อมูลนักเรียน<strong>ห้อง 606</strong>ที่ครูผู้สอน + ผู้เชี่ยวชาญ 2 คน ตรวจครบ อย่างน้อย 2 คน</td></tr>`;
       const p = document.getElementById('pearsonReportParagraph');
       if (p) p.innerHTML = `<h6 class="fw-bold text-dark mb-2"><i class="bi bi-file-earmark-text text-primary"></i> บทวิเคราะห์ค่าความสอดคล้องผู้ตรวจ (ICC)</h6><p class="mb-0 text-muted">ยังมีข้อมูลไม่พอสำหรับคำนวณ ICC — ต้องมีนักเรียนห้อง 606 ที่ผู้ตรวจครบ 3 คนอย่างน้อย 2 คน</p>`;
       setKpiValue('kpiIccOverall', 'N/A');
@@ -1254,6 +1403,9 @@ require_once 'header.php';
       if (rs) rs.innerHTML = 'ผู้ตรวจ 3 คน (ครูผู้สอน + ผู้เชี่ยวชาญ 2 ท่าน) — ยังมีนักเรียนที่ถูกตรวจครบไม่พอ';
       const sc = document.getElementById('iccStudentCards');
       if (sc) sc.innerHTML = `<div class="text-center py-4 text-muted">ต้องการข้อมูลนักเรียน<strong>ห้อง 606</strong> ที่ครูผู้สอน + ผู้เชี่ยวชาญ 2 คน ตรวจครบ อย่างน้อย 2 คน</div>`;
+      const ciEl0 = document.getElementById('overallIccCI'); if (ciEl0) ciEl0.textContent = '95% CI: -';
+      const pEl0 = document.getElementById('overallIccP'); if (pEl0) pEl0.textContent = 'p: -';
+      const avgEl0 = document.getElementById('overallIccAverage'); if (avgEl0) avgEl0.textContent = 'Average-measure ICC (ค่าเฉลี่ยผู้ประเมิน 3 คน, ข้อมูลประกอบ): -';
       renderIccFormula(null);
       return;
     }
@@ -1271,12 +1423,30 @@ require_once 'header.php';
     const totalMatrix = triples.map(tr => tr.evals.map(dims[0].get));
     const overallDetail = computeICC(totalMatrix);
     const overallICC = overallDetail ? overallDetail.icc : null;
-    overallEl.textContent = overallICC !== null ? overallICC.toFixed(4) : "N/A";
+    overallEl.textContent = fmtAPA(overallICC);
     const overallInterp = getICCInterpretation(overallICC);
     interpEl.textContent = overallInterp.text;
     interpEl.className = "badge " + overallInterp.css;
     setKpiValue('kpiIccOverall', overallICC !== null ? overallICC.toFixed(3) : 'N/A');
     setKpiBadge('kpiIccBadge', overallInterp.text.split(' (')[0], overallInterp.css);
+
+    // แสดง 95% CI, p-value และ Average-measure ICC ของคะแนนรวม (ข้อมูลประกอบ)
+    const ciEl = document.getElementById('overallIccCI');
+    if (ciEl) {
+      ciEl.textContent = (overallDetail && overallDetail.ciLower !== null && overallDetail.ciUpper !== null)
+        ? `95% CI: [${fmtAPA(overallDetail.ciLower)}, ${fmtAPA(overallDetail.ciUpper)}]`
+        : '95% CI: N/A';
+    }
+    const pEl = document.getElementById('overallIccP');
+    if (pEl) {
+      pEl.innerHTML = (overallDetail && overallDetail.pValue !== null)
+        ? `p: ${fmtPValue(overallDetail.pValue)}`
+        : 'p: N/A';
+    }
+    const avgEl = document.getElementById('overallIccAverage');
+    if (avgEl) {
+      avgEl.textContent = `Average-measure ICC (ค่าเฉลี่ยผู้ประเมิน 3 คน, ข้อมูลประกอบ): ${fmtAPA(overallDetail ? overallDetail.iccAvg : null)}`;
+    }
 
     let html = '';
     const iccVals = [];
@@ -1286,11 +1456,17 @@ require_once 'header.php';
       const icc = det ? det.icc : null;
       if (icc !== null) iccVals.push(icc);
       const interp = getICCInterpretation(icc);
+      const ciText = (det && det.ciLower !== null && det.ciUpper !== null) ? `[${fmtAPA(det.ciLower)}, ${fmtAPA(det.ciUpper)}]` : 'N/A';
+      const pText = (det && det.pValue !== null) ? fmtPValue(det.pValue) : 'N/A';
       html += `
         <tr>
-          <td class="fw-semibold">${d.name}</td>
+          <td class="fw-semibold text-nowrap">${escapeHtml(phaseLabel)} — ${d.name}</td>
+          <td class="text-center font-mono">3</td>
           <td class="text-center font-mono">${triples.length}</td>
-          <td class="text-center font-mono fw-bold text-primary">${icc !== null ? icc.toFixed(4) : "N/A"}</td>
+          <td class="text-center font-mono fw-bold text-primary">${fmtAPA(icc)}</td>
+          <td class="text-center font-mono small">${ciText}</td>
+          <td class="text-center font-mono small text-muted">${fmtAPA(det ? det.iccAvg : null)}</td>
+          <td class="text-center font-mono small">${pText}</td>
           <td class="text-end"><span class="badge ${interp.css} small">${interp.text.split(' (')[0]}</span></td>
         </tr>
       `;
@@ -1418,8 +1594,8 @@ require_once 'header.php';
       const iccBanner = `
         <div class="alert alert-primary border-0 rounded-3 d-flex flex-wrap align-items-center gap-2 py-2 px-3 mb-0 small">
           <i class="bi bi-people-fill"></i>
-          <span class="fw-semibold">ค่า ICC ภาพรวม (คะแนนรวม) ของผู้ตรวจ 3 คน =</span>
-          <span class="fw-bold" style="font-size:1.05rem;">${overallICC !== null ? overallICC.toFixed(4) : 'N/A'}</span>
+          <span class="fw-semibold">ค่าความเชื่อมั่นของผู้ประเมินรายบุคคล (Single-measure ICC, คะแนนรวม) ของผู้ตรวจ 3 คน =</span>
+          <span class="fw-bold" style="font-size:1.05rem;">${fmtAPA(overallICC)}</span>
           <span class="badge ${overallInterp.css}">${overallInterp.text.split(' (')[0]}</span>
         </div>`;
 
@@ -1431,16 +1607,25 @@ require_once 'header.php';
 
     const paragraphEl = document.getElementById('pearsonReportParagraph');
     if (paragraphEl) {
-      const minICC = iccVals.length > 0 ? Math.min(...iccVals).toFixed(4) : "N/A";
-      const maxICC = iccVals.length > 0 ? Math.max(...iccVals).toFixed(4) : "N/A";
+      const minICC = iccVals.length > 0 ? fmtAPA(Math.min(...iccVals)) : "N/A";
+      const maxICC = iccVals.length > 0 ? fmtAPA(Math.max(...iccVals)) : "N/A";
       const overallInterpText = overallInterp.text.split(' (')[0];
+      const ciStr = (overallDetail && overallDetail.ciLower !== null && overallDetail.ciUpper !== null)
+        ? `[${fmtAPA(overallDetail.ciLower)}, ${fmtAPA(overallDetail.ciUpper)}]` : '[N/A, N/A]';
+      const pStr = (overallDetail && overallDetail.pValue !== null)
+        ? (overallDetail.pValue < 0.001 ? 'p &lt; .001' : `p = ${fmtAPA(overallDetail.pValue)}`)
+        : 'p N/A';
       paragraphEl.innerHTML = `
         <h6 class="fw-bold text-dark mb-2"><i class="bi bi-file-earmark-text text-primary"></i> บทวิเคราะห์ค่าความสอดคล้องระหว่างผู้ตรวจ (Inter-rater Reliability — ICC)</h6>
         <p class="mb-0 text-slate-700" style="line-height: 1.6;">
-          การตรวจสอบความสอดคล้องของการให้คะแนนโดยผู้ตรวจ 3 คน (ครูผู้สอน และผู้เชี่ยวชาญ 2 ท่าน) สำหรับงานเขียนของนักเรียน<strong>ห้อง 606 (กลุ่มทดลอง)</strong> (N = ${triples.length} คน)
-          ด้วยค่าสัมประสิทธิ์สหสัมพันธ์ภายในชั้น <strong>ICC(3,1) — two-way mixed effects, absolute agreement, single rater</strong>
-          พบว่า <strong>ค่า ICC ของคะแนนรวมเท่ากับ ${overallICC !== null ? overallICC.toFixed(4) : "N/A"}</strong> ซึ่งเมื่อแปลผลตามเกณฑ์ของ Koo &amp; Li (2016) จัดอยู่ใน<strong>ระดับ${overallInterpText}</strong>
-          และเมื่อพิจารณาแยกราย 4 ด้าน พบว่าค่า ICC อยู่ระหว่าง <strong>${minICC}</strong> ถึง <strong>${maxICC}</strong> สะท้อนถึงความสอดคล้องของเกณฑ์ประเมินระหว่างผู้ตรวจในระดับที่เชื่อถือได้เชิงสถิติวิจัย
+          ผลการตรวจสอบความเชื่อมั่นระหว่างผู้ประเมินของแบบประเมิน โดยใช้ค่าสัมประสิทธิ์สหสัมพันธ์ภายในชั้น (Intraclass Correlation Coefficient: ICC) แบบ two-way mixed-effects, absolute agreement และ single measurement [ICC(A,1)]
+          จากคะแนนของผู้ประเมิน 3 คน (ผู้วิจัย + ครูผู้เชี่ยวชาญ 2 ท่าน) สำหรับงานเขียนของนักเรียน<strong>ห้อง 606 (กลุ่มทดลอง)</strong> (n = ${triples.length} ชิ้น)
+          พบว่า มีค่า ICC เท่ากับ <strong>${fmtAPA(overallICC)}</strong> ช่วงความเชื่อมั่น 95% ${ciStr} (${pStr})
+          แสดงว่าคะแนนจากผู้ประเมินมีความเชื่อมั่นระหว่างผู้ประเมินอยู่ในระดับ<strong>${overallInterpText}</strong> ตามเกณฑ์ของ Koo and Li (2016)
+        </p>
+        <p class="mb-0 mt-2 text-muted small" style="line-height: 1.6;">
+          <strong>ข้อมูลประกอบ:</strong> เมื่อพิจารณาแยกราย 4 ด้าน ค่า Single-measure ICC อยู่ระหว่าง <strong>${minICC}</strong> ถึง <strong>${maxICC}</strong>
+          และ Average-measure ICC (ความเชื่อมั่นของค่าเฉลี่ยคะแนนจากผู้ประเมินทั้ง 3 คนรวมกัน ไม่ใช่ค่าหลักที่ใช้สรุปผล) ของคะแนนรวมเท่ากับ ${fmtAPA(overallDetail ? overallDetail.iccAvg : null)}
         </p>
       `;
     }
