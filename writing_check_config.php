@@ -1430,7 +1430,7 @@ function ai_extract_api_error($body, $status) {
         return 'ใช้โควตาฟรีของผู้ให้บริการครบแล้วในช่วงนี้ กรุณารอสักครู่แล้วลองใหม่ (' . $msg . ')';
     }
     if ($status === 404) {
-        return 'ไม่พบโมเดลที่ตั้งค่าไว้ กรุณาตรวจสอบชื่อโมเดลในหน้าตั้งค่าระบบตรวจอัตโนมัติ (' . $msg . ')';
+        return 'ไม่พบโมเดลที่ตั้งค่าไว้ กรุณาตรวจสอบชื่อโมเดลในหน้าตั้งค่าระบบ (' . $msg . ')';
     }
     return 'ผู้ให้บริการโมเดลภาษาตอบกลับข้อผิดพลาด (HTTP ' . $status . '): ' . $msg;
 }
@@ -1450,7 +1450,7 @@ function ai_call_model(array $s, $systemPrompt, $userPrompt, array $opts = []) {
     $timeout = isset($opts['timeout']) ? max(30, min(300, (int)$opts['timeout'])) : 90;
     if (!$s['configured']) {
         return ['ok' => false, 'text' => '', 'finish' => '',
-                'error' => 'ยังไม่ได้ตั้งค่าระบบตรวจอัตโนมัติ (ขาด API key หรือชื่อโมเดล) กรุณาตั้งค่าในหน้า "ระบบตรวจอัตโนมัติ"'];
+                'error' => 'ยังไม่ได้ตั้งค่าระบบตรวจอัตโนมัติ (ขาด API key หรือชื่อโมเดล) กรุณาตั้งค่าในหน้า "ตั้งค่าระบบ"'];
     }
 
     if ($s['kind'] === 'gemini') {
@@ -2995,7 +2995,7 @@ function ai_parse_norm($rawText, $intro, array $bodyArr, $conclusion, $finish = 
     $obj = ai_extract_json($rawText, $salvaged);
     $cut = $salvaged || in_array(strtolower((string)$finish), ['length', 'max_tokens', 'maxtokens'], true);
     $cutHint = 'ตัวบทของฉบับนี้ยาว คำตอบจึงถูกตัดกลางคันเพราะชนเพดานความยาวของโมเดล — '
-             . 'ลองสั่งใหม่อีกครั้ง หรือเปลี่ยนไปใช้โมเดลที่ตอบได้ยาวกว่านี้ในหน้าตั้งค่า';
+             . 'ลองสั่งใหม่อีกครั้ง หรือเปลี่ยนไปใช้โมเดลที่ตอบได้ยาวกว่านี้ในหน้าตั้งค่าระบบ';
 
     if (!is_array($obj)) {
         return ['ok' => false, 'data' => [],

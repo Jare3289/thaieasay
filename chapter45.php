@@ -311,19 +311,19 @@ $c45IsTeacher = ($sessionUser['role'] === 'teacher');
     </div>
   </div>
 
-  <!-- 7) ข้อมูลประจำงานวิจัย -->
+  <!-- 7) ข้อมูลประจำงานวิจัย — ย้ายไปกรอกที่หน้าตั้งค่ารวมแล้ว เหลือไว้แค่สรุปค่าที่ใช้อยู่ -->
   <div class="card border-0 shadow-sm rounded-4 mb-4">
     <div class="card-body p-4">
-      <h5 class="fw-bold mb-1"><i class="bi bi-gear me-2 text-secondary"></i>ข้อมูลประจำงานวิจัย</h5>
+      <h5 class="fw-bold mb-1"><i class="bi bi-gear me-2 text-secondary"></i>ข้อมูลประจำงานวิจัยที่ใช้อยู่</h5>
       <p class="text-muted small mb-3">
-        ค่าที่กรอกที่นี่ถูกนำไปใช้ในย่อหน้าเปิดบทที่ 5 และเป็นตัวกำหนดว่าจะใช้ผลงานรอบใดเป็น
-        &quot;ผลงานครั้งที่ 1 และครั้งที่ 2&quot; ในการวิเคราะห์เชิงคุณภาพ
+        ค่าชุดนี้ถูกนำไปใช้ในย่อหน้าเปิดบทที่ 5 และเป็นตัวกำหนดว่าจะใช้ผลงานรอบใดเป็น
+        &quot;ผลงานครั้งที่ 1 และครั้งที่ 2&quot; ในการวิเคราะห์เชิงคุณภาพ — แก้ไขได้ที่หน้าตั้งค่าระบบ
       </p>
-      <div id="c45MetaForm" class="row g-2"></div>
+      <div id="c45MetaSummary" class="row g-2"></div>
       <div class="mt-3">
-        <button class="btn btn-primary btn-sm fw-bold rounded-pill px-4" onclick="c45SaveMeta()">
-          <i class="bi bi-save me-1"></i>บันทึกข้อมูลประจำงานวิจัย
-        </button>
+        <a class="btn btn-outline-primary btn-sm fw-bold rounded-pill px-4" href="settings.php#research">
+          <i class="bi bi-gear me-1"></i>แก้ไขที่หน้าตั้งค่าระบบ
+        </a>
       </div>
     </div>
   </div>
@@ -953,48 +953,28 @@ function c45Modal(title, bodyHtml) {
 </script>
 
 <script>
-/* ---------------------------------------------------------------- ข้อมูลประจำงานวิจัย */
+/* ---------------------------------------------------------------- ข้อมูลประจำงานวิจัย
+   แก้ไขค่าทำที่หน้า settings.php แล้ว หน้านี้แสดงเฉพาะค่าที่กำลังถูกใช้คำนวณอยู่ */
 function c45PaintMeta() {
   const fields = c45Data.meta_fields;
-  const meta = c45Data.meta;
+  const meta   = c45Data.meta;
   const phases = c45Data.phases;
+  const opts   = { mean: 'คะแนนเฉลี่ยจากผู้ประเมินทุกคน (ตรงกับที่ระบุในบทที่ 4)',
+                   teacher: 'คะแนนของครูผู้สอนอย่างเดียว',
+                   expert: 'คะแนนของผู้เชี่ยวชาญอย่างเดียว' };
   let h = '';
   Object.keys(fields).forEach(function (k) {
     const f = fields[k];
     const v = meta[k] === undefined ? '' : meta[k];
-    let input;
-    if (f.type === 'source') {
-      const opts = { mean: 'คะแนนเฉลี่ยจากผู้ประเมินทุกคน (ตรงกับที่ระบุในบทที่ 4)',
-                     teacher: 'คะแนนของครูผู้สอนอย่างเดียว',
-                     expert: 'คะแนนของผู้เชี่ยวชาญอย่างเดียว' };
-      input = '<select class="form-select form-select-sm c45-meta" data-key="' + k + '">'
-        + Object.keys(opts).map(function (o) {
-            return '<option value="' + o + '"' + (o === v ? ' selected' : '') + '>' + c45Esc(opts[o]) + '</option>';
-          }).join('') + '</select>';
-    } else if (f.type === 'phase') {
-      input = '<select class="form-select form-select-sm c45-meta" data-key="' + k + '">'
-        + Object.keys(phases).map(function (p) {
-            return '<option value="' + c45Esc(p) + '"' + (p === v ? ' selected' : '') + '>'
-              + c45Esc(phases[p]) + '</option>';
-          }).join('') + '</select>';
-    } else {
-      input = '<input class="form-control form-control-sm c45-meta" data-key="' + k + '"'
-        + (f.type === 'number' ? ' type="number" step="any"' : '')
-        + ' value="' + c45Esc(v) + '">';
-    }
-    h += '<div class="col-md-4 col-lg-3"><label class="form-label small fw-bold mb-1">'
-      + c45Esc(f.label) + '</label>' + input + '</div>';
+    let shown = v;
+    if (f.type === 'source') shown = opts[v] || v;
+    else if (f.type === 'phase') shown = phases[v] || v;
+    if (shown === '' || shown === null) shown = '—';
+    h += '<div class="col-md-4 col-lg-3"><div class="border rounded-3 p-2 h-100 bg-light">'
+      + '<div class="small text-muted">' + c45Esc(f.label) + '</div>'
+      + '<div class="fw-bold small">' + c45Esc(shown) + '</div></div></div>';
   });
-  document.getElementById('c45MetaForm').innerHTML = h;
-}
-
-async function c45SaveMeta() {
-  const payload = {};
-  document.querySelectorAll('.c45-meta').forEach(function (el) { payload[el.dataset.key] = el.value; });
-  const d = await c45Api({ action: 'ch45_save_meta', meta: payload });
-  if (!d.success) { c45Alert(c45Esc(d.error || 'บันทึกไม่สำเร็จ'), 'danger'); return; }
-  c45Alert('บันทึกข้อมูลประจำงานวิจัยแล้ว — กำลังคำนวณสถิติใหม่ตามค่าที่ตั้ง', 'success');
-  await c45Load();
+  document.getElementById('c45MetaSummary').innerHTML = h;
 }
 
 /* ---------------------------------------------------------------- บันทึกหลังสอน */
