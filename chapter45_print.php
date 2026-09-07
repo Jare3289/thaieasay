@@ -286,16 +286,29 @@ $scope = implode(' · ', $scopeParts);
         $ind  = $inds[$id];
         $ijob = 'ind_' . str_replace('.', '_', $id);
         $ip   = $R[$ijob]['payload'] ?? [];
-        $ex   = $ind['ex']; ?>
+        $pairs  = is_array($ip['pairs'] ?? null) ? $ip['pairs'] : [];
+        $exList = is_array($ip['ex_no'] ?? null) ? $ip['ex_no'] : [];
+        $rangeTxt = $exList ? (' ดังตัวอย่าง (' . $exList[0][0] . ')–(' . $exList[count($exList) - 1][1] . ')') : ''; ?>
       <h4 class="sub2"><?php echo rp_esc($ind['sub'] . ' ' . $ind['name']); ?></h4>
-      <?php echo c45para(c45p($R, $ijob, 'finding', 'ย่อหน้าเปิดหัวข้อ')
-          . ' ดังตัวอย่าง (' . $ex[0] . ')–(' . $ex[1] . ')'); ?>
+      <?php echo c45para(c45p($R, $ijob, 'finding', 'ย่อหน้าเปิดหัวข้อ') . rp_esc($rangeTxt)); ?>
+      <?php if (!$pairs): ?>
+        <div class="quote todo-box">[ยังไม่มีตัวอย่างที่ยกจากผลงานจริง]</div>
+      <?php endif; ?>
+      <?php foreach ($pairs as $i => $pair):
+          $ex = $exList[$i] ?? [0, 0]; ?>
+        <?php
+        echo c45quote($pair['excerpt1'] ?? null, $meta['work1_label']);
+        echo c45quote($pair['excerpt2'] ?? null, $meta['work2_label']);
+        echo c45para('<strong>ตัวอย่าง (' . (int)$ex[0] . ')</strong> '
+            . (trim((string)($pair['analysis1'] ?? '')) !== '' ? rp_esc($pair['analysis1'])
+                : '<span class="todo">[ไม่มีบทวิเคราะห์]</span>'));
+        echo c45para('<strong>ตัวอย่าง (' . (int)$ex[1] . ')</strong> '
+            . (trim((string)($pair['analysis2'] ?? '')) !== '' ? rp_esc($pair['analysis2'])
+                : '<span class="todo">[ไม่มีบทวิเคราะห์]</span>'));
+        ?>
+      <?php endforeach; ?>
       <?php
-      echo c45quote($ip['excerpt1'] ?? null, $meta['work1_label']);
-      echo c45quote($ip['excerpt2'] ?? null, $meta['work2_label']);
-      echo c45para('<strong>ตัวอย่าง (' . $ex[0] . ')</strong> ' . c45p($R, $ijob, 'analysis1', 'บทวิเคราะห์ตัวอย่างแรก'));
-      echo c45para('<strong>ตัวอย่าง (' . $ex[1] . ')</strong> ' . c45p($R, $ijob, 'analysis2', 'บทวิเคราะห์ตัวอย่างที่สอง'));
-      echo c45para(c45p($R, $ijob, 'synthesis', 'ข้อสรุปจากคู่ตัวอย่าง'));
+      echo c45para(c45p($R, $ijob, 'synthesis', 'ข้อสรุปจากตัวอย่างทั้งหมด'));
       if (trim((string)($ip['caution'] ?? '')) !== '') echo c45para(rp_esc($ip['caution']));
       ?>
     <?php endforeach; ?>
