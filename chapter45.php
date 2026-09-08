@@ -100,6 +100,13 @@ $c45IsTeacher = ($sessionUser['role'] === 'teacher');
       ระบบทำหน้าที่เรียบเรียงเป็นภาษาวิชาการเท่านั้น และข้อความที่ยกเป็นตัวอย่างจะถูกตรวจซ้ำว่า
       <strong>ปรากฏอยู่ในผลงานจริงของนักเรียน</strong> ถ้าไม่ตรงระบบจะขึ้นเตือนเป็นสีแดงให้ตรวจก่อนนำไปใช้
     </div>
+    <div class="bg-white border-top px-4 py-3 small">
+      <div class="fw-bold text-dark mb-1"><i class="bi bi-mortarboard me-1 text-primary"></i>มาตรฐานการเรียบเรียงบทที่ 4</div>
+      <div class="text-muted">
+        ระบบจะแยกผลเชิงปริมาณออกจากหลักฐานเชิงคุณภาพ ใช้ถ้อยคำตามระดับความมั่นใจของข้อมูล
+        ระบุฐานของร้อยละให้ชัด และไม่อภิปรายสาเหตุ อ้างทฤษฎี หรือให้ข้อเสนอแนะปะปนในบทผลการวิจัย
+      </div>
+    </div>
   </div>
 
   <div id="c45Alert" class="alert border-0 rounded-3 small d-none" role="alert"></div>
