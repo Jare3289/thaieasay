@@ -346,6 +346,38 @@ require_once 'header.php';
           </tbody>
         </table>
       </div>
+
+      <!-- ตารางที่ 6: จำนวนนักเรียนที่ได้แต่ละระดับคุณภาพ รายประเด็น แยกหน่วยที่ 1 / หน่วยที่ 2 -->
+      <div class="px-3 pt-4 pb-2 border-top mt-2">
+        <h6 class="fw-bold text-dark mb-1"><i class="bi bi-bar-chart-steps"></i> ตารางที่ 6 &nbsp;จำนวนนักเรียนที่ได้แต่ละระดับคุณภาพ รายประเด็น (หน่วยที่ 1 / หน่วยที่ 2)</h6>
+        <p class="text-muted small mb-0" id="levelDistTableDesc">กำลังประมวลผล...</p>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0 text-start table-classroom">
+          <thead class="table-light text-secondary small fw-bold text-uppercase">
+            <tr>
+              <th class="px-3 py-2" rowspan="2" style="width: 26%">ประเด็น</th>
+              <th class="px-2 py-2 text-center" id="levelDistHeadUnit1" colspan="5">หน่วยที่ 1</th>
+              <th class="px-2 py-2 text-center" id="levelDistHeadUnit2" colspan="5">หน่วยที่ 2</th>
+            </tr>
+            <tr>
+              <th class="px-1 py-1 text-center small fw-normal text-muted">ดีมาก (4)</th>
+              <th class="px-1 py-1 text-center small fw-normal text-muted">ดี (3)</th>
+              <th class="px-1 py-1 text-center small fw-normal text-muted">ปานกลาง (2)</th>
+              <th class="px-1 py-1 text-center small fw-normal text-muted">พอใช้ (1)</th>
+              <th class="px-1 py-1 text-center small fw-normal text-muted border-end">ปรับปรุง (0)</th>
+              <th class="px-1 py-1 text-center small fw-normal text-muted">ดีมาก (4)</th>
+              <th class="px-1 py-1 text-center small fw-normal text-muted">ดี (3)</th>
+              <th class="px-1 py-1 text-center small fw-normal text-muted">ปานกลาง (2)</th>
+              <th class="px-1 py-1 text-center small fw-normal text-muted">พอใช้ (1)</th>
+              <th class="px-1 py-1 text-center small fw-normal text-muted">ปรับปรุง (0)</th>
+            </tr>
+          </thead>
+          <tbody id="levelDistTableBody" class="small">
+            <tr><td colspan="11" class="text-center text-muted py-5 fw-bold"><div class="spinner-border spinner-border-sm mb-2 d-block mx-auto"></div>กำลังประมวลผลการกระจายระดับคะแนน...</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <!-- ลิงก์ไปหน้าระบบวิเคราะห์ทางสถิติเพื่อการวิจัย (Inter-rater & Paired t-test) -->
@@ -588,8 +620,10 @@ require_once 'header.php';
   async function loadDefectsSummary() {
     const body = document.getElementById('defectsTableBody');
     const desc = document.getElementById('defectsTableDesc');
+    const lvlBody = document.getElementById('levelDistTableBody');
     if (!body) return;
     body.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-5 fw-bold"><div class="spinner-border spinner-border-sm mb-2 d-block mx-auto"></div>กำลังประมวลผลข้อบกพร่องที่พบในผลงาน...</td></tr>';
+    if (lvlBody) lvlBody.innerHTML = '<tr><td colspan="11" class="text-center text-muted py-5 fw-bold"><div class="spinner-border spinner-border-sm mb-2 d-block mx-auto"></div>กำลังประมวลผลการกระจายระดับคะแนน...</td></tr>';
     try {
       const groupParam = (currentGroupFilter === 'all') ? '' : currentGroupFilter;
       const response = await fetch(`api.php?action=ch45_get_defects_summary&group=${encodeURIComponent(groupParam)}&_t=${new Date().getTime()}`);
@@ -599,10 +633,12 @@ require_once 'header.php';
         res = JSON.parse(text);
       } catch (parseErr) {
         body.innerHTML = '<tr><td colspan="5" class="text-center text-danger py-4 fw-bold">เกิดข้อผิดพลาดในการโหลดข้อมูลข้อบกพร่อง</td></tr>';
+        if (lvlBody) lvlBody.innerHTML = '<tr><td colspan="11" class="text-center text-danger py-4 fw-bold">เกิดข้อผิดพลาดในการโหลดข้อมูล</td></tr>';
         return;
       }
       if (!res.success) {
         body.innerHTML = `<tr><td colspan="5" class="text-center text-danger py-4 fw-bold">เกิดข้อผิดพลาดจาก API: ${res.error || ''}</td></tr>`;
+        if (lvlBody) lvlBody.innerHTML = `<tr><td colspan="11" class="text-center text-danger py-4 fw-bold">เกิดข้อผิดพลาดจาก API: ${res.error || ''}</td></tr>`;
         return;
       }
 
@@ -645,8 +681,49 @@ require_once 'header.php';
         }
         desc.innerHTML = `นับเฉพาะนักเรียนที่มีคะแนนครบทั้ง 2 ครั้ง (N = ${res.n_base} จากทั้งหมด ${res.n_total} คน) เพื่อให้ร้อยละของทั้งสองครั้งเทียบกันได้จริง — ${res.rule || ''}${warn}`;
       }
+
+      renderLevelDistTable(res);
     } catch (err) {
       body.innerHTML = `<tr><td colspan="5" class="text-center text-danger py-4 fw-bold">เกิดข้อผิดพลาดในการเชื่อมต่อเครือข่าย: ${err.message}</td></tr>`;
+      if (lvlBody) lvlBody.innerHTML = `<tr><td colspan="11" class="text-center text-danger py-4 fw-bold">เกิดข้อผิดพลาดในการเชื่อมต่อเครือข่าย: ${err.message}</td></tr>`;
+    }
+  }
+
+  // ตารางที่ 6: จำนวนนักเรียนที่ได้แต่ละระดับคุณภาพ (5 ระดับ) รายประเด็น แยกหน่วยที่ 1 / หน่วยที่ 2
+  // ใช้ข้อมูลชุดเดียวกับ loadDefectsSummary() (field level_rows) จึงไม่ยิง fetch ซ้ำ
+  function renderLevelDistTable(res) {
+    const body = document.getElementById('levelDistTableBody');
+    const desc = document.getElementById('levelDistTableDesc');
+    if (!body) return;
+
+    const headUnit1 = document.getElementById('levelDistHeadUnit1');
+    const headUnit2 = document.getElementById('levelDistHeadUnit2');
+    if (headUnit1 && res.work1_label) headUnit1.textContent = res.work1_label;
+    if (headUnit2 && res.work2_label) headUnit2.textContent = res.work2_label;
+
+    const levelOrder = [4, 3, 2, 1, 0];
+    let html = '';
+    Object.keys(res.domains || {}).forEach(dKey => {
+      const dom = res.domains[dKey];
+      const rows = (res.level_rows || []).filter(r => r.domain === dKey);
+      if (!rows.length) return;
+      html += `<tr class="table-light">
+        <td colspan="11" class="px-3 py-2 fw-bold" ${defectDomainStyle[dKey] || ''}>${dom.no}) ด้าน${dom.name}</td>
+      </tr>`;
+      rows.forEach(r => {
+        const cells1 = levelOrder.map(lv => `<td class="px-1 py-2 text-center font-mono">${(r.levels1 && r.levels1[lv]) || 0}</td>`).join('');
+        const cells2 = levelOrder.map(lv => `<td class="px-1 py-2 text-center font-mono">${(r.levels2 && r.levels2[lv]) || 0}</td>`).join('');
+        html += `<tr>
+          <td class="px-3 py-2">${r.no}. ${r.name}</td>
+          ${cells1}
+          ${cells2}
+        </tr>`;
+      });
+    });
+    body.innerHTML = html || '<tr><td colspan="11" class="text-center text-muted py-4 fw-bold">ไม่มีข้อมูล</td></tr>';
+
+    if (desc) {
+      desc.textContent = `จำนวนนักเรียนที่ได้คะแนนดิบแต่ละระดับ (0-4) ของแต่ละประเด็น นับแยกอิสระต่อหน่วย (n ของแต่ละแถวอาจไม่เท่ากัน ขึ้นกับจำนวนคนที่มีคะแนนครบในหน่วยนั้น)`;
     }
   }
 

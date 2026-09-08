@@ -860,6 +860,46 @@ function ch45_defects(array $ds) {
     ];
 }
 
+/**
+ * จำนวนนักเรียนที่ได้แต่ละระดับคุณภาพ (0-4) รายตัวบ่งชี้ แยกครั้งที่ 1 และครั้งที่ 2
+ *
+ * ต่างจาก ch45_defects() ตรงที่นับแยกอิสระของแต่ละครั้ง ไม่บังคับว่าต้องมีคะแนนครบทั้งสองครั้ง
+ * (สนใจแค่การกระจายคะแนนของครั้งนั้น ๆ เอง ไม่ได้เปรียบเทียบนักเรียนคนเดียวกันข้ามครั้ง)
+ * คะแนนที่มาจากการเฉลี่ยหลายผู้ประเมิน (score_source = mean) อาจเป็นเลขทศนิยม จึงปัดเข้าระดับที่ใกล้ที่สุด
+ */
+function ch45_level_distribution(array $ds) {
+    $meta = $ds['meta'];
+    $p1   = $meta['work1_eval_phase'];
+    $p2   = $meta['work2_eval_phase'];
+    $inds = ch45_indicators();
+
+    $emptyLevels = [4 => 0, 3 => 0, 2 => 0, 1 => 0, 0 => 0];
+    $rows = [];
+    foreach ($inds as $id => $ind) {
+        $rows[$id] = ['id' => $id, 'no' => $ind['no'], 'domain' => $ind['domain'], 'name' => $ind['name'],
+                      'levels1' => $emptyLevels, 'n1' => 0, 'levels2' => $emptyLevels, 'n2' => 0];
+    }
+
+    foreach ($ds['sids'] as $sid) {
+        $a = ch45_scores_of($ds, $sid, $p1);
+        $b = ch45_scores_of($ds, $sid, $p2);
+        foreach ($inds as $id => $ind) {
+            if ($a !== null && $a['raw'][$id] !== null) {
+                $lv = max(0, min(4, (int)round($a['raw'][$id])));
+                $rows[$id]['levels1'][$lv]++;
+                $rows[$id]['n1']++;
+            }
+            if ($b !== null && $b['raw'][$id] !== null) {
+                $lv = max(0, min(4, (int)round($b['raw'][$id])));
+                $rows[$id]['levels2'][$lv]++;
+                $rows[$id]['n2']++;
+            }
+        }
+    }
+
+    return ['work1_phase' => $p1, 'work2_phase' => $p2, 'rows' => $rows];
+}
+
 /* =========================================================================
  * ส่วนที่ 6  ข้อมูลกลไกการเขียน (การสะกดคำ / การเว้นวรรค / ความยาว)
  * ========================================================================= */

@@ -4359,6 +4359,17 @@ try {
                     'n2' => $r['n2'], 'pct2' => $r['pct2'],
                 ];
             }, array_values($c45Def['rows']));
+
+            // จำนวนนักเรียนที่ได้แต่ละระดับคุณภาพ (5 ระดับ) รายตัวบ่งชี้ แยกครั้งที่ 1/ครั้งที่ 2 — ใช้คู่กับตารางข้อบกพร่องด้านบน
+            $c45Lvl = ch45_level_distribution($c45Ds);
+            $c45LevelRows = array_map(function ($r) {
+                return [
+                    'id' => $r['id'], 'no' => $r['no'], 'domain' => $r['domain'], 'name' => $r['name'],
+                    'levels1' => $r['levels1'], 'n1' => $r['n1'],
+                    'levels2' => $r['levels2'], 'n2' => $r['n2'],
+                ];
+            }, array_values($c45Lvl['rows']));
+
             echo json_encode([
                 'success'     => true,
                 'n_base'      => $c45Def['n'],
@@ -4368,6 +4379,7 @@ try {
                 'work2_label' => $c45Ds['meta']['work2_label'],
                 'domains'     => ch45_domains(),
                 'rows'        => $c45Rows,
+                'level_rows'  => $c45LevelRows,
             ], JSON_UNESCAPED_UNICODE);
             break;
 
