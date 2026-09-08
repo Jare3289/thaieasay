@@ -345,7 +345,7 @@ async function clearApiKey() {
 }
 
 /* ---------------------------------------------------- 2) ข้อมูลประจำงานวิจัย */
-let stMetaFields = null, stMetaPhases = null, stMetaLevels = null;
+let stMetaFields = null, stMetaPhases = null, stMetaLevels = null, stMetaIndicators = null, stMetaDomains = null;
 
 async function loadMeta() {
   try {
@@ -360,6 +360,8 @@ async function loadMeta() {
     stMetaFields = data.meta_fields;
     stMetaPhases = data.phases;
     stMetaLevels = data.levels;
+    stMetaIndicators = data.indicators;
+    stMetaDomains = data.domains;
     paintMeta(data.meta);
   } catch (err) {
     console.error(err);
@@ -368,11 +370,40 @@ async function loadMeta() {
   }
 }
 
+/** ตารางเลือกระดับ "ปรากฏข้อบกพร่อง" แยกรายตัวบ่งชี้ — ใช้กับฟิลด์ type: 'level_per_indicator' */
+function renderDefectCutTable(f, value) {
+  // value = object {รหัสตัวบ่งชี้: ระดับ} ที่ได้จาก ch45_meta() แล้ว (แปลงจาก JSON ให้แล้วฝั่งเซิร์ฟเวอร์)
+  const val = (value && typeof value === 'object') ? value : {};
+  const doms = stMetaDomains || {};
+  const inds = stMetaIndicators || {};
+  const levelOpts = Object.keys(stMetaLevels || {});
+  let rows = '';
+  Object.keys(doms).forEach(function (dk) {
+    const dom = doms[dk];
+    rows += '<tr class="table-light"><td colspan="2" class="fw-bold small">ด้าน' + esc(dom.name) + '</td></tr>';
+    (dom.indicators || []).forEach(function (id) {
+      const ind = inds[id] || {};
+      const v = val[id] !== undefined ? String(val[id]) : '2';
+      rows += '<tr><td class="small">' + esc(ind.sub || '') + ' ' + esc(ind.name || id) + '</td>'
+        + '<td><select class="form-select form-select-sm st-defect-cut" data-indicator="' + esc(id) + '">'
+        + levelOpts.map(function (lv) {
+            return '<option value="' + lv + '"' + (v === lv ? ' selected' : '') + '>'
+              + esc(stMetaLevels[lv]) + ' (' + lv + ')</option>';
+          }).join('') + '</select></td></tr>';
+    });
+  });
+  return '<div class="col-12"><label class="form-label small fw-bold mb-1">' + esc(f.label) + '</label>'
+    + (f.hint ? '<div class="form-text small mb-2">' + esc(f.hint) + '</div>' : '')
+    + '<div class="table-responsive"><table class="table table-sm align-middle mb-0">'
+    + '<tbody>' + rows + '</tbody></table></div></div>';
+}
+
 function paintMeta(meta) {
   let h = '';
   Object.keys(stMetaFields).forEach(function (k) {
     const f = stMetaFields[k];
     const v = meta[k] === undefined ? '' : meta[k];
+    if (f.type === 'level_per_indicator') { h += renderDefectCutTable(f, v); return; }
     let input;
     if (f.type === 'source') {
       const opts = { mean: 'คะแนนเฉลี่ยจากผู้ประเมินทุกคน (ตรงกับที่ระบุในบทที่ 4)',
@@ -415,6 +446,10 @@ async function saveMeta() {
   try {
     const payload = {};
     document.querySelectorAll('.st-meta').forEach(function (el) { payload[el.dataset.key] = el.value; });
+    // ตารางเกณฑ์ข้อบกพร่องรายตัวบ่งชี้ประกอบเป็น JSON ก้อนเดียวเก็บที่คีย์ defect_cut
+    const defectCut = {};
+    document.querySelectorAll('.st-defect-cut').forEach(function (el) { defectCut[el.dataset.indicator] = el.value; });
+    if (Object.keys(defectCut).length) payload.defect_cut = JSON.stringify(defectCut);
     const data = await stPost({ action: 'ch45_save_meta', meta: payload });
     if (!data.success) { showToast(data.error || 'บันทึกไม่สำเร็จ', 'error'); return; }
     showToast('บันทึกข้อมูลประจำงานวิจัยแล้ว — หน้าบทที่ 4-5 จะคำนวณใหม่ตามค่านี้');

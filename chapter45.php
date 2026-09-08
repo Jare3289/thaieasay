@@ -1009,6 +1009,13 @@ function c45PaintMeta() {
     if (f.type === 'source') shown = opts[v] || v;
     else if (f.type === 'phase') shown = phases[v] || v;
     else if (f.type === 'level') shown = (levels[v] ? levels[v] + ' (คะแนนดิบ ' + v + ')' : v);
+    else if (f.type === 'level_per_indicator') {
+      const vals = (v && typeof v === 'object') ? Object.keys(v).map(function (id) { return String(v[id]); }) : [];
+      const uniqueVals = vals.filter(function (x, i) { return vals.indexOf(x) === i; });
+      shown = (uniqueVals.length === 1 && levels[uniqueVals[0]])
+        ? (levels[uniqueVals[0]] + ' (คะแนนดิบ ' + uniqueVals[0] + ') ทุกตัวบ่งชี้')
+        : 'ตั้งแยกตามตัวบ่งชี้ (ดูหน้าตั้งค่า)';
+    }
     if (shown === '' || shown === null) shown = '—';
     h += '<div class="col-md-4 col-lg-3"><div class="border rounded-3 p-2 h-100 bg-light">'
       + '<div class="small text-muted">' + c45Esc(f.label) + '</div>'

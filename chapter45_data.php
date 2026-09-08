@@ -151,10 +151,12 @@ function ch45_meta_fields() {
         'work2_phase'   => ['label' => 'รอบงานที่ใช้เป็น "ผลงานครั้งที่ 2"', 'default' => 'task2_d2', 'type' => 'phase'],
         'work1_genre'   => ['label' => 'ประเภทงานเขียนครั้งที่ 1',   'default' => 'เรียงความเชิงบรรยาย', 'type' => 'text'],
         'work2_genre'   => ['label' => 'ประเภทงานเขียนครั้งที่ 2',   'default' => 'เรียงความเชิงวิจารณ์', 'type' => 'text'],
-        'defect_cut'    => ['label' => 'เกณฑ์นับว่า "ปรากฏข้อบกพร่อง" — คะแนนดิบอยู่ระดับใดลงมา', 'default' => '2', 'type' => 'level',
-                             'hint' => 'ทุกตัวบ่งชี้ใช้มาตรฐานระดับเดียวกัน (ดีมาก/ดี/ปานกลาง/พอใช้/ปรับปรุง) '
-                                     . 'แม้เนื้อหาของแต่ละระดับจะต่างกันไปตามเกณฑ์การให้คะแนนของตัวบ่งชี้นั้น ๆ '
-                                     . 'เลือก "ปานกลาง" (ค่าเริ่มต้น) หมายถึง นักเรียนที่ได้คะแนนดิบระดับปานกลางหรือต่ำกว่า '
+        'defect_cut'    => ['label' => 'เกณฑ์นับว่า "ปรากฏข้อบกพร่อง" — คะแนนดิบอยู่ระดับใดลงมา (ตั้งแยกแต่ละตัวบ่งชี้ได้)',
+                             'default' => json_encode(array_fill_keys(array_keys(ch45_indicators()), 2)),
+                             'type' => 'level_per_indicator',
+                             'hint' => 'ตั้งเกณฑ์แยกแต่ละตัวบ่งชี้ได้ เพราะความหมายของแต่ละระดับในแต่ละตัวบ่งชี้ไม่เหมือนกัน '
+                                     . '(ดูเกณฑ์การให้คะแนนของแต่ละตัวบ่งชี้ที่หน้าตั้งค่าระบบตรวจ) '
+                                     . 'เลือก "ปานกลาง" (ค่าเริ่มต้นของทุกตัวบ่งชี้) หมายถึง นักเรียนที่ได้คะแนนดิบระดับปานกลางหรือต่ำกว่า '
                                      . '(ปานกลาง/พอใช้/ปรับปรุง) จะถูกนับว่า "ปรากฏข้อบกพร่อง" ด้านนั้น '
                                      . '— เลือกระดับสูงขึ้นจะยิ่งนับว่ามีข้อบกพร่องง่ายขึ้น (เกณฑ์หลวมขึ้น)'],
         'good_example_min' => ['label' => 'เกณฑ์ตัวอย่างผลงาน "ที่ทำได้ดี" สำหรับยกเปรียบเทียบ — ต้องอยู่ระดับใดขึ้นไป',
@@ -196,8 +198,20 @@ function ch45_meta(PDO $pdo) {
     // ค่าที่ต้องเป็นตัวเลข/ต้องอยู่ในขอบเขตที่ระบบรู้จัก
     if (!in_array($out['work1_phase'], ai_all_phases(), true)) $out['work1_phase'] = 'task1_d2';
     if (!in_array($out['work2_phase'], ai_all_phases(), true)) $out['work2_phase'] = 'task2_d2';
-    $cut = (int)$out['defect_cut'];
-    $out['defect_cut'] = ($cut >= 0 && $cut <= 3) ? $cut : 2;
+
+    // defect_cut เก็บเป็น JSON string {รหัสตัวบ่งชี้: ระดับ} เพื่อตั้งแยกแต่ละตัวบ่งชี้ได้
+    // (ค่าเก่าก่อนมีฟีเจอร์นี้เป็นเลขเดี่ยว เช่น "2" — json_decode ได้ตัวเลขธรรมดา ไม่ใช่ array
+    // จึงถือเป็นค่าเดียวที่เคยตั้งไว้ แล้วใช้ค่านั้นเป็นค่าเริ่มต้นของทุกตัวบ่งชี้แทน เพื่อไม่ให้เกณฑ์เปลี่ยนไปจากเดิมโดยไม่ได้ตั้งใจ)
+    $decoded = json_decode((string)$out['defect_cut'], true);
+    $uniform = is_numeric($decoded) ? (int)$decoded : null;
+    $rawMap  = is_array($decoded) ? $decoded : [];
+    $cutMap  = [];
+    foreach (ch45_indicators() as $id => $ind) {
+        $v = array_key_exists($id, $rawMap) ? (int)$rawMap[$id] : ($uniform !== null ? $uniform : 2);
+        $cutMap[$id] = ($v >= 0 && $v <= 3) ? $v : 2;
+    }
+    $out['defect_cut'] = $cutMap;
+
     $gem = (int)($out['good_example_min'] ?? 2);
     $out['good_example_min'] = ($gem >= 0 && $gem <= 4) ? $gem : 2;
 
@@ -207,10 +221,21 @@ function ch45_meta(PDO $pdo) {
     if (!isset($srcLabel[$out['score_source']])) $out['score_source'] = 'mean';
     $out['score_source_label'] = $srcLabel[$out['score_source']];
     $levels = ch45_score_levels();
-    $out['defect_rule'] = 'นับว่า "ปรากฏข้อบกพร่อง" ในตัวบ่งชี้หนึ่ง เมื่อผลงานชิ้นนั้นได้คะแนนดิบของตัวบ่งชี้'
-        . 'อยู่ระดับ' . ($levels[$out['defect_cut']] ?? $out['defect_cut']) . 'หรือต่ำกว่า (คะแนนดิบไม่เกิน '
-        . $out['defect_cut'] . ' จากเต็ม 4) ตามเกณฑ์ประเมินแบบแยกองค์ประกอบ '
-        . '(ใช้' . $out['score_source_label'] . ')';
+    $uniqueCuts = array_unique(array_values($cutMap));
+    if (count($uniqueCuts) === 1) {
+        $lv = reset($uniqueCuts);
+        $out['defect_rule'] = 'นับว่า "ปรากฏข้อบกพร่อง" ในตัวบ่งชี้หนึ่ง เมื่อผลงานชิ้นนั้นได้คะแนนดิบของตัวบ่งชี้'
+            . 'อยู่ระดับ' . ($levels[$lv] ?? $lv) . 'หรือต่ำกว่า (คะแนนดิบไม่เกิน ' . $lv . ' จากเต็ม 4) '
+            . 'ตามเกณฑ์ประเมินแบบแยกองค์ประกอบ (ใช้' . $out['score_source_label'] . ')';
+    } else {
+        $parts = [];
+        foreach (ch45_indicators() as $id => $ind) {
+            $lv = $cutMap[$id];
+            $parts[] = $ind['name'] . ' = ' . ($levels[$lv] ?? $lv) . 'หรือต่ำกว่า';
+        }
+        $out['defect_rule'] = 'นับว่า "ปรากฏข้อบกพร่อง" เมื่อผลงานได้คะแนนดิบของตัวบ่งชี้นั้นอยู่ในระดับที่ตั้งไว้เฉพาะตัวบ่งชี้นั้นหรือต่ำกว่า '
+            . '(ใช้' . $out['score_source_label'] . ') ได้แก่ ' . implode(', ', $parts);
+    }
     $out['work1_label'] = 'ครั้งที่ 1 ' . $out['work1_genre'];
     $out['work2_label'] = 'ครั้งที่ 2 ' . $out['work2_genre'];
     $out['work1_eval_phase'] = ch45_eval_phase_of($out['work1_phase']);
@@ -745,11 +770,11 @@ function ch45_interrater(array $ds) {
  * คืนค่า rows[] เรียงตามลำดับในตาราง 14 พร้อมจำนวน/ร้อยละของทั้งสองครั้งและผลต่าง
  */
 function ch45_defects(array $ds) {
-    $meta = $ds['meta'];
-    $cut  = (int)$meta['defect_cut'];
-    $p1   = $meta['work1_eval_phase'];
-    $p2   = $meta['work2_eval_phase'];
-    $inds = ch45_indicators();
+    $meta   = $ds['meta'];
+    $cutMap = is_array($meta['defect_cut'] ?? null) ? $meta['defect_cut'] : [];
+    $p1     = $meta['work1_eval_phase'];
+    $p2     = $meta['work2_eval_phase'];
+    $inds   = ch45_indicators();
 
     // ฐานการนับ = นักเรียนที่มีคะแนนครบทั้งสองครั้ง เพื่อให้ร้อยละสองคอลัมน์เทียบกันได้จริง
     $base = [];
@@ -763,6 +788,7 @@ function ch45_defects(array $ds) {
 
     $rows = [];
     foreach ($inds as $id => $ind) {
+        $cut = (int)($cutMap[$id] ?? 2);
         $c1 = []; $c2 = [];
         foreach ($base as $sid => $b) {
             $r1 = $b['w1']['raw'][$id];
@@ -822,7 +848,7 @@ function ch45_defects(array $ds) {
     }
 
     return [
-        'n' => $n, 'cut' => $cut, 'rule' => $meta['defect_rule'],
+        'n' => $n, 'cut' => $cutMap, 'rule' => $meta['defect_rule'],
         'work1_phase' => $p1, 'work2_phase' => $p2,
         'rows' => $rows,
         'ranked' => $ranked,
