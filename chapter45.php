@@ -997,6 +997,7 @@ function c45PaintMeta() {
   const fields = c45Data.meta_fields;
   const meta   = c45Data.meta;
   const phases = c45Data.phases;
+  const levels = c45Data.levels || {};
   const opts   = { mean: 'คะแนนเฉลี่ยจากผู้ประเมินทุกคน (ตรงกับที่ระบุในบทที่ 4)',
                    teacher: 'คะแนนของครูผู้สอนอย่างเดียว',
                    expert: 'คะแนนของผู้เชี่ยวชาญอย่างเดียว' };
@@ -1007,6 +1008,7 @@ function c45PaintMeta() {
     let shown = v;
     if (f.type === 'source') shown = opts[v] || v;
     else if (f.type === 'phase') shown = phases[v] || v;
+    else if (f.type === 'level') shown = (levels[v] ? levels[v] + ' (คะแนนดิบ ' + v + ')' : v);
     if (shown === '' || shown === null) shown = '—';
     h += '<div class="col-md-4 col-lg-3"><div class="border rounded-3 p-2 h-100 bg-light">'
       + '<div class="small text-muted">' + c45Esc(f.label) + '</div>'

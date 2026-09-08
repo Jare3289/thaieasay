@@ -4240,6 +4240,7 @@ try {
                 'meta'       => $c45['ds']['meta'],
                 'meta_fields'=> ch45_meta_fields(),
                 'phases'     => array_map('ai_phase_label', array_combine(ai_all_phases(), ai_all_phases())),
+                'levels'     => ch45_score_levels(),
                 'topics'     => $c45['ds']['topics'],
                 'students'   => count($c45['ds']['sids']),
                 'domains'    => ch45_domains(),
@@ -4332,6 +4333,7 @@ try {
                 'meta'        => ch45_meta($pdo),
                 'meta_fields' => ch45_meta_fields(),
                 'phases'      => array_map('ai_phase_label', array_combine(ai_all_phases(), ai_all_phases())),
+                'levels'      => ch45_score_levels(),
             ], JSON_UNESCAPED_UNICODE);
             break;
 

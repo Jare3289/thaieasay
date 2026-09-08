@@ -345,7 +345,7 @@ async function clearApiKey() {
 }
 
 /* ---------------------------------------------------- 2) ข้อมูลประจำงานวิจัย */
-let stMetaFields = null, stMetaPhases = null;
+let stMetaFields = null, stMetaPhases = null, stMetaLevels = null;
 
 async function loadMeta() {
   try {
@@ -359,6 +359,7 @@ async function loadMeta() {
     }
     stMetaFields = data.meta_fields;
     stMetaPhases = data.phases;
+    stMetaLevels = data.levels;
     paintMeta(data.meta);
   } catch (err) {
     console.error(err);
@@ -386,6 +387,13 @@ function paintMeta(meta) {
         + Object.keys(stMetaPhases).map(function (p) {
             return '<option value="' + esc(p) + '"' + (p === v ? ' selected' : '') + '>'
               + esc(stMetaPhases[p]) + '</option>';
+          }).join('') + '</select>';
+    } else if (f.type === 'level') {
+      // ตัวเลือกเรียงจากน้อยไปมาก (JS จัดคีย์ตัวเลขให้เองอัตโนมัติ) — ปรับปรุง(0) ... ดีมาก(4)
+      input = '<select class="form-select form-select-sm st-meta" data-key="' + k + '">'
+        + Object.keys(stMetaLevels || {}).map(function (lv) {
+            return '<option value="' + lv + '"' + (String(v) === lv ? ' selected' : '') + '>'
+              + esc(stMetaLevels[lv]) + ' (คะแนนดิบ ' + lv + ')</option>';
           }).join('') + '</select>';
     } else {
       input = '<input class="form-control form-control-sm st-meta" data-key="' + k + '"'
