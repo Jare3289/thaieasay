@@ -63,14 +63,32 @@ $c45IsTeacher = ($sessionUser['role'] === 'teacher');
           <span class="badge bg-white text-dark px-3 py-2 fw-bold d-block mb-2">
             <i class="bi bi-person-fill me-1"></i><?php echo htmlspecialchars($sessionUser['name']); ?>
           </span>
-          <a href="chapter45_print.php" target="_blank" class="btn btn-light btn-sm fw-bold rounded-pill px-3 mb-2">
-            <i class="bi bi-file-earmark-text me-1"></i>เปิดร่างบทที่ 4-5
-          </a>
+          <div class="d-flex gap-1 justify-content-end flex-wrap mb-2">
+            <a href="chapter45_print.php?chapter=4" target="_blank" class="btn btn-light btn-sm fw-bold rounded-pill px-3">
+              <i class="bi bi-file-earmark-text me-1"></i>เปิดร่างบทที่ 4
+            </a>
+            <a href="chapter45_print.php?chapter=5" target="_blank" class="btn btn-light btn-sm fw-bold rounded-pill px-3">
+              <i class="bi bi-file-earmark-text me-1"></i>เปิดร่างบทที่ 5
+            </a>
+            <a href="chapter45_print.php" target="_blank" class="btn btn-outline-light btn-sm fw-bold rounded-pill px-3">
+              เปิดร่างรวมทั้งสองบท
+            </a>
+          </div>
 <?php if ($c45IsTeacher): ?>
-          <button id="c45ExportBtn" class="btn btn-sm fw-bold rounded-pill px-3 text-white d-block w-100"
-                  style="background:linear-gradient(135deg,#1a1a2e,#4c1d95);" type="button" onclick="sendChapter45ReportToGoogleDocs()">
-            <i class="bi bi-google me-1"></i>ส่งร่างบทที่ 4-5 เข้า Google Doc
-          </button>
+          <div class="d-flex flex-column gap-1">
+            <button id="c45ExportBtn4" class="btn btn-sm fw-bold rounded-pill px-3 text-white d-block w-100"
+                    style="background:linear-gradient(135deg,#1a1a2e,#4c1d95);" type="button" onclick="sendChapter45ReportToGoogleDocs('ch4')">
+              <i class="bi bi-google me-1"></i>ส่งบทที่ 4 เข้า Google Doc
+            </button>
+            <button id="c45ExportBtn5" class="btn btn-sm fw-bold rounded-pill px-3 text-white d-block w-100"
+                    style="background:linear-gradient(135deg,#1a1a2e,#4c1d95);" type="button" onclick="sendChapter45ReportToGoogleDocs('ch5')">
+              <i class="bi bi-google me-1"></i>ส่งบทที่ 5 เข้า Google Doc
+            </button>
+            <button id="c45ExportBtn" class="btn btn-sm fw-bold rounded-pill px-3 text-white d-block w-100"
+                    style="background:linear-gradient(135deg,#334155,#4c1d95);" type="button" onclick="sendChapter45ReportToGoogleDocs()">
+              <i class="bi bi-google me-1"></i>ส่งร่างรวมทั้งสองบทเข้า Google Doc
+            </button>
+          </div>
           <div id="c45GoogleStatusBox" class="small text-white-50 mt-1"></div>
 <?php endif; ?>
         </div>
@@ -103,6 +121,12 @@ $c45IsTeacher = ($sessionUser['role'] === 'teacher');
           <button id="c45RunAllBtn" class="btn btn-lg fw-bold rounded-pill px-4 py-3 text-white"
                   style="background:linear-gradient(135deg,#6d28d9,#0d7377);" onclick="c45RunAll()">
             <i class="bi bi-stars me-1"></i>วิเคราะห์ทั้งหมด (บทที่ 4 และ 5)
+          </button>
+          <button id="c45RunCh4Btn" class="btn btn-outline-primary fw-bold rounded-pill px-3" onclick="c45RunAll('ch4')">
+            <i class="bi bi-stars me-1"></i>วิเคราะห์เฉพาะบทที่ 4
+          </button>
+          <button id="c45RunCh5Btn" class="btn btn-outline-primary fw-bold rounded-pill px-3" onclick="c45RunAll('ch5')">
+            <i class="bi bi-stars me-1"></i>วิเคราะห์เฉพาะบทที่ 5
           </button>
           <button id="c45StopBtn" class="btn btn-outline-danger rounded-pill px-3 d-none" onclick="c45Stop()">
             <i class="bi bi-stop-circle"></i> หยุด
@@ -574,6 +598,14 @@ function c45JobsInOrder() {
   return order;
 }
 
+/* หัวข้อของบทเดียว — chapter = 'ch4' | 'ch5' | ว่าง/undefined (ทั้งสองบท)
+   ใช้กลุ่ม (group) ของแต่ละหัวข้อตัดสิน เพราะกลุ่มทุกกลุ่มขึ้นต้นด้วย 'ch4_' หรือ 'ch5_' เสมอ (ดู ch45_ai_job_groups) */
+function c45JobsForChapter(chapter) {
+  const all = c45JobsInOrder();
+  if (!chapter) return all;
+  return all.filter(function (k) { return (c45Data.jobs[k].group || '').indexOf(chapter + '_') === 0; });
+}
+
 function c45WarnBox(warnings) {
   if (!warnings || !warnings.length) return '';
   return '<div class="alert alert-warning border-0 rounded-3 py-2 small mb-2">'
@@ -887,19 +919,30 @@ async function c45RunOne(jobKey) {
   }
 }
 
-async function c45RunAll() {
+const C45_RUN_BTN_IDS = ['c45RunAllBtn', 'c45RunCh4Btn', 'c45RunCh5Btn'];
+
+/* chapter = 'ch4' | 'ch5' | ว่าง/undefined (ทั้งสองบท) — ปุ่มทั้งสามใช้ฟังก์ชันนี้ร่วมกัน
+   บทที่ 5 บางหัวข้อต้องมีผลของบทที่ 4 (quant_narrative) ก่อนจึงจะเขียนได้ครบ ถ้ายังไม่มีระบบจะเตือนต่อหัวข้อ
+   (ผ่าน pending deps) แต่ไม่ได้บล็อกไม่ให้สั่งแยก */
+async function c45RunAll(chapter) {
   if (c45Running) return;
-  if (!confirm('ระบบจะเขียนให้ครบทั้งบทที่ 4 และบทที่ 5 รวม ' + Object.keys(c45Data.jobs).length
-      + ' หัวข้อ ตามลำดับที่ถูกต้อง ใช้เวลาประมาณ 5-15 นาที (เปิดหน้านี้ทิ้งไว้จนกว่าจะเสร็จ) '
-      + 'ผลเดิมจะถูกทับทั้งหมด ยืนยันหรือไม่?')) return;
+  const jobs = c45JobsForChapter(chapter);
+  if (!jobs.length) return;
+  const chapterLabel = chapter === 'ch4' ? 'เฉพาะบทที่ 4' : (chapter === 'ch5' ? 'เฉพาะบทที่ 5' : 'ทั้งบทที่ 4 และบทที่ 5');
+  // อิงเวลาต่อหัวข้อเดียวกับที่แจ้งไว้ตอนวิเคราะห์ทีละหัวข้อ (15-40 วินาทีต่อหัวข้อ ดู c45RunOne)
+  const etaLo = Math.max(1, Math.round(jobs.length * 15 / 60));
+  const etaHi = Math.max(etaLo + 1, Math.round(jobs.length * 40 / 60));
+  if (!confirm('ระบบจะเขียนให้ครบ' + chapterLabel + ' รวม ' + jobs.length
+      + ' หัวข้อ ตามลำดับที่ถูกต้อง ใช้เวลาประมาณ ' + etaLo + '-' + etaHi
+      + ' นาที (เปิดหน้านี้ทิ้งไว้จนกว่าจะเสร็จ) '
+      + 'ผลเดิมของหัวข้อเหล่านี้จะถูกทับทั้งหมด ยืนยันหรือไม่?')) return;
 
   c45Running = true;
   c45Stopped = false;
-  document.getElementById('c45RunAllBtn').disabled = true;
+  C45_RUN_BTN_IDS.forEach(function (id) { const b = document.getElementById(id); if (b) b.disabled = true; });
   document.getElementById('c45StopBtn').classList.remove('d-none');
   document.getElementById('c45RunLog').innerHTML = '';
 
-  const jobs = c45JobsInOrder();
   const MAX_JOB_ATTEMPTS = 3; // ลองวิเคราะห์ซ้ำอัตโนมัติสูงสุดต่อหัวข้อ กันวนซ้ำไม่รู้จบถ้าหัวข้อนั้นมีปัญหาถาวร
   let done = 0, failed = 0, warned = 0;
   for (const k of jobs) {
@@ -921,12 +964,18 @@ async function c45RunAll() {
       failed++;
       c45Log('bi-x-circle-fill', 'text-danger', c45Data.jobs[k].label
         + ' — ลองซ้ำอัตโนมัติแล้ว ' + MAX_JOB_ATTEMPTS + ' ครั้งไม่สำเร็จ (' + (r.error || 'ไม่สำเร็จ') + ')');
-    } else if (r.warnings.length) {
-      warned++;
-      c45Log('bi-exclamation-triangle-fill', 'text-warning',
-        c45Data.jobs[k].label + ' — เสร็จแล้ว แต่มี ' + r.warnings.length + ' จุดต้องตรวจ');
     } else {
-      c45Log('bi-check-circle-fill', 'text-success', c45Data.jobs[k].label + ' — เรียบร้อย');
+      if (r.pending && r.pending.length) {
+        c45Log('bi-exclamation-triangle-fill', 'text-warning', c45Data.jobs[k].label
+          + ' — ควรทำหลังจาก: ' + r.pending.join(', ') + ' (ยังไม่ได้วิเคราะห์)');
+      }
+      if (r.warnings.length) {
+        warned++;
+        c45Log('bi-exclamation-triangle-fill', 'text-warning',
+          c45Data.jobs[k].label + ' — เสร็จแล้ว แต่มี ' + r.warnings.length + ' จุดต้องตรวจ');
+      } else {
+        c45Log('bi-check-circle-fill', 'text-success', c45Data.jobs[k].label + ' — เรียบร้อย');
+      }
     }
     c45SetProgress(done, jobs.length);
   }
@@ -934,12 +983,13 @@ async function c45RunAll() {
   c45SetProgress(done, jobs.length, 'เสร็จสิ้น — สำเร็จ ' + (done - failed) + ' หัวข้อ · ไม่สำเร็จ '
     + failed + ' หัวข้อ · ต้องตรวจ ' + warned + ' หัวข้อ');
   c45Running = false;
-  document.getElementById('c45RunAllBtn').disabled = false;
+  C45_RUN_BTN_IDS.forEach(function (id) { const b = document.getElementById(id); if (b) b.disabled = false; });
   document.getElementById('c45StopBtn').classList.add('d-none');
   c45PaintResults();
+  const openLabel = chapter === 'ch4' ? 'เปิดร่างบทที่ 4' : (chapter === 'ch5' ? 'เปิดร่างบทที่ 5' : 'เปิดร่างบทที่ 4 หรือ 5');
   c45Alert(failed
     ? ('วิเคราะห์เสร็จแล้ว แต่มี ' + failed + ' หัวข้อที่ไม่สำเร็จ — กดวิเคราะห์ซ้ำเฉพาะหัวข้อนั้นได้')
-    : 'เขียนครบทั้งบทที่ 4 และบทที่ 5 แล้ว กด "เปิดร่างบทที่ 4-5" ด้านบนเพื่อดูฉบับประกอบเสร็จ',
+    : ('เขียนครบ' + chapterLabel + ' แล้ว กด "' + openLabel + '" ด้านบนเพื่อดูฉบับประกอบเสร็จ'),
     failed ? 'warning' : 'success');
 }
 
@@ -1665,7 +1715,8 @@ function c45Payload(jobKey) {
   return (r && r.payload) ? r.payload : {};
 }
 
-function buildChapter45ReportHtml() {
+/* chapter = 'ch4' | 'ch5' | ว่าง/undefined (ทั้งสองบท) */
+function buildChapter45ReportHtml(chapter) {
   const now    = new Date();
   const thDate = now.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
   const P = [];
@@ -1685,6 +1736,7 @@ function buildChapter45ReportHtml() {
      ลำดับของบท: ย่อหน้านำบท → ตอนที่ 1 (เกริ่น → ตาราง 12 → อ่านผล → สรุปปิดตอน)
                  → ตอนที่ 2 (เกริ่น → ตาราง 13 → ตาราง 14 → รายองค์ประกอบทีละด้าน) → สรุปปิดบท
      ===================================================================== */
+  if (!chapter || chapter === 'ch4') {
   P.push('<h1 class="chap" id="ch4">บทที่ 4 ผลการวิจัย</h1>');
   P.push(c45DocP('ผลการวิจัย เรื่องผลการจัดการเรียนการสอนเขียนตามแนวคิด POA ที่มีต่อความสามารถ'
     + 'ในการเขียนเรียงความของนักเรียนมัธยมศึกษาตอนปลาย ผู้วิจัยนำเสนอผลการวิจัยเป็น 2 ตอน '
@@ -1805,6 +1857,7 @@ function buildChapter45ReportHtml() {
   });
 
   P.push(c45DocP(ov.closing, 'ย่อหน้าสรุปปิดบทที่ 4'));
+  } // chapter === 'ch4'
 
   /* =====================================================================
      บทที่ 5 — สรุปผลการวิจัย อภิปรายผล และข้อเสนอแนะ
@@ -1813,7 +1866,8 @@ function buildChapter45ReportHtml() {
   const d5 = c45Payload('ch5_discussion');
   const r5 = c45Payload('ch5_recommend');
 
-  P.push('<div class="pagebreak"></div>');
+  if (!chapter || chapter === 'ch5') {
+  if (!chapter) P.push('<div class="pagebreak"></div>'); // ขึ้นหน้าใหม่เฉพาะตอนอยู่ต่อจากบทที่ 4 ในเอกสารเดียวกัน
   P.push('<h1 class="chap" id="ch5">บทที่ 5 สรุปผลการวิจัย อภิปรายผล และข้อเสนอแนะ</h1>');
   P.push(c45DocP(s5.opening, 'ย่อหน้าเปิดบทที่ 5'));
 
@@ -1871,9 +1925,11 @@ function buildChapter45ReportHtml() {
     futs.forEach(function (f) { P.push(c45DocP(f.text)); });
   }
   P.push(c45DocP(r5.closing, 'ย่อหน้าปิดท้ายบทที่ 5'));
+  } // chapter === 'ch5'
 
   /* =====================================================================
      ภาคผนวกของรายงาน — ข้อมูลประกอบที่ใช้ตรวจสอบ ไม่ต้องพิมพ์ลงวิทยานิพนธ์
+     (แสดงเสมอไม่ว่าจะส่งออกบทไหน เพราะเป็นข้อมูลช่วยตรวจสอบ ไม่ใช่เนื้อหาที่พิมพ์ลงวิทยานิพนธ์)
      ===================================================================== */
   P.push('<div class="pagebreak"></div>');
   P.push('<h1 class="chap" id="app">ภาคผนวกของรายงาน</h1>');
@@ -1989,12 +2045,11 @@ function buildChapter45ReportHtml() {
   })));
 
   P.push('<h2 class="part" id="app-g">ช. สิ่งที่ต้องตรวจสอบก่อนนำไปใช้</h2>');
-  const jobKeys = (d.run_order && d.run_order.length ? d.run_order : Object.keys(jobs))
-    .filter(function (k) { return jobs[k]; });
+  const jobKeys = c45JobsForChapter(chapter);
   const doneJobs = jobKeys.filter(function (k) { return results[k]; });
   const pending  = jobKeys.filter(function (k) { return !results[k]; });
   const warnRows = [];
-  Object.keys(jobs).forEach(function (k) {
+  jobKeys.forEach(function (k) {
     const res = results[k];
     if (res && res.warnings && res.warnings.length) warnRows.push([jobs[k].label, res.warnings.join(' · ')]);
   });
@@ -2004,20 +2059,26 @@ function buildChapter45ReportHtml() {
 
   /* ---------------------------------------------------------------- ประกอบเป็นเอกสาร */
   const body = P.join('\n');
-  const secLabels = [
-    'บทที่ 4 ผลการวิจัย',
-    '    ตอนที่ 1 ผลการเปรียบเทียบก่อนและหลังเรียน (ตาราง 12)',
-    '    ตอนที่ 2 ผลการวิเคราะห์การเปลี่ยนแปลง (ตาราง 13 ตาราง 14 และรายองค์ประกอบ 4 ด้าน)',
-    'บทที่ 5 สรุปผลการวิจัย อภิปรายผล และข้อเสนอแนะ',
-    '    สรุปผลการวิจัย · อภิปรายผล · ข้อเสนอแนะ',
-    'ภาคผนวกของรายงาน (ข้อมูลประกอบ ไม่ต้องพิมพ์ลงวิทยานิพนธ์)'
-  ];
+  const secLabels = [];
+  if (!chapter || chapter === 'ch4') {
+    secLabels.push('บทที่ 4 ผลการวิจัย');
+    secLabels.push('    ตอนที่ 1 ผลการเปรียบเทียบก่อนและหลังเรียน (ตาราง 12)');
+    secLabels.push('    ตอนที่ 2 ผลการวิเคราะห์การเปลี่ยนแปลง (ตาราง 13 ตาราง 14 และรายองค์ประกอบ 4 ด้าน)');
+  }
+  if (!chapter || chapter === 'ch5') {
+    secLabels.push('บทที่ 5 สรุปผลการวิจัย อภิปรายผล และข้อเสนอแนะ');
+    secLabels.push('    สรุปผลการวิจัย · อภิปรายผล · ข้อเสนอแนะ');
+  }
+  secLabels.push('ภาคผนวกของรายงาน (ข้อมูลประกอบ ไม่ต้องพิมพ์ลงวิทยานิพนธ์)');
   const toc = '<div class="toc"><h1 class="chap nonum">สารบัญ</h1>'
     + secLabels.map(function (s) { return '<div class="tocitem">' + c45Esc(s) + '</div>'; }).join('')
     + '</div>';
+  const coverTop   = chapter === 'ch4' ? 'ร่างบทที่ 4' : (chapter === 'ch5' ? 'ร่างบทที่ 5' : 'ร่างบทที่ 4 และบทที่ 5');
+  const coverTitle = chapter === 'ch4' ? 'ผลการวิจัย'
+    : (chapter === 'ch5' ? 'สรุปผลการวิจัย อภิปรายผล และข้อเสนอแนะ' : 'ผลการวิจัย สรุปผลการวิจัย อภิปรายผล และข้อเสนอแนะ');
   const cover = '<div class="cover">'
-    + '<div class="cover-top">ร่างบทที่ 4 และบทที่ 5</div>'
-    + '<div class="cover-title">ผลการวิจัย สรุปผลการวิจัย อภิปรายผล และข้อเสนอแนะ</div>'
+    + '<div class="cover-top">' + c45Esc(coverTop) + '</div>'
+    + '<div class="cover-title">' + c45Esc(coverTitle) + '</div>'
     + '<div class="cover-box">วิเคราะห์แล้ว ' + doneJobs.length + ' / ' + jobKeys.length + ' หัวข้อ</div>'
     + '<div class="cover-note">ร่างนี้เรียงตามลำดับของวิทยานิพนธ์ ผู้วิจัยต้องอ่านทวน ตรวจสอบตัวเลข '
     + 'และเกลาสำนวนให้เป็นเสียงของตนเองก่อนนำไปใช้เสมอ</div>'
@@ -2052,17 +2113,21 @@ function buildChapter45ReportHtml() {
     + '.toc .tocitem { font-size:16pt; padding:5pt 0; border-bottom:0.5pt dotted #bbb; white-space:pre; }'
     + 'h1.nonum { text-align:center; }';
 
+  const filenameChapters = chapter === 'ch4' ? '4' : (chapter === 'ch5' ? '5' : '4-5');
   const doc = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">'
-    + '<head><meta charset="utf-8"><title>ร่างบทที่ 4 และบทที่ 5</title>'
+    + '<head><meta charset="utf-8"><title>' + c45Esc(coverTop) + '</title>'
     + '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->'
     + '<style>' + css + '</style></head><body>'
     + cover + toc + '<div class="pagebreak"></div>' + body + '</body></html>';
 
-  return { doc, filename: 'ร่างบทที่4-5_' + now.toISOString().slice(0, 10) };
+  return { doc, filename: 'ร่างบทที่' + filenameChapters + '_' + now.toISOString().slice(0, 10) };
 }
 
-async function sendChapter45ReportToGoogleDocs() {
-  const btn = document.getElementById('c45ExportBtn');
+/* chapter = 'ch4' | 'ch5' | ว่าง/undefined (ทั้งสองบท) — ต้องส่งค่าเดียวกับตอนกดปุ่มเสมอ
+   เพื่อให้ปุ่ม/สถานะที่แสดงผลตรงกับเอกสารที่กำลังส่งจริง */
+async function sendChapter45ReportToGoogleDocs(chapter) {
+  const btnId = chapter === 'ch4' ? 'c45ExportBtn4' : (chapter === 'ch5' ? 'c45ExportBtn5' : 'c45ExportBtn');
+  const btn = document.getElementById(btnId);
   const original = btn ? btn.innerHTML : '';
   if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>กำลังจัดทำและส่งเข้า Google Docs...'; }
   try {
@@ -2080,7 +2145,7 @@ async function sendChapter45ReportToGoogleDocs() {
       window.location.href = 'google_auth.php?action=connect&return=' + ret;
       return;
     }
-    const rep = buildChapter45ReportHtml();
+    const rep = buildChapter45ReportHtml(chapter);
     const httpResp = await fetch('google_upload_doc.php', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ html: rep.doc, title: rep.filename })
