@@ -71,20 +71,34 @@ require_once 'header.php';
             </div>
             <!-- กราฟจัดลำดับรายบุคคลที่นำไปใช้ติดตามและวางแผนช่วยเหลือได้จริง -->
             <div class="col-12 mt-4 border-top pt-4">
-              <span class="small fw-bold text-secondary mb-1 d-block text-center">3. ติดตามผลรายบุคคลเพื่อเลือกผู้เรียนที่ควรได้รับการช่วยเหลือ</span>
-              <span class="small text-muted mb-3 d-block text-center">เรียงคะแนนจากน้อยไปมาก คลิกชื่อในตารางด้านล่างเพื่อดูรายละเอียดเชิงลึก</span>
+              <span class="small fw-bold text-secondary mb-1 d-block text-center">3. ภาพรวมความก้าวหน้าและความพร้อมของข้อมูล</span>
+              <span class="small text-muted mb-3 d-block text-center">ดูแนวโน้มทั้งห้องก่อน แล้วคลิกกราฟด้านบนเพื่อเจาะดูรายชื่อนักเรียนหรือเกณฑ์ที่สนใจ</span>
               <div class="row g-4">
                 <div class="col-lg-6 col-12 text-center">
-                  <span class="small fw-bold text-primary-emphasis mb-2 d-block"><i class="bi bi-clipboard-check"></i> 3.1 คะแนนเฉลี่ยภาระงานรายคน (เต็ม 60)</span>
+                  <span class="small fw-bold text-primary-emphasis mb-2 d-block"><i class="bi bi-graph-up-arrow"></i> 3.1 แนวโน้มคะแนนเฉลี่ยทั้งห้องตามช่วงการประเมิน</span>
                   <div style="position: relative; height: 440px;" class="w-100">
                     <canvas id="classDimensionSpiderTask"></canvas>
                   </div>
                 </div>
                 <div class="col-lg-6 col-12 text-center">
-                  <span class="small fw-bold text-success-emphasis mb-2 d-block"><i class="bi bi-arrow-left-right"></i> 3.2 เปรียบเทียบก่อน–หลังเรียนรายคน (เต็ม 60)</span>
+                  <span class="small fw-bold text-success-emphasis mb-2 d-block"><i class="bi bi-check2-circle"></i> 3.2 ความครบถ้วนของข้อมูลแต่ละช่วง</span>
                   <div style="position: relative; height: 440px;" class="w-100">
                     <canvas id="classDimensionSpiderPrePost"></canvas>
                   </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-12 d-none" id="chartDrilldownPanel">
+              <div class="card border-primary-subtle bg-primary-subtle bg-opacity-25 shadow-none">
+                <div class="card-body p-3">
+                  <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
+                    <div>
+                      <h6 class="fw-bold text-primary-emphasis mb-1" id="chartDrilldownTitle">รายละเอียดจากกราฟ</h6>
+                      <p class="small text-muted mb-0" id="chartDrilldownDescription"></p>
+                    </div>
+                    <button type="button" class="btn-close" aria-label="ปิดรายละเอียด" onclick="closeChartDrilldown()"></button>
+                  </div>
+                  <div class="table-responsive" id="chartDrilldownContent"></div>
                 </div>
               </div>
             </div>
@@ -637,6 +651,7 @@ require_once 'header.php';
   let classroomResearchData = null;
   let currentResearchPhase = 'task1';
   let currentDashboardViewMode = 'task1';
+  let currentOverviewData = {};
 
   // แผนที่กลุ่มการวิจัยของนักเรียน (รหัส -> กลุ่มทดลอง/กลุ่มตัวอย่าง) และตัวกรองกลุ่มปัจจุบัน
   let studentGroupDB = {};
@@ -1153,11 +1168,9 @@ require_once 'header.php';
     // ตารางสรุป 4 ตาราง (ภาระงานทั้ง 2 หน่วย + ก่อน/หลังเรียน + รายละเอียดรายข้อเกณฑ์ย่อยทั้ง 2 ชุด) แสดงข้อมูลครบเสมอไม่ขึ้นกับมุมมองกราฟ
     renderSplitSummaryTables(studentEvals);
 
-    // กราฟแมงมุมรายบุคคล 2 กราฟ — ไม่ขึ้นกับโหมดตาราง แสดงทั้ง "ภาระงาน" และ "ก่อน/หลังเรียน" เสมอ
-    const taskDimMap = buildDimMapFromEvals(studentEvals, 'task');
-    const prepostDimMap = buildDimMapFromEvals(studentEvals, 'prepost');
-    drawDimensionSpider(taskDimMap, 'classDimensionSpiderTask', 'task');
-    drawDimensionSpider(prepostDimMap, 'classDimensionSpiderPrePost', 'prepost');
+    // ภาพรวมแนวโน้มและความพร้อมของข้อมูล แทนการแสดงรายชื่อทุกคนตั้งแต่แรก
+    drawClassProgressOverview(studentEvals);
+    drawDataCompletenessOverview(studentEvals);
   }
 
   // คำนวณค่าสถิติพื้นฐานเพื่อการวิจัยจากชุดคะแนน (ข้ามค่าว่าง null)
@@ -1526,6 +1539,7 @@ require_once 'header.php';
   // คำนวณค่าสถิติภาพรวมสำหรับกราฟ บทวิเคราะห์ และการ์ดสรุป (ขับเคลื่อนด้วยมุมมองกราฟที่เลือก)
   // หมายเหตุ: ตารางสรุป 2 ตารางถูกวาดแยกใน renderSplitSummaryTables() โดยไม่ขึ้นกับมุมมองนี้
   function renderCustomTeacherOverview(data) {
+    currentOverviewData = data;
     // กรองเฉพาะนักเรียนในกลุ่มที่เลือก (ทั้งหมด/กลุ่มทดลอง/กลุ่มตัวอย่าง)
     const sortedKeys = Object.keys(studentDB).sort().filter(passesGroupFilter);
     let totalRegistered = sortedKeys.length;
@@ -1747,21 +1761,23 @@ require_once 'header.php';
           label: 'จำนวนนักเรียน',
           data: [counts.poor, counts.pass, counts.fair, counts.good, counts.veryGood],
           backgroundColor: ['#ef4444', '#f97316', '#f59e0b', '#2563eb', '#059669'],
-          borderRadius: 6
+          borderColor: '#fff',
+          borderWidth: 3,
+          hoverOffset: 8
         }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { display: false },
-          tooltip: { callbacks: { label: context => ` ${context.parsed.x} คน` } }
+          legend: { position: 'bottom', labels: { boxWidth: 12, usePointStyle: true } },
+          tooltip: { callbacks: { label: context => ` ${context.label}: ${context.raw} คน` } }
         },
-        indexAxis: 'y',
-        scales: {
-          x: { beginAtZero: true, ticks: { precision: 0 }, title: { display: true, text: 'จำนวนนักเรียน (คน)' } },
-          y: { grid: { display: false } }
-        }
+        onClick: (event, elements) => {
+          if (!elements.length) return;
+          showQualityDrilldown(elements[0].index);
+        },
+        onHover: (event, elements) => { event.native.target.style.cursor = elements.length ? 'pointer' : 'default'; }
       }
     });
   }
@@ -1879,7 +1895,12 @@ require_once 'header.php';
             ticks: { font: { family: 'Google Sans', size: 9 }, autoSkip: false },
             grid: { display: false }
           }
-        }
+        },
+        onClick: (event, elements) => {
+          if (!elements.length) return;
+          showCriterionDrilldown(criteria[elements[0].index]);
+        },
+        onHover: (event, elements) => { event.native.target.style.cursor = elements.length ? 'pointer' : 'default'; }
       }
     });
   }
@@ -1888,53 +1909,114 @@ require_once 'header.php';
   //  dataMap  = { id: {count, avg_1_1..avg_4_3} }
   //  canvasId = id ของ <canvas>
   //  key      = 'task' | 'prepost' เพื่อเก็บอินสแตนซ์แยกกัน
-  function drawDimensionSpider(dataMap, canvasId, key) {
-    const canvas = document.getElementById(canvasId);
+  function getTeacherPhaseScore(studentEvals, id, phase) {
+    const evals = (studentEvals[id] && studentEvals[id][phase]) || [];
+    const teacher = evals.find(e => e.evaluator_type === 'teacher');
+    if (phase === 'task1' || phase === 'task2') {
+      if (!evals.length) return null;
+      return evals.reduce((sum, e) => sum + Number(e.total_score || 0), 0) / evals.length;
+    }
+    return teacher ? Number(teacher.total_score) : null;
+  }
+
+  function drawClassProgressOverview(studentEvals) {
+    const canvas = document.getElementById('classDimensionSpiderTask');
     if (!canvas) return;
-    if (spiderChartInstances[key]) spiderChartInstances[key].destroy();
-
-    const rows = Object.keys(studentDB).filter(passesGroupFilter).map(id => {
-      const rec = dataMap && dataMap[id] ? dataMap[id] : {};
-      return { id, name: studentDB[id], ...rec };
-    }).filter(row => row.count > 0).sort((a, b) => {
-      const scoreA = key === 'prepost' ? (a.postScore ?? a.preScore ?? 0) : a.totalScore;
-      const scoreB = key === 'prepost' ? (b.postScore ?? b.preScore ?? 0) : b.totalScore;
-      return scoreA - scoreB;
-    });
-
-    const labels = rows.map(row => `${row.id} ${row.name}`);
-    const datasets = key === 'prepost' ? [
-      { label: 'ก่อนเรียน', data: rows.map(row => row.preScore), backgroundColor: '#94a3b8', borderRadius: 4 },
-      { label: 'หลังเรียน', data: rows.map(row => row.postScore), backgroundColor: '#059669', borderRadius: 4 }
-    ] : [
-      {
-        label: 'คะแนนเฉลี่ยภาระงาน',
-        data: rows.map(row => row.totalScore),
-        backgroundColor: rows.map(row => row.totalScore < 37 ? '#ef4444' : (row.totalScore < 49 ? '#2563eb' : '#059669')),
-        borderRadius: 4
-      }
+    if (spiderChartInstances.task) spiderChartInstances.task.destroy();
+    canvas.parentElement.style.height = '340px';
+    const phases = [
+      { key: 'pretest', label: 'ก่อนเรียน' }, { key: 'task1', label: 'หน่วยที่ 1' },
+      { key: 'task2', label: 'หน่วยที่ 2' }, { key: 'posttest', label: 'หลังเรียน' }
     ];
-
-    // เพิ่มความสูงตามจำนวนผู้เรียนเพื่อไม่ให้ชื่อและแท่งเบียดกัน
-    canvas.parentElement.style.height = `${Math.max(320, Math.min(720, rows.length * 28 + 90))}px`;
-    spiderChartInstances[key] = new Chart(canvas.getContext('2d'), {
-      type: 'bar',
-      data: { labels, datasets },
+    const ids = Object.keys(studentDB).filter(passesGroupFilter);
+    const stats = phases.map(phase => computeDescriptiveStats(ids.map(id => getTeacherPhaseScore(studentEvals, id, phase.key))));
+    spiderChartInstances.task = new Chart(canvas.getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: phases.map(p => p.label),
+        datasets: [{ label: 'คะแนนเฉลี่ย', data: stats.map(s => s.mean === null ? null : Number(s.mean.toFixed(2))), borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,.12)', fill: true, tension: .3, pointRadius: 5, pointHoverRadius: 7 }]
+      },
       options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        indexAxis: 'y',
-        interaction: { mode: 'index', intersect: false },
-        plugins: {
-          legend: { display: key === 'prepost', position: 'top' },
-          tooltip: { callbacks: { label: context => context.raw === null ? `${context.dataset.label}: ยังไม่มีข้อมูล` : `${context.dataset.label}: ${Number(context.raw).toFixed(2)} / 60` } }
-        },
-        scales: {
-          x: { beginAtZero: true, max: 60, ticks: { stepSize: 10 }, title: { display: true, text: 'คะแนน (เต็ม 60)' } },
-          y: { grid: { display: false }, ticks: { font: { family: 'Google Sans', size: 9 } } }
-        }
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { afterLabel: context => `ข้อมูล ${stats[context.dataIndex].n} คน` } } },
+        scales: { y: { beginAtZero: true, max: 60, title: { display: true, text: 'คะแนนเฉลี่ย (เต็ม 60)' } } },
+        onClick: (event, elements) => { if (elements.length) showPhaseDrilldown(studentEvals, phases[elements[0].index]); },
+        onHover: (event, elements) => { event.native.target.style.cursor = elements.length ? 'pointer' : 'default'; }
       }
     });
+  }
+
+  function drawDataCompletenessOverview(studentEvals) {
+    const canvas = document.getElementById('classDimensionSpiderPrePost');
+    if (!canvas) return;
+    if (spiderChartInstances.prepost) spiderChartInstances.prepost.destroy();
+    canvas.parentElement.style.height = '340px';
+    const ids = Object.keys(studentDB).filter(passesGroupFilter);
+    const phases = [
+      { key: 'pretest', label: 'ก่อนเรียน' }, { key: 'task1', label: 'หน่วยที่ 1' },
+      { key: 'task2', label: 'หน่วยที่ 2' }, { key: 'posttest', label: 'หลังเรียน' }
+    ];
+    const completed = phases.map(p => ids.filter(id => getTeacherPhaseScore(studentEvals, id, p.key) !== null).length);
+    const missing = completed.map(n => Math.max(0, ids.length - n));
+    spiderChartInstances.prepost = new Chart(canvas.getContext('2d'), {
+      type: 'bar',
+      data: { labels: phases.map(p => p.label), datasets: [
+        { label: 'มีข้อมูลแล้ว', data: completed, backgroundColor: '#10b981', borderRadius: 4 },
+        { label: 'ยังไม่มีข้อมูล', data: missing, backgroundColor: '#e2e8f0', borderRadius: 4 }
+      ] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 }, title: { display: true, text: 'จำนวนนักเรียน (คน)' } } },
+        plugins: { legend: { position: 'top' } },
+        onClick: (event, elements) => { if (elements.length) showPhaseDrilldown(studentEvals, phases[elements[0].index], elements[0].datasetIndex === 1); },
+        onHover: (event, elements) => { event.native.target.style.cursor = elements.length ? 'pointer' : 'default'; }
+      }
+    });
+  }
+
+  function openChartDrilldown(title, description, rows) {
+    const panel = document.getElementById('chartDrilldownPanel');
+    document.getElementById('chartDrilldownTitle').textContent = title;
+    document.getElementById('chartDrilldownDescription').textContent = description;
+    document.getElementById('chartDrilldownContent').innerHTML = rows.length ? `
+      <table class="table table-sm table-hover align-middle bg-white mb-0 rounded overflow-hidden">
+        <thead><tr><th>รหัส</th><th>ชื่อผู้เรียน</th><th class="text-end">ผลคะแนน</th><th class="text-end">ดูต่อ</th></tr></thead>
+        <tbody>${rows.map(row => `<tr><td class="font-mono">${row.id}</td><td>${row.name}</td><td class="text-end fw-bold ${row.className || ''}">${row.value}</td><td class="text-end"><button class="btn btn-sm btn-outline-primary rounded-pill" onclick="viewStudentDetail('${row.id}')">เปิดรายงาน</button></td></tr>`).join('')}</tbody>
+      </table>` : '<div class="text-muted text-center py-3">ไม่มีนักเรียนในรายการนี้</div>';
+    panel.classList.remove('d-none');
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function closeChartDrilldown() { document.getElementById('chartDrilldownPanel').classList.add('d-none'); }
+
+  function showQualityDrilldown(index) {
+    const ranges = [
+      { title: 'ระดับปรับปรุง', min: -Infinity, max: 13 }, { title: 'ระดับพอใช้', min: 13, max: 25 },
+      { title: 'ระดับปานกลาง', min: 25, max: 37 }, { title: 'ระดับดี', min: 37, max: 49 },
+      { title: 'ระดับดีมาก', min: 49, max: Infinity }
+    ];
+    const range = ranges[index];
+    const rows = Object.keys(currentOverviewData).filter(passesGroupFilter).map(id => {
+      const rec = currentOverviewData[id];
+      const score = currentDashboardViewMode === 'prepost' ? rec.postScore : rec.avgScore;
+      return { id, name: studentDB[id], score: score === null || score === undefined ? null : Number(score), count: rec.count };
+    }).filter(r => r.score !== null && r.score >= range.min && r.score < range.max).sort((a,b) => a.score-b.score).map(r => ({ ...r, value: `${r.score.toFixed(2)} / 60` }));
+    openChartDrilldown(`รายชื่อนักเรียน${range.title}`, 'เรียงจากคะแนนน้อยไปมาก เพื่อใช้วางแผนติดตามรายบุคคล', rows);
+  }
+
+  function showCriterionDrilldown(criterion) {
+    const key = `avg_${criterion.label.substring(0, 3).replace('.', '_')}`;
+    const rows = Object.keys(currentOverviewData).filter(passesGroupFilter).map(id => {
+      const rec = currentOverviewData[id];
+      const raw = Number(rec[key] || 0); const pct = raw / criterion.max * 100;
+      return { id, name: studentDB[id], count: rec.count, pct, value: `${pct.toFixed(1)}% (${raw.toFixed(2)}/${criterion.max})`, className: pct < 70 ? 'text-danger' : 'text-success' };
+    }).filter(r => r.count > 0).sort((a,b) => a.pct-b.pct);
+    openChartDrilldown(`ผลรายบุคคล: ${criterion.label}`, 'สีแดงหมายถึงต่ำกว่าเป้าหมาย 70% และเรียงผู้ที่ควรได้รับการช่วยเหลือก่อน', rows);
+  }
+
+  function showPhaseDrilldown(studentEvals, phase, missingOnly = false) {
+    const rows = Object.keys(studentDB).filter(passesGroupFilter).map(id => ({ id, name: studentDB[id], score: getTeacherPhaseScore(studentEvals, id, phase.key) })).filter(r => missingOnly ? r.score === null : r.score !== null).sort((a,b) => (a.score ?? 0)-(b.score ?? 0)).map(r => ({ ...r, value: r.score === null ? 'ยังไม่มีข้อมูล' : `${r.score.toFixed(2)} / 60`, className: r.score === null ? 'text-danger' : '' }));
+    openChartDrilldown(`${missingOnly ? 'ผู้เรียนที่ยังไม่มีข้อมูล' : 'คะแนนรายบุคคล'}: ${phase.label}`, missingOnly ? 'รายการสำหรับติดตามการส่งงานหรือการประเมินที่ยังไม่ครบ' : 'เรียงจากคะแนนน้อยไปมาก คลิกเปิดรายงานเพื่อดูรายละเอียด', rows);
   }
 
   // กรอง/ค้นหาพร้อมกันทั้ง 2 ตาราง (ภาระงาน + ก่อน/หลังเรียน) ด้วยคำค้นและตัวกรองสถานะร่วมกัน
