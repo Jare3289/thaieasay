@@ -152,10 +152,42 @@ require_once 'header.php';
             </div>
           </div>
         </div>
-        <p class="text-muted small mb-0 mt-2"><i class="bi bi-info-circle"></i> ตัวเลือก "มุมมองกราฟ" ใช้กับกราฟสถิติและบทวิเคราะห์ด้านบนเท่านั้น ส่วนตาราง 2 ตารางด้านล่างแสดงข้อมูลครบทุกหน่วยเสมอ</p>
+        <p class="text-muted small mb-0 mt-2"><i class="bi bi-info-circle"></i> ตัวเลือก "มุมมองกราฟ" ใช้กับกราฟสถิติและบทวิเคราะห์ด้านบนเท่านั้น ส่วนตารางด้านล่างแสดงข้อมูลครบทุกหน่วยเสมอ (แยกดูได้ทีละแท็บ)</p>
       </div>
 
+      <!-- แท็บสลับตาราง (ลดความยาวหน้าจอจากตารางที่เรียงต่อกันหลายตาราง) -->
+      <ul class="nav nav-tabs px-3 pt-3 flex-nowrap overflow-auto text-nowrap" id="dashboardTablesTab" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active fw-bold" id="tab-btn-task" data-bs-toggle="tab" data-bs-target="#tab-pane-task" type="button" role="tab" aria-controls="tab-pane-task" aria-selected="true">
+            <i class="bi bi-clipboard-check"></i> ตารางที่ 1 ภาระงาน
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link fw-bold" id="tab-btn-prepost" data-bs-toggle="tab" data-bs-target="#tab-pane-prepost" type="button" role="tab" aria-controls="tab-pane-prepost" aria-selected="false">
+            <i class="bi bi-arrow-left-right"></i> ตารางที่ 2 ก่อน-หลังเรียน
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link fw-bold" id="tab-btn-detail" data-bs-toggle="tab" data-bs-target="#tab-pane-detail" type="button" role="tab" aria-controls="tab-pane-detail" aria-selected="false">
+            <i class="bi bi-list-columns"></i> ตารางที่ 3-4 รายข้อเกณฑ์ย่อย
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link fw-bold" id="tab-btn-defects" data-bs-toggle="tab" data-bs-target="#tab-pane-defects" type="button" role="tab" aria-controls="tab-pane-defects" aria-selected="false">
+            <i class="bi bi-exclamation-triangle"></i> ตารางที่ 5 ข้อบกพร่อง
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link fw-bold" id="tab-btn-leveldist" data-bs-toggle="tab" data-bs-target="#tab-pane-leveldist" type="button" role="tab" aria-controls="tab-pane-leveldist" aria-selected="false">
+            <i class="bi bi-bar-chart-steps"></i> ตารางที่ 6 ระดับคุณภาพ
+          </button>
+        </li>
+      </ul>
+
+      <div class="tab-content" id="dashboardTablesTabContent">
+
       <!-- ตารางที่ 1: สรุปคะแนนภาระงาน (หน่วยที่ 1 และ หน่วยที่ 2) -->
+      <div class="tab-pane fade show active" id="tab-pane-task" role="tabpanel" aria-labelledby="tab-btn-task" tabindex="0">
       <div class="px-3 pt-4 pb-2">
         <h6 class="fw-bold text-primary-emphasis mb-1"><i class="bi bi-clipboard-check"></i> ตารางที่ 1 &nbsp;สรุปคะแนนภาระงานในหน่วยเรียน (หน่วยที่ 1 และ หน่วยที่ 2)</h6>
         <p class="text-muted small mb-0">คะแนนเฉลี่ยจากการประเมินรอบด้าน 360° (เต็มหน่วยละ 60 คะแนน) พร้อมค่าสถิติพื้นฐานเพื่อการวิจัยที่ท้ายตาราง</p>
@@ -178,9 +210,12 @@ require_once 'header.php';
           <tfoot id="taskTableFoot" class="small border-top border-2"></tfoot>
         </table>
       </div>
+      </div>
+      <!-- /ตารางที่ 1 -->
 
       <!-- ตารางที่ 2: เปรียบเทียบคะแนนก่อนเรียน–หลังเรียน -->
-      <div class="px-3 pt-4 pb-2 border-top mt-2">
+      <div class="tab-pane fade" id="tab-pane-prepost" role="tabpanel" aria-labelledby="tab-btn-prepost" tabindex="0">
+      <div class="px-3 pt-4 pb-2">
         <h6 class="fw-bold text-success-emphasis mb-1"><i class="bi bi-arrow-left-right"></i> ตารางที่ 2 &nbsp;เปรียบเทียบคะแนนก่อนเรียน–หลังเรียน (Pretest / Posttest โดยครู)</h6>
         <p class="text-muted small mb-0">คะแนนที่ครูประเมิน (เต็ม 60 คะแนน) และคะแนนพัฒนาการ (หลังเรียน − ก่อนเรียน) พร้อมค่าสถิติพื้นฐานเพื่อการวิจัยที่ท้ายตาราง</p>
       </div>
@@ -202,9 +237,12 @@ require_once 'header.php';
           <tfoot id="prepostTableFoot" class="small border-top border-2"></tfoot>
         </table>
       </div>
+      </div>
+      <!-- /ตารางที่ 2 -->
 
       <!-- ตารางที่ 3-4: คะแนนรายละเอียดแยกตามรายข้อเกณฑ์ย่อย (ทุกคน) — สลับดูได้ทีละคู่ -->
-      <div class="px-3 pt-4 pb-2 border-top mt-2 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+      <div class="tab-pane fade" id="tab-pane-detail" role="tabpanel" aria-labelledby="tab-btn-detail" tabindex="0">
+      <div class="px-3 pt-4 pb-2 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
         <div>
           <h6 class="fw-bold text-dark mb-1"><i class="bi bi-list-columns"></i> ตารางรายละเอียดคะแนนรายข้อเกณฑ์ย่อย (ทุกคน)</h6>
           <p class="text-muted small mb-0">คะแนนเฉลี่ยของผู้เรียนทุกคน แยกลงถึงระดับข้อเกณฑ์ย่อยทั้ง 11 ข้อ (จัดกลุ่มตาม 4 ด้านหลัก) — เลือกคู่ที่ต้องการเปรียบเทียบด้านล่าง</p>
@@ -324,9 +362,12 @@ require_once 'header.php';
       </div>
       </div>
       <!-- /คู่ที่ 2 -->
+      </div>
+      <!-- /ตารางที่ 3-4 -->
 
       <!-- ตารางที่ 5: ข้อบกพร่องที่พบในผลงานเรียงความ (ตาราง 14 ตามโครงวิจัย) -->
-      <div class="px-3 pt-4 pb-2 border-top mt-2">
+      <div class="tab-pane fade" id="tab-pane-defects" role="tabpanel" aria-labelledby="tab-btn-defects" tabindex="0">
+      <div class="px-3 pt-4 pb-2">
         <h6 class="fw-bold text-dark mb-1"><i class="bi bi-exclamation-triangle"></i> ตารางที่ 5 &nbsp;จำนวนและร้อยละของนักเรียนที่ปรากฏข้อบกพร่องในผลงานเรียงความ</h6>
         <p class="text-muted small mb-0" id="defectsTableDesc">กำลังประมวลผล...</p>
       </div>
@@ -346,9 +387,12 @@ require_once 'header.php';
           </tbody>
         </table>
       </div>
+      </div>
+      <!-- /ตารางที่ 5 -->
 
       <!-- ตารางที่ 6: จำนวนนักเรียนที่ได้แต่ละระดับคุณภาพ รายประเด็น แยกหน่วยที่ 1 / หน่วยที่ 2 -->
-      <div class="px-3 pt-4 pb-2 border-top mt-2">
+      <div class="tab-pane fade" id="tab-pane-leveldist" role="tabpanel" aria-labelledby="tab-btn-leveldist" tabindex="0">
+      <div class="px-3 pt-4 pb-2">
         <h6 class="fw-bold text-dark mb-1"><i class="bi bi-bar-chart-steps"></i> ตารางที่ 6 &nbsp;จำนวนนักเรียนที่ได้แต่ละระดับคุณภาพ รายประเด็น (หน่วยที่ 1 / หน่วยที่ 2)</h6>
         <p class="text-muted small mb-0" id="levelDistTableDesc">กำลังประมวลผล...</p>
       </div>
@@ -378,6 +422,11 @@ require_once 'header.php';
           </tbody>
         </table>
       </div>
+      </div>
+      <!-- /ตารางที่ 6 -->
+
+      </div>
+      <!-- /tab-content -->
     </div>
 
     <!-- ลิงก์ไปหน้าระบบวิเคราะห์ทางสถิติเพื่อการวิจัย (Inter-rater & Paired t-test) -->
