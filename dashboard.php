@@ -1754,7 +1754,7 @@ require_once 'header.php';
     if (classQualityChartInstance) classQualityChartInstance.destroy();
     
     classQualityChartInstance = new Chart(ctx, {
-      type: 'doughnut',
+      type: 'bar',
       data: {
         labels: ['ปรับปรุง (<13)', 'พอใช้ (13–24)', 'ปานกลาง (25–36)', 'ดี (37–48)', 'ดีมาก (49–60)'],
         datasets: [{
