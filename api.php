@@ -4362,6 +4362,8 @@ try {
             echo json_encode([
                 'success'     => true,
                 'n_base'      => $c45Def['n'],
+                'n_total'     => count($c45Ds['sids']),
+                'rule'        => $c45Ds['meta']['defect_rule'],
                 'work1_label' => $c45Ds['meta']['work1_label'],
                 'work2_label' => $c45Ds['meta']['work2_label'],
                 'domains'     => ch45_domains(),
