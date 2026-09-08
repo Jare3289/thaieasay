@@ -638,7 +638,12 @@ require_once 'header.php';
       body.innerHTML = html || '<tr><td colspan="5" class="text-center text-muted py-4 fw-bold">ไม่มีข้อมูล</td></tr>';
 
       if (desc) {
-        desc.textContent = `นับเฉพาะนักเรียนที่มีคะแนนครบทั้ง 2 ครั้ง (N = ${res.n_base} คน) เพื่อให้ร้อยละของทั้งสองครั้งเทียบกันได้จริง`;
+        const incomplete = (res.n_total || 0) - (res.n_base || 0);
+        let warn = '';
+        if (incomplete > 0) {
+          warn = ` <span class="text-danger fw-bold">— มีนักเรียน ${incomplete} คนที่ยังไม่ถูกนับ เพราะคะแนนยังไม่ครบทั้ง 2 ครั้ง จึงอาจเห็นบางแถวเป็น 0 ทั้งที่พบปัญหาจริงระหว่างตรวจ</span>`;
+        }
+        desc.innerHTML = `นับเฉพาะนักเรียนที่มีคะแนนครบทั้ง 2 ครั้ง (N = ${res.n_base} จากทั้งหมด ${res.n_total} คน) เพื่อให้ร้อยละของทั้งสองครั้งเทียบกันได้จริง — ${res.rule || ''}${warn}`;
       }
     } catch (err) {
       body.innerHTML = `<tr><td colspan="5" class="text-center text-danger py-4 fw-bold">เกิดข้อผิดพลาดในการเชื่อมต่อเครือข่าย: ${err.message}</td></tr>`;
