@@ -258,6 +258,10 @@ require_once 'header.php';
       <div class="px-3 pt-2 pb-2">
         <p class="text-muted small mb-0">ตารางที่ 3 — แต่ละข้อเกณฑ์ย่อยแยกเป็น 2 คอลัมน์ <strong>หน่วยที่ 1 / หน่วยที่ 2</strong> ช่อง "หน่วย 2" จะไฮไลต์ <span class="text-success fw-bold">เขียว</span> เมื่อเพิ่มขึ้นมาก และ <span class="text-danger fw-bold">แดง</span> เมื่อลดลงมาก (≥1 ระดับเกณฑ์)</p>
       </div>
+      <div class="px-3 pb-3">
+        <span class="small fw-bold text-dark d-block mb-2"><i class="bi bi-trophy-fill text-warning"></i> Top 5 &nbsp;นักเรียนที่คะแนนรวมเปลี่ยนแปลงมากที่สุด (หน่วยที่ 1 → หน่วยที่ 2)</span>
+        <div id="taskDetailTop5" class="d-flex flex-wrap gap-2"></div>
+      </div>
       <div class="table-responsive">
         <table class="table table-hover align-middle mb-0 text-start table-classroom">
           <thead class="table-light text-secondary small fw-bold text-uppercase">
@@ -312,6 +316,10 @@ require_once 'header.php';
       <div id="detailPairPrepostSection" class="d-none">
       <div class="px-3 pt-4 pb-2 border-top mt-2">
         <p class="text-muted small mb-0">ตารางที่ 4 — คะแนนที่ครูประเมิน แต่ละข้อเกณฑ์ย่อยแยกเป็น 2 คอลัมน์ <strong>ก่อนเรียน / หลังเรียน</strong> ช่อง "หลัง" จะไฮไลต์ <span class="text-success fw-bold">เขียว</span> เมื่อเพิ่มขึ้นมาก และ <span class="text-danger fw-bold">แดง</span> เมื่อลดลงมาก (≥1 ระดับเกณฑ์)</p>
+      </div>
+      <div class="px-3 pb-3">
+        <span class="small fw-bold text-dark d-block mb-2"><i class="bi bi-trophy-fill text-warning"></i> Top 5 &nbsp;นักเรียนที่คะแนนรวมเปลี่ยนแปลงมากที่สุด (ก่อนเรียน → หลังเรียน)</span>
+        <div id="prepostDetailTop5" class="d-flex flex-wrap gap-2"></div>
       </div>
       <div class="table-responsive">
         <table class="table table-hover align-middle mb-0 text-start table-classroom">
@@ -1338,6 +1346,38 @@ require_once 'header.php';
     return `<td class="px-1 py-2 text-center font-mono">${v1Disp}</td><td class="px-1 py-2 text-center font-mono border-end ${cls}">${v2Disp}</td>`;
   }
 
+  // วาดกล่อง Top 5 นักเรียนที่คะแนนรวมเปลี่ยนแปลงมากที่สุด (เรียงตามขนาดผลต่างสัมบูรณ์ ไม่สนทิศทาง)
+  //  entries: [{ id, v1, v2 }] เฉพาะนักเรียนที่มีค่าครบทั้ง 2 ฝั่งเท่านั้น
+  function renderTop5ChangeList(containerId, entries) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    if (entries.length === 0) {
+      container.innerHTML = '<p class="text-muted small mb-0">ยังไม่มีข้อมูลเพียงพอสำหรับจัดอันดับ</p>';
+      return;
+    }
+
+    const top5 = entries
+      .map(e => ({ ...e, diff: e.v2 - e.v1 }))
+      .sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff))
+      .slice(0, 5);
+
+    container.innerHTML = top5.map((e, i) => {
+      const up = e.diff > 0;
+      const flat = e.diff === 0;
+      const cls = flat ? 'border-secondary-subtle bg-light' : (up ? 'border-success bg-success bg-opacity-10' : 'border-danger bg-danger bg-opacity-10');
+      const diffCls = flat ? 'text-secondary' : (up ? 'text-success' : 'text-danger');
+      const arrow = flat ? '' : (up ? '▲' : '▼');
+      const diffDisp = flat ? '0.00' : `${up ? '+' : ''}${e.diff.toFixed(2)}`;
+      return `
+        <div class="border rounded-3 px-3 py-2 ${cls}" style="min-width:150px;">
+          <div class="small fw-bold text-secondary">#${i + 1} รหัส ${e.id}</div>
+          <div class="fw-bold font-mono">${e.v1.toFixed(2)} → ${e.v2.toFixed(2)}</div>
+          <div class="small fw-bold ${diffCls}">${arrow} ${diffDisp} คะแนน</div>
+        </div>`;
+    }).join('');
+  }
+
   // วาดตารางที่ 3: คะแนนรายละเอียดรายข้อเกณฑ์ย่อยของภาระงาน เปรียบเทียบหน่วยที่ 1 กับหน่วยที่ 2 ของทุกคน (แยกคอลัมน์)
   function renderTaskDetailTable(studentEvals) {
     const body = document.getElementById('taskDetailTableBody');
@@ -1347,6 +1387,7 @@ require_once 'header.php';
     const sortedKeys = Object.keys(studentDB).sort().filter(passesGroupFilter);
     const subVals1 = {}, subVals2 = {}; SUB_KEYS.forEach(k => { subVals1[k] = []; subVals2[k] = []; });
     const t1Vals = [], t2Vals = [], avgVals = [];
+    const changeEntries = [];
     let html = '';
 
     sortedKeys.forEach(id => {
@@ -1362,6 +1403,7 @@ require_once 'header.php';
       if (u1) t1Vals.push(u1.total);
       if (u2) t2Vals.push(u2.total);
       if (combined !== null) avgVals.push(combined);
+      if (u1 && u2) changeEntries.push({ id, v1: u1.total, v2: u2.total });
 
       const subCells = SUB_KEYS.map(k => pairCells(u1, u2, k)).join('');
       const totalCls = diffHighlightClass(u1 ? u1.total : null, u2 ? u2.total : null, TOTAL_MAX);
@@ -1384,6 +1426,7 @@ require_once 'header.php';
     SUB_KEYS.forEach(k => { footerCols.push(subVals1[k]); footerCols.push(subVals2[k]); });
     footerCols.push(t1Vals, t2Vals, avgVals);
     if (foot) foot.innerHTML = buildStatsFooter(footerCols, 1, 1);
+    renderTop5ChangeList('taskDetailTop5', changeEntries);
   }
 
   // วาดตารางที่ 4: คะแนนรายละเอียดรายข้อเกณฑ์ย่อยของครู เปรียบเทียบก่อนเรียนกับหลังเรียนของทุกคน (แยกคอลัมน์)
@@ -1395,6 +1438,7 @@ require_once 'header.php';
     const sortedKeys = Object.keys(studentDB).sort().filter(passesGroupFilter);
     const subValsPre = {}, subValsPost = {}; SUB_KEYS.forEach(k => { subValsPre[k] = []; subValsPost[k] = []; });
     const preVals = [], postVals = [], gainVals = [];
+    const changeEntries = [];
     let html = '';
 
     sortedKeys.forEach(id => {
@@ -1411,6 +1455,7 @@ require_once 'header.php';
       if (post) postVals.push(post.total);
       const gain = (pre && post) ? (post.total - pre.total) : null;
       if (gain !== null) gainVals.push(gain);
+      if (pre && post) changeEntries.push({ id, v1: pre.total, v2: post.total });
 
       let gainDisp = '-', gainClass = 'text-muted';
       if (gain !== null) {
@@ -1440,6 +1485,7 @@ require_once 'header.php';
     SUB_KEYS.forEach(k => { footerCols.push(subValsPre[k]); footerCols.push(subValsPost[k]); });
     footerCols.push(preVals, postVals, gainVals);
     if (foot) foot.innerHTML = buildStatsFooter(footerCols, 1, 1);
+    renderTop5ChangeList('prepostDetailTop5', changeEntries);
   }
 
   // สร้างแผนที่คะแนนเฉลี่ยรายด้านต่อคน สำหรับกราฟแมงมุม
