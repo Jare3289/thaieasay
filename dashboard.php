@@ -218,14 +218,13 @@ require_once 'header.php';
       <!-- คู่ที่ 1: ภาระงาน หน่วยที่ 1 เทียบ หน่วยที่ 2 -->
       <div id="detailPairTaskSection">
       <div class="px-3 pt-2 pb-2">
-        <p class="text-muted small mb-0">ตารางที่ 3 — แต่ละข้อเกณฑ์ย่อยแยกเป็น 2 คอลัมน์ <strong>หน่วยที่ 1 / หน่วยที่ 2</strong></p>
+        <p class="text-muted small mb-0">ตารางที่ 3 — แต่ละข้อเกณฑ์ย่อยแยกเป็น 2 คอลัมน์ <strong>หน่วยที่ 1 / หน่วยที่ 2</strong> ช่อง "หน่วย 2" จะไฮไลต์ <span class="text-success fw-bold">เขียว</span> เมื่อเพิ่มขึ้นมาก และ <span class="text-danger fw-bold">แดง</span> เมื่อลดลงมาก (≥1 ระดับเกณฑ์)</p>
       </div>
       <div class="table-responsive">
         <table class="table table-hover align-middle mb-0 text-start table-classroom">
           <thead class="table-light text-secondary small fw-bold text-uppercase">
             <tr>
               <th class="px-2 py-2" rowspan="3">รหัส</th>
-              <th class="px-2 py-2" rowspan="3">ชื่อ-สกุลผู้เรียน</th>
               <th class="px-2 py-2 text-center text-primary-emphasis" colspan="6">1) ด้านเนื้อหาสาระ</th>
               <th class="px-2 py-2 text-center" colspan="4" style="color:#8b5cf6">2) ด้านองค์ประกอบและการลำดับ</th>
               <th class="px-2 py-2 text-center text-warning-emphasis" colspan="6">3) ด้านการใช้สำนวนภาษา</th>
@@ -263,7 +262,7 @@ require_once 'header.php';
             </tr>
           </thead>
           <tbody id="taskDetailTableBody" class="small">
-            <tr><td colspan="28" class="text-center text-muted py-5 fw-bold">กำลังประมวลผลคะแนนรายข้อเกณฑ์ย่อย...</td></tr>
+            <tr><td colspan="27" class="text-center text-muted py-5 fw-bold">กำลังประมวลผลคะแนนรายข้อเกณฑ์ย่อย...</td></tr>
           </tbody>
           <tfoot id="taskDetailTableFoot" class="small border-top border-2"></tfoot>
         </table>
@@ -274,14 +273,13 @@ require_once 'header.php';
       <!-- คู่ที่ 2: ก่อนเรียน เทียบ หลังเรียน -->
       <div id="detailPairPrepostSection" class="d-none">
       <div class="px-3 pt-4 pb-2 border-top mt-2">
-        <p class="text-muted small mb-0">ตารางที่ 4 — คะแนนที่ครูประเมิน แต่ละข้อเกณฑ์ย่อยแยกเป็น 2 คอลัมน์ <strong>ก่อนเรียน / หลังเรียน</strong></p>
+        <p class="text-muted small mb-0">ตารางที่ 4 — คะแนนที่ครูประเมิน แต่ละข้อเกณฑ์ย่อยแยกเป็น 2 คอลัมน์ <strong>ก่อนเรียน / หลังเรียน</strong> ช่อง "หลัง" จะไฮไลต์ <span class="text-success fw-bold">เขียว</span> เมื่อเพิ่มขึ้นมาก และ <span class="text-danger fw-bold">แดง</span> เมื่อลดลงมาก (≥1 ระดับเกณฑ์)</p>
       </div>
       <div class="table-responsive">
         <table class="table table-hover align-middle mb-0 text-start table-classroom">
           <thead class="table-light text-secondary small fw-bold text-uppercase">
             <tr>
               <th class="px-2 py-2" rowspan="3">รหัส</th>
-              <th class="px-2 py-2" rowspan="3">ชื่อ-สกุลผู้เรียน</th>
               <th class="px-2 py-2 text-center text-primary-emphasis" colspan="6">1) ด้านเนื้อหาสาระ</th>
               <th class="px-2 py-2 text-center" colspan="4" style="color:#8b5cf6">2) ด้านองค์ประกอบและการลำดับ</th>
               <th class="px-2 py-2 text-center text-warning-emphasis" colspan="6">3) ด้านการใช้สำนวนภาษา</th>
@@ -319,7 +317,7 @@ require_once 'header.php';
             </tr>
           </thead>
           <tbody id="prepostDetailTableBody" class="small">
-            <tr><td colspan="28" class="text-center text-muted py-5 fw-bold">กำลังประมวลผลคะแนนรายข้อเกณฑ์ย่อย...</td></tr>
+            <tr><td colspan="27" class="text-center text-muted py-5 fw-bold">กำลังประมวลผลคะแนนรายข้อเกณฑ์ย่อย...</td></tr>
           </tbody>
           <tfoot id="prepostDetailTableFoot" class="small border-top border-2"></tfoot>
         </table>
@@ -1070,11 +1068,31 @@ require_once 'header.php';
     return rec;
   }
 
+  // คะแนนเต็มของแต่ละข้อเกณฑ์ย่อย ใช้คำนวณเกณฑ์ไฮไลต์สีในตารางเปรียบเทียบรายละเอียด
+  const SUB_MAX = { '1_1': 12, '1_2': 6, '1_3': 9, '2_1': 8, '2_2': 4, '3_1': 4, '3_2': 6, '3_3': 5, '4_1': 2, '4_2': 2, '4_3': 2 };
+  const TOTAL_MAX = 60;
+  // เกณฑ์ "เปลี่ยนแปลงมาก" = อย่างน้อย 25% ของคะแนนเต็ม (เท่ากับเปลี่ยนไป 1 ระดับเกณฑ์เต็มของข้อนั้น เพราะทุกข้อมี 5 ระดับ 0-4)
+  const DIFF_THRESHOLD_FRACTION = 0.25;
+
+  // คืนคลาส Bootstrap สำหรับไฮไลต์เซลล์ "ค่าใหม่" เมื่อเปลี่ยนจาก "ค่าเดิม" อย่างมีนัยสำคัญ (เขียว=เพิ่มมาก, แดง=ลดมาก)
+  function diffHighlightClass(oldVal, newVal, max) {
+    if (oldVal === null || oldVal === undefined || newVal === null || newVal === undefined) return '';
+    const diff = newVal - oldVal;
+    const threshold = max * DIFF_THRESHOLD_FRACTION;
+    if (diff >= threshold) return 'table-success text-success fw-bold';
+    if (diff <= -threshold) return 'table-danger text-danger fw-bold';
+    return '';
+  }
+
   // สร้าง 2 เซลล์แยกคอลัมน์ (ค่าที่1, ค่าที่2) สำหรับข้อเกณฑ์ย่อย 1 ข้อ ในตารางเปรียบเทียบรายละเอียด
+  // เซลล์ "ค่าที่2" จะไฮไลต์สีเมื่อเปลี่ยนจากค่าที่1 อย่างมาก
   function pairCells(rec1, rec2, key) {
-    const v1 = rec1 ? rec1[key].toFixed(2) : '-';
-    const v2 = rec2 ? rec2[key].toFixed(2) : '-';
-    return `<td class="px-1 py-2 text-center font-mono">${v1}</td><td class="px-1 py-2 text-center font-mono border-end">${v2}</td>`;
+    const v1 = rec1 ? rec1[key] : null;
+    const v2 = rec2 ? rec2[key] : null;
+    const cls = diffHighlightClass(v1, v2, SUB_MAX[key]);
+    const v1Disp = v1 !== null ? v1.toFixed(2) : '-';
+    const v2Disp = v2 !== null ? v2.toFixed(2) : '-';
+    return `<td class="px-1 py-2 text-center font-mono">${v1Disp}</td><td class="px-1 py-2 text-center font-mono border-end ${cls}">${v2Disp}</td>`;
   }
 
   // วาดตารางที่ 3: คะแนนรายละเอียดรายข้อเกณฑ์ย่อยของภาระงาน เปรียบเทียบหน่วยที่ 1 กับหน่วยที่ 2 ของทุกคน (แยกคอลัมน์)
@@ -1103,14 +1121,14 @@ require_once 'header.php';
       if (combined !== null) avgVals.push(combined);
 
       const subCells = SUB_KEYS.map(k => pairCells(u1, u2, k)).join('');
+      const totalCls = diffHighlightClass(u1 ? u1.total : null, u2 ? u2.total : null, TOTAL_MAX);
 
       html += `
         <tr class="hover-row cursor-pointer" onclick="viewStudentDetail('${id}')">
           <td class="px-2 py-2 font-mono fw-bold text-secondary">${id}</td>
-          <td class="px-2 py-2 fw-bold text-dark text-start">${studentDB[id]}</td>
           ${subCells}
           <td class="px-2 py-2 text-center font-mono fw-semibold">${u1 ? u1.total.toFixed(2) : '-'}</td>
-          <td class="px-2 py-2 text-center font-mono fw-semibold">${u2 ? u2.total.toFixed(2) : '-'}</td>
+          <td class="px-2 py-2 text-center font-mono fw-semibold ${totalCls}">${u2 ? u2.total.toFixed(2) : '-'}</td>
           <td class="px-2 py-2 text-center font-mono fw-extrabold text-primary">${combined !== null ? combined.toFixed(2) : '-'}</td>
           <td class="px-2 py-2 text-end">
              <button class="btn btn-outline-primary btn-sm fw-bold rounded-pill px-3" onclick="event.stopPropagation(); viewStudentDetail('${id}')">วิเคราะห์</button>
@@ -1118,11 +1136,11 @@ require_once 'header.php';
         </tr>`;
     });
 
-    body.innerHTML = html || '<tr><td colspan="28" class="text-center text-muted py-5 fw-bold">ยังไม่มีข้อมูลนักเรียนในกลุ่มนี้</td></tr>';
+    body.innerHTML = html || '<tr><td colspan="27" class="text-center text-muted py-5 fw-bold">ยังไม่มีข้อมูลนักเรียนในกลุ่มนี้</td></tr>';
     const footerCols = [];
     SUB_KEYS.forEach(k => { footerCols.push(subVals1[k]); footerCols.push(subVals2[k]); });
     footerCols.push(t1Vals, t2Vals, avgVals);
-    if (foot) foot.innerHTML = buildStatsFooter(footerCols, 2, 1);
+    if (foot) foot.innerHTML = buildStatsFooter(footerCols, 1, 1);
   }
 
   // วาดตารางที่ 4: คะแนนรายละเอียดรายข้อเกณฑ์ย่อยของครู เปรียบเทียบก่อนเรียนกับหลังเรียนของทุกคน (แยกคอลัมน์)
@@ -1159,14 +1177,14 @@ require_once 'header.php';
       }
 
       const subCells = SUB_KEYS.map(k => pairCells(pre, post, k)).join('');
+      const totalCls = diffHighlightClass(pre ? pre.total : null, post ? post.total : null, TOTAL_MAX);
 
       html += `
         <tr class="hover-row cursor-pointer" onclick="viewStudentDetail('${id}')">
           <td class="px-2 py-2 font-mono fw-bold text-secondary">${id}</td>
-          <td class="px-2 py-2 fw-bold text-dark text-start">${studentDB[id]}</td>
           ${subCells}
           <td class="px-2 py-2 text-center font-mono fw-semibold">${pre ? pre.total.toFixed(2) : '-'}</td>
-          <td class="px-2 py-2 text-center font-mono fw-semibold">${post ? post.total.toFixed(2) : '-'}</td>
+          <td class="px-2 py-2 text-center font-mono fw-semibold ${totalCls}">${post ? post.total.toFixed(2) : '-'}</td>
           <td class="px-2 py-2 text-center font-mono ${gainClass}">${gainDisp}</td>
           <td class="px-2 py-2 text-end">
              <button class="btn btn-outline-primary btn-sm fw-bold rounded-pill px-3" onclick="event.stopPropagation(); viewStudentDetail('${id}')">วิเคราะห์</button>
@@ -1174,11 +1192,11 @@ require_once 'header.php';
         </tr>`;
     });
 
-    body.innerHTML = html || '<tr><td colspan="28" class="text-center text-muted py-5 fw-bold">ยังไม่มีข้อมูลนักเรียนในกลุ่มนี้</td></tr>';
+    body.innerHTML = html || '<tr><td colspan="27" class="text-center text-muted py-5 fw-bold">ยังไม่มีข้อมูลนักเรียนในกลุ่มนี้</td></tr>';
     const footerCols = [];
     SUB_KEYS.forEach(k => { footerCols.push(subValsPre[k]); footerCols.push(subValsPost[k]); });
     footerCols.push(preVals, postVals, gainVals);
-    if (foot) foot.innerHTML = buildStatsFooter(footerCols, 2, 1);
+    if (foot) foot.innerHTML = buildStatsFooter(footerCols, 1, 1);
   }
 
   // สร้างแผนที่คะแนนเฉลี่ยรายด้านต่อคน สำหรับกราฟแมงมุม
@@ -1726,13 +1744,14 @@ require_once 'header.php';
     // คอลัมน์คะแนนที่ใช้เป็นตัวชี้วัดความครบถ้วนของแต่ละตาราง (ระบุด้วยดัชนีเซลล์)
     //  - ตารางภาระงาน: หน่วยที่ 1 (cell 2) / หน่วยที่ 2 (cell 3)
     //  - ตารางก่อน/หลังเรียน: ก่อนเรียน (cell 2) / หลังเรียน (cell 3)
-    const applyToBody = (bodyId, scoreCells) => {
+    //  - hasName: true = คอลัมน์ 1 เป็นชื่อ (ใช้ค้นหาด้วย), false = ไม่มีคอลัมน์ชื่อ (ตารางรายละเอียดที่แสดงแค่รหัส)
+    const applyToBody = (bodyId, scoreCells, hasName = true) => {
       document.querySelectorAll(`#${bodyId} tr`).forEach(row => {
-        // ต้องมีอย่างน้อย รหัส + ชื่อ + คอลัมน์คะแนนที่ตรวจ (ข้ามแถวสถานะ/ว่าง)
+        // ต้องมีอย่างน้อย รหัส (+ ชื่อ ถ้ามี) + คอลัมน์คะแนนที่ตรวจ (ข้ามแถวสถานะ/ว่าง)
         if (row.cells.length <= Math.max(...scoreCells)) return;
 
         const studentId = row.cells[0].textContent.toLowerCase();
-        const name = row.cells[1].textContent.toLowerCase();
+        const name = hasName ? row.cells[1].textContent.toLowerCase() : '';
         const flags = scoreCells.map(i => row.cells[i].textContent.trim() !== '-');
         const hasAll  = flags.every(Boolean);
         const hasNone = flags.every(v => !v);
@@ -1754,9 +1773,9 @@ require_once 'header.php';
 
     applyToBody('taskTableBody', [2, 3]);
     applyToBody('prepostTableBody', [2, 3]);
-    // ตารางรายละเอียดรายข้อเกณฑ์ย่อย: คอลัมน์รวมหน่วย1/หน่วย2 และ ก่อน/หลัง อยู่ที่ cell 24, 25 (หลังคอลัมน์ย่อย 11 ข้อ x 2 = 22 คอลัมน์)
-    applyToBody('taskDetailTableBody', [24, 25]);
-    applyToBody('prepostDetailTableBody', [24, 25]);
+    // ตารางรายละเอียดรายข้อเกณฑ์ย่อย (ไม่มีคอลัมน์ชื่อ): คอลัมน์รวมหน่วย1/หน่วย2 และ ก่อน/หลัง อยู่ที่ cell 23, 24 (คอลัมน์รหัส 1 + คอลัมน์ย่อย 11 ข้อ x 2 = 22 คอลัมน์)
+    applyToBody('taskDetailTableBody', [23, 24], false);
+    applyToBody('prepostDetailTableBody', [23, 24], false);
   }
 
   function viewStudentDetail(id) {
