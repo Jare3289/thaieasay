@@ -31,6 +31,8 @@ if (!defined('CH45_AI_LOADED')) {
     // ความยาวข้อความต้นฉบับที่ต้องวางมา ก่อนให้ระบบช่วยย่อเป็น "สิ่งที่งานนี้ค้นพบโดยย่อ"
     define('CH45_REF_SOURCE_MIN_CHARS', 80);
     define('CH45_REF_SOURCE_MAX_CHARS', 6000);
+    // จำนวนครั้งสูงสุดที่ยอมให้ขอให้ระบบแก้ความยาวตัวอย่าง (ind_*) ใหม่ ถ้ารอบแรกได้ตัวอย่างที่สั้น/ยาวเกิน 20-40 คำ
+    define('CH45_EXCERPT_LENGTH_MAX_ATTEMPTS', 3);
 }
 
 /* =========================================================================
@@ -1703,6 +1705,16 @@ function ch45_verify_excerpt(array $excerpt, array $pool) {
 }
 
 /**
+ * คัดเฉพาะคำเตือนที่เป็นเรื่อง "ความยาวตัวอย่างไม่อยู่ในช่วง 20-40 คำ" ออกจากคำเตือนทั้งหมดของชิ้นงาน ind_*
+ * ใช้ตัดสินใจว่าต้องขอให้ระบบแก้ความยาวแล้วตอบใหม่หรือไม่ (ch45_ai_run)
+ */
+function ch45_length_warnings(array $warnings) {
+    return array_values(array_filter($warnings, function ($w) {
+        return mb_strpos($w, 'ตัวอย่างสั้นเกินไป') !== false || mb_strpos($w, 'ตัวอย่างยาวเกินไป') !== false;
+    }));
+}
+
+/**
  * ตรวจแบบหยาบว่าในเนื้อความย่อหน้าอภิปรายผลมี "ร่องรอยการอ้างอิงงานวิจัย" (ชื่อผู้แต่ง + ปี)
  * ที่ไม่ตรงกับ citation_used ที่แจ้งไว้และไม่มีอยู่ในคลังอ้างอิงหรือไม่ — เป็นด่านป้องกันชั้นที่สอง
  * กันกรณีระบบแอบใส่ชื่อผู้แต่งที่แต่งขึ้นเองปนอยู่ในเนื้อความ ทั้งที่ citation_used ตอบถูกต้องหรือเว้นว่างไว้
@@ -2013,14 +2025,34 @@ function ch45_ai_run(PDO $pdo, $jobKey, array $ctx, array $who) {
 
     // งาน ind_* ต้องคัดข้อความจริงและวิเคราะห์ให้ตรงจุดเป๊ะ ๆ (งานเชิงระบุตำแหน่ง/เหตุผล ไม่ใช่งานเชิงสร้างสรรค์)
     // ลดอุณหภูมิลงจากค่าปกติของทั้งระบบ (0.4) เพื่อลดโอกาสที่ระบบจะ "เดา" หรือหยิบตัวอย่างที่ไม่ตรงประเด็น
-    $opts = (strpos($jobKey, 'ind_') === 0) ? ['temperature' => 0.15] : [];
-    $res = ai_call_model($settings, ch45_ai_system_prompt(), $prompt, $opts);
-    ai_log_usage($pdo, (string)($who['id'] ?? ''), (string)($who['role'] ?? ''), null, 'ch45:' . $jobKey,
-                 $res['ok'] ? 1 : 0, $res['ok'] ? '' : (string)$res['error']);
-    if (!$res['ok']) return ['ok' => false, 'error' => (string)$res['error']];
+    $isInd = (strpos($jobKey, 'ind_') === 0);
+    $opts = $isInd ? ['temperature' => 0.15] : [];
 
-    $parsed = ch45_ai_parse($jobKey, $res['text'], $ctx, $built['evidence']);
-    if ($parsed['error'] !== '') return ['ok' => false, 'error' => $parsed['error'], 'raw' => $res['text']];
+    // ตัวบ่งชี้ (ind_*) เป็นงานเดียวที่มีข้อจำกัดความยาวตัวอย่าง (20-40 คำ) ซึ่งบางครั้งระบบตอบไม่ตรงตามที่สั่ง
+    // ตั้งแต่ครั้งเดียว — ถ้าเจอแบบนั้น ขอให้ระบบแก้เฉพาะความยาวแล้วตอบใหม่อีกไม่เกิน CH45_EXCERPT_LENGTH_MAX_ATTEMPTS ครั้ง
+    // ก่อนจะยอมรับผลรอบสุดท้ายพร้อมคำเตือน (ให้ครูตรวจเองถ้ายังไม่อยู่ในช่วงหลังจากพยายามครบแล้ว)
+    $maxAttempts = $isInd ? CH45_EXCERPT_LENGTH_MAX_ATTEMPTS : 1;
+    $sendPrompt = $prompt;
+    $res = null;
+    $parsed = null;
+    for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+        $res = ai_call_model($settings, ch45_ai_system_prompt(), $sendPrompt, $opts);
+        ai_log_usage($pdo, (string)($who['id'] ?? ''), (string)($who['role'] ?? ''), null, 'ch45:' . $jobKey,
+                     $res['ok'] ? 1 : 0, $res['ok'] ? '' : (string)$res['error']);
+        if (!$res['ok']) return ['ok' => false, 'error' => (string)$res['error']];
+
+        $parsed = ch45_ai_parse($jobKey, $res['text'], $ctx, $built['evidence']);
+        if ($parsed['error'] !== '') return ['ok' => false, 'error' => $parsed['error'], 'raw' => $res['text']];
+
+        $lenWarn = $isInd ? ch45_length_warnings($parsed['warnings']) : [];
+        if (!$lenWarn || $attempt >= $maxAttempts) break;
+
+        $sendPrompt = $prompt . "\n\n=== แก้ไขความยาวตัวอย่างที่ยกมา (ตอบใหม่ทั้งชุดเหมือนเดิมทุกฟิลด์) ===\n"
+            . "คำตอบรอบที่แล้วมีตัวอย่างที่ยกมายาวไม่อยู่ในช่วง 20-40 คำ ดังนี้:\n- "
+            . implode("\n- ", $lenWarn)
+            . "\nตอบใหม่ทั้ง JSON ชุดเดิมทุกฟิลด์เหมือนเดิม แต่แก้เฉพาะข้อความ excerpt ที่ยาวไม่อยู่ในช่วงให้อยู่ในช่วง 20-40 คำ "
+            . "(คัดลอกคำต่อคำจากผลงานจริงเท่านั้น ห้ามแต่งเพิ่ม) ส่วนคู่ตัวอย่างอื่นที่ความยาวถูกต้องแล้วให้คงไว้เหมือนเดิม";
+    }
 
     ch45_save_result($pdo, $jobKey, $parsed['payload'], [
         'raw'        => (string)$res['text'],
