@@ -584,7 +584,7 @@ function c45WarnBox(warnings) {
 function c45Para(label, text) {
   if (!text) return '';
   return '<div class="mb-2"><div class="small fw-bold text-secondary">' + c45Esc(label) + '</div>'
-    + '<p class="mb-0" style="text-indent:2.5em; line-height:1.9;">' + c45Esc(text) + '</p></div>';
+    + '<p class="mb-0" style="text-indent:2.5em; line-height:2.1;">' + c45Esc(text) + '</p></div>';
 }
 
 function c45Excerpt(exNo, ex, roundLabel, usageCount) {
@@ -608,7 +608,7 @@ function c45Excerpt(exNo, ex, roundLabel, usageCount) {
     + (ok ? '<i class="bi bi-check2-circle"></i> ตรวจแล้วตรงกับผลงานจริง' : '<i class="bi bi-exclamation-octagon"></i> ไม่ตรงกับผลงานจริง')
     + '</span>'
     + '<span class="small text-muted">ตัวอย่าง (' + exNo + ')</span></div>'
-    + '<div style="line-height:1.9;">' + c45Esc(ex.text) + '</div>'
+    + '<div style="line-height:2.1;">' + c45Esc(ex.text) + '</div>'
     + '<div class="small text-muted mt-1">(' + who + ' ' + c45Esc(roundLabel) + ')' + dup + '</div>'
     + (ex.reason ? '<div class="small text-danger mt-1">' + c45Esc(ex.reason) + '</div>' : '')
     + '</div>';
@@ -724,7 +724,7 @@ function c45RenderPayload(jobKey, payload) {
       h += '<div class="border rounded-3 p-2 mb-2 ' + (cite.verified === false || p.suspect_citation ? 'border-danger' : '') + '">'
         + '<div class="fw-bold small mb-1">' + c45Esc(p.heading) + '</div>'
         + suspectBox
-        + '<p class="mb-1" style="text-indent:2.5em; line-height:1.9;">' + c45Esc(p.text) + '</p>'
+        + '<p class="mb-1" style="text-indent:2.5em; line-height:2.1;">' + c45Esc(p.text) + '</p>'
         + citeBox
         + '</div>';
     });
@@ -966,7 +966,7 @@ async function c45ShowEvidence(indicatorId) {
         + (c45RevealNames && c.name ? ' (ชื่อจริง: ' + c45Esc(c.name) + ')' : '');
       h += '<div class="border rounded-3 p-2 mb-2"><div class="small fw-bold mb-1">' + who
         + ' · คะแนนดิบ ' + (c.raw === null ? '—' : Number(c.raw).toFixed(1)) + '/4 · ' + c45Esc(c.tag) + '</div>'
-        + '<div class="small" style="line-height:1.8;">' + c45Esc(c.text) + '</div></div>';
+        + '<div class="small" style="line-height:2.0;">' + c45Esc(c.text) + '</div></div>';
     });
   });
   c45Modal('ผลงานที่ระบบคัดให้ระบบ — ตัวบ่งชี้ ' + indicatorId, h);
@@ -1529,7 +1529,7 @@ function c45PaintSynthesis() {
         + (p.bad_numbers && p.bad_numbers.length ? '<div class="small text-danger fw-bold mb-1">'
             + '<i class="bi bi-exclamation-octagon-fill me-1"></i>ตัวเลข ' + c45Esc(p.bad_numbers.join(', '))
             + ' ไม่พบทั้งในผลจริงและในคลังอ้างอิง</div>' : '')
-        + '<div style="text-indent:2.5em;line-height:1.9;">' + c45Esc(p.text) + '</div></div>';
+        + '<div style="text-indent:2.5em;line-height:2.1;">' + c45Esc(p.text) + '</div></div>';
     });
     h += '</div>';
   }
