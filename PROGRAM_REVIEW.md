@@ -14,7 +14,7 @@
 | 1 | `api.php` | สูงมาก | 3,969 บรรทัด, 72 actions และตอบ JSON โดยตรงราว 250 จุด ทำให้สิทธิ์, validation และ transaction ไม่สม่ำเสมอ |
 | 2 | `db_config.php` | สูง | การเปิดทุกหน้าจะโหลดไฟล์นี้ และไฟล์มีทั้งการเชื่อมต่อ, สร้างตาราง, ตรวจ schema และ migration แบบ runtime |
 | 3 | `writing_check_config.php` / `chapter45_engine.php` | สูง | รวม config, prompt, HTTP client, parsing, scoring และ persistence ไว้ในไฟล์ใหญ่เดียว ฟังก์ชันสร้าง prompt บางตัวเกิน 290 บรรทัด |
-| 4 | JavaScript ที่ฝังในหน้า PHP | กลาง-สูง | `research_analysis.php`, `dashboard.php`, `evaluation.php` และ `reflection_tools.php` รวม view, state, fetch, คำนวณ และ render ไว้ในไฟล์เดียว |
+| 4 | JavaScript ที่ฝังในหน้า PHP | กลาง-สูง | `chapter45.php`, `dashboard.php`, `evaluation.php` และ `reflection_tools.php` รวม view, state, fetch, คำนวณ และ render ไว้ในไฟล์เดียว |
 
 ไม่พบ syntax error ใน PHP หรือ JavaScript จากการตรวจรอบนี้ แต่ยังไม่มี test suite อัตโนมัติ
 สำหรับ business flow; มีเพียง `verify_calculations.js` ที่ตรวจสูตรสถิติบางส่วน ดังนั้น
@@ -67,7 +67,7 @@ characterization tests
 
 ### 4. หน้าใหญ่รวม presentation กับ business logic
 
-`research_analysis.php` มีฟังก์ชันสร้างรายงาน HTML ขนาดหลายร้อยบรรทัดและคำนวณสถิติ
+`chapter45.php` มีฟังก์ชันสร้างรายงาน HTML ขนาดหลายร้อยบรรทัดและแสดงผลสถิติจาก `chapter45_data.php`
 ใน browser ขณะที่ `dashboard.php` คำนวณและวาดกราฟในไฟล์เดียวกัน ทำให้สูตรเดียวกัน
 มีโอกาสได้ผลต่างกันระหว่างหน้ารายงาน, dashboard และ PHP ฝั่ง server
 

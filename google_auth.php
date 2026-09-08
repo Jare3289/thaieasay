@@ -53,7 +53,7 @@ if ($action === 'connect') {
     if (!is_teacher()) { header('Location: login.php'); exit; }
     if (!google_is_configured()) { die('ยังไม่ได้ตั้งค่า Google API — โปรดกรอก Client ID/Secret ใน google_config.php'); }
     $_SESSION['google_oauth_state']  = bin2hex(random_bytes(16));
-    $_SESSION['google_oauth_return'] = isset($_GET['return']) ? $_GET['return'] : 'research_analysis.php';
+    $_SESSION['google_oauth_return'] = isset($_GET['return']) ? $_GET['return'] : 'chapter45.php';
     // เก็บสำรองไว้ในคุกกี้ด้วย (อายุ 10 นาที) เผื่อ session ฝั่งเซิร์ฟเวอร์เก็บไม่ทัน
     // ตอนหน้า Google เด้งกลับมาที่ callback (พบได้บนบางโฮสติ้ง)
     google_set_short_cookie('google_oauth_state', $_SESSION['google_oauth_state']);
@@ -97,13 +97,13 @@ if ($action === 'callback') {
     ]);
     if (!$r['ok']) { die('แลกโทเคนไม่สำเร็จ: ' . htmlspecialchars($r['error'])); }
     google_store_tokens($r['data']);
-    $return = $_SESSION['google_oauth_return'] ?? ($_COOKIE['google_oauth_return'] ?? 'research_analysis.php');
+    $return = $_SESSION['google_oauth_return'] ?? ($_COOKIE['google_oauth_return'] ?? 'chapter45.php');
     unset($_SESSION['google_oauth_state'], $_SESSION['google_oauth_return']);
     google_clear_short_cookie('google_oauth_state');
     google_clear_short_cookie('google_oauth_return');
     // กันการ redirect ออกนอกโดเมน — อนุญาตเฉพาะ path ภายใน
-    if (!preg_match('#^/[^/\\\\]#', $return) && strpos($return, 'research_analysis.php') !== 0) {
-        $return = 'research_analysis.php#section-export';
+    if (!preg_match('#^/[^/\\\\]#', $return) && strpos($return, 'chapter45.php') !== 0) {
+        $return = 'chapter45.php';
     }
     header('Location: ' . $return);
     exit;
