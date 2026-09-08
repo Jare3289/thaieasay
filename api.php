@@ -4334,6 +4334,8 @@ try {
                 'meta_fields' => ch45_meta_fields(),
                 'phases'      => array_map('ai_phase_label', array_combine(ai_all_phases(), ai_all_phases())),
                 'levels'      => ch45_score_levels(),
+                'indicators'  => ch45_indicators(),
+                'domains'     => ch45_domains(),
             ], JSON_UNESCAPED_UNICODE);
             break;
 
