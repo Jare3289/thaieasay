@@ -1176,11 +1176,12 @@ function ch45_ai_example_plan(array $row, array $indicator) {
     // ให้น้ำหนักตัวบ่งชี้ย่อยมากกว่าองค์ประกอบหลักเล็กน้อย เพราะตัวอย่างถูกยกเพื่อวิเคราะห์
     // ตัวบ่งชี้นั้นโดยตรง ส่วนคะแนนองค์ประกอบหลักทำหน้าที่รักษาสัดส่วนภาพรวมของบท
     $importance = (0.60 * min(1, $indicatorMax / 12)) + (0.40 * min(1, $domainMax / 27));
-    $scoreCap = $importance >= 0.75 ? 4 : ($importance >= 0.45 ? 3 : 2);
+    // จำกัดสัดส่วนให้อ่านกระชับ: ประเด็นน้ำหนักสูง/กลาง/ต่ำ ใช้ได้สูงสุด 3/2/1 คู่ตามลำดับ
+    $scoreCap = $importance >= 0.75 ? 3 : ($importance >= 0.45 ? 2 : 1);
 
     // จำนวนผู้ปรากฏข้อบกพร่องเป็นข้อจำกัดด้านความเพียงพอของหลักฐาน ไม่ใช่ตัวกำหนดน้ำหนักเนื้อหา
     $base = max($n1, $n2);
-    $evidenceCap = $base === 0 ? 0 : ($base <= 2 ? 1 : ($base <= 5 ? 2 : 4));
+    $evidenceCap = $base === 0 ? 0 : ($base <= 2 ? 1 : ($base <= 5 ? 2 : 3));
 
     return [
         'pairs'         => min($scoreCap, $evidenceCap),
@@ -1272,7 +1273,7 @@ function ch45_ai_build_prompt($jobKey, array $ctx) {
         }
         // เผื่อตัวเลือกให้ระบบมากกว่าเพดานคู่จริงอีก 1 คน (กันกรณีตัวเลือกอันดับแรกเนื้อหาไม่พอยกตัวอย่าง)
         // แต่ไม่เผื่อไว้ที่ 3 เสมอเหมือนเดิม เพราะยิ่งเห็นตัวเลือกเยอะเกินจำเป็น ยิ่งมีแนวโน้มอยากยกให้ครบทุกคนที่เห็น
-        $evidence = ch45_evidence($ds, $id, $defects, min(5, $maxPairs + 1), $usedW1, $usedW2);
+        $evidence = ch45_evidence($ds, $id, $defects, min(4, $maxPairs + 1), $usedW1, $usedW2);
 
         $extra = [];
         if ($id === '4.1') {
