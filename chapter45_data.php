@@ -880,7 +880,7 @@ function ch45_mechanics(PDO $pdo, array $ds) {
     $out = [];
     foreach (['work1' => $meta['work1_phase'], 'work2' => $meta['work2_phase']] as $slot => $phase) {
         $spellCounts = []; $spellTypes = []; $wordCounts = []; $paraCounts = [];
-        $maiyamok = []; $wordFreq = [];
+        $maiyamok = []; $wordFreq = []; $perStudentWords = [];
         $pieces = 0;
         $normPieces = 0; $spaceFix = [];
         foreach ($ds['sids'] as $sid) {
@@ -911,6 +911,10 @@ function ch45_mechanics(PDO $pdo, array $ds) {
             }
             $spellCounts[] = $occ;
             $spellTypes[]  = count($types);
+            // เก็บคำที่ตรวจพบว่าสะกดผิดไว้ "รายคน" ด้วย (ไม่ใช่แค่รวมทั้งชั้น) เพื่อให้ ch45_evidence()
+            // นำไปกำกับตัวอย่างของตัวบ่งชี้ 4.1 ว่าต้องยกข้อความที่มีคำเหล่านี้จริง แทนที่จะปล่อยให้ระบบ
+            // ต้องไปหาคำสะกดผิดเองจากตัวบทดิบ ซึ่งเป็นจุดที่ตัวอย่างมักยกมาไม่ตรงกับข้อบกพร่องจริง
+            $perStudentWords[$sid] = array_keys($types);
             try {
                 // ต้องนับจาก "ต้นฉบับที่นักเรียนพิมพ์เอง" เท่านั้น ถ้านับจากฉบับจัดวรรคแล้วจะได้ศูนย์เสมอ
                 // เพราะระบบจัดเว้นวรรคไม้ยมกให้ถูกไปแล้ว ซึ่งไม่ใช่ความสามารถของนักเรียน
@@ -929,6 +933,7 @@ function ch45_mechanics(PDO $pdo, array $ds) {
             'spell_types_mean' => ch45_mean($spellTypes),
             'spell_ge3'    => count(array_filter($spellCounts, function ($c) { return $c >= 3; })),
             'top_words'    => array_slice($wordFreq, 0, 25, true),
+            'per_student_misspelled' => $perStudentWords,
             'word_mean'    => ch45_mean($wordCounts),
             'word_sd'      => ch45_sd($wordCounts),
             'para_mean'    => ch45_mean($paraCounts),
