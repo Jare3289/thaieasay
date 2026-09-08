@@ -1228,6 +1228,29 @@ function ch45_ai_build_prompt($jobKey, array $ctx) {
             $top = array_keys($mech['work1']['top_words'] ?? []);
             if ($top) $extra[] = 'คำที่ระบบตรวจพบว่าสะกดผิดบ่อยในครั้งที่ 1: ' . implode(', ', array_slice($top, 0, 15))
                 . ' (บางคำอาจเป็นวิสามานยนามที่สะกดถูกอยู่แล้ว ให้ใช้วิจารณญาณ)';
+            // เดิมระบบมีแค่รายการคำสะกดผิดที่พบบ่อย "ทั้งชั้น" ให้ ทำให้ระบบต้องไปไล่หาเองว่าคนที่ถูกยกเป็น
+            // ตัวอย่างสะกดผิดตรงคำไหนบ้าง ซึ่งเป็นจุดที่ตัวอย่างที่ยกมามักไม่ตรงกับข้อบกพร่องจริง (ยกประโยค
+            // ที่สะกดถูกทุกคำมาอ้างว่าสะกดผิด) จึงต้องบอกคำที่ตรวจพบจริง "รายคน" ของนักเรียนที่ถูกคัดมาให้ตรง ๆ
+            $wordsOf = function ($cands, $table) use ($mech) {
+                $lines = [];
+                foreach ($cands as $c) {
+                    $ws = $mech[$table]['per_student_misspelled'][$c['sid']] ?? [];
+                    $lines[] = '  นักเรียนคนที่ ' . $c['no'] . ': '
+                        . ($ws ? implode(', ', array_slice($ws, 0, 20)) : '(ระบบตรวจไม่พบคำที่สะกดผิดในผลงานชิ้นนี้)');
+                }
+                return $lines;
+            };
+            $w1Cands = $evidence['work1'] ?? []; $w2Cands = $evidence['work2'] ?? [];
+            if ($w1Cands) $extra = array_merge($extra,
+                ['คำที่ระบบตรวจพบว่าสะกดผิดจริงในผลงานครั้งที่ 1 ของนักเรียนแต่ละคนที่คัดมาให้ข้างล่างนี้:'],
+                $wordsOf($w1Cands, 'work1'));
+            if ($w2Cands) $extra = array_merge($extra,
+                ['คำที่ระบบตรวจพบว่าสะกดผิดจริงในผลงานครั้งที่ 2 ของนักเรียนแต่ละคนที่คัดมาให้ข้างล่างนี้:'],
+                $wordsOf($w2Cands, 'work2'));
+            $extra[] = 'กติกาสำคัญของตัวบ่งชี้นี้: excerpt1/excerpt2 ที่ยกมาต้อง "มีคำใดคำหนึ่งในรายการคำสะกดผิดของนักเรียนคนนั้น'
+                . 'ที่ให้ไว้ข้างต้นปรากฏอยู่จริงในข้อความ" เสมอ ถ้านักเรียนที่มีคะแนนต่ำสุดไม่มีประโยคใดมีคำสะกดผิดปรากฏชัดเจนพอ '
+                . 'ให้เลือกนักเรียนคนอื่นที่มีคำสะกดผิดปรากฏชัดแทน ห้ามยกประโยคที่ไม่มีคำในรายการนี้มาอ้างว่าเป็นตัวอย่างการสะกดผิด '
+                . '(บางคำในรายการอาจเป็นวิสามานยนามที่สะกดถูกอยู่แล้ว ให้ใช้วิจารณญาณเลือกคำที่สะกดผิดจริง ๆ)';
         }
         if ($id === '4.3') {
             $extra[] = 'หมายเหตุ: ตัวบ่งชี้นี้ประเมินจากต้นฉบับลายมือ ระบบจึงมีเพียงคะแนนที่ครูให้ ไม่มีตัวบทให้ยกตัวอย่าง';
@@ -1723,12 +1746,34 @@ function ch45_ai_parse($jobKey, $rawText, array $ctx = [], $evidence = null) {
         $rawPairs = is_array($obj['pairs'] ?? null) ? array_slice($obj['pairs'], 0, $maxPairs) : [];
         $pairs = [];
         $seen = ['w1' => [], 'w2' => []];
+
+        // ตัวบ่งชี้ 4.1 (สะกดคำ) เป็นตัวบ่งชี้เดียวที่มี "หลักฐานตรวจสอบได้อัตโนมัติ" ว่าข้อความที่ยกมา
+        // มีคำสะกดผิดจริงหรือไม่ (พจนานุกรมของระบบ) ต่างจากตัวบ่งชี้อื่นที่ต้องอาศัยดุลพินิจของระบบล้วน ๆ
+        // จึงตรวจซ้ำได้ว่าตัวอย่างที่ยกมา "ตรงกับข้อบกพร่องจริง" หรือไม่ ไม่ใช่แค่ตรวจว่าคัดลอกมาจริงเฉย ๆ
+        $noToSid = [];
+        if ($id === '4.1') {
+            foreach ((($ctx['ds']['students'] ?? [])) as $sid => $st) $noToSid[(int)($st['no'] ?? 0)] = $sid;
+        }
+        $checkSpelling = function ($ex, $table) use ($id, $noToSid, $ctx) {
+            if ($id !== '4.1' || $ex['verified'] !== true || $ex['text'] === '') return $ex;
+            $sid = $noToSid[(int)$ex['student_no']] ?? null;
+            $flagged = $sid !== null ? ($ctx['mech'][$table]['per_student_misspelled'][$sid] ?? []) : [];
+            if (!$flagged) return $ex; // ไม่มีข้อมูลคำสะกดผิดของคนนี้ให้ตรวจ ปล่อยผ่าน ไม่ฟันธงว่าผิด
+            foreach ($flagged as $w) {
+                if ($w !== '' && mb_strpos($ex['text'], $w, 0, 'UTF-8') !== false) return $ex; // เจอคำที่ตรวจว่าสะกดผิดจริง
+            }
+            $note = 'ไม่พบคำที่ระบบตรวจว่าสะกดผิดของนักเรียนคนนี้อยู่ในข้อความที่ยกมา '
+                . 'ตรวจสอบก่อนว่าตัวอย่างนี้แสดงข้อบกพร่องด้านการสะกดคำจริงหรือไม่';
+            $ex['reason'] = ($ex['reason'] !== '') ? ($ex['reason'] . ' · ' . $note) : $note;
+            return $ex;
+        };
+
         foreach ($rawPairs as $i => $rp) {
             if (!is_array($rp)) continue;
             $e1 = is_array($rp['excerpt1'] ?? null) ? $rp['excerpt1'] : ['student_no' => 0, 'text' => ''];
             $e2 = is_array($rp['excerpt2'] ?? null) ? $rp['excerpt2'] : ['student_no' => 0, 'text' => ''];
-            $v1 = ch45_verify_excerpt($e1, $evidence['work1'] ?? []);
-            $v2 = ch45_verify_excerpt($e2, $evidence['work2'] ?? []);
+            $v1 = $checkSpelling(ch45_verify_excerpt($e1, $evidence['work1'] ?? []), 'work1');
+            $v2 = $checkSpelling(ch45_verify_excerpt($e2, $evidence['work2'] ?? []), 'work2');
             // คู่ที่ระบบตอบว่างทั้งสองฝั่ง ไม่ถือเป็นคู่ตัวอย่างจริง ตัดทิ้งไปเลย
             if ($v1['text'] === '' && $v2['text'] === '') continue;
             $pairs[] = [
@@ -1935,7 +1980,10 @@ function ch45_ai_run(PDO $pdo, $jobKey, array $ctx, array $who) {
         return ['ok' => false, 'error' => 'ข้อมูลนำเข้ายาวเกินกว่าที่จะส่งให้ระบบได้ในครั้งเดียว'];
     }
 
-    $res = ai_call_model($settings, ch45_ai_system_prompt(), $prompt);
+    // งาน ind_* ต้องคัดข้อความจริงและวิเคราะห์ให้ตรงจุดเป๊ะ ๆ (งานเชิงระบุตำแหน่ง/เหตุผล ไม่ใช่งานเชิงสร้างสรรค์)
+    // ลดอุณหภูมิลงจากค่าปกติของทั้งระบบ (0.4) เพื่อลดโอกาสที่ระบบจะ "เดา" หรือหยิบตัวอย่างที่ไม่ตรงประเด็น
+    $opts = (strpos($jobKey, 'ind_') === 0) ? ['temperature' => 0.15] : [];
+    $res = ai_call_model($settings, ch45_ai_system_prompt(), $prompt, $opts);
     ai_log_usage($pdo, (string)($who['id'] ?? ''), (string)($who['role'] ?? ''), null, 'ch45:' . $jobKey,
                  $res['ok'] ? 1 : 0, $res['ok'] ? '' : (string)$res['error']);
     if (!$res['ok']) return ['ok' => false, 'error' => (string)$res['error']];
