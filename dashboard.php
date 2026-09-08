@@ -58,29 +58,30 @@ require_once 'header.php';
         <div class="card-body">
           <div class="row g-4">
             <div class="col-md-6 col-sm-12 text-center">
-              <span class="small fw-bold text-secondary mb-2 d-block">1. สัดส่วนคุณภาพผลสัมฤทธิ์ทางการประเมินของห้องเรียน (คน)</span>
+              <span class="small fw-bold text-secondary mb-2 d-block">1. จำนวนนักเรียนแยกตามระดับคุณภาพ (เรียงจากระดับที่ต้องเร่งช่วยเหลือ)</span>
               <div style="position: relative; height: 260px;" class="w-100">
                 <canvas id="classQualityDistributionChart"></canvas>
               </div>
             </div>
             <div class="col-md-6 col-sm-12 text-center">
-              <span class="small fw-bold text-secondary mb-2 d-block">2. ค่าเฉลี่ยของชั้นเรียนคิดเป็นร้อยละแยกตามมิติหลักและเกณฑ์ย่อย (เต็ม 100%)</span>
+              <span class="small fw-bold text-secondary mb-2 d-block">2. จุดแข็ง–จุดที่ควรพัฒนา: ค่าเฉลี่ยรายเกณฑ์เทียบเป้าหมาย 70%</span>
               <div style="position: relative; height: 340px;" class="w-100">
                 <canvas id="classDimensionAveragesChart"></canvas>
               </div>
             </div>
-            <!-- กราฟแมงมุมคะแนนเฉลี่ยรายบุคคลแยกตามรายด้าน (1 นักเรียน = 1 รูปใย) — แยก 2 กราฟ: ภาระงาน และ ก่อน/หลังเรียน -->
+            <!-- กราฟจัดลำดับรายบุคคลที่นำไปใช้ติดตามและวางแผนช่วยเหลือได้จริง -->
             <div class="col-12 mt-4 border-top pt-4">
-              <span class="small fw-bold text-secondary mb-3 d-block text-center">3. กราฟแมงมุมวิเคราะห์รูปแบบคะแนนเฉลี่ยของผู้เรียนแต่ละคนแยกตามรายด้าน (1 นักเรียน = 1 รูปใยแมงมุม)</span>
+              <span class="small fw-bold text-secondary mb-1 d-block text-center">3. ติดตามผลรายบุคคลเพื่อเลือกผู้เรียนที่ควรได้รับการช่วยเหลือ</span>
+              <span class="small text-muted mb-3 d-block text-center">เรียงคะแนนจากน้อยไปมาก คลิกชื่อในตารางด้านล่างเพื่อดูรายละเอียดเชิงลึก</span>
               <div class="row g-4">
                 <div class="col-lg-6 col-12 text-center">
-                  <span class="small fw-bold text-primary-emphasis mb-2 d-block"><i class="bi bi-clipboard-check"></i> 3.1 ภาระงานในหน่วยเรียน (Task 1 + Task 2)</span>
+                  <span class="small fw-bold text-primary-emphasis mb-2 d-block"><i class="bi bi-clipboard-check"></i> 3.1 คะแนนเฉลี่ยภาระงานรายคน (เต็ม 60)</span>
                   <div style="position: relative; height: 440px;" class="w-100">
                     <canvas id="classDimensionSpiderTask"></canvas>
                   </div>
                 </div>
                 <div class="col-lg-6 col-12 text-center">
-                  <span class="small fw-bold text-success-emphasis mb-2 d-block"><i class="bi bi-arrow-left-right"></i> 3.2 ก่อนเรียน–หลังเรียน (Pretest / Posttest โดยครู)</span>
+                  <span class="small fw-bold text-success-emphasis mb-2 d-block"><i class="bi bi-arrow-left-right"></i> 3.2 เปรียบเทียบก่อน–หลังเรียนรายคน (เต็ม 60)</span>
                   <div style="position: relative; height: 440px;" class="w-100">
                     <canvas id="classDimensionSpiderPrePost"></canvas>
                   </div>
@@ -576,7 +577,8 @@ require_once 'header.php';
     <div class="row g-4 mb-4">
       <div class="col-12">
         <div class="card border-0 shadow-sm p-4 bg-white rounded-4 text-start">
-          <h5 class="fw-bold text-dark mb-3"><i class="bi bi-hexagon-fill text-primary"></i> กราฟเรดาร์ 6 เหลี่ยมแสดงระดับคุณภาพประเมินเทียบ 3 มิติ (360° Radar Profile)</h5>
+          <h5 class="fw-bold text-dark mb-1"><i class="bi bi-bar-chart-steps text-primary"></i> จุดแข็งและจุดที่ควรพัฒนารายเกณฑ์</h5>
+          <p class="text-muted small mb-3">เปรียบเทียบผู้ประเมินทั้ง 3 ฝ่ายบนสเกลเดียวกัน เพื่อระบุเกณฑ์ที่เห็นต่างและนำไปพูดคุยได้ชัดเจน</p>
           <div style="position: relative; height: 380px;" class="w-100">
             <canvas id="individualRadarChart"></canvas>
           </div>
@@ -1509,6 +1511,13 @@ require_once 'header.php';
       subKeys.forEach(k => sums[k] = 0);
       evs.forEach(e => { subKeys.forEach(k => { sums[k] += Number(e['score_' + k] || 0); }); });
       subKeys.forEach(k => { rec['avg_' + k] = evs.length > 0 ? (sums[k] / evs.length) : 0; });
+      rec.totalScore = evs.length > 0 ? evs.reduce((sum, e) => sum + Number(e.total_score || 0), 0) / evs.length : null;
+      if (mode === 'prepost') {
+        const pre = (studentEvals[id]['pretest'] || []).find(e => e.evaluator_type === 'teacher');
+        const post = (studentEvals[id]['posttest'] || []).find(e => e.evaluator_type === 'teacher');
+        rec.preScore = pre ? Number(pre.total_score) : null;
+        rec.postScore = post ? Number(post.total_score) : null;
+      }
       map[id] = rec;
     });
     return map;
@@ -1731,24 +1740,27 @@ require_once 'header.php';
     if (classQualityChartInstance) classQualityChartInstance.destroy();
     
     classQualityChartInstance = new Chart(ctx, {
-      type: 'doughnut',
+      type: 'bar',
       data: {
-        labels: ['ดีมาก (49-60 คะแนน)', 'ดี (37-48 คะแนน)', 'ปานกลาง (25-36 คะแนน)', 'พอใช้ (13-24 คะแนน)', 'ปรับปรุง (<13 คะแนน)'],
+        labels: ['ปรับปรุง (<13)', 'พอใช้ (13–24)', 'ปานกลาง (25–36)', 'ดี (37–48)', 'ดีมาก (49–60)'],
         datasets: [{
-          data: [counts.veryGood, counts.good, counts.fair, counts.pass, counts.poor],
-          backgroundColor: ['#059669', '#2563eb', '#ea580c', '#94a3b8', '#ef4444'],
-          borderWidth: 2,
-          borderColor: '#ffffff'
+          label: 'จำนวนนักเรียน',
+          data: [counts.poor, counts.pass, counts.fair, counts.good, counts.veryGood],
+          backgroundColor: ['#ef4444', '#f97316', '#f59e0b', '#2563eb', '#059669'],
+          borderRadius: 6
         }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: {
-            position: 'bottom',
-            labels: { boxWidth: 12, font: { family: 'Google Sans', size: 10 } }
-          }
+          legend: { display: false },
+          tooltip: { callbacks: { label: context => ` ${context.parsed.x} คน` } }
+        },
+        indexAxis: 'y',
+        scales: {
+          x: { beginAtZero: true, ticks: { precision: 0 }, title: { display: true, text: 'จำนวนนักเรียน (คน)' } },
+          y: { grid: { display: false } }
         }
       }
     });
@@ -1802,7 +1814,7 @@ require_once 'header.php';
       }
     ];
 
-    const labels = [];
+    const criteria = [];
     const dataPct = [];
     const bgColors = [];
     const borderColors = [];
@@ -1810,26 +1822,25 @@ require_once 'header.php';
 
     groups.forEach(g => {
       const mainAvg = count > 0 ? (Number(g.main.value || 0) / count) : 0;
-      labels.push('▎' + g.main.label);
-      dataPct.push(parseFloat(((mainAvg / g.main.max) * 100).toFixed(2)));
-      bgColors.push(g.solid);
-      borderColors.push(g.solid);
-      meta.push({ avg: mainAvg, max: g.main.max, isMain: true });
-
       g.subs.forEach(sub => {
         const subAvg = count > 0 ? (Number(subSums[sub.key] || 0) / count) : 0;
-        labels.push(sub.label);
-        dataPct.push(parseFloat(((subAvg / sub.max) * 100).toFixed(2)));
-        bgColors.push(g.soft);
-        borderColors.push(g.solid);
-        meta.push({ avg: subAvg, max: sub.max, isMain: false });
+        criteria.push({ label: sub.label, pct: parseFloat(((subAvg / sub.max) * 100).toFixed(2)), avg: subAvg, max: sub.max });
       });
+    });
+
+    // เรียงจากจุดอ่อนขึ้นไปหาจุดแข็ง ทำให้ครูเห็นลำดับสิ่งที่ควรลงมือแก้ก่อนทันที
+    criteria.sort((a, b) => a.pct - b.pct);
+    criteria.forEach(item => {
+      dataPct.push(item.pct);
+      bgColors.push(item.pct < 70 ? '#ef4444' : '#10b981');
+      borderColors.push(item.pct < 70 ? '#dc2626' : '#059669');
+      meta.push({ avg: item.avg, max: item.max, isMain: false });
     });
 
     classDimensionChartInstance = new Chart(ctx, {
       type: 'bar',
       data: {
-        labels: labels,
+        labels: criteria.map(item => item.label),
         datasets: [{
           label: 'ร้อยละคะแนนเฉลี่ย',
           data: dataPct,
@@ -1841,12 +1852,13 @@ require_once 'header.php';
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        indexAxis: 'y',
         plugins: {
           legend: { display: false },
           tooltip: {
             callbacks: {
               label: function(context) {
-                const val = context.parsed.y;
+                const val = context.parsed.x;
                 const m = meta[context.dataIndex] || {};
                 const rawStr = (m.max ? ` (${(m.avg || 0).toFixed(2)}/${m.max} คะแนน)` : '');
                 const tag = m.isMain ? 'มิติหลัก' : 'เกณฑ์ย่อย';
@@ -1856,19 +1868,16 @@ require_once 'header.php';
           }
         },
         scales: {
-          y: {
+          x: {
             beginAtZero: true,
             max: 100,
             ticks: { stepSize: 20 },
-            title: { display: true, text: 'ค่าร้อยละของคะแนนเต็ม (%)', font: { family: 'Google Sans', size: 10, weight: 'bold' } }
+            title: { display: true, text: 'ร้อยละของคะแนนเต็ม (%) — เป้าหมาย 70%', font: { family: 'Google Sans', size: 10, weight: 'bold' } },
+            grid: { color: context => context.tick.value === 70 ? '#dc2626' : 'rgba(0,0,0,.06)', lineWidth: context => context.tick.value === 70 ? 2 : 1 }
           },
-          x: {
-            ticks: {
-              font: { family: 'Google Sans', size: 8 },
-              maxRotation: 90,
-              minRotation: 55,
-              autoSkip: false
-            }
+          y: {
+            ticks: { font: { family: 'Google Sans', size: 9 }, autoSkip: false },
+            grid: { display: false }
           }
         }
       }
@@ -1882,140 +1891,47 @@ require_once 'header.php';
   function drawDimensionSpider(dataMap, canvasId, key) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
     if (spiderChartInstances[key]) spiderChartInstances[key].destroy();
 
-    const datasets = [];
-    // กรองเฉพาะนักเรียนในกลุ่มที่เลือกให้ตรงกับตารางและกราฟอื่น
-    const sortedKeys = Object.keys(studentDB).sort().filter(passesGroupFilter);
-
-    let lineCount = 0;
-    sortedKeys.forEach(id => {
-      const studentData = dataMap && dataMap[id] ? dataMap[id] : null;
-      // วาดรูปใยแมงมุมของนักเรียนทันทีที่มีการประเมินอย่างน้อย 1 รายการในหมวดนี้
-      if (studentData && studentData.count > 0) {
-        const pct11 = (parseFloat(studentData.avg_1_1) / 12) * 100;
-        const pct12 = (parseFloat(studentData.avg_1_2) / 6) * 100;
-        const pct13 = (parseFloat(studentData.avg_1_3) / 9) * 100;
-        const pct21 = (parseFloat(studentData.avg_2_1) / 8) * 100;
-        const pct22 = (parseFloat(studentData.avg_2_2) / 4) * 100;
-        const pct31 = (parseFloat(studentData.avg_3_1) / 4) * 100;
-        const pct32 = (parseFloat(studentData.avg_3_2) / 6) * 100;
-        const pct33 = (parseFloat(studentData.avg_3_3) / 5) * 100;
-        const pct41 = (parseFloat(studentData.avg_4_1) / 2) * 100;
-        const pct42 = (parseFloat(studentData.avg_4_2) / 2) * 100;
-        const pct43 = (parseFloat(studentData.avg_4_3) / 2) * 100;
-        
-        const hue = (lineCount * 33) % 360;
-        const colorDefault = `hsla(${hue}, 60%, 60%, 0.18)`; // เส้นใยจางลงโดยเริ่มต้นเพื่อให้อ่านง่ายเมื่อมีนักเรียนหลายคน
-        const colorHover = `hsla(${hue}, 85%, 45%, 1.0)`; // เส้นใยเข้มขึ้นชัดเจนเมื่อเอาเมาส์ชี้ (Hover)
-        const fillHover = `hsla(${hue}, 85%, 55%, 0.18)`; // เติมสีในรูปใยจาง ๆ เมื่อชี้เพื่อเน้นรูปทรงของนักเรียนคนนั้น
-
-        datasets.push({
-          label: `${id} - ${studentDB[id]}`,
-          data: [
-            parseFloat(pct11.toFixed(2)),
-            parseFloat(pct12.toFixed(2)),
-            parseFloat(pct13.toFixed(2)),
-            parseFloat(pct21.toFixed(2)),
-            parseFloat(pct22.toFixed(2)),
-            parseFloat(pct31.toFixed(2)),
-            parseFloat(pct32.toFixed(2)),
-            parseFloat(pct33.toFixed(2)),
-            parseFloat(pct41.toFixed(2)),
-            parseFloat(pct42.toFixed(2)),
-            parseFloat(pct43.toFixed(2))
-          ],
-          borderColor: colorDefault,
-          borderWidth: 1.5,
-          backgroundColor: 'transparent',
-          fill: true,
-          tension: 0.05,
-          pointBackgroundColor: colorDefault,
-          pointRadius: 1,
-          pointHoverRadius: 5,
-          pointHoverBackgroundColor: colorHover,
-          hoverBorderColor: colorHover,
-          hoverBackgroundColor: fillHover,
-          hoverBorderWidth: 3
-        });
-        lineCount++;
-      }
+    const rows = Object.keys(studentDB).filter(passesGroupFilter).map(id => {
+      const rec = dataMap && dataMap[id] ? dataMap[id] : {};
+      return { id, name: studentDB[id], ...rec };
+    }).filter(row => row.count > 0).sort((a, b) => {
+      const scoreA = key === 'prepost' ? (a.postScore ?? a.preScore ?? 0) : a.totalScore;
+      const scoreB = key === 'prepost' ? (b.postScore ?? b.preScore ?? 0) : b.totalScore;
+      return scoreA - scoreB;
     });
-    
-    spiderChartInstances[key] = new Chart(ctx, {
-      type: 'radar',
-      data: {
-        labels: [
-          '1.1 ตรงประเด็น (12)',
-          '1.2 แก่นเรื่อง (6)',
-          '1.3 ขยายความ (9)',
-          '2.1 องค์ประกอบครบ (8)',
-          '2.2 ลำดับประเด็น (4)',
-          '3.1 ประโยคถูกต้อง (4)',
-          '3.2 เลือกใช้คำ (6)',
-          '3.3 ระดับภาษา (5)',
-          '4.1 สะกดคำ (2)',
-          '4.2 เว้นวรรค (2)',
-          '4.3 เรียบร้อย (2)'
-        ],
-        datasets: datasets
-      },
+
+    const labels = rows.map(row => `${row.id} ${row.name}`);
+    const datasets = key === 'prepost' ? [
+      { label: 'ก่อนเรียน', data: rows.map(row => row.preScore), backgroundColor: '#94a3b8', borderRadius: 4 },
+      { label: 'หลังเรียน', data: rows.map(row => row.postScore), backgroundColor: '#059669', borderRadius: 4 }
+    ] : [
+      {
+        label: 'คะแนนเฉลี่ยภาระงาน',
+        data: rows.map(row => row.totalScore),
+        backgroundColor: rows.map(row => row.totalScore < 37 ? '#ef4444' : (row.totalScore < 49 ? '#2563eb' : '#059669')),
+        borderRadius: 4
+      }
+    ];
+
+    // เพิ่มความสูงตามจำนวนผู้เรียนเพื่อไม่ให้ชื่อและแท่งเบียดกัน
+    canvas.parentElement.style.height = `${Math.max(320, Math.min(720, rows.length * 28 + 90))}px`;
+    spiderChartInstances[key] = new Chart(canvas.getContext('2d'), {
+      type: 'bar',
+      data: { labels, datasets },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        interaction: {
-          mode: 'dataset',
-          intersect: false
-        },
+        indexAxis: 'y',
+        interaction: { mode: 'index', intersect: false },
         plugins: {
-          legend: { display: false }, // ซ่อนคำอธิบายใต้กราฟเนื่องจากนักเรียนมีจำนวนมาก เพื่อความสะอาดตา
-          tooltip: {
-            mode: 'nearest',
-            intersect: false,
-            callbacks: {
-              label: function(context) {
-                const studentInfo = context.dataset.label;
-                const val = context.parsed.r;
-                let rawStr = '';
-                
-                if (context.dataIndex === 0) rawStr = ` (${(val/100*12).toFixed(2)}/12 คะแนน)`;
-                else if (context.dataIndex === 1) rawStr = ` (${(val/100*6).toFixed(2)}/6 คะแนน)`;
-                else if (context.dataIndex === 2) rawStr = ` (${(val/100*9).toFixed(2)}/9 คะแนน)`;
-                else if (context.dataIndex === 3) rawStr = ` (${(val/100*8).toFixed(2)}/8 คะแนน)`;
-                else if (context.dataIndex === 4) rawStr = ` (${(val/100*4).toFixed(2)}/4 คะแนน)`;
-                else if (context.dataIndex === 5) rawStr = ` (${(val/100*4).toFixed(2)}/4 คะแนน)`;
-                else if (context.dataIndex === 6) rawStr = ` (${(val/100*6).toFixed(2)}/6 คะแนน)`;
-                else if (context.dataIndex === 7) rawStr = ` (${(val/100*5).toFixed(2)}/5 คะแนน)`;
-                else if (context.dataIndex === 8) rawStr = ` (${(val/100*2).toFixed(2)}/2 คะแนน)`;
-                else if (context.dataIndex === 9) rawStr = ` (${(val/100*2).toFixed(2)}/2 คะแนน)`;
-                else if (context.dataIndex === 10) rawStr = ` (${(val/100*2).toFixed(2)}/2 คะแนน)`;
-                
-                // ค้นหาจำนวนรายการประเมินที่นำมาเฉลี่ยในหมวดนี้
-                const studentId = studentInfo.split(' - ')[0];
-                const studentData = dataMap && dataMap[studentId] ? dataMap[studentId] : null;
-                const countStr = studentData ? ` [ประเมิน ${studentData.count} รายการ]` : '';
-
-                return `${studentInfo}: ${val}%${rawStr}${countStr}`;
-              }
-            }
-          }
+          legend: { display: key === 'prepost', position: 'top' },
+          tooltip: { callbacks: { label: context => context.raw === null ? `${context.dataset.label}: ยังไม่มีข้อมูล` : `${context.dataset.label}: ${Number(context.raw).toFixed(2)} / 60` } }
         },
         scales: {
-          r: {
-            beginAtZero: true,
-            min: 0,
-            max: 100,
-            ticks: {
-              stepSize: 20,
-              font: { family: 'Google Sans', size: 9 },
-              backdropColor: 'rgba(255, 255, 255, 0.75)',
-              callback: function(value) { return value + '%'; }
-            },
-            pointLabels: { font: { family: 'Google Sans', size: 9.5, weight: 'bold' } },
-            grid: { color: 'rgba(0, 0, 0, 0.06)' },
-            angleLines: { color: 'rgba(0, 0, 0, 0.08)' }
-          }
+          x: { beginAtZero: true, max: 60, ticks: { stepSize: 10 }, title: { display: true, text: 'คะแนน (เต็ม 60)' } },
+          y: { grid: { display: false }, ticks: { font: { family: 'Google Sans', size: 9 } } }
         }
       }
     });
@@ -2328,7 +2244,7 @@ require_once 'header.php';
     const teacherAspects = calculateSixAspects(teacherData);
     
     individualRadarChartInstance = new Chart(ctx, {
-      type: 'radar',
+      type: 'bar',
       data: {
         labels: [
           '1. เนื้อหาสาระ (เต็ม 27)',
@@ -2371,13 +2287,14 @@ require_once 'header.php';
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        indexAxis: 'y',
         plugins: {
           legend: { position: 'top', labels: { font: { family: 'Google Sans', size: 11 } } },
           tooltip: {
             callbacks: {
               label: function(context) {
                 const datasetLabel = context.dataset.label || '';
-                const val = context.parsed.r;
+                const val = context.parsed.x;
                 let rawVal = '';
                 if (context.dataIndex === 0) rawVal = (val / 100 * 27).toFixed(2) + '/27 คะแนน';
                 else if (context.dataIndex === 1) rawVal = (val / 100 * 12).toFixed(2) + '/12 คะแนน';
@@ -2391,13 +2308,8 @@ require_once 'header.php';
           }
         },
         scales: {
-          r: {
-            angleLines: { display: true },
-            suggestedMin: 0,
-            suggestedMax: 100,
-            ticks: { stepSize: 20, font: { family: 'Google Sans', size: 9 } },
-            pointLabels: { font: { family: 'Google Sans', size: 10, weight: 'bold' } }
-          }
+          x: { beginAtZero: true, max: 100, ticks: { stepSize: 20 }, title: { display: true, text: 'ร้อยละของคะแนนเต็ม (%)' } },
+          y: { grid: { display: false }, ticks: { font: { family: 'Google Sans', size: 10, weight: 'bold' } } }
         }
       }
     });
