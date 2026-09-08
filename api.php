@@ -4339,6 +4339,36 @@ try {
             ], JSON_UNESCAPED_UNICODE);
             break;
 
+        // อ่านสรุปตาราง 14 (จำนวน/ร้อยละของนักเรียนที่ปรากฏข้อบกพร่องรายตัวบ่งชี้ ในผลงาน 2 ครั้ง) อย่างเดียว
+        // ใช้แสดงในแดชบอร์ดภาพรวมของครู — ไม่คำนวณสถิติชุดใหญ่ (quant/mechanics/AI findings) เหมือน ch45_get_data
+        case 'ch45_get_defects_summary':
+            if (!isset($_SESSION['user']) || !in_array($_SESSION['user']['role'], ['teacher', 'expert'], true)) {
+                echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูและผู้เชี่ยวชาญเท่านั้น']);
+                exit;
+            }
+            $c45DsOpt = [
+                'group'     => isset($request_data['group'])     ? trim((string)$request_data['group'])     : '',
+                'classroom' => isset($request_data['classroom']) ? trim((string)$request_data['classroom']) : '',
+            ];
+            $c45Ds  = ch45_dataset($pdo, $c45DsOpt);
+            $c45Def = ch45_defects($c45Ds);
+            $c45Rows = array_map(function ($r) {
+                return [
+                    'id' => $r['id'], 'no' => $r['no'], 'domain' => $r['domain'], 'defect' => $r['defect'],
+                    'n1' => $r['n1'], 'pct1' => $r['pct1'],
+                    'n2' => $r['n2'], 'pct2' => $r['pct2'],
+                ];
+            }, array_values($c45Def['rows']));
+            echo json_encode([
+                'success'     => true,
+                'n_base'      => $c45Def['n'],
+                'work1_label' => $c45Ds['meta']['work1_label'],
+                'work2_label' => $c45Ds['meta']['work2_label'],
+                'domains'     => ch45_domains(),
+                'rows'        => $c45Rows,
+            ], JSON_UNESCAPED_UNICODE);
+            break;
+
         // บันทึกข้อมูลประจำงานวิจัย (ปีการศึกษา ประชากร รอบงานที่ใช้ ฯลฯ)
         case 'ch45_save_meta':
             if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
