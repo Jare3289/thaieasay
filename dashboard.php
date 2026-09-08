@@ -203,10 +203,22 @@ require_once 'header.php';
         </table>
       </div>
 
-      <!-- ตารางที่ 3: คะแนนรายละเอียดแยกตามรายข้อเกณฑ์ย่อย - ภาระงาน (หน่วยที่ 1 เทียบ หน่วยที่ 2) -->
-      <div class="px-3 pt-4 pb-2 border-top mt-2">
-        <h6 class="fw-bold text-warning-emphasis mb-1"><i class="bi bi-list-columns"></i> ตารางที่ 3 &nbsp;คะแนนรายละเอียดแยกตามรายข้อเกณฑ์ย่อย - ภาระงาน (ทุกคน)</h6>
-        <p class="text-muted small mb-0">คะแนนเฉลี่ยของผู้เรียนทุกคน แยกลงถึงระดับข้อเกณฑ์ย่อยทั้ง 11 ข้อ (จัดกลุ่มตาม 4 ด้านหลัก) แต่ละช่องแสดงคู่คะแนน <strong>หน่วยที่ 1 / หน่วยที่ 2</strong></p>
+      <!-- ตารางที่ 3-4: คะแนนรายละเอียดแยกตามรายข้อเกณฑ์ย่อย (ทุกคน) — สลับดูได้ทีละคู่ -->
+      <div class="px-3 pt-4 pb-2 border-top mt-2 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+        <div>
+          <h6 class="fw-bold text-dark mb-1"><i class="bi bi-list-columns"></i> ตารางรายละเอียดคะแนนรายข้อเกณฑ์ย่อย (ทุกคน)</h6>
+          <p class="text-muted small mb-0">คะแนนเฉลี่ยของผู้เรียนทุกคน แยกลงถึงระดับข้อเกณฑ์ย่อยทั้ง 11 ข้อ (จัดกลุ่มตาม 4 ด้านหลัก) — เลือกคู่ที่ต้องการเปรียบเทียบด้านล่าง</p>
+        </div>
+        <div class="btn-group flex-shrink-0" role="group" aria-label="เลือกคู่เปรียบเทียบคะแนนรายข้อเกณฑ์ย่อย">
+          <button type="button" id="btnDetailPairTask" class="btn btn-sm btn-primary fw-bold px-3" onclick="switchDetailPair('task')">หน่วยที่ 1 / หน่วยที่ 2</button>
+          <button type="button" id="btnDetailPairPrepost" class="btn btn-sm btn-outline-primary fw-bold px-3" onclick="switchDetailPair('prepost')">ก่อนเรียน / หลังเรียน</button>
+        </div>
+      </div>
+
+      <!-- คู่ที่ 1: ภาระงาน หน่วยที่ 1 เทียบ หน่วยที่ 2 -->
+      <div id="detailPairTaskSection">
+      <div class="px-3 pt-2 pb-2">
+        <p class="text-muted small mb-0">ตารางที่ 3 — แต่ละช่องแสดงคู่คะแนน <strong>หน่วยที่ 1 / หน่วยที่ 2</strong></p>
       </div>
       <div class="table-responsive">
         <table class="table table-hover align-middle mb-0 text-start table-classroom">
@@ -243,11 +255,13 @@ require_once 'header.php';
           <tfoot id="taskDetailTableFoot" class="small border-top border-2"></tfoot>
         </table>
       </div>
+      </div>
+      <!-- /คู่ที่ 1 -->
 
-      <!-- ตารางที่ 4: คะแนนรายละเอียดแยกตามรายข้อเกณฑ์ย่อย - ก่อนเรียน เทียบ หลังเรียน -->
+      <!-- คู่ที่ 2: ก่อนเรียน เทียบ หลังเรียน -->
+      <div id="detailPairPrepostSection" class="d-none">
       <div class="px-3 pt-4 pb-2 border-top mt-2">
-        <h6 class="fw-bold text-danger-emphasis mb-1"><i class="bi bi-list-columns"></i> ตารางที่ 4 &nbsp;คะแนนรายละเอียดแยกตามรายข้อเกณฑ์ย่อย - ก่อนเรียน/หลังเรียน (ทุกคน)</h6>
-        <p class="text-muted small mb-0">คะแนนที่ครูประเมิน แยกลงถึงระดับข้อเกณฑ์ย่อยทั้ง 11 ข้อ (จัดกลุ่มตาม 4 ด้านหลัก) แต่ละช่องแสดงคู่คะแนน <strong>ก่อนเรียน / หลังเรียน</strong></p>
+        <p class="text-muted small mb-0">ตารางที่ 4 — คะแนนที่ครูประเมิน แต่ละช่องแสดงคู่คะแนน <strong>ก่อนเรียน / หลังเรียน</strong></p>
       </div>
       <div class="table-responsive">
         <table class="table table-hover align-middle mb-0 text-start table-classroom">
@@ -284,6 +298,8 @@ require_once 'header.php';
           <tfoot id="prepostDetailTableFoot" class="small border-top border-2"></tfoot>
         </table>
       </div>
+      </div>
+      <!-- /คู่ที่ 2 -->
     </div>
 
     <!-- ลิงก์ไปหน้าระบบวิเคราะห์ทางสถิติเพื่อการวิจัย (Inter-rater & Paired t-test) -->
@@ -1266,6 +1282,24 @@ require_once 'header.php';
     drawClassQualityDistribution(qualityCounts);
     drawClassDimensionAverages(dimensionSums, evaluatedStdsCount, subCriteriaSums);
     generateResearchInsights(subCriteriaSums, evaluatedStdsCount, totalRegistered, totalSumScores, totalScoredCount, activeEvaluationSetCount);
+  }
+
+  // สลับดูตารางรายละเอียดรายข้อเกณฑ์ย่อยระหว่างคู่ "หน่วยที่ 1/2" กับ "ก่อน/หลังเรียน"
+  function switchDetailPair(pair) {
+    const taskSection = document.getElementById('detailPairTaskSection');
+    const prepostSection = document.getElementById('detailPairPrepostSection');
+    const btnTask = document.getElementById('btnDetailPairTask');
+    const btnPrepost = document.getElementById('btnDetailPairPrepost');
+    if (!taskSection || !prepostSection || !btnTask || !btnPrepost) return;
+
+    const showTask = pair === 'task';
+    taskSection.classList.toggle('d-none', !showTask);
+    prepostSection.classList.toggle('d-none', showTask);
+
+    btnTask.classList.toggle('btn-primary', showTask);
+    btnTask.classList.toggle('btn-outline-primary', !showTask);
+    btnPrepost.classList.toggle('btn-primary', !showTask);
+    btnPrepost.classList.toggle('btn-outline-primary', showTask);
   }
 
   function switchDashboardViewMode() {
