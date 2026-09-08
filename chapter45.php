@@ -626,7 +626,7 @@ function c45Excerpt(exNo, ex, roundLabel, usageCount) {
       + '</div>';
   }
   const ok = ex.verified === true;
-  const who = 'นักเรียนคนที่ ' + c45Esc(ex.student_no)
+  const who = ((ex.student_no > 0) ? ('นักเรียนคนที่ ' + c45Esc(ex.student_no)) : 'ไม่สามารถระบุหมายเลขนักเรียนได้')
     + (c45RevealNames && ex.student_name ? ' (ชื่อจริง: ' + c45Esc(ex.student_name) + ')' : '');
   // ถ้านักเรียนคนนี้ถูกยกเป็นตัวอย่างในหัวข้ออื่นซ้ำอีก ให้ขึ้นป้ายเตือนชัด ๆ
   // เพราะเป็นการยกตัวอย่างซ้ำคน แม้ระบบจะพยายามคัดให้หลากหลายก่อนแล้วก็ตาม
@@ -644,6 +644,16 @@ function c45Excerpt(exNo, ex, roundLabel, usageCount) {
     + '<div class="small text-muted mt-1">(' + who + ' ' + c45Esc(roundLabel) + ')' + dup + '</div>'
     + (ex.reason ? '<div class="small text-danger mt-1">' + c45Esc(ex.reason) + '</div>' : '')
     + '</div>';
+}
+
+// ประโยคนำเข้าก่อนยกตัวอย่าง บอกตรง ๆ ว่าตัวอย่างที่จะยกต่อไปนี้คือหมายเลขใดถึงหมายเลขใด
+// แยกเป็นประโยคของตัวเองจากย่อหน้า "ข้อค้นพบ" ที่ระบบเขียน (ระบบไม่รู้เลขตัวอย่างล่วงหน้าตอนเขียน)
+function c45ExampleRangeNote(exList) {
+  if (!Array.isArray(exList) || !exList.length) return '';
+  const first = exList[0][0];
+  const last = exList[exList.length - 1][1];
+  const joiner = exList.length > 1 ? 'ถึง' : 'และ';
+  return 'ตัวอย่างที่ยกมาประกอบการอธิบายในหัวข้อนี้ คือ ตัวอย่าง (' + first + ') ' + joiner + ' (' + last + ') ดังนี้';
 }
 
 function c45RenderPayload(jobKey, payload) {
@@ -669,6 +679,8 @@ function c45RenderPayload(jobKey, payload) {
       + c45Esc(meta.work2_label) + '</div><div class="small">' + c45Esc(payload.cell2) + '</div></div></div>'
       + '</div>'
       + c45Para('ย่อหน้าเปิดหัวข้อ ' + (ind.sub || ''), payload.finding);
+    const rangeNote = c45ExampleRangeNote(exList);
+    if (rangeNote) out += '<p class="mb-2"><em>' + c45Esc(rangeNote) + '</em></p>';
     if (!pairs.length) {
       out += '<div class="text-muted small mb-2"><i class="bi bi-dash-circle me-1"></i>ยังไม่มีตัวอย่างที่ยกจากผลงานจริง</div>';
     }
@@ -1704,8 +1716,9 @@ function c45DocQuote(exNo, ex, roundLabel) {
   const warn = ex.verified === true
     ? (ex.reason ? '<span class="todo">' + c45Esc(ex.reason) + '</span>' : '')
     : '<span class="todo">⚠ ระบบตรวจไม่พบข้อความนี้ในผลงานจริง — ต้องตรวจสอบกับต้นฉบับก่อนนำไปใช้</span>';
+  const docWho = (ex.student_no > 0) ? ('นักเรียนคนที่ ' + c45Esc(ex.student_no)) : 'ไม่สามารถระบุหมายเลขนักเรียนได้';
   return '<p class="quote">' + c45Esc(ex.text) + '</p>'
-    + '<p class="quote-src">(นักเรียนคนที่ ' + c45Esc(ex.student_no) + ' ' + c45Esc(roundLabel) + ')'
+    + '<p class="quote-src">(' + docWho + ' ' + c45Esc(roundLabel) + ')'
     + (warn ? ' ' + warn : '') + '</p>';
 }
 
@@ -1831,12 +1844,10 @@ function buildChapter45ReportHtml(chapter) {
       const ip  = c45Payload('ind_' + id.replace('.', '_'));
       const pairs = Array.isArray(ip.pairs) ? ip.pairs : [];
       const exList = Array.isArray(ip.ex_no) ? ip.ex_no : [];
-      const rangeTxt = exList.length
-        ? ('ดังตัวอย่าง (' + exList[0][0] + ')–(' + exList[exList.length - 1][1] + ')')
-        : '';
+      const rangeTxt = c45ExampleRangeNote(exList);
       P.push('<h4 class="sub2">' + c45Esc(ind.sub || '') + ' ' + c45Esc(ind.name || id) + '</h4>');
-      P.push(c45DocP((String(ip.finding || '').trim() ? ip.finding + (rangeTxt ? ' ' + rangeTxt : '') : ''),
-        'ย่อหน้าเปิดหัวข้อ ' + (ind.sub || id)));
+      P.push(c45DocP(ip.finding, 'ย่อหน้าเปิดหัวข้อ ' + (ind.sub || id)));
+      if (rangeTxt) P.push(c45DocP(rangeTxt, ''));
       if (!pairs.length) {
         P.push('<p class="para"><span class="todo">[ยังไม่มีตัวอย่างที่ยกจากผลงานจริง]</span></p>');
       }
