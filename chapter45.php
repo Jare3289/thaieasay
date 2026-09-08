@@ -900,15 +900,27 @@ async function c45RunAll() {
   document.getElementById('c45RunLog').innerHTML = '';
 
   const jobs = c45JobsInOrder();
+  const MAX_JOB_ATTEMPTS = 3; // ลองวิเคราะห์ซ้ำอัตโนมัติสูงสุดต่อหัวข้อ กันวนซ้ำไม่รู้จบถ้าหัวข้อนั้นมีปัญหาถาวร
   let done = 0, failed = 0, warned = 0;
   for (const k of jobs) {
     if (c45Stopped) { c45Log('bi-stop-circle', 'text-warning', 'หยุดตามคำสั่งผู้ใช้'); break; }
     c45SetProgress(done, jobs.length, 'กำลังวิเคราะห์: ' + c45Data.jobs[k].label);
-    const r = await c45RunJob(k, true);
+
+    // หัวข้อไหนวิเคราะห์ไม่สำเร็จ ให้ลองซ้ำอัตโนมัติทันทีโดยยังอยู่ในคิวเดิม ไม่ต้องรอผู้ใช้กดเอง
+    let r, attempt = 0;
+    for (;;) {
+      attempt++;
+      r = await c45RunJob(k, true);
+      if (r.ok || c45Stopped || attempt >= MAX_JOB_ATTEMPTS) break;
+      c45Log('bi-arrow-repeat', 'text-warning', c45Data.jobs[k].label + ' — ' + (r.error || 'ไม่สำเร็จ')
+        + ' กำลังวิเคราะห์ซ้ำอัตโนมัติ (ครั้งที่ ' + (attempt + 1) + '/' + MAX_JOB_ATTEMPTS + ')');
+    }
+
     done++;
     if (!r.ok) {
       failed++;
-      c45Log('bi-x-circle-fill', 'text-danger', c45Data.jobs[k].label + ' — ' + (r.error || 'ไม่สำเร็จ'));
+      c45Log('bi-x-circle-fill', 'text-danger', c45Data.jobs[k].label
+        + ' — ลองซ้ำอัตโนมัติแล้ว ' + MAX_JOB_ATTEMPTS + ' ครั้งไม่สำเร็จ (' + (r.error || 'ไม่สำเร็จ') + ')');
     } else if (r.warnings.length) {
       warned++;
       c45Log('bi-exclamation-triangle-fill', 'text-warning',
