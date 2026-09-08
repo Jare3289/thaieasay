@@ -173,7 +173,7 @@ require_once 'header.php';
       <div class="card-header bg-white border-bottom py-3 px-4 rounded-top-4">
         <h6 class="fw-bold text-dark mb-0"><i class="bi bi-google text-danger me-2"></i>บัญชี Google สำหรับส่งรายงานเข้า Google Docs</h6>
         <div class="text-muted small mt-1">
-          ใช้กับปุ่ม &quot;ส่งเข้า Google Doc&quot; ในหน้าวิเคราะห์สถิติวิจัย หน้าผลตรวจอัตโนมัติ และหน้าบทที่ 4-5
+          ใช้กับปุ่ม &quot;ส่งเข้า Google Doc&quot; ในหน้าผลตรวจอัตโนมัติและหน้าวิเคราะห์งานวิจัย บทที่ 4-5
         </div>
       </div>
       <div class="card-body p-4">

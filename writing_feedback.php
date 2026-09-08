@@ -1288,7 +1288,7 @@ function overviewHTML(ov) {
       <i class="bi bi-exclamation-circle me-1"></i>
       <strong>ข้อสังเกตนี้ไม่ใช่ผลทดสอบทางสถิติ</strong> — ตัวเลขในกล่องนี้เป็นค่าบรรยาย (ค่าเฉลี่ย จำนวนฉบับที่ดีขึ้น สัดส่วนตามแนวทางนำเสนอ)
       ที่ระบบคำนวณเอง ส่วนการทดสอบนัยสำคัญด้วย <strong>Paired t-test</strong> อยู่ในหน้า
-      <a href="research_analysis.php" class="alert-link">วิเคราะห์สถิติงานวิจัย</a> ให้อ้างอิงค่าจากหน้านั้นในการรายงานผล
+      <a href="chapter45.php#research-statistics" class="alert-link">วิเคราะห์งานวิจัย บทที่ 4-5</a> ให้อ้างอิงค่าจากส่วนสถิติวิจัยในการรายงานผล
     </div>
 
     <div class="text-muted mt-3" style="font-size:0.75rem;">
@@ -3161,7 +3161,7 @@ async function startRecheckQueue() {
 /* ============================================================
    ส่งออกรายงานภาพรวมทั้งชั้น (3 ส่วนตามแท็บ) เป็น Google Doc
    ใช้ข้อมูลที่โหลดไว้ในหน่วยความจำอยู่แล้ว (aiOverviewList / aiOverviews)
-   ไม่ต้องยิง API ซ้ำ — ต่อกับ google_upload_doc.php ตัวเดียวกับหน้าวิเคราะห์สถิติงานวิจัย
+   ไม่ต้องยิง API ซ้ำ — ต่อกับ google_upload_doc.php ตัวเดียวกับหน้าวิเคราะห์งานวิจัย บทที่ 4-5
    ============================================================ */
 function wrEsc(s) { return esc(String(s == null ? '' : s)); }
 

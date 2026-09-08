@@ -59,8 +59,7 @@ function teg_menu_for_role($role) {
       ['รายงานรายบุคคล',       'student_report.php',           'bi-person-vcard',       'student_report'],
       ['รายงานสะท้อนคิด',      'reflection_tools.php',         'bi-lightbulb-fill',     'reflection_tools'],
       ['นักเรียน & จับคู่',    'manage_students.php',          'bi-person-lines-fill',  'manage_students'],
-      ['วิเคราะห์สถิติวิจัย',  'research_analysis.php',        'bi-graph-up-arrow',     'research_analysis'],
-      ['วิเคราะห์บทที่ 4-5',   'chapter45.php',                'bi-journal-richtext',   'chapter45'],
+      ['วิเคราะห์งานวิจัย บทที่ 4-5', 'chapter45.php',          'bi-journal-richtext',   'chapter45'],
       ['ตั้งค่าระบบ',          'settings.php',                 'bi-gear-fill',          'settings'],
     ],
   ];

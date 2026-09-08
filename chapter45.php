@@ -178,10 +178,14 @@ $c45IsTeacher = ($sessionUser['role'] === 'teacher');
     </div>
   </div>
 
-  <!-- 2) ตาราง 12 -->
-  <div class="card border-0 shadow-sm rounded-4 mb-4">
+  <!-- 2) ศูนย์รวมสถิติวิจัย: ตาราง 12 + Paired t-test + ICC -->
+  <div class="card border-0 shadow-sm rounded-4 mb-4" id="research-statistics" style="scroll-margin-top:84px;">
     <div class="card-body p-4">
-      <h5 class="fw-bold mb-1"><i class="bi bi-table me-2 text-primary"></i>ตาราง 12 ผลการเปรียบเทียบก่อนเรียนและหลังเรียน</h5>
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-1">
+        <h5 class="fw-bold mb-0"><i class="bi bi-graph-up-arrow me-2 text-primary"></i>สถิติวิจัยและตาราง 12</h5>
+        <span class="badge bg-primary-subtle text-primary-emphasis px-3 py-2">Paired t-test · ICC</span>
+      </div>
+      <p class="text-muted small mb-2">รวมผลเปรียบเทียบก่อนเรียน–หลังเรียน การทดสอบนัยสำคัญ และความเที่ยงระหว่างผู้ประเมินไว้ในจุดเดียว เพื่อไม่ต้องเปิดหน้าวิเคราะห์ซ้ำซ้อน</p>
       <p class="text-muted small mb-3" id="c45QuantNote">—</p>
       <div class="table-responsive"><table class="table table-sm align-middle mb-0" id="c45QuantTable"></table></div>
       <div id="c45QuantExtra" class="mt-3 small"></div>
@@ -1681,7 +1685,7 @@ async function c45DeleteSynthesis() {
               คลังอ้างอิง ข้อมูลประจำงานวิจัย และจุดที่ต้องตรวจสอบ (ไม่ต้องพิมพ์ลงวิทยานิพนธ์)
 
    ใช้ c45Data ที่โหลดไว้ในหน่วยความจำอยู่แล้ว ต่อกับ google_upload_doc.php
-   ตัวเดียวกับหน้าวิเคราะห์สถิติงานวิจัยและหน้าตรวจเรียงความอัตโนมัติ
+   ตัวเดียวกับหน้าตรวจเรียงความอัตโนมัติ
    ============================================================ */
 const C45_REPORT_AUTHOR = <?php echo json_encode($sessionUser['name'] ?? 'ครูผู้สอน'); ?>;
 
