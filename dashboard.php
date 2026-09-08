@@ -202,6 +202,32 @@ require_once 'header.php';
           <tfoot id="prepostTableFoot" class="small border-top border-2"></tfoot>
         </table>
       </div>
+
+      <!-- ตารางที่ 3: คะแนนรายละเอียดแยกตามรายด้าน (ทุกคน) -->
+      <div class="px-3 pt-4 pb-2 border-top mt-2">
+        <h6 class="fw-bold text-warning-emphasis mb-1"><i class="bi bi-list-columns"></i> ตารางที่ 3 &nbsp;คะแนนรายละเอียดแยกตามรายด้าน (ทุกคน)</h6>
+        <p class="text-muted small mb-0">คะแนนเฉลี่ยของผู้เรียนทุกคน แยกตาม 4 ด้านหลักของเกณฑ์ประเมิน อ้างอิงข้อมูลตาม "มุมมองกราฟ" ที่เลือกด้านบน (<span id="dimensionTablePhaseLabel" class="fw-bold text-primary">หน่วยที่ 1</span>)</p>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0 text-start table-classroom">
+          <thead class="table-light text-secondary small fw-bold text-uppercase">
+            <tr>
+              <th class="px-3 py-3" style="width: 10%">รหัสนักเรียน</th>
+              <th class="px-3 py-3" style="width: 20%">ชื่อ-สกุลผู้เรียน</th>
+              <th class="px-3 py-3 text-center text-primary-emphasis" style="width: 12%">1) เนื้อหาสาระ<br><span class="fw-normal text-muted" style="font-size:.7rem">(เต็ม 27)</span></th>
+              <th class="px-3 py-3 text-center" style="width: 12%; color:#8b5cf6">2) องค์ประกอบ<br><span class="fw-normal text-muted" style="font-size:.7rem">(เต็ม 12)</span></th>
+              <th class="px-3 py-3 text-center text-warning-emphasis" style="width: 12%">3) สำนวนภาษา<br><span class="fw-normal text-muted" style="font-size:.7rem">(เต็ม 15)</span></th>
+              <th class="px-3 py-3 text-center text-success-emphasis" style="width: 12%">4) อักขรวิธี<br><span class="fw-normal text-muted" style="font-size:.7rem">(เต็ม 6)</span></th>
+              <th class="px-3 py-3 text-center" style="width: 10%">รวม<br><span class="fw-normal text-muted" style="font-size:.7rem">(เต็ม 60)</span></th>
+              <th class="px-3 py-3 text-end" style="width: 12%">การจัดการ</th>
+            </tr>
+          </thead>
+          <tbody id="dimensionTableBody" class="small">
+            <tr><td colspan="8" class="text-center text-muted py-5 fw-bold">กำลังประมวลผลคะแนนรายด้าน...</td></tr>
+          </tbody>
+          <tfoot id="dimensionTableFoot" class="small border-top border-2"></tfoot>
+        </table>
+      </div>
     </div>
 
     <!-- ลิงก์ไปหน้าระบบวิเคราะห์ทางสถิติเพื่อการวิจัย (Inter-rater & Paired t-test) -->
@@ -778,6 +804,9 @@ require_once 'header.php';
     // ตารางสรุป 2 ตาราง (ภาระงานทั้ง 2 หน่วย + ก่อน/หลังเรียน) แสดงข้อมูลครบเสมอไม่ขึ้นกับมุมมองกราฟ
     renderSplitSummaryTables(studentEvals);
 
+    // ตารางที่ 3: คะแนนรายละเอียดแยกตามรายด้านของผู้เรียนทุกคน ตามมุมมองกราฟที่เลือกอยู่
+    renderDimensionBreakdownTable(summaryData);
+
     // กราฟแมงมุมรายบุคคล 2 กราฟ — ไม่ขึ้นกับโหมดตาราง แสดงทั้ง "ภาระงาน" และ "ก่อน/หลังเรียน" เสมอ
     const taskDimMap = buildDimMapFromEvals(studentEvals, 'task');
     const prepostDimMap = buildDimMapFromEvals(studentEvals, 'prepost');
@@ -913,6 +942,59 @@ require_once 'header.php';
     if (prepostFoot) prepostFoot.innerHTML = buildStatsFooter([preVals, postVals, gainVals], 2, 1);
 
     // ใช้ตัวกรอง/ค้นหาที่ผู้ใช้เลือกอยู่กับตารางที่เพิ่งวาดใหม่
+    filterTeacherTable();
+  }
+
+  // วาดตารางที่ 3: คะแนนรายละเอียดแยกตามรายด้านของผู้เรียนทุกคน (อ้างอิงมุมมองกราฟที่เลือกอยู่)
+  function renderDimensionBreakdownTable(data) {
+    const body = document.getElementById('dimensionTableBody');
+    const foot = document.getElementById('dimensionTableFoot');
+    const phaseLabel = document.getElementById('dimensionTablePhaseLabel');
+    if (!body) return;
+
+    if (phaseLabel) {
+      const labels = { task1: 'ภาระงาน หน่วยที่ 1', task2: 'ภาระงาน หน่วยที่ 2', prepost: 'ก่อน/หลังเรียน (ใช้คะแนนล่าสุดที่มี)' };
+      phaseLabel.textContent = labels[currentDashboardViewMode] || currentDashboardViewMode;
+    }
+
+    const sortedKeys = Object.keys(studentDB).sort().filter(passesGroupFilter);
+    const cVals = [], sVals = [], lVals = [], mVals = [], totalVals = [];
+    let html = '';
+
+    sortedKeys.forEach(id => {
+      const sData = data[id] || {};
+      const hasData = Number(sData.count || 0) > 0;
+
+      const cell = (v, extra) => (hasData
+        ? `<td class="px-3 py-3 text-center font-mono fw-semibold ${extra || ''}">${Number(v || 0).toFixed(2)}</td>`
+        : `<td class="px-3 py-3 text-center text-muted">-</td>`);
+
+      if (hasData) {
+        cVals.push(Number(sData.avg_c || 0));
+        sVals.push(Number(sData.avg_s || 0));
+        lVals.push(Number(sData.avg_l || 0));
+        mVals.push(Number(sData.avg_m || 0));
+        totalVals.push(Number(sData.avgScore || 0));
+      }
+
+      html += `
+        <tr class="hover-row cursor-pointer" onclick="viewStudentDetail('${id}')">
+          <td class="px-3 py-3 font-mono fw-bold text-secondary">${id}</td>
+          <td class="px-3 py-3 fw-bold text-dark text-start">${studentDB[id]}</td>
+          ${cell(sData.avg_c)}
+          ${cell(sData.avg_s)}
+          ${cell(sData.avg_l)}
+          ${cell(sData.avg_m)}
+          ${cell(sData.avgScore, hasData ? 'text-primary bg-light-blue fw-extrabold' : '')}
+          <td class="px-3 py-3 text-end">
+             <button class="btn btn-outline-primary btn-sm fw-bold rounded-pill px-3" onclick="event.stopPropagation(); viewStudentDetail('${id}')">วิเคราะห์</button>
+          </td>
+        </tr>`;
+    });
+
+    body.innerHTML = html || '<tr><td colspan="8" class="text-center text-muted py-5 fw-bold">ยังไม่มีข้อมูลนักเรียนในกลุ่มนี้</td></tr>';
+    if (foot) foot.innerHTML = buildStatsFooter([cVals, sVals, lVals, mVals, totalVals], 2, 1);
+
     filterTeacherTable();
   }
 
@@ -1471,6 +1553,8 @@ require_once 'header.php';
 
     applyToBody('taskTableBody', [2, 3]);
     applyToBody('prepostTableBody', [2, 3]);
+    // ตารางรายด้าน: ใช้คอลัมน์ "รวม" (cell 6) เป็นตัวชี้วัดว่ามีคะแนนแล้วหรือยัง
+    applyToBody('dimensionTableBody', [6]);
   }
 
   function viewStudentDetail(id) {
