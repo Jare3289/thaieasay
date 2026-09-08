@@ -356,7 +356,7 @@ require_once 'header.php';
         <table class="table table-hover align-middle mb-0 text-start table-classroom">
           <thead class="table-light text-secondary small fw-bold text-uppercase">
             <tr>
-              <th class="px-3 py-2" rowspan="2" style="width: 26%">ประเด็น</th>
+              <th class="px-3 py-2" rowspan="2" style="width: 26%">ความสามารถในการเขียนเรียงความ</th>
               <th class="px-2 py-2 text-center" id="levelDistHeadUnit1" colspan="5">หน่วยที่ 1</th>
               <th class="px-2 py-2 text-center" id="levelDistHeadUnit2" colspan="5">หน่วยที่ 2</th>
             </tr>
@@ -691,6 +691,27 @@ require_once 'header.php';
 
   // ตารางที่ 6: จำนวนนักเรียนที่ได้แต่ละระดับคุณภาพ (5 ระดับ) รายประเด็น แยกหน่วยที่ 1 / หน่วยที่ 2
   // ใช้ข้อมูลชุดเดียวกับ loadDefectsSummary() (field level_rows) จึงไม่ยิง fetch ซ้ำ
+  // ป้ายชื่อคอลัมน์แรกใช้ถ้อยคำสั้นตามที่ครูกำหนดไว้เฉพาะตารางนี้ (ต่างจากถ้อยคำเต็มของตาราง 14 ด้านบน)
+  const levelDistDomainNames = {
+    d1: 'เนื้อหาสาระ',
+    d2: 'องค์ประกอบและการลำดับเรื่อง',
+    d3: 'การใช้สำนวนภาษา',
+    d4: 'อักขรวิธีและกลไกการเขียน'
+  };
+  const levelDistIndicatorNames = {
+    '1.1': 'ความตรงประเด็น',
+    '1.2': 'แก่นเรื่องชัดเจน',
+    '1.3': 'การขยายความและให้เหตุผล',
+    '2.1': 'ความครบถ้วนขององค์ประกอบ',
+    '2.2': 'การลำดับประเด็นเป็นระบบ',
+    '3.1': 'การใช้ประโยคถูกต้อง',
+    '3.2': 'การเลือกใช้คำ',
+    '3.3': 'ระดับภาษาเหมาะสม',
+    '4.1': 'การสะกดคำถูกต้อง',
+    '4.2': 'การเว้นวรรค',
+    '4.3': 'ความเรียบร้อย'
+  };
+
   function renderLevelDistTable(res) {
     const body = document.getElementById('levelDistTableBody');
     const desc = document.getElementById('levelDistTableDesc');
@@ -708,13 +729,13 @@ require_once 'header.php';
       const rows = (res.level_rows || []).filter(r => r.domain === dKey);
       if (!rows.length) return;
       html += `<tr class="table-light">
-        <td colspan="11" class="px-3 py-2 fw-bold" ${defectDomainStyle[dKey] || ''}>${dom.no}) ด้าน${dom.name}</td>
+        <td colspan="11" class="px-3 py-2 fw-bold" ${defectDomainStyle[dKey] || ''}>${dom.no}. ${levelDistDomainNames[dKey] || dom.name}</td>
       </tr>`;
       rows.forEach(r => {
         const cells1 = levelOrder.map(lv => `<td class="px-1 py-2 text-center font-mono">${(r.levels1 && r.levels1[lv]) || 0}</td>`).join('');
         const cells2 = levelOrder.map(lv => `<td class="px-1 py-2 text-center font-mono">${(r.levels2 && r.levels2[lv]) || 0}</td>`).join('');
         html += `<tr>
-          <td class="px-3 py-2">${r.no}. ${r.name}</td>
+          <td class="px-3 py-2 ps-4">${r.id} ${levelDistIndicatorNames[r.id] || r.name}</td>
           ${cells1}
           ${cells2}
         </tr>`;
