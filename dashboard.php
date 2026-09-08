@@ -218,39 +218,52 @@ require_once 'header.php';
       <!-- คู่ที่ 1: ภาระงาน หน่วยที่ 1 เทียบ หน่วยที่ 2 -->
       <div id="detailPairTaskSection">
       <div class="px-3 pt-2 pb-2">
-        <p class="text-muted small mb-0">ตารางที่ 3 — แต่ละช่องแสดงคู่คะแนน <strong>หน่วยที่ 1 / หน่วยที่ 2</strong></p>
+        <p class="text-muted small mb-0">ตารางที่ 3 — แต่ละข้อเกณฑ์ย่อยแยกเป็น 2 คอลัมน์ <strong>หน่วยที่ 1 / หน่วยที่ 2</strong></p>
       </div>
       <div class="table-responsive">
         <table class="table table-hover align-middle mb-0 text-start table-classroom">
           <thead class="table-light text-secondary small fw-bold text-uppercase">
             <tr>
-              <th class="px-2 py-2" rowspan="2">รหัส</th>
-              <th class="px-2 py-2" rowspan="2">ชื่อ-สกุลผู้เรียน</th>
-              <th class="px-2 py-2 text-center text-primary-emphasis" colspan="3">1) ด้านเนื้อหาสาระ<br><span class="fw-normal text-muted" style="font-size:.65rem">(หน่วย1 / หน่วย2)</span></th>
-              <th class="px-2 py-2 text-center" colspan="2" style="color:#8b5cf6">2) ด้านองค์ประกอบและการลำดับ<br><span class="fw-normal text-muted" style="font-size:.65rem">(หน่วย1 / หน่วย2)</span></th>
-              <th class="px-2 py-2 text-center text-warning-emphasis" colspan="3">3) ด้านการใช้สำนวนภาษา<br><span class="fw-normal text-muted" style="font-size:.65rem">(หน่วย1 / หน่วย2)</span></th>
-              <th class="px-2 py-2 text-center text-success-emphasis" colspan="3">4) ด้านอักขรวิธีและกลไกการเขียน<br><span class="fw-normal text-muted" style="font-size:.65rem">(หน่วย1 / หน่วย2)</span></th>
-              <th class="px-2 py-2 text-center" rowspan="2">รวม<br>หน่วย1<br><span class="fw-normal text-muted" style="font-size:.65rem">(60)</span></th>
-              <th class="px-2 py-2 text-center" rowspan="2">รวม<br>หน่วย2<br><span class="fw-normal text-muted" style="font-size:.65rem">(60)</span></th>
-              <th class="px-2 py-2 text-center" rowspan="2">เฉลี่ยรวม<br><span class="fw-normal text-muted" style="font-size:.65rem">(60)</span></th>
-              <th class="px-2 py-2 text-end" rowspan="2">การจัดการ</th>
+              <th class="px-2 py-2" rowspan="3">รหัส</th>
+              <th class="px-2 py-2" rowspan="3">ชื่อ-สกุลผู้เรียน</th>
+              <th class="px-2 py-2 text-center text-primary-emphasis" colspan="6">1) ด้านเนื้อหาสาระ</th>
+              <th class="px-2 py-2 text-center" colspan="4" style="color:#8b5cf6">2) ด้านองค์ประกอบและการลำดับ</th>
+              <th class="px-2 py-2 text-center text-warning-emphasis" colspan="6">3) ด้านการใช้สำนวนภาษา</th>
+              <th class="px-2 py-2 text-center text-success-emphasis" colspan="6">4) ด้านอักขรวิธีและกลไกการเขียน</th>
+              <th class="px-2 py-2 text-center" rowspan="3">รวม<br>หน่วย1<br><span class="fw-normal text-muted" style="font-size:.65rem">(60)</span></th>
+              <th class="px-2 py-2 text-center" rowspan="3">รวม<br>หน่วย2<br><span class="fw-normal text-muted" style="font-size:.65rem">(60)</span></th>
+              <th class="px-2 py-2 text-center" rowspan="3">เฉลี่ยรวม<br><span class="fw-normal text-muted" style="font-size:.65rem">(60)</span></th>
+              <th class="px-2 py-2 text-end" rowspan="3">การจัดการ</th>
             </tr>
             <tr>
-              <th class="px-1 py-2 text-center text-primary-emphasis">1.1<br><span class="fw-normal text-muted" style="font-size:.65rem">(12)</span></th>
-              <th class="px-1 py-2 text-center text-primary-emphasis">1.2<br><span class="fw-normal text-muted" style="font-size:.65rem">(6)</span></th>
-              <th class="px-1 py-2 text-center text-primary-emphasis">1.3<br><span class="fw-normal text-muted" style="font-size:.65rem">(9)</span></th>
-              <th class="px-1 py-2 text-center" style="color:#8b5cf6">2.1<br><span class="fw-normal text-muted" style="font-size:.65rem">(8)</span></th>
-              <th class="px-1 py-2 text-center" style="color:#8b5cf6">2.2<br><span class="fw-normal text-muted" style="font-size:.65rem">(4)</span></th>
-              <th class="px-1 py-2 text-center text-warning-emphasis">3.1<br><span class="fw-normal text-muted" style="font-size:.65rem">(4)</span></th>
-              <th class="px-1 py-2 text-center text-warning-emphasis">3.2<br><span class="fw-normal text-muted" style="font-size:.65rem">(6)</span></th>
-              <th class="px-1 py-2 text-center text-warning-emphasis">3.3<br><span class="fw-normal text-muted" style="font-size:.65rem">(5)</span></th>
-              <th class="px-1 py-2 text-center text-success-emphasis">4.1<br><span class="fw-normal text-muted" style="font-size:.65rem">(2)</span></th>
-              <th class="px-1 py-2 text-center text-success-emphasis">4.2<br><span class="fw-normal text-muted" style="font-size:.65rem">(2)</span></th>
-              <th class="px-1 py-2 text-center text-success-emphasis">4.3<br><span class="fw-normal text-muted" style="font-size:.65rem">(2)</span></th>
+              <th class="px-1 py-1 text-center text-primary-emphasis" colspan="2">1.1<br><span class="fw-normal text-muted" style="font-size:.65rem">(12)</span></th>
+              <th class="px-1 py-1 text-center text-primary-emphasis" colspan="2">1.2<br><span class="fw-normal text-muted" style="font-size:.65rem">(6)</span></th>
+              <th class="px-1 py-1 text-center text-primary-emphasis" colspan="2">1.3<br><span class="fw-normal text-muted" style="font-size:.65rem">(9)</span></th>
+              <th class="px-1 py-1 text-center" colspan="2" style="color:#8b5cf6">2.1<br><span class="fw-normal text-muted" style="font-size:.65rem">(8)</span></th>
+              <th class="px-1 py-1 text-center" colspan="2" style="color:#8b5cf6">2.2<br><span class="fw-normal text-muted" style="font-size:.65rem">(4)</span></th>
+              <th class="px-1 py-1 text-center text-warning-emphasis" colspan="2">3.1<br><span class="fw-normal text-muted" style="font-size:.65rem">(4)</span></th>
+              <th class="px-1 py-1 text-center text-warning-emphasis" colspan="2">3.2<br><span class="fw-normal text-muted" style="font-size:.65rem">(6)</span></th>
+              <th class="px-1 py-1 text-center text-warning-emphasis" colspan="2">3.3<br><span class="fw-normal text-muted" style="font-size:.65rem">(5)</span></th>
+              <th class="px-1 py-1 text-center text-success-emphasis" colspan="2">4.1<br><span class="fw-normal text-muted" style="font-size:.65rem">(2)</span></th>
+              <th class="px-1 py-1 text-center text-success-emphasis" colspan="2">4.2<br><span class="fw-normal text-muted" style="font-size:.65rem">(2)</span></th>
+              <th class="px-1 py-1 text-center text-success-emphasis" colspan="2">4.3<br><span class="fw-normal text-muted" style="font-size:.65rem">(2)</span></th>
+            </tr>
+            <tr>
+              <th class="px-1 py-1 text-center small fw-normal text-muted">น.1</th><th class="px-1 py-1 text-center small fw-normal text-muted border-end">น.2</th>
+              <th class="px-1 py-1 text-center small fw-normal text-muted">น.1</th><th class="px-1 py-1 text-center small fw-normal text-muted border-end">น.2</th>
+              <th class="px-1 py-1 text-center small fw-normal text-muted">น.1</th><th class="px-1 py-1 text-center small fw-normal text-muted border-end">น.2</th>
+              <th class="px-1 py-1 text-center small fw-normal text-muted">น.1</th><th class="px-1 py-1 text-center small fw-normal text-muted border-end">น.2</th>
+              <th class="px-1 py-1 text-center small fw-normal text-muted">น.1</th><th class="px-1 py-1 text-center small fw-normal text-muted border-end">น.2</th>
+              <th class="px-1 py-1 text-center small fw-normal text-muted">น.1</th><th class="px-1 py-1 text-center small fw-normal text-muted border-end">น.2</th>
+              <th class="px-1 py-1 text-center small fw-normal text-muted">น.1</th><th class="px-1 py-1 text-center small fw-normal text-muted border-end">น.2</th>
+              <th class="px-1 py-1 text-center small fw-normal text-muted">น.1</th><th class="px-1 py-1 text-center small fw-normal text-muted border-end">น.2</th>
+              <th class="px-1 py-1 text-center small fw-normal text-muted">น.1</th><th class="px-1 py-1 text-center small fw-normal text-muted border-end">น.2</th>
+              <th class="px-1 py-1 text-center small fw-normal text-muted">น.1</th><th class="px-1 py-1 text-center small fw-normal text-muted border-end">น.2</th>
+              <th class="px-1 py-1 text-center small fw-normal text-muted">น.1</th><th class="px-1 py-1 text-center small fw-normal text-muted border-end">น.2</th>
             </tr>
           </thead>
           <tbody id="taskDetailTableBody" class="small">
-            <tr><td colspan="17" class="text-center text-muted py-5 fw-bold">กำลังประมวลผลคะแนนรายข้อเกณฑ์ย่อย...</td></tr>
+            <tr><td colspan="28" class="text-center text-muted py-5 fw-bold">กำลังประมวลผลคะแนนรายข้อเกณฑ์ย่อย...</td></tr>
           </tbody>
           <tfoot id="taskDetailTableFoot" class="small border-top border-2"></tfoot>
         </table>
@@ -261,39 +274,52 @@ require_once 'header.php';
       <!-- คู่ที่ 2: ก่อนเรียน เทียบ หลังเรียน -->
       <div id="detailPairPrepostSection" class="d-none">
       <div class="px-3 pt-4 pb-2 border-top mt-2">
-        <p class="text-muted small mb-0">ตารางที่ 4 — คะแนนที่ครูประเมิน แต่ละช่องแสดงคู่คะแนน <strong>ก่อนเรียน / หลังเรียน</strong></p>
+        <p class="text-muted small mb-0">ตารางที่ 4 — คะแนนที่ครูประเมิน แต่ละข้อเกณฑ์ย่อยแยกเป็น 2 คอลัมน์ <strong>ก่อนเรียน / หลังเรียน</strong></p>
       </div>
       <div class="table-responsive">
         <table class="table table-hover align-middle mb-0 text-start table-classroom">
           <thead class="table-light text-secondary small fw-bold text-uppercase">
             <tr>
-              <th class="px-2 py-2" rowspan="2">รหัส</th>
-              <th class="px-2 py-2" rowspan="2">ชื่อ-สกุลผู้เรียน</th>
-              <th class="px-2 py-2 text-center text-primary-emphasis" colspan="3">1) ด้านเนื้อหาสาระ<br><span class="fw-normal text-muted" style="font-size:.65rem">(ก่อน / หลัง)</span></th>
-              <th class="px-2 py-2 text-center" colspan="2" style="color:#8b5cf6">2) ด้านองค์ประกอบและการลำดับ<br><span class="fw-normal text-muted" style="font-size:.65rem">(ก่อน / หลัง)</span></th>
-              <th class="px-2 py-2 text-center text-warning-emphasis" colspan="3">3) ด้านการใช้สำนวนภาษา<br><span class="fw-normal text-muted" style="font-size:.65rem">(ก่อน / หลัง)</span></th>
-              <th class="px-2 py-2 text-center text-success-emphasis" colspan="3">4) ด้านอักขรวิธีและกลไกการเขียน<br><span class="fw-normal text-muted" style="font-size:.65rem">(ก่อน / หลัง)</span></th>
-              <th class="px-2 py-2 text-center" rowspan="2">ก่อนเรียน<br><span class="fw-normal text-muted" style="font-size:.65rem">(60)</span></th>
-              <th class="px-2 py-2 text-center" rowspan="2">หลังเรียน<br><span class="fw-normal text-muted" style="font-size:.65rem">(60)</span></th>
-              <th class="px-2 py-2 text-center" rowspan="2">พัฒนาการ</th>
-              <th class="px-2 py-2 text-end" rowspan="2">การจัดการ</th>
+              <th class="px-2 py-2" rowspan="3">รหัส</th>
+              <th class="px-2 py-2" rowspan="3">ชื่อ-สกุลผู้เรียน</th>
+              <th class="px-2 py-2 text-center text-primary-emphasis" colspan="6">1) ด้านเนื้อหาสาระ</th>
+              <th class="px-2 py-2 text-center" colspan="4" style="color:#8b5cf6">2) ด้านองค์ประกอบและการลำดับ</th>
+              <th class="px-2 py-2 text-center text-warning-emphasis" colspan="6">3) ด้านการใช้สำนวนภาษา</th>
+              <th class="px-2 py-2 text-center text-success-emphasis" colspan="6">4) ด้านอักขรวิธีและกลไกการเขียน</th>
+              <th class="px-2 py-2 text-center" rowspan="3">ก่อนเรียน<br><span class="fw-normal text-muted" style="font-size:.65rem">(60)</span></th>
+              <th class="px-2 py-2 text-center" rowspan="3">หลังเรียน<br><span class="fw-normal text-muted" style="font-size:.65rem">(60)</span></th>
+              <th class="px-2 py-2 text-center" rowspan="3">พัฒนาการ</th>
+              <th class="px-2 py-2 text-end" rowspan="3">การจัดการ</th>
             </tr>
             <tr>
-              <th class="px-1 py-2 text-center text-primary-emphasis">1.1<br><span class="fw-normal text-muted" style="font-size:.65rem">(12)</span></th>
-              <th class="px-1 py-2 text-center text-primary-emphasis">1.2<br><span class="fw-normal text-muted" style="font-size:.65rem">(6)</span></th>
-              <th class="px-1 py-2 text-center text-primary-emphasis">1.3<br><span class="fw-normal text-muted" style="font-size:.65rem">(9)</span></th>
-              <th class="px-1 py-2 text-center" style="color:#8b5cf6">2.1<br><span class="fw-normal text-muted" style="font-size:.65rem">(8)</span></th>
-              <th class="px-1 py-2 text-center" style="color:#8b5cf6">2.2<br><span class="fw-normal text-muted" style="font-size:.65rem">(4)</span></th>
-              <th class="px-1 py-2 text-center text-warning-emphasis">3.1<br><span class="fw-normal text-muted" style="font-size:.65rem">(4)</span></th>
-              <th class="px-1 py-2 text-center text-warning-emphasis">3.2<br><span class="fw-normal text-muted" style="font-size:.65rem">(6)</span></th>
-              <th class="px-1 py-2 text-center text-warning-emphasis">3.3<br><span class="fw-normal text-muted" style="font-size:.65rem">(5)</span></th>
-              <th class="px-1 py-2 text-center text-success-emphasis">4.1<br><span class="fw-normal text-muted" style="font-size:.65rem">(2)</span></th>
-              <th class="px-1 py-2 text-center text-success-emphasis">4.2<br><span class="fw-normal text-muted" style="font-size:.65rem">(2)</span></th>
-              <th class="px-1 py-2 text-center text-success-emphasis">4.3<br><span class="fw-normal text-muted" style="font-size:.65rem">(2)</span></th>
+              <th class="px-1 py-1 text-center text-primary-emphasis" colspan="2">1.1<br><span class="fw-normal text-muted" style="font-size:.65rem">(12)</span></th>
+              <th class="px-1 py-1 text-center text-primary-emphasis" colspan="2">1.2<br><span class="fw-normal text-muted" style="font-size:.65rem">(6)</span></th>
+              <th class="px-1 py-1 text-center text-primary-emphasis" colspan="2">1.3<br><span class="fw-normal text-muted" style="font-size:.65rem">(9)</span></th>
+              <th class="px-1 py-1 text-center" colspan="2" style="color:#8b5cf6">2.1<br><span class="fw-normal text-muted" style="font-size:.65rem">(8)</span></th>
+              <th class="px-1 py-1 text-center" colspan="2" style="color:#8b5cf6">2.2<br><span class="fw-normal text-muted" style="font-size:.65rem">(4)</span></th>
+              <th class="px-1 py-1 text-center text-warning-emphasis" colspan="2">3.1<br><span class="fw-normal text-muted" style="font-size:.65rem">(4)</span></th>
+              <th class="px-1 py-1 text-center text-warning-emphasis" colspan="2">3.2<br><span class="fw-normal text-muted" style="font-size:.65rem">(6)</span></th>
+              <th class="px-1 py-1 text-center text-warning-emphasis" colspan="2">3.3<br><span class="fw-normal text-muted" style="font-size:.65rem">(5)</span></th>
+              <th class="px-1 py-1 text-center text-success-emphasis" colspan="2">4.1<br><span class="fw-normal text-muted" style="font-size:.65rem">(2)</span></th>
+              <th class="px-1 py-1 text-center text-success-emphasis" colspan="2">4.2<br><span class="fw-normal text-muted" style="font-size:.65rem">(2)</span></th>
+              <th class="px-1 py-1 text-center text-success-emphasis" colspan="2">4.3<br><span class="fw-normal text-muted" style="font-size:.65rem">(2)</span></th>
+            </tr>
+            <tr>
+              <th class="px-1 py-1 text-center small fw-normal text-muted">ก่อน</th><th class="px-1 py-1 text-center small fw-normal text-muted border-end">หลัง</th>
+              <th class="px-1 py-1 text-center small fw-normal text-muted">ก่อน</th><th class="px-1 py-1 text-center small fw-normal text-muted border-end">หลัง</th>
+              <th class="px-1 py-1 text-center small fw-normal text-muted">ก่อน</th><th class="px-1 py-1 text-center small fw-normal text-muted border-end">หลัง</th>
+              <th class="px-1 py-1 text-center small fw-normal text-muted">ก่อน</th><th class="px-1 py-1 text-center small fw-normal text-muted border-end">หลัง</th>
+              <th class="px-1 py-1 text-center small fw-normal text-muted">ก่อน</th><th class="px-1 py-1 text-center small fw-normal text-muted border-end">หลัง</th>
+              <th class="px-1 py-1 text-center small fw-normal text-muted">ก่อน</th><th class="px-1 py-1 text-center small fw-normal text-muted border-end">หลัง</th>
+              <th class="px-1 py-1 text-center small fw-normal text-muted">ก่อน</th><th class="px-1 py-1 text-center small fw-normal text-muted border-end">หลัง</th>
+              <th class="px-1 py-1 text-center small fw-normal text-muted">ก่อน</th><th class="px-1 py-1 text-center small fw-normal text-muted border-end">หลัง</th>
+              <th class="px-1 py-1 text-center small fw-normal text-muted">ก่อน</th><th class="px-1 py-1 text-center small fw-normal text-muted border-end">หลัง</th>
+              <th class="px-1 py-1 text-center small fw-normal text-muted">ก่อน</th><th class="px-1 py-1 text-center small fw-normal text-muted border-end">หลัง</th>
+              <th class="px-1 py-1 text-center small fw-normal text-muted">ก่อน</th><th class="px-1 py-1 text-center small fw-normal text-muted border-end">หลัง</th>
             </tr>
           </thead>
           <tbody id="prepostDetailTableBody" class="small">
-            <tr><td colspan="17" class="text-center text-muted py-5 fw-bold">กำลังประมวลผลคะแนนรายข้อเกณฑ์ย่อย...</td></tr>
+            <tr><td colspan="28" class="text-center text-muted py-5 fw-bold">กำลังประมวลผลคะแนนรายข้อเกณฑ์ย่อย...</td></tr>
           </tbody>
           <tfoot id="prepostDetailTableFoot" class="small border-top border-2"></tfoot>
         </table>
@@ -1044,21 +1070,21 @@ require_once 'header.php';
     return rec;
   }
 
-  // สร้างข้อความคู่ "ค่าที่1 / ค่าที่2" สำหรับ 1 เซลล์ในตารางเปรียบเทียบรายข้อเกณฑ์ย่อย
-  function pairCellText(rec1, rec2, key) {
+  // สร้าง 2 เซลล์แยกคอลัมน์ (ค่าที่1, ค่าที่2) สำหรับข้อเกณฑ์ย่อย 1 ข้อ ในตารางเปรียบเทียบรายละเอียด
+  function pairCells(rec1, rec2, key) {
     const v1 = rec1 ? rec1[key].toFixed(2) : '-';
     const v2 = rec2 ? rec2[key].toFixed(2) : '-';
-    return `${v1} / ${v2}`;
+    return `<td class="px-1 py-2 text-center font-mono">${v1}</td><td class="px-1 py-2 text-center font-mono border-end">${v2}</td>`;
   }
 
-  // วาดตารางที่ 3: คะแนนรายละเอียดรายข้อเกณฑ์ย่อยของภาระงาน เปรียบเทียบหน่วยที่ 1 กับหน่วยที่ 2 ของทุกคน
+  // วาดตารางที่ 3: คะแนนรายละเอียดรายข้อเกณฑ์ย่อยของภาระงาน เปรียบเทียบหน่วยที่ 1 กับหน่วยที่ 2 ของทุกคน (แยกคอลัมน์)
   function renderTaskDetailTable(studentEvals) {
     const body = document.getElementById('taskDetailTableBody');
     const foot = document.getElementById('taskDetailTableFoot');
     if (!body) return;
 
     const sortedKeys = Object.keys(studentDB).sort().filter(passesGroupFilter);
-    const subVals = {}; SUB_KEYS.forEach(k => subVals[k] = []);
+    const subVals1 = {}, subVals2 = {}; SUB_KEYS.forEach(k => { subVals1[k] = []; subVals2[k] = []; });
     const t1Vals = [], t2Vals = [], avgVals = [];
     let html = '';
 
@@ -1067,8 +1093,8 @@ require_once 'header.php';
       const u2 = computeSubAvgsForEvs(studentEvals[id] && studentEvals[id].task2);
 
       SUB_KEYS.forEach(k => {
-        if (u1) subVals[k].push(u1[k]);
-        if (u2) subVals[k].push(u2[k]);
+        if (u1) subVals1[k].push(u1[k]);
+        if (u2) subVals2[k].push(u2[k]);
       });
       const presentTotals = [u1, u2].filter(v => v !== null);
       const combined = presentTotals.length > 0 ? presentTotals.reduce((a, b) => a + b.total, 0) / presentTotals.length : null;
@@ -1076,7 +1102,7 @@ require_once 'header.php';
       if (u2) t2Vals.push(u2.total);
       if (combined !== null) avgVals.push(combined);
 
-      const subCells = SUB_KEYS.map(k => `<td class="px-1 py-2 text-center font-mono">${pairCellText(u1, u2, k)}</td>`).join('');
+      const subCells = SUB_KEYS.map(k => pairCells(u1, u2, k)).join('');
 
       html += `
         <tr class="hover-row cursor-pointer" onclick="viewStudentDetail('${id}')">
@@ -1092,18 +1118,21 @@ require_once 'header.php';
         </tr>`;
     });
 
-    body.innerHTML = html || '<tr><td colspan="17" class="text-center text-muted py-5 fw-bold">ยังไม่มีข้อมูลนักเรียนในกลุ่มนี้</td></tr>';
-    if (foot) foot.innerHTML = buildStatsFooter([...SUB_KEYS.map(k => subVals[k]), t1Vals, t2Vals, avgVals], 2, 1);
+    body.innerHTML = html || '<tr><td colspan="28" class="text-center text-muted py-5 fw-bold">ยังไม่มีข้อมูลนักเรียนในกลุ่มนี้</td></tr>';
+    const footerCols = [];
+    SUB_KEYS.forEach(k => { footerCols.push(subVals1[k]); footerCols.push(subVals2[k]); });
+    footerCols.push(t1Vals, t2Vals, avgVals);
+    if (foot) foot.innerHTML = buildStatsFooter(footerCols, 2, 1);
   }
 
-  // วาดตารางที่ 4: คะแนนรายละเอียดรายข้อเกณฑ์ย่อยของครู เปรียบเทียบก่อนเรียนกับหลังเรียนของทุกคน
+  // วาดตารางที่ 4: คะแนนรายละเอียดรายข้อเกณฑ์ย่อยของครู เปรียบเทียบก่อนเรียนกับหลังเรียนของทุกคน (แยกคอลัมน์)
   function renderPrePostDetailTable(studentEvals) {
     const body = document.getElementById('prepostDetailTableBody');
     const foot = document.getElementById('prepostDetailTableFoot');
     if (!body) return;
 
     const sortedKeys = Object.keys(studentDB).sort().filter(passesGroupFilter);
-    const subVals = {}; SUB_KEYS.forEach(k => subVals[k] = []);
+    const subValsPre = {}, subValsPost = {}; SUB_KEYS.forEach(k => { subValsPre[k] = []; subValsPost[k] = []; });
     const preVals = [], postVals = [], gainVals = [];
     let html = '';
 
@@ -1114,8 +1143,8 @@ require_once 'header.php';
       const post = subValsFromSingleEval(postT);
 
       SUB_KEYS.forEach(k => {
-        if (pre) subVals[k].push(pre[k]);
-        if (post) subVals[k].push(post[k]);
+        if (pre) subValsPre[k].push(pre[k]);
+        if (post) subValsPost[k].push(post[k]);
       });
       if (pre) preVals.push(pre.total);
       if (post) postVals.push(post.total);
@@ -1129,7 +1158,7 @@ require_once 'header.php';
         else { gainDisp = '0.00'; gainClass = 'text-secondary'; }
       }
 
-      const subCells = SUB_KEYS.map(k => `<td class="px-1 py-2 text-center font-mono">${pairCellText(pre, post, k)}</td>`).join('');
+      const subCells = SUB_KEYS.map(k => pairCells(pre, post, k)).join('');
 
       html += `
         <tr class="hover-row cursor-pointer" onclick="viewStudentDetail('${id}')">
@@ -1145,8 +1174,11 @@ require_once 'header.php';
         </tr>`;
     });
 
-    body.innerHTML = html || '<tr><td colspan="17" class="text-center text-muted py-5 fw-bold">ยังไม่มีข้อมูลนักเรียนในกลุ่มนี้</td></tr>';
-    if (foot) foot.innerHTML = buildStatsFooter([...SUB_KEYS.map(k => subVals[k]), preVals, postVals, gainVals], 2, 1);
+    body.innerHTML = html || '<tr><td colspan="28" class="text-center text-muted py-5 fw-bold">ยังไม่มีข้อมูลนักเรียนในกลุ่มนี้</td></tr>';
+    const footerCols = [];
+    SUB_KEYS.forEach(k => { footerCols.push(subValsPre[k]); footerCols.push(subValsPost[k]); });
+    footerCols.push(preVals, postVals, gainVals);
+    if (foot) foot.innerHTML = buildStatsFooter(footerCols, 2, 1);
   }
 
   // สร้างแผนที่คะแนนเฉลี่ยรายด้านต่อคน สำหรับกราฟแมงมุม
@@ -1722,9 +1754,9 @@ require_once 'header.php';
 
     applyToBody('taskTableBody', [2, 3]);
     applyToBody('prepostTableBody', [2, 3]);
-    // ตารางรายละเอียดรายข้อเกณฑ์ย่อย: คอลัมน์รวมหน่วย1/หน่วย2 และ ก่อน/หลัง อยู่ที่ cell 13, 14 (หลังคอลัมน์ย่อย 11 ข้อ)
-    applyToBody('taskDetailTableBody', [13, 14]);
-    applyToBody('prepostDetailTableBody', [13, 14]);
+    // ตารางรายละเอียดรายข้อเกณฑ์ย่อย: คอลัมน์รวมหน่วย1/หน่วย2 และ ก่อน/หลัง อยู่ที่ cell 24, 25 (หลังคอลัมน์ย่อย 11 ข้อ x 2 = 22 คอลัมน์)
+    applyToBody('taskDetailTableBody', [24, 25]);
+    applyToBody('prepostDetailTableBody', [24, 25]);
   }
 
   function viewStudentDetail(id) {
