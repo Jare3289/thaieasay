@@ -66,13 +66,26 @@ function c45quote($ex, $roundLabel) {
         return '<div class="quote todo-box">[ยังไม่มีข้อความตัวอย่างจากผลงานจริง]</div>';
     }
     $bad = ($ex['verified'] === false);
-    $who = 'นักเรียนคนที่ ' . rp_esc($ex['student_no'])
+    $who = ((int)($ex['student_no'] ?? 0) > 0 ? 'นักเรียนคนที่ ' . rp_esc($ex['student_no']) : 'ไม่สามารถระบุหมายเลขนักเรียนได้')
         . (($fReveal && !empty($ex['student_name'])) ? ' (ชื่อจริง: ' . rp_esc($ex['student_name']) . ')' : '');
     return '<div class="quote' . ($bad ? ' quote-bad' : '') . '">'
         . rp_esc($ex['text'])
         . '<div class="quote-cite">(' . $who . ' ' . rp_esc($roundLabel) . ')</div>'
         . ($bad ? '<div class="quote-warn">⚠ ระบบตรวจไม่พบข้อความนี้ในผลงานจริง — ต้องตรวจสอบก่อนนำไปใช้</div>' : '')
         . '</div>';
+}
+
+/**
+ * ประโยคนำเข้าก่อนยกตัวอย่าง บอกตรง ๆ ว่าตัวอย่างที่จะยกต่อไปนี้คือหมายเลขใดถึงหมายเลขใด
+ * เขียนเป็นประโยคสมบูรณ์แยกจากย่อหน้า "ข้อค้นพบ" ของระบบ (ซึ่งไม่รู้เลขตัวอย่างล่วงหน้า)
+ * ไม่ใช่แค่วงเล็บห้อยต่อท้ายประโยคเดิมเหมือนก่อนหน้านี้ ซึ่งอ่านแล้วดูคลุมเครือว่าเลขนี้คืออะไร
+ */
+function c45_example_range_note(array $exList) {
+    if (!$exList) return '';
+    $first = (int)$exList[0][0];
+    $last  = (int)$exList[count($exList) - 1][1];
+    $joiner = (count($exList) > 1) ? 'ถึง' : 'และ';
+    return 'ตัวอย่างที่ยกมาประกอบการอธิบายในหัวข้อนี้ คือ ตัวอย่าง (' . $first . ') ' . $joiner . ' (' . $last . ') ดังนี้';
 }
 
 $scopeParts = [];
@@ -297,9 +310,12 @@ $titleChapters = (!$showCh5) ? 'บทที่ 4' : ((!$showCh4) ? 'บทท�
         $ip   = $R[$ijob]['payload'] ?? [];
         $pairs  = is_array($ip['pairs'] ?? null) ? $ip['pairs'] : [];
         $exList = is_array($ip['ex_no'] ?? null) ? $ip['ex_no'] : [];
-        $rangeTxt = $exList ? (' ดังตัวอย่าง (' . $exList[0][0] . ')–(' . $exList[count($exList) - 1][1] . ')') : ''; ?>
+        $rangeTxt = c45_example_range_note($exList); ?>
       <h4 class="sub2"><?php echo rp_esc($ind['sub'] . ' ' . $ind['name']); ?></h4>
-      <?php echo c45para(c45p($R, $ijob, 'finding', 'ย่อหน้าเปิดหัวข้อ') . rp_esc($rangeTxt)); ?>
+      <?php echo c45para(c45p($R, $ijob, 'finding', 'ย่อหน้าเปิดหัวข้อ')); ?>
+      <?php if ($rangeTxt): ?>
+      <?php echo c45para('<em>' . rp_esc($rangeTxt) . '</em>'); ?>
+      <?php endif; ?>
       <?php if (!$pairs): ?>
         <div class="quote todo-box">[ยังไม่มีตัวอย่างที่ยกจากผลงานจริง]</div>
       <?php endif; ?>
