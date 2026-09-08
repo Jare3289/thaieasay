@@ -263,6 +263,7 @@ function ch45_input_hash(array $ds, array $quant, array $defects) {
                                array_values($defects['rows'])),
         'work' => [$ds['meta']['work1_phase'], $ds['meta']['work2_phase']],
         'cut'  => $ds['meta']['defect_cut'],
+        'good_example_min' => $ds['meta']['good_example_min'] ?? null,
     ];
     return sha1(json_encode($sig));
 }
