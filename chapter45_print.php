@@ -27,6 +27,11 @@ $fClassroom = isset($_GET['classroom']) ? trim($_GET['classroom']) : '';
 // เพราะบทที่ 4 ฉบับจริงต้องอ้างด้วย "นักเรียนคนที่ N" เท่านั้น ห้ามใช้ชื่อจริง
 $fReveal = isset($_GET['reveal']) && $_GET['reveal'] === '1';
 
+// เปิดเฉพาะบทที่ 4 หรือบทที่ 5 ได้ (chapter=4 หรือ chapter=5) ค่าเริ่มต้น (ไม่ระบุ) คือเปิดทั้งสองบท
+$fChapter = isset($_GET['chapter']) ? trim($_GET['chapter']) : '';
+$showCh4  = ($fChapter === '' || $fChapter === '4');
+$showCh5  = ($fChapter === '' || $fChapter === '5');
+
 $ctx     = ch45_build_context($pdo, ['group' => $fGroup, 'classroom' => $fClassroom]);
 $ds      = $ctx['ds'];
 $meta    = $ds['meta'];
@@ -76,13 +81,14 @@ if ($fGroup === '__none__')                  $scopeParts[] = 'เฉพาะผ
 elseif ($fGroup !== '' && $fGroup !== 'all') $scopeParts[] = 'กลุ่ม ' . $fGroup;
 else                                         $scopeParts[] = 'ทุกกลุ่มการวิจัย';
 $scope = implode(' · ', $scopeParts);
+$titleChapters = (!$showCh5) ? 'บทที่ 4' : ((!$showCh4) ? 'บทที่ 5' : 'บทที่ 4 และบทที่ 5');
 ?>
 <!DOCTYPE html>
 <html lang="th">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ร่างบทที่ 4 และบทที่ 5 · <?php echo rp_esc($scope); ?></title>
+<title>ร่าง<?php echo rp_esc($titleChapters); ?> · <?php echo rp_esc($scope); ?></title>
 <?php rp_styles(); ?>
 <style>
   .para { text-indent: 2.5em; margin: 0 0 10px; line-height: 1.75; text-align: justify; }
@@ -131,7 +137,10 @@ $scope = implode(' · ', $scopeParts);
       <a href="<?php echo rp_esc($toggleUrl); ?>">แสดงชื่อจริงชั่วคราว (ไล่หาต้นฉบับ)</a>
     <?php endif; ?>
   </div>
+</div>
 
+<?php if ($showCh4): ?>
+<div class="sheet">
   <div class="doc-head">
     <h1>บทที่ 4</h1>
     <div class="sub">ผลการวิจัย</div>
@@ -319,7 +328,9 @@ $scope = implode(' · ', $scopeParts);
   <?php // ย่อหน้าสรุปปิดบทที่ 4 ทั้งบท
   echo c45para(c45p($R, 'overview', 'closing', 'ย่อหน้าสรุปปิดบทที่ 4')); ?>
 </div>
+<?php endif; // showCh4 ?>
 
+<?php if ($showCh5): ?>
 <div class="sheet">
   <div class="doc-head">
     <h1>บทที่ 5</h1>
@@ -397,6 +408,7 @@ $scope = implode(' · ', $scopeParts);
   }
   ?>
 </div>
+<?php endif; // showCh5 ?>
 
 <div class="sheet no-print">
   <div class="doc-head"><h1>ภาคผนวกของร่าง</h1><div class="sub">ข้อมูลประกอบที่ไม่ต้องพิมพ์ลงวิทยานิพนธ์</div></div>
