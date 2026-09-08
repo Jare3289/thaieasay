@@ -118,7 +118,7 @@ require_once 'header.php';
     <div class="card border-0 shadow-sm rounded-4 overflow-hidden bg-white mb-4">
       <div class="bg-primary text-white p-4 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3" style="background: linear-gradient(135deg, var(--primary-navy) 0%, var(--secondary-blue) 100%) !important;">
         <h5 class="fw-bold mb-0"><i class="bi bi-table"></i> ตารางสรุปภาพรวมคะแนนการประเมินชั้นเรียน</h5>
-        <button onclick="loadTeacherOverview()" class="btn btn-outline-light btn-sm fw-bold px-3">🔄 โหลดข้อมูลใหม่</button>
+        <button onclick="loadTeacherOverview(); loadDefectsSummary();" class="btn btn-outline-light btn-sm fw-bold px-3">🔄 โหลดข้อมูลใหม่</button>
       </div>
       
       <!-- ตัวกรองและกล่องค้นหา (ใช้ร่วมกันทั้ง 2 ตาราง) -->
@@ -324,6 +324,28 @@ require_once 'header.php';
       </div>
       </div>
       <!-- /คู่ที่ 2 -->
+
+      <!-- ตารางที่ 5: ข้อบกพร่องที่พบในผลงานเรียงความ (ตาราง 14 ตามโครงวิจัย) -->
+      <div class="px-3 pt-4 pb-2 border-top mt-2">
+        <h6 class="fw-bold text-dark mb-1"><i class="bi bi-exclamation-triangle"></i> ตารางที่ 5 &nbsp;จำนวนและร้อยละของนักเรียนที่ปรากฏข้อบกพร่องในผลงานเรียงความ</h6>
+        <p class="text-muted small mb-0" id="defectsTableDesc">กำลังประมวลผล...</p>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0 text-start table-classroom">
+          <thead class="table-light text-secondary small fw-bold text-uppercase">
+            <tr>
+              <th class="px-3 py-3" style="width: 40%">ข้อบกพร่องที่พบในผลงานเรียงความ</th>
+              <th class="px-2 py-3 text-center" id="defectsHeadN1" style="width: 15%">ครั้งที่ 1<br><span class="fw-normal text-muted" style="font-size:.7rem">n</span></th>
+              <th class="px-2 py-3 text-center" id="defectsHeadPct1" style="width: 15%">ครั้งที่ 1<br><span class="fw-normal text-muted" style="font-size:.7rem">%</span></th>
+              <th class="px-2 py-3 text-center" id="defectsHeadN2" style="width: 15%">ครั้งที่ 2<br><span class="fw-normal text-muted" style="font-size:.7rem">n</span></th>
+              <th class="px-2 py-3 text-center" id="defectsHeadPct2" style="width: 15%">ครั้งที่ 2<br><span class="fw-normal text-muted" style="font-size:.7rem">%</span></th>
+            </tr>
+          </thead>
+          <tbody id="defectsTableBody" class="small">
+            <tr><td colspan="5" class="text-center text-muted py-5 fw-bold"><div class="spinner-border spinner-border-sm mb-2 d-block mx-auto"></div>กำลังประมวลผลข้อบกพร่องที่พบในผลงาน...</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <!-- ลิงก์ไปหน้าระบบวิเคราะห์ทางสถิติเพื่อการวิจัย (Inter-rater & Paired t-test) -->
@@ -552,7 +574,76 @@ require_once 'header.php';
     currentGroupFilter = window.TEG ? TEG.get() : 'all';
     updateGroupBadge();
     if (classroomResearchData) processDashboardData();
+    loadDefectsSummary();
   };
+
+  // ตารางที่ 5: จำนวน/ร้อยละของนักเรียนที่ปรากฏข้อบกพร่องรายตัวบ่งชี้ ในผลงานครั้งที่ 1 และครั้งที่ 2 (ตาราง 14)
+  const defectDomainStyle = {
+    d1: 'class="text-primary-emphasis"',
+    d2: 'style="color:#8b5cf6"',
+    d3: 'class="text-warning-emphasis"',
+    d4: 'class="text-success-emphasis"'
+  };
+
+  async function loadDefectsSummary() {
+    const body = document.getElementById('defectsTableBody');
+    const desc = document.getElementById('defectsTableDesc');
+    if (!body) return;
+    body.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-5 fw-bold"><div class="spinner-border spinner-border-sm mb-2 d-block mx-auto"></div>กำลังประมวลผลข้อบกพร่องที่พบในผลงาน...</td></tr>';
+    try {
+      const groupParam = (currentGroupFilter === 'all') ? '' : currentGroupFilter;
+      const response = await fetch(`api.php?action=ch45_get_defects_summary&group=${encodeURIComponent(groupParam)}&_t=${new Date().getTime()}`);
+      const text = await response.text();
+      let res;
+      try {
+        res = JSON.parse(text);
+      } catch (parseErr) {
+        body.innerHTML = '<tr><td colspan="5" class="text-center text-danger py-4 fw-bold">เกิดข้อผิดพลาดในการโหลดข้อมูลข้อบกพร่อง</td></tr>';
+        return;
+      }
+      if (!res.success) {
+        body.innerHTML = `<tr><td colspan="5" class="text-center text-danger py-4 fw-bold">เกิดข้อผิดพลาดจาก API: ${res.error || ''}</td></tr>`;
+        return;
+      }
+
+      const headN1 = document.getElementById('defectsHeadN1');
+      const headPct1 = document.getElementById('defectsHeadPct1');
+      const headN2 = document.getElementById('defectsHeadN2');
+      const headPct2 = document.getElementById('defectsHeadPct2');
+      if (headN1) headN1.innerHTML = `${res.work1_label}<br><span class="fw-normal text-muted" style="font-size:.7rem">n</span>`;
+      if (headPct1) headPct1.innerHTML = `${res.work1_label}<br><span class="fw-normal text-muted" style="font-size:.7rem">%</span>`;
+      if (headN2) headN2.innerHTML = `${res.work2_label}<br><span class="fw-normal text-muted" style="font-size:.7rem">n</span>`;
+      if (headPct2) headPct2.innerHTML = `${res.work2_label}<br><span class="fw-normal text-muted" style="font-size:.7rem">%</span>`;
+
+      let html = '';
+      Object.keys(res.domains || {}).forEach(dKey => {
+        const dom = res.domains[dKey];
+        const rows = (res.rows || []).filter(r => r.domain === dKey);
+        if (!rows.length) return;
+        html += `<tr class="table-light">
+          <td colspan="5" class="px-3 py-2 fw-bold" ${defectDomainStyle[dKey] || ''}>${dom.no}) ด้าน${dom.name}</td>
+        </tr>`;
+        rows.forEach(r => {
+          const pct1 = (r.pct1 === null || r.pct1 === undefined) ? '—' : r.pct1.toFixed(1) + '%';
+          const pct2 = (r.pct2 === null || r.pct2 === undefined) ? '—' : r.pct2.toFixed(1) + '%';
+          html += `<tr>
+            <td class="px-3 py-2">${r.no}. ${r.defect}</td>
+            <td class="px-2 py-2 text-center font-mono">${r.n1}</td>
+            <td class="px-2 py-2 text-center font-mono">${pct1}</td>
+            <td class="px-2 py-2 text-center font-mono">${r.n2}</td>
+            <td class="px-2 py-2 text-center font-mono">${pct2}</td>
+          </tr>`;
+        });
+      });
+      body.innerHTML = html || '<tr><td colspan="5" class="text-center text-muted py-4 fw-bold">ไม่มีข้อมูล</td></tr>';
+
+      if (desc) {
+        desc.textContent = `นับเฉพาะนักเรียนที่มีคะแนนครบทั้ง 2 ครั้ง (N = ${res.n_base} คน) เพื่อให้ร้อยละของทั้งสองครั้งเทียบกันได้จริง`;
+      }
+    } catch (err) {
+      body.innerHTML = `<tr><td colspan="5" class="text-center text-danger py-4 fw-bold">เกิดข้อผิดพลาดในการเชื่อมต่อเครือข่าย: ${err.message}</td></tr>`;
+    }
+  }
 
   const criteriaMap = {
     '1.1': { name: '1.1 ความตรงประเด็น (คะแนนเต็ม 12)', mult: 3 },
@@ -2443,6 +2534,7 @@ require_once 'header.php';
     if (userRole === 'teacher') {
       initGroupFilterFromStore(); // ดึงกลุ่มที่จำไว้มาตั้งเป็นค่าเริ่มต้น
       loadTeacherOverview();
+      loadDefectsSummary();
     } else {
       // สำหรับนักเรียน ให้ดึงรายงานของตนเองทันที
       fetchScores(currentUser.id, currentUser.name);
