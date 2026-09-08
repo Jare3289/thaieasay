@@ -203,31 +203,103 @@ require_once 'header.php';
         </table>
       </div>
 
-      <!-- ตารางที่ 3: คะแนนรายละเอียดแยกตามรายด้าน (ทุกคน) -->
-      <div class="px-3 pt-4 pb-2 border-top mt-2">
-        <h6 class="fw-bold text-warning-emphasis mb-1"><i class="bi bi-list-columns"></i> ตารางที่ 3 &nbsp;คะแนนรายละเอียดแยกตามรายด้าน (ทุกคน)</h6>
-        <p class="text-muted small mb-0">คะแนนเฉลี่ยของผู้เรียนทุกคน แยกตาม 4 ด้านหลักของเกณฑ์ประเมิน อ้างอิงข้อมูลตาม "มุมมองกราฟ" ที่เลือกด้านบน (<span id="dimensionTablePhaseLabel" class="fw-bold text-primary">หน่วยที่ 1</span>)</p>
+      <!-- ตารางที่ 3-4: คะแนนรายละเอียดแยกตามรายข้อเกณฑ์ย่อย (ทุกคน) — สลับดูได้ทีละคู่ -->
+      <div class="px-3 pt-4 pb-2 border-top mt-2 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+        <div>
+          <h6 class="fw-bold text-dark mb-1"><i class="bi bi-list-columns"></i> ตารางรายละเอียดคะแนนรายข้อเกณฑ์ย่อย (ทุกคน)</h6>
+          <p class="text-muted small mb-0">คะแนนเฉลี่ยของผู้เรียนทุกคน แยกลงถึงระดับข้อเกณฑ์ย่อยทั้ง 11 ข้อ (จัดกลุ่มตาม 4 ด้านหลัก) — เลือกคู่ที่ต้องการเปรียบเทียบด้านล่าง</p>
+        </div>
+        <div class="btn-group flex-shrink-0" role="group" aria-label="เลือกคู่เปรียบเทียบคะแนนรายข้อเกณฑ์ย่อย">
+          <button type="button" id="btnDetailPairTask" class="btn btn-sm btn-primary fw-bold px-3" onclick="switchDetailPair('task')">หน่วยที่ 1 / หน่วยที่ 2</button>
+          <button type="button" id="btnDetailPairPrepost" class="btn btn-sm btn-outline-primary fw-bold px-3" onclick="switchDetailPair('prepost')">ก่อนเรียน / หลังเรียน</button>
+        </div>
+      </div>
+
+      <!-- คู่ที่ 1: ภาระงาน หน่วยที่ 1 เทียบ หน่วยที่ 2 -->
+      <div id="detailPairTaskSection">
+      <div class="px-3 pt-2 pb-2">
+        <p class="text-muted small mb-0">ตารางที่ 3 — แต่ละช่องแสดงคู่คะแนน <strong>หน่วยที่ 1 / หน่วยที่ 2</strong></p>
       </div>
       <div class="table-responsive">
         <table class="table table-hover align-middle mb-0 text-start table-classroom">
           <thead class="table-light text-secondary small fw-bold text-uppercase">
             <tr>
-              <th class="px-3 py-3" style="width: 10%">รหัสนักเรียน</th>
-              <th class="px-3 py-3" style="width: 20%">ชื่อ-สกุลผู้เรียน</th>
-              <th class="px-3 py-3 text-center text-primary-emphasis" style="width: 12%">1) เนื้อหาสาระ<br><span class="fw-normal text-muted" style="font-size:.7rem">(เต็ม 27)</span></th>
-              <th class="px-3 py-3 text-center" style="width: 12%; color:#8b5cf6">2) องค์ประกอบ<br><span class="fw-normal text-muted" style="font-size:.7rem">(เต็ม 12)</span></th>
-              <th class="px-3 py-3 text-center text-warning-emphasis" style="width: 12%">3) สำนวนภาษา<br><span class="fw-normal text-muted" style="font-size:.7rem">(เต็ม 15)</span></th>
-              <th class="px-3 py-3 text-center text-success-emphasis" style="width: 12%">4) อักขรวิธี<br><span class="fw-normal text-muted" style="font-size:.7rem">(เต็ม 6)</span></th>
-              <th class="px-3 py-3 text-center" style="width: 10%">รวม<br><span class="fw-normal text-muted" style="font-size:.7rem">(เต็ม 60)</span></th>
-              <th class="px-3 py-3 text-end" style="width: 12%">การจัดการ</th>
+              <th class="px-2 py-2" rowspan="2">รหัส</th>
+              <th class="px-2 py-2" rowspan="2">ชื่อ-สกุลผู้เรียน</th>
+              <th class="px-2 py-2 text-center text-primary-emphasis" colspan="3">1) ด้านเนื้อหาสาระ<br><span class="fw-normal text-muted" style="font-size:.65rem">(หน่วย1 / หน่วย2)</span></th>
+              <th class="px-2 py-2 text-center" colspan="2" style="color:#8b5cf6">2) ด้านองค์ประกอบและการลำดับ<br><span class="fw-normal text-muted" style="font-size:.65rem">(หน่วย1 / หน่วย2)</span></th>
+              <th class="px-2 py-2 text-center text-warning-emphasis" colspan="3">3) ด้านการใช้สำนวนภาษา<br><span class="fw-normal text-muted" style="font-size:.65rem">(หน่วย1 / หน่วย2)</span></th>
+              <th class="px-2 py-2 text-center text-success-emphasis" colspan="3">4) ด้านอักขรวิธีและกลไกการเขียน<br><span class="fw-normal text-muted" style="font-size:.65rem">(หน่วย1 / หน่วย2)</span></th>
+              <th class="px-2 py-2 text-center" rowspan="2">รวม<br>หน่วย1<br><span class="fw-normal text-muted" style="font-size:.65rem">(60)</span></th>
+              <th class="px-2 py-2 text-center" rowspan="2">รวม<br>หน่วย2<br><span class="fw-normal text-muted" style="font-size:.65rem">(60)</span></th>
+              <th class="px-2 py-2 text-center" rowspan="2">เฉลี่ยรวม<br><span class="fw-normal text-muted" style="font-size:.65rem">(60)</span></th>
+              <th class="px-2 py-2 text-end" rowspan="2">การจัดการ</th>
+            </tr>
+            <tr>
+              <th class="px-1 py-2 text-center text-primary-emphasis">1.1<br><span class="fw-normal text-muted" style="font-size:.65rem">(12)</span></th>
+              <th class="px-1 py-2 text-center text-primary-emphasis">1.2<br><span class="fw-normal text-muted" style="font-size:.65rem">(6)</span></th>
+              <th class="px-1 py-2 text-center text-primary-emphasis">1.3<br><span class="fw-normal text-muted" style="font-size:.65rem">(9)</span></th>
+              <th class="px-1 py-2 text-center" style="color:#8b5cf6">2.1<br><span class="fw-normal text-muted" style="font-size:.65rem">(8)</span></th>
+              <th class="px-1 py-2 text-center" style="color:#8b5cf6">2.2<br><span class="fw-normal text-muted" style="font-size:.65rem">(4)</span></th>
+              <th class="px-1 py-2 text-center text-warning-emphasis">3.1<br><span class="fw-normal text-muted" style="font-size:.65rem">(4)</span></th>
+              <th class="px-1 py-2 text-center text-warning-emphasis">3.2<br><span class="fw-normal text-muted" style="font-size:.65rem">(6)</span></th>
+              <th class="px-1 py-2 text-center text-warning-emphasis">3.3<br><span class="fw-normal text-muted" style="font-size:.65rem">(5)</span></th>
+              <th class="px-1 py-2 text-center text-success-emphasis">4.1<br><span class="fw-normal text-muted" style="font-size:.65rem">(2)</span></th>
+              <th class="px-1 py-2 text-center text-success-emphasis">4.2<br><span class="fw-normal text-muted" style="font-size:.65rem">(2)</span></th>
+              <th class="px-1 py-2 text-center text-success-emphasis">4.3<br><span class="fw-normal text-muted" style="font-size:.65rem">(2)</span></th>
             </tr>
           </thead>
-          <tbody id="dimensionTableBody" class="small">
-            <tr><td colspan="8" class="text-center text-muted py-5 fw-bold">กำลังประมวลผลคะแนนรายด้าน...</td></tr>
+          <tbody id="taskDetailTableBody" class="small">
+            <tr><td colspan="17" class="text-center text-muted py-5 fw-bold">กำลังประมวลผลคะแนนรายข้อเกณฑ์ย่อย...</td></tr>
           </tbody>
-          <tfoot id="dimensionTableFoot" class="small border-top border-2"></tfoot>
+          <tfoot id="taskDetailTableFoot" class="small border-top border-2"></tfoot>
         </table>
       </div>
+      </div>
+      <!-- /คู่ที่ 1 -->
+
+      <!-- คู่ที่ 2: ก่อนเรียน เทียบ หลังเรียน -->
+      <div id="detailPairPrepostSection" class="d-none">
+      <div class="px-3 pt-4 pb-2 border-top mt-2">
+        <p class="text-muted small mb-0">ตารางที่ 4 — คะแนนที่ครูประเมิน แต่ละช่องแสดงคู่คะแนน <strong>ก่อนเรียน / หลังเรียน</strong></p>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0 text-start table-classroom">
+          <thead class="table-light text-secondary small fw-bold text-uppercase">
+            <tr>
+              <th class="px-2 py-2" rowspan="2">รหัส</th>
+              <th class="px-2 py-2" rowspan="2">ชื่อ-สกุลผู้เรียน</th>
+              <th class="px-2 py-2 text-center text-primary-emphasis" colspan="3">1) ด้านเนื้อหาสาระ<br><span class="fw-normal text-muted" style="font-size:.65rem">(ก่อน / หลัง)</span></th>
+              <th class="px-2 py-2 text-center" colspan="2" style="color:#8b5cf6">2) ด้านองค์ประกอบและการลำดับ<br><span class="fw-normal text-muted" style="font-size:.65rem">(ก่อน / หลัง)</span></th>
+              <th class="px-2 py-2 text-center text-warning-emphasis" colspan="3">3) ด้านการใช้สำนวนภาษา<br><span class="fw-normal text-muted" style="font-size:.65rem">(ก่อน / หลัง)</span></th>
+              <th class="px-2 py-2 text-center text-success-emphasis" colspan="3">4) ด้านอักขรวิธีและกลไกการเขียน<br><span class="fw-normal text-muted" style="font-size:.65rem">(ก่อน / หลัง)</span></th>
+              <th class="px-2 py-2 text-center" rowspan="2">ก่อนเรียน<br><span class="fw-normal text-muted" style="font-size:.65rem">(60)</span></th>
+              <th class="px-2 py-2 text-center" rowspan="2">หลังเรียน<br><span class="fw-normal text-muted" style="font-size:.65rem">(60)</span></th>
+              <th class="px-2 py-2 text-center" rowspan="2">พัฒนาการ</th>
+              <th class="px-2 py-2 text-end" rowspan="2">การจัดการ</th>
+            </tr>
+            <tr>
+              <th class="px-1 py-2 text-center text-primary-emphasis">1.1<br><span class="fw-normal text-muted" style="font-size:.65rem">(12)</span></th>
+              <th class="px-1 py-2 text-center text-primary-emphasis">1.2<br><span class="fw-normal text-muted" style="font-size:.65rem">(6)</span></th>
+              <th class="px-1 py-2 text-center text-primary-emphasis">1.3<br><span class="fw-normal text-muted" style="font-size:.65rem">(9)</span></th>
+              <th class="px-1 py-2 text-center" style="color:#8b5cf6">2.1<br><span class="fw-normal text-muted" style="font-size:.65rem">(8)</span></th>
+              <th class="px-1 py-2 text-center" style="color:#8b5cf6">2.2<br><span class="fw-normal text-muted" style="font-size:.65rem">(4)</span></th>
+              <th class="px-1 py-2 text-center text-warning-emphasis">3.1<br><span class="fw-normal text-muted" style="font-size:.65rem">(4)</span></th>
+              <th class="px-1 py-2 text-center text-warning-emphasis">3.2<br><span class="fw-normal text-muted" style="font-size:.65rem">(6)</span></th>
+              <th class="px-1 py-2 text-center text-warning-emphasis">3.3<br><span class="fw-normal text-muted" style="font-size:.65rem">(5)</span></th>
+              <th class="px-1 py-2 text-center text-success-emphasis">4.1<br><span class="fw-normal text-muted" style="font-size:.65rem">(2)</span></th>
+              <th class="px-1 py-2 text-center text-success-emphasis">4.2<br><span class="fw-normal text-muted" style="font-size:.65rem">(2)</span></th>
+              <th class="px-1 py-2 text-center text-success-emphasis">4.3<br><span class="fw-normal text-muted" style="font-size:.65rem">(2)</span></th>
+            </tr>
+          </thead>
+          <tbody id="prepostDetailTableBody" class="small">
+            <tr><td colspan="17" class="text-center text-muted py-5 fw-bold">กำลังประมวลผลคะแนนรายข้อเกณฑ์ย่อย...</td></tr>
+          </tbody>
+          <tfoot id="prepostDetailTableFoot" class="small border-top border-2"></tfoot>
+        </table>
+      </div>
+      </div>
+      <!-- /คู่ที่ 2 -->
     </div>
 
     <!-- ลิงก์ไปหน้าระบบวิเคราะห์ทางสถิติเพื่อการวิจัย (Inter-rater & Paired t-test) -->
@@ -801,11 +873,8 @@ require_once 'header.php';
 
     renderCustomTeacherOverview(summaryData);
 
-    // ตารางสรุป 2 ตาราง (ภาระงานทั้ง 2 หน่วย + ก่อน/หลังเรียน) แสดงข้อมูลครบเสมอไม่ขึ้นกับมุมมองกราฟ
+    // ตารางสรุป 4 ตาราง (ภาระงานทั้ง 2 หน่วย + ก่อน/หลังเรียน + รายละเอียดรายข้อเกณฑ์ย่อยทั้ง 2 ชุด) แสดงข้อมูลครบเสมอไม่ขึ้นกับมุมมองกราฟ
     renderSplitSummaryTables(studentEvals);
-
-    // ตารางที่ 3: คะแนนรายละเอียดแยกตามรายด้านของผู้เรียนทุกคน ตามมุมมองกราฟที่เลือกอยู่
-    renderDimensionBreakdownTable(summaryData);
 
     // กราฟแมงมุมรายบุคคล 2 กราฟ — ไม่ขึ้นกับโหมดตาราง แสดงทั้ง "ภาระงาน" และ "ก่อน/หลังเรียน" เสมอ
     const taskDimMap = buildDimMapFromEvals(studentEvals, 'task');
@@ -941,61 +1010,143 @@ require_once 'header.php';
     prepostBody.innerHTML = ppHtml || '<tr><td colspan="6" class="text-center text-muted py-5 fw-bold">ยังไม่มีข้อมูลนักเรียนในกลุ่มนี้</td></tr>';
     if (prepostFoot) prepostFoot.innerHTML = buildStatsFooter([preVals, postVals, gainVals], 2, 1);
 
+    // ---------- ตารางที่ 3-4: รายละเอียดรายข้อเกณฑ์ย่อย (ภาระงาน และ ก่อน/หลังเรียน) ----------
+    renderTaskDetailTable(studentEvals);
+    renderPrePostDetailTable(studentEvals);
+
     // ใช้ตัวกรอง/ค้นหาที่ผู้ใช้เลือกอยู่กับตารางที่เพิ่งวาดใหม่
     filterTeacherTable();
   }
 
-  // วาดตารางที่ 3: คะแนนรายละเอียดแยกตามรายด้านของผู้เรียนทุกคน (อ้างอิงมุมมองกราฟที่เลือกอยู่)
-  function renderDimensionBreakdownTable(data) {
-    const body = document.getElementById('dimensionTableBody');
-    const foot = document.getElementById('dimensionTableFoot');
-    const phaseLabel = document.getElementById('dimensionTablePhaseLabel');
+  // รหัสข้อเกณฑ์ย่อยทั้ง 11 ข้อ ใช้ร่วมกันในตารางเปรียบเทียบรายละเอียด (ตารางที่ 3 และ 4)
+  const SUB_KEYS = ['1_1','1_2','1_3','2_1','2_2','3_1','3_2','3_3','4_1','4_2','4_3'];
+
+  // เฉลี่ยคะแนนรายข้อเกณฑ์ย่อยและคะแนนรวม จากรายการผลประเมินหลายฉบับของหน่วยเดียว (เช่น ตนเอง+เพื่อน+ครู)
+  function computeSubAvgsForEvs(evs) {
+    if (!evs || evs.length === 0) return null;
+    const sums = {}; SUB_KEYS.forEach(k => sums[k] = 0);
+    let totalSum = 0;
+    evs.forEach(e => {
+      SUB_KEYS.forEach(k => { sums[k] += Number(e['score_' + k] || 0); });
+      totalSum += Number(e.total_score);
+    });
+    const n = evs.length;
+    const rec = { total: totalSum / n };
+    SUB_KEYS.forEach(k => { rec[k] = sums[k] / n; });
+    return rec;
+  }
+
+  // ดึงคะแนนรายข้อเกณฑ์ย่อยและคะแนนรวมจากผลประเมินฉบับเดียว (ใช้กับคะแนนครูก่อน/หลังเรียน)
+  function subValsFromSingleEval(e) {
+    if (!e) return null;
+    const rec = { total: Number(e.total_score) };
+    SUB_KEYS.forEach(k => { rec[k] = Number(e['score_' + k] || 0); });
+    return rec;
+  }
+
+  // สร้างข้อความคู่ "ค่าที่1 / ค่าที่2" สำหรับ 1 เซลล์ในตารางเปรียบเทียบรายข้อเกณฑ์ย่อย
+  function pairCellText(rec1, rec2, key) {
+    const v1 = rec1 ? rec1[key].toFixed(2) : '-';
+    const v2 = rec2 ? rec2[key].toFixed(2) : '-';
+    return `${v1} / ${v2}`;
+  }
+
+  // วาดตารางที่ 3: คะแนนรายละเอียดรายข้อเกณฑ์ย่อยของภาระงาน เปรียบเทียบหน่วยที่ 1 กับหน่วยที่ 2 ของทุกคน
+  function renderTaskDetailTable(studentEvals) {
+    const body = document.getElementById('taskDetailTableBody');
+    const foot = document.getElementById('taskDetailTableFoot');
     if (!body) return;
 
-    if (phaseLabel) {
-      const labels = { task1: 'ภาระงาน หน่วยที่ 1', task2: 'ภาระงาน หน่วยที่ 2', prepost: 'ก่อน/หลังเรียน (ใช้คะแนนล่าสุดที่มี)' };
-      phaseLabel.textContent = labels[currentDashboardViewMode] || currentDashboardViewMode;
-    }
-
     const sortedKeys = Object.keys(studentDB).sort().filter(passesGroupFilter);
-    const cVals = [], sVals = [], lVals = [], mVals = [], totalVals = [];
+    const subVals = {}; SUB_KEYS.forEach(k => subVals[k] = []);
+    const t1Vals = [], t2Vals = [], avgVals = [];
     let html = '';
 
     sortedKeys.forEach(id => {
-      const sData = data[id] || {};
-      const hasData = Number(sData.count || 0) > 0;
+      const u1 = computeSubAvgsForEvs(studentEvals[id] && studentEvals[id].task1);
+      const u2 = computeSubAvgsForEvs(studentEvals[id] && studentEvals[id].task2);
 
-      const cell = (v, extra) => (hasData
-        ? `<td class="px-3 py-3 text-center font-mono fw-semibold ${extra || ''}">${Number(v || 0).toFixed(2)}</td>`
-        : `<td class="px-3 py-3 text-center text-muted">-</td>`);
+      SUB_KEYS.forEach(k => {
+        if (u1) subVals[k].push(u1[k]);
+        if (u2) subVals[k].push(u2[k]);
+      });
+      const presentTotals = [u1, u2].filter(v => v !== null);
+      const combined = presentTotals.length > 0 ? presentTotals.reduce((a, b) => a + b.total, 0) / presentTotals.length : null;
+      if (u1) t1Vals.push(u1.total);
+      if (u2) t2Vals.push(u2.total);
+      if (combined !== null) avgVals.push(combined);
 
-      if (hasData) {
-        cVals.push(Number(sData.avg_c || 0));
-        sVals.push(Number(sData.avg_s || 0));
-        lVals.push(Number(sData.avg_l || 0));
-        mVals.push(Number(sData.avg_m || 0));
-        totalVals.push(Number(sData.avgScore || 0));
-      }
+      const subCells = SUB_KEYS.map(k => `<td class="px-1 py-2 text-center font-mono">${pairCellText(u1, u2, k)}</td>`).join('');
 
       html += `
         <tr class="hover-row cursor-pointer" onclick="viewStudentDetail('${id}')">
-          <td class="px-3 py-3 font-mono fw-bold text-secondary">${id}</td>
-          <td class="px-3 py-3 fw-bold text-dark text-start">${studentDB[id]}</td>
-          ${cell(sData.avg_c)}
-          ${cell(sData.avg_s)}
-          ${cell(sData.avg_l)}
-          ${cell(sData.avg_m)}
-          ${cell(sData.avgScore, hasData ? 'text-primary bg-light-blue fw-extrabold' : '')}
-          <td class="px-3 py-3 text-end">
+          <td class="px-2 py-2 font-mono fw-bold text-secondary">${id}</td>
+          <td class="px-2 py-2 fw-bold text-dark text-start">${studentDB[id]}</td>
+          ${subCells}
+          <td class="px-2 py-2 text-center font-mono fw-semibold">${u1 ? u1.total.toFixed(2) : '-'}</td>
+          <td class="px-2 py-2 text-center font-mono fw-semibold">${u2 ? u2.total.toFixed(2) : '-'}</td>
+          <td class="px-2 py-2 text-center font-mono fw-extrabold text-primary">${combined !== null ? combined.toFixed(2) : '-'}</td>
+          <td class="px-2 py-2 text-end">
              <button class="btn btn-outline-primary btn-sm fw-bold rounded-pill px-3" onclick="event.stopPropagation(); viewStudentDetail('${id}')">วิเคราะห์</button>
           </td>
         </tr>`;
     });
 
-    body.innerHTML = html || '<tr><td colspan="8" class="text-center text-muted py-5 fw-bold">ยังไม่มีข้อมูลนักเรียนในกลุ่มนี้</td></tr>';
-    if (foot) foot.innerHTML = buildStatsFooter([cVals, sVals, lVals, mVals, totalVals], 2, 1);
+    body.innerHTML = html || '<tr><td colspan="17" class="text-center text-muted py-5 fw-bold">ยังไม่มีข้อมูลนักเรียนในกลุ่มนี้</td></tr>';
+    if (foot) foot.innerHTML = buildStatsFooter([...SUB_KEYS.map(k => subVals[k]), t1Vals, t2Vals, avgVals], 2, 1);
+  }
 
-    filterTeacherTable();
+  // วาดตารางที่ 4: คะแนนรายละเอียดรายข้อเกณฑ์ย่อยของครู เปรียบเทียบก่อนเรียนกับหลังเรียนของทุกคน
+  function renderPrePostDetailTable(studentEvals) {
+    const body = document.getElementById('prepostDetailTableBody');
+    const foot = document.getElementById('prepostDetailTableFoot');
+    if (!body) return;
+
+    const sortedKeys = Object.keys(studentDB).sort().filter(passesGroupFilter);
+    const subVals = {}; SUB_KEYS.forEach(k => subVals[k] = []);
+    const preVals = [], postVals = [], gainVals = [];
+    let html = '';
+
+    sortedKeys.forEach(id => {
+      const preT = ((studentEvals[id] && studentEvals[id].pretest) || []).find(e => e.evaluator_type === 'teacher');
+      const postT = ((studentEvals[id] && studentEvals[id].posttest) || []).find(e => e.evaluator_type === 'teacher');
+      const pre = subValsFromSingleEval(preT);
+      const post = subValsFromSingleEval(postT);
+
+      SUB_KEYS.forEach(k => {
+        if (pre) subVals[k].push(pre[k]);
+        if (post) subVals[k].push(post[k]);
+      });
+      if (pre) preVals.push(pre.total);
+      if (post) postVals.push(post.total);
+      const gain = (pre && post) ? (post.total - pre.total) : null;
+      if (gain !== null) gainVals.push(gain);
+
+      let gainDisp = '-', gainClass = 'text-muted';
+      if (gain !== null) {
+        if (gain > 0) { gainDisp = `+${gain.toFixed(2)}`; gainClass = 'text-success fw-bold'; }
+        else if (gain < 0) { gainDisp = `${gain.toFixed(2)}`; gainClass = 'text-danger fw-bold'; }
+        else { gainDisp = '0.00'; gainClass = 'text-secondary'; }
+      }
+
+      const subCells = SUB_KEYS.map(k => `<td class="px-1 py-2 text-center font-mono">${pairCellText(pre, post, k)}</td>`).join('');
+
+      html += `
+        <tr class="hover-row cursor-pointer" onclick="viewStudentDetail('${id}')">
+          <td class="px-2 py-2 font-mono fw-bold text-secondary">${id}</td>
+          <td class="px-2 py-2 fw-bold text-dark text-start">${studentDB[id]}</td>
+          ${subCells}
+          <td class="px-2 py-2 text-center font-mono fw-semibold">${pre ? pre.total.toFixed(2) : '-'}</td>
+          <td class="px-2 py-2 text-center font-mono fw-semibold">${post ? post.total.toFixed(2) : '-'}</td>
+          <td class="px-2 py-2 text-center font-mono ${gainClass}">${gainDisp}</td>
+          <td class="px-2 py-2 text-end">
+             <button class="btn btn-outline-primary btn-sm fw-bold rounded-pill px-3" onclick="event.stopPropagation(); viewStudentDetail('${id}')">วิเคราะห์</button>
+          </td>
+        </tr>`;
+    });
+
+    body.innerHTML = html || '<tr><td colspan="17" class="text-center text-muted py-5 fw-bold">ยังไม่มีข้อมูลนักเรียนในกลุ่มนี้</td></tr>';
+    if (foot) foot.innerHTML = buildStatsFooter([...SUB_KEYS.map(k => subVals[k]), preVals, postVals, gainVals], 2, 1);
   }
 
   // สร้างแผนที่คะแนนเฉลี่ยรายด้านต่อคน สำหรับกราฟแมงมุม
@@ -1131,6 +1282,24 @@ require_once 'header.php';
     drawClassQualityDistribution(qualityCounts);
     drawClassDimensionAverages(dimensionSums, evaluatedStdsCount, subCriteriaSums);
     generateResearchInsights(subCriteriaSums, evaluatedStdsCount, totalRegistered, totalSumScores, totalScoredCount, activeEvaluationSetCount);
+  }
+
+  // สลับดูตารางรายละเอียดรายข้อเกณฑ์ย่อยระหว่างคู่ "หน่วยที่ 1/2" กับ "ก่อน/หลังเรียน"
+  function switchDetailPair(pair) {
+    const taskSection = document.getElementById('detailPairTaskSection');
+    const prepostSection = document.getElementById('detailPairPrepostSection');
+    const btnTask = document.getElementById('btnDetailPairTask');
+    const btnPrepost = document.getElementById('btnDetailPairPrepost');
+    if (!taskSection || !prepostSection || !btnTask || !btnPrepost) return;
+
+    const showTask = pair === 'task';
+    taskSection.classList.toggle('d-none', !showTask);
+    prepostSection.classList.toggle('d-none', showTask);
+
+    btnTask.classList.toggle('btn-primary', showTask);
+    btnTask.classList.toggle('btn-outline-primary', !showTask);
+    btnPrepost.classList.toggle('btn-primary', !showTask);
+    btnPrepost.classList.toggle('btn-outline-primary', showTask);
   }
 
   function switchDashboardViewMode() {
@@ -1553,8 +1722,9 @@ require_once 'header.php';
 
     applyToBody('taskTableBody', [2, 3]);
     applyToBody('prepostTableBody', [2, 3]);
-    // ตารางรายด้าน: ใช้คอลัมน์ "รวม" (cell 6) เป็นตัวชี้วัดว่ามีคะแนนแล้วหรือยัง
-    applyToBody('dimensionTableBody', [6]);
+    // ตารางรายละเอียดรายข้อเกณฑ์ย่อย: คอลัมน์รวมหน่วย1/หน่วย2 และ ก่อน/หลัง อยู่ที่ cell 13, 14 (หลังคอลัมน์ย่อย 11 ข้อ)
+    applyToBody('taskDetailTableBody', [13, 14]);
+    applyToBody('prepostDetailTableBody', [13, 14]);
   }
 
   function viewStudentDetail(id) {
