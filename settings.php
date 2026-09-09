@@ -237,10 +237,11 @@ require_once 'header.php';
 
         <h6 class="fw-bold small mb-3"><i class="bi bi-list-ol text-primary me-1"></i>วิธีนำไปใช้ (5 ขั้น)</h6>
         <ol class="small ps-3 mb-4" style="line-height:1.9;">
-          <li>กดปุ่มสีเขียวด้านบน แล้ว<strong>แตกไฟล์ zip ทั้งหมดไว้ในโฟลเดอร์เดียวกัน</strong>
-              (แนะนำให้ใช้โฟลเดอร์ตามที่กรอกไว้ในช่องด้านบน จะได้ไม่ต้องแก้อะไรเลย)</li>
+          <li>กดปุ่มสีเขียวด้านบน แล้ว<strong>แตกไฟล์จาก zip ให้ครบทุกไฟล์ไว้ในโฟลเดอร์เดียวกัน</strong>
+              (รันจากในไฟล์ zip ไม่ได้ · แนะนำให้ใช้โฟลเดอร์ตามที่กรอกไว้ในช่องด้านบน จะได้ไม่ต้องแก้อะไรเลย)</li>
           <li>เปิด SPSS → เมนู <strong>File → Open → Syntax…</strong> → เลือกไฟล์ <code>spss_syntax.sps</code></li>
-          <li>ถ้าเก็บไฟล์ไว้โฟลเดอร์อื่น ให้กด Ctrl+H แทนที่ path เดิมด้วยโฟลเดอร์จริง (มี 4 แห่ง ระบบบอกไว้ในไฟล์แล้ว)</li>
+          <li>ดูบรรทัด <code>CD '…'.</code> ที่ต้นไฟล์ — ถ้าไม่ตรงกับโฟลเดอร์ที่แตกไฟล์ไว้ ให้แก้ให้ตรง
+              <strong>มีจุดเดียว บรรทัดเดียว</strong> ที่เหลือทั้งไฟล์อ้างอิงจากบรรทัดนี้ทั้งหมด</li>
           <li>กด <strong>Ctrl+A</strong> เลือกทั้งหมด แล้วกด <strong>Ctrl+R</strong> เพื่อสั่งรัน — ผลจะขึ้นในหน้าต่าง Output</li>
           <li>บันทึก Output เป็นไฟล์ <code>.spv</code> หรือส่งออกเป็น Word/PDF เพื่อแนบเป็นหลักฐานของตัวเลขในบทที่ 4</li>
         </ol>
@@ -262,6 +263,17 @@ require_once 'header.php';
               <tr><td>Correlations</td><td>ค่าสหสัมพันธ์ระหว่างผู้ประเมินรายคู่ (Pearson r) ในตาราง 12</td></tr>
             </tbody>
           </table>
+        </div>
+
+        <div class="alert alert-danger border-0 rounded-3 small mb-3">
+          <i class="bi bi-exclamation-octagon me-1"></i>
+          <strong>ถ้า SPSS ขึ้น <code>Error 2269 Failure opening file</code> แล้วตามด้วย Error อีกเป็นสิบ ๆ บรรทัด</strong> —
+          แปลว่า SPSS หาไฟล์ <code>spss_data.csv</code> ไม่เจอ คือบรรทัด <code>CD</code> ยังไม่ตรงกับโฟลเดอร์ที่เก็บไฟล์จริง
+          Error ที่เหลือทั้งหมดเป็นผลพวงของข้อนี้ข้อเดียว ไม่ต้องไล่แก้ทีละอัน — แก้บรรทัด <code>CD</code> ให้ถูกแล้วรันใหม่ทั้งไฟล์
+          <div class="mt-2">
+            วิธีดูชื่อโฟลเดอร์: เปิดโฟลเดอร์นั้นใน File Explorer → คลิกที่<strong>แถบที่อยู่ด้านบน</strong> →
+            ข้อความจะกลายเป็น path เต็ม → กด Ctrl+C แล้วนำมาวางแทนของเดิมในเครื่องหมาย <code>' '</code>
+          </div>
         </div>
 
         <div class="alert alert-light border rounded-3 small mb-3">

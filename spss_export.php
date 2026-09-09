@@ -399,11 +399,16 @@ function spss_labels_block(array $vars) {
     return $s . "\n";
 }
 
-/** บล็อก GET DATA ของไฟล์ CSV หนึ่งไฟล์ */
-function spss_get_data($path, array $vars, $datasetName) {
+/**
+ * บล็อก GET DATA ของไฟล์ CSV หนึ่งไฟล์
+ *
+ * ใช้ชื่อไฟล์เปล่า ๆ ไม่ใส่ path เพราะไฟล์คำสั่งสั่ง CD ไปที่โฟลเดอร์ของชุดข้อมูลไว้แล้ว
+ * ตั้งแต่บรรทัดแรก ผู้ใช้จึงมีจุดที่ต้องแก้ path เพียงจุดเดียวเมื่อเก็บไฟล์ไว้ที่อื่น
+ */
+function spss_get_data($file, array $vars, $datasetName) {
     return "GET DATA\n"
         . "  /TYPE=TXT\n"
-        . "  /FILE='" . $path . "'\n"
+        . "  /FILE='" . $file . "'\n"
         . "  /ENCODING='UTF8'\n"
         . "  /ARRANGEMENT=DELIMITED\n"
         . "  /DELIMITERS=\",\"\n"
@@ -430,10 +435,7 @@ function spss_syntax(array $ds, array $quant, array $defects, array $rd, $dir) {
     $slots  = spss_slots($meta);
     $vars   = spss_variables($meta);
     $rvars  = spss_rater_variables($rd);
-    $sep    = (substr($dir, -1) === '\\' || substr($dir, -1) === '/') ? '' : '\\';
-    $pData  = $dir . $sep . SPSS_FILE_DATA;
-    $pRater = $dir . $sep . SPSS_FILE_RATERS;
-    $cut    = is_array($meta['defect_cut'] ?? null) ? $meta['defect_cut'] : [];
+    $cut = is_array($meta['defect_cut'] ?? null) ? $meta['defect_cut'] : [];
 
     $s = "\xEF\xBB\xBF";
     $s .= "* =====================================================================\n";
@@ -441,11 +443,20 @@ function spss_syntax(array $ds, array $quant, array $defects, array $rd, $dir) {
     $s .= "* สร้างอัตโนมัติจากระบบประเมินการเขียนเรียงความ เมื่อ " . date('Y-m-d H:i') . "\n";
     $s .= "* =====================================================================\n";
     $s .= "* วิธีใช้ (ทำ 3 ขั้น)\n";
-    $s .= "*   1) แตกไฟล์ทั้งหมดจากไฟล์ zip ไว้ในโฟลเดอร์เดียวกัน\n";
-    $s .= "*   2) ถ้าโฟลเดอร์ไม่ใช่ " . $dir . " ให้ค้นหาข้อความนี้ในไฟล์แล้วแทนที่ด้วยโฟลเดอร์จริง\n";
-    $s .= "*      (แทนที่ทุกแห่งที่พบ — อยู่ในบรรทัด /FILE= และ SAVE OUTFILE=)\n";
-    $s .= "*   3) เปิดไฟล์นี้ใน SPSS แล้วสั่ง Run > All (หรือกด Ctrl+A แล้ว Ctrl+R)\n";
+    $s .= "*   1) แตกไฟล์จาก zip ให้ครบทุกไฟล์ไว้ในโฟลเดอร์เดียวกัน (รันจากในไฟล์ zip ไม่ได้)\n";
+    $s .= "*   2) แก้บรรทัด CD ข้างล่างให้เป็นโฟลเดอร์นั้น — แก้ที่เดียว บรรทัดเดียว\n";
+    $s .= "*   3) กด Ctrl+A แล้ว Ctrl+R เพื่อรันทั้งไฟล์\n";
     $s .= "* =====================================================================\n\n";
+
+    /* ---------- 0) โฟลเดอร์ของชุดข้อมูล — จุดเดียวที่ผู้ใช้ต้องแก้ ---------- */
+    $s .= "* ---------------------------------------------------------------------.\n";
+    $s .= "*  >>>>>  แก้เฉพาะบรรทัด CD ข้างล่างนี้บรรทัดเดียว  <<<<<\n";
+    $s .= "*  ใส่ชื่อโฟลเดอร์ที่แตกไฟล์ spss_data.csv กับ spss_raters.csv ไว้\n";
+    $s .= "*  วิธีดูชื่อโฟลเดอร์: เปิดโฟลเดอร์นั้นใน File Explorer แล้วคลิกที่แถบที่อยู่ด้านบน\n";
+    $s .= "*  ข้อความจะกลายเป็น path เต็ม กด Ctrl+C คัดลอกมาวางแทนของเดิมในเครื่องหมาย ' '\n";
+    $s .= "*  ถ้าขึ้น Failure opening file แปลว่าบรรทัดนี้ยังไม่ตรงกับที่เก็บไฟล์จริง.\n";
+    $s .= "* ---------------------------------------------------------------------.\n";
+    $s .= "CD '" . $dir . "'.\n\n";
 
     $s .= spss_note('ขอบเขตข้อมูล: กลุ่ม ' . ($ds['filter']['group'] !== '' ? $ds['filter']['group'] : 'ทุกกลุ่ม')
         . ' · ห้อง ' . ($ds['filter']['classroom'] !== '' ? $ds['filter']['classroom'] : 'ทุกห้อง')
@@ -458,9 +469,9 @@ function spss_syntax(array $ds, array $quant, array $defects, array $rd, $dir) {
 
     /* ---------- 1) นำเข้าข้อมูล ---------- */
     $s .= "* ---------------------------------------------------------------------.\n";
-    $s .= "* 1) นำเข้าข้อมูลดิบรายบุคคล  <<< แก้ path ตรงนี้ถ้าเก็บไฟล์ไว้ที่อื่น.\n";
+    $s .= "* 1) นำเข้าข้อมูลดิบรายบุคคล (อ่านจากโฟลเดอร์ที่ตั้งไว้ในบรรทัด CD ด้านบน).\n";
     $s .= "* ---------------------------------------------------------------------.\n";
-    $s .= spss_get_data($pData, $vars, 'main');
+    $s .= spss_get_data(SPSS_FILE_DATA, $vars, 'main');
     $s .= spss_labels_block($vars);
 
     /* ---------- 2) คะแนนถ่วงน้ำหนักและคะแนนรวม ---------- */
@@ -628,7 +639,7 @@ function spss_syntax(array $ds, array $quant, array $defects, array $rd, $dir) {
         $s .= spss_note('เมื่อมีข้อมูลตรวจซ้ำแล้ว ให้ส่งออกชุดข้อมูลใหม่อีกครั้ง');
         $s .= "\n";
     } else {
-        $s .= spss_get_data($pRater, $rvars, 'raters');
+        $s .= spss_get_data(SPSS_FILE_RATERS, $rvars, 'raters');
         $s .= spss_labels_block($rvars);
         foreach ($rd['phases'] as $phase => $p) {
             $names = [];
@@ -666,10 +677,10 @@ function spss_syntax(array $ds, array $quant, array $defects, array $rd, $dir) {
     $s .= "* 7) บันทึกเป็นไฟล์ข้อมูลของ SPSS ไว้ใช้ต่อ.\n";
     $s .= "* ---------------------------------------------------------------------.\n";
     $s .= "DATASET ACTIVATE main.\n";
-    $s .= "SAVE OUTFILE='" . $dir . $sep . "thaieasay_main.sav'\n  /COMPRESSED.\n";
+    $s .= "SAVE OUTFILE='thaieasay_main.sav'\n  /COMPRESSED.\n";
     if (!empty($rd['phases'])) {
         $s .= "DATASET ACTIVATE raters.\n";
-        $s .= "SAVE OUTFILE='" . $dir . $sep . "thaieasay_raters.sav'\n  /COMPRESSED.\n";
+        $s .= "SAVE OUTFILE='thaieasay_raters.sav'\n  /COMPRESSED.\n";
         $s .= "DATASET ACTIVATE main.\n";
     }
     $s .= "\n* จบไฟล์คำสั่ง.\n";
@@ -696,13 +707,20 @@ function spss_readme(array $ds, array $rd, $dir) {
     $t .= "  " . SPSS_FILE_README . "    ไฟล์นี้\r\n\r\n";
 
     $t .= "ขั้นตอนการใช้งาน\r\n";
-    $t .= "  1. แตกไฟล์ทั้งหมดไว้ในโฟลเดอร์เดียวกัน แนะนำให้ใช้ " . $dir . "\r\n";
-    $t .= "     (ถ้าใช้โฟลเดอร์อื่น ต้องแก้ path ในไฟล์คำสั่งด้วย ดูข้อ 3)\r\n";
+    $t .= "  1. แตกไฟล์จาก zip ให้ครบทุกไฟล์ไว้ในโฟลเดอร์เดียวกัน (รันจากในไฟล์ zip ไม่ได้)\r\n";
+    $t .= "     แนะนำให้ใช้ " . $dir . " จะได้ไม่ต้องแก้อะไรเลย\r\n";
     $t .= "  2. เปิด SPSS แล้วเลือก File > Open > Syntax เลือกไฟล์ " . SPSS_FILE_SYNTAX . "\r\n";
-    $t .= "  3. ถ้าเก็บไฟล์ไว้โฟลเดอร์อื่น ให้แทนที่ข้อความ " . $dir . " ในไฟล์คำสั่งด้วยโฟลเดอร์จริง\r\n";
-    $t .= "     (แทนที่ทุกแห่งที่พบ — อยู่ในบรรทัด /FILE= และ SAVE OUTFILE=)\r\n";
+    $t .= "  3. ดูบรรทัด CD ที่อยู่ต้นไฟล์ ถ้าไม่ตรงกับโฟลเดอร์ที่แตกไฟล์ไว้ ให้แก้บรรทัดนั้น\r\n";
+    $t .= "     ให้ตรง — มีจุดเดียว บรรทัดเดียว ที่เหลือทั้งไฟล์อ้างอิงจากบรรทัดนี้ทั้งหมด\r\n";
+    $t .= "     วิธีดูชื่อโฟลเดอร์: เปิดโฟลเดอร์ใน File Explorer คลิกที่แถบที่อยู่ด้านบน\r\n";
+    $t .= "     ข้อความจะกลายเป็น path เต็ม กด Ctrl+C แล้วนำมาวางแทนของเดิมในเครื่องหมาย ' '\r\n";
     $t .= "  4. กด Ctrl+A เลือกทั้งหมด แล้วกด Ctrl+R เพื่อสั่งรัน\r\n";
     $t .= "  5. ผลลัพธ์ทั้งหมดจะขึ้นในหน้าต่าง Output — บันทึกเป็น .spv หรือส่งออกเป็น Word/PDF\r\n\r\n";
+
+    $t .= "ถ้าขึ้น Error 2269 Failure opening file\r\n";
+    $t .= "  แปลว่า SPSS หาไฟล์ csv ไม่เจอ = บรรทัด CD ยังไม่ตรงกับที่เก็บไฟล์จริง\r\n";
+    $t .= "  ข้อความ Error ที่ตามมาอีกจำนวนมากเป็นผลพวงของข้อนี้ข้อเดียว ไม่ต้องไล่แก้ทีละอัน\r\n";
+    $t .= "  แก้บรรทัด CD ให้ถูกแล้วรันใหม่ทั้งไฟล์ ข้อความ Error จะหายไปทั้งหมด\r\n\r\n";
 
     $t .= "ผลที่ได้ตรงกับส่วนใดของวิทยานิพนธ์\r\n";
     $t .= "  Paired-Samples T Test        ตาราง 12 (ค่า t, df, p, Cohen's d)\r\n";
@@ -783,7 +801,10 @@ function spss_send($filename, $mime, $content) {
 try {
     if ($targetDir === '') $targetDir = SPSS_DEFAULT_DIR;
     // path ของ SPSS อยู่ในเครื่องหมายคำพูดเดี่ยว จึงต้องกันอัญประกาศเดี่ยวและอักขระควบคุมออก
+    // และตัดขีดปิดท้ายทิ้ง เพราะคำสั่ง CD ไม่ต้องการ (และ 'C:\path\' อ่านยากเวลาผู้ใช้แก้เอง)
     $targetDir = preg_replace('/[\'"\r\n]+/u', '', $targetDir);
+    $targetDir = rtrim($targetDir, "\\/");
+    if ($targetDir === '') $targetDir = SPSS_DEFAULT_DIR;
 
     $ds = ch45_dataset($pdo, ['group' => $group, 'classroom' => $classroom]);
     if (!$ds['sids']) {
