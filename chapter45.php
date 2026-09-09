@@ -355,9 +355,12 @@ $c45IsTeacher = ($sessionUser['role'] === 'teacher');
         &quot;ผลงานครั้งที่ 1 และครั้งที่ 2&quot; ในการวิเคราะห์เชิงคุณภาพ — แก้ไขได้ที่หน้าตั้งค่าระบบ
       </p>
       <div id="c45MetaSummary" class="row g-2"></div>
-      <div class="mt-3">
+      <div class="mt-3 d-flex flex-wrap gap-2">
         <a class="btn btn-outline-primary btn-sm fw-bold rounded-pill px-4" href="settings.php#research">
           <i class="bi bi-gear me-1"></i>แก้ไขที่หน้าตั้งค่าระบบ
+        </a>
+        <a class="btn btn-outline-success btn-sm fw-bold rounded-pill px-4" href="settings.php#spss">
+          <i class="bi bi-bar-chart-steps me-1"></i>ส่งออกข้อมูลดิบเข้า SPSS
         </a>
       </div>
     </div>

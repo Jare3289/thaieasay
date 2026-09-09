@@ -3,15 +3,16 @@
  * settings.php — ศูนย์รวมการตั้งค่าทั้งระบบ (เฉพาะคุณครู)
  *
  * เดิมการตั้งค่ากระจายอยู่ตามหน้าที่ใช้งาน ทำให้หน้าจอทำงานประจำวันรก
- * และหาที่ตั้งค่าไม่เจอ หน้านี้จึงรวบไว้ที่เดียว แบ่งเป็น 4 กลุ่ม
+ * และหาที่ตั้งค่าไม่เจอ หน้านี้จึงรวบไว้ที่เดียว แบ่งเป็น 5 กลุ่ม
  *   1) ระบบตรวจอัตโนมัติ   — ผู้ให้บริการโมเดลภาษา / โมเดล / API key / เปิด-ปิดการใช้งาน
  *      (ย้ายมาจากหน้า writing_feedback.php)
  *   2) ข้อมูลประจำงานวิจัย  — ปีการศึกษา ประชากร รอบงานที่ใช้วิเคราะห์ ฯลฯ
  *      (ย้ายมาจากหน้า chapter45.php)
- *   3) เชื่อมต่อ Google    — สถานะบัญชีที่ใช้ส่งรายงานเข้า Google Docs
- *   4) การแสดงผลในเครื่องนี้ — ค่าที่จำไว้เฉพาะเบราว์เซอร์เครื่องนี้ เช่นกลุ่มการวิจัยเริ่มต้น
+ *   3) ส่งออกเข้า SPSS     — ข้อมูลดิบ ไฟล์คำสั่ง .sps และพจนานุกรมตัวแปร สำหรับรันสถิติซ้ำใน SPSS
+ *   4) เชื่อมต่อ Google    — สถานะบัญชีที่ใช้ส่งรายงานเข้า Google Docs
+ *   5) การแสดงผลในเครื่องนี้ — ค่าที่จำไว้เฉพาะเบราว์เซอร์เครื่องนี้ เช่นกลุ่มการวิจัยเริ่มต้น
  *
- * ค่าในกลุ่ม 1-3 เก็บที่เซิร์ฟเวอร์ (ใช้ร่วมกันทุกเครื่อง) ส่วนกลุ่ม 4 เก็บใน localStorage
+ * ค่าในกลุ่ม 1-2 เก็บที่เซิร์ฟเวอร์ (ใช้ร่วมกันทุกเครื่อง) ส่วนกลุ่ม 5 เก็บใน localStorage
  */
 $page_title = 'ตั้งค่าระบบ - ระบบประเมินเรียงความ';
 require_once 'auth_helper.php';
@@ -39,6 +40,12 @@ require_once 'header.php';
     <button class="nav-link rounded-pill fw-bold px-4" id="tab-research" data-bs-toggle="pill"
             data-bs-target="#pane-research" type="button" role="tab">
       <i class="bi bi-journal-richtext me-1"></i> ข้อมูลประจำงานวิจัย
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link rounded-pill fw-bold px-4" id="tab-spss" data-bs-toggle="pill"
+            data-bs-target="#pane-spss" type="button" role="tab">
+      <i class="bi bi-bar-chart-steps me-1"></i> ส่งออกเข้า SPSS
     </button>
   </li>
   <li class="nav-item" role="presentation">
@@ -167,7 +174,115 @@ require_once 'header.php';
     </div>
   </div>
 
-  <!-- ============================ 3) เชื่อมต่อ Google ============================ -->
+  <!-- ============================ 3) ส่งออกเข้า SPSS ============================ -->
+  <div class="tab-pane fade" id="pane-spss" role="tabpanel" aria-labelledby="tab-spss">
+    <div class="card border-0 shadow-sm rounded-4 mb-4">
+      <div class="card-header bg-white border-bottom py-3 px-4 rounded-top-4">
+        <h6 class="fw-bold text-dark mb-0">
+          <i class="bi bi-bar-chart-steps text-success me-2"></i>ส่งออกข้อมูลดิบเข้า IBM SPSS Statistics
+        </h6>
+        <div class="text-muted small mt-1">
+          ระบบคำนวณสถิติทุกตัวให้อยู่แล้ว หน้านี้เตรียม<strong>ข้อมูลดิบและไฟล์คำสั่ง</strong>ให้เอาไปรันซ้ำใน SPSS
+          เพื่อแนบผลจาก SPSS เป็นหลักฐานของตัวเลขในวิทยานิพนธ์
+        </div>
+      </div>
+      <div class="card-body p-4">
+
+        <div class="alert alert-success border-0 rounded-3 small">
+          <i class="bi bi-box-seam me-1"></i>
+          ปุ่มเดียวได้ครบ <strong>5 ไฟล์</strong> — ข้อมูลดิบ · คะแนนรายผู้ประเมิน · ไฟล์คำสั่ง <code>.sps</code> ·
+          พจนานุกรมตัวแปร · คู่มือย่อ ทั้งหมดพร้อมใช้กับ <strong>SPSS รุ่น 27 ขึ้นไป (รวมรุ่น 32)</strong>
+          เปิดไฟล์คำสั่งแล้วสั่ง Run ได้ทันที ไม่ต้องพิมพ์คำสั่งเอง
+        </div>
+
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label fw-bold small">กลุ่มการวิจัยที่ส่งออก</label>
+            <select id="spssGroup" class="form-select border-2 rounded-3">
+              <option value="">ทุกกลุ่มรวมกัน</option>
+              <option value="กลุ่มทดลอง">กลุ่มทดลอง</option>
+              <option value="กลุ่มตัวอย่าง">กลุ่มตัวอย่าง</option>
+            </select>
+            <div class="form-text small">ควรตรงกับกลุ่มที่ใช้เขียนบทที่ 4 เพื่อให้ตัวเลขตรงกับหน้าจอ</div>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-bold small">ห้องเรียน (ไม่ระบุ = ทุกห้อง)</label>
+            <input type="text" id="spssRoom" class="form-control border-2 rounded-3" placeholder="เช่น 606">
+          </div>
+          <div class="col-md-5">
+            <label class="form-label fw-bold small">โฟลเดอร์ที่จะเก็บไฟล์บนเครื่องที่ลง SPSS</label>
+            <input type="text" id="spssDir" class="form-control border-2 rounded-3" value="C:\thaieasay_spss">
+            <div class="form-text small">
+              ระบบเขียน path นี้ลงในไฟล์คำสั่งให้เลย — แตกไฟล์ไว้ตรงนี้แล้วกด Run ได้ทันที
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 mt-4">
+          <button class="btn btn-success rounded-pill px-4 fw-bold" onclick="spssDownload('zip')">
+            <i class="bi bi-download me-1"></i>ดาวน์โหลดชุดข้อมูลทั้งชุด (.zip)
+          </button>
+          <button class="btn btn-outline-secondary rounded-pill px-3" onclick="spssDownload('data')">
+            <i class="bi bi-filetype-csv me-1"></i>เฉพาะข้อมูลดิบ
+          </button>
+          <button class="btn btn-outline-secondary rounded-pill px-3" onclick="spssDownload('syntax')">
+            <i class="bi bi-code-square me-1"></i>เฉพาะไฟล์คำสั่ง
+          </button>
+          <button class="btn btn-outline-secondary rounded-pill px-3" onclick="spssDownload('codebook')">
+            <i class="bi bi-journal-text me-1"></i>เฉพาะพจนานุกรมตัวแปร
+          </button>
+        </div>
+
+        <hr class="my-4">
+
+        <h6 class="fw-bold small mb-3"><i class="bi bi-list-ol text-primary me-1"></i>วิธีนำไปใช้ (5 ขั้น)</h6>
+        <ol class="small ps-3 mb-4" style="line-height:1.9;">
+          <li>กดปุ่มสีเขียวด้านบน แล้ว<strong>แตกไฟล์ zip ทั้งหมดไว้ในโฟลเดอร์เดียวกัน</strong>
+              (แนะนำให้ใช้โฟลเดอร์ตามที่กรอกไว้ในช่องด้านบน จะได้ไม่ต้องแก้อะไรเลย)</li>
+          <li>เปิด SPSS → เมนู <strong>File → Open → Syntax…</strong> → เลือกไฟล์ <code>spss_syntax.sps</code></li>
+          <li>ถ้าเก็บไฟล์ไว้โฟลเดอร์อื่น ให้กด Ctrl+H แทนที่ path เดิมด้วยโฟลเดอร์จริง (มี 4 แห่ง ระบบบอกไว้ในไฟล์แล้ว)</li>
+          <li>กด <strong>Ctrl+A</strong> เลือกทั้งหมด แล้วกด <strong>Ctrl+R</strong> เพื่อสั่งรัน — ผลจะขึ้นในหน้าต่าง Output</li>
+          <li>บันทึก Output เป็นไฟล์ <code>.spv</code> หรือส่งออกเป็น Word/PDF เพื่อแนบเป็นหลักฐานของตัวเลขในบทที่ 4</li>
+        </ol>
+
+        <h6 class="fw-bold small mb-2"><i class="bi bi-table text-primary me-1"></i>ผลจาก SPSS ตรงกับส่วนใดของวิทยานิพนธ์</h6>
+        <div class="table-responsive mb-4">
+          <table class="table table-sm table-bordered align-middle small mb-0">
+            <thead class="table-light">
+              <tr><th style="width:38%;">ตารางที่ SPSS พิมพ์ออกมา</th><th>ใช้เติมช่องใดในวิทยานิพนธ์</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Descriptives</td><td>ตาราง 12 — ค่าเฉลี่ยและส่วนเบี่ยงเบนมาตรฐาน ก่อน/หลังเรียน</td></tr>
+              <tr><td>Paired-Samples T Test</td><td>ตาราง 12 — ค่า t, df, p และขนาดอิทธิพล (Cohen's d)</td></tr>
+              <tr><td>Tests of Normality</td><td>ข้อตกลงเบื้องต้นก่อนใช้ t-test (Shapiro-Wilk)</td></tr>
+              <tr><td>Wilcoxon Signed Ranks Test</td><td>ใช้แทน t-test เมื่อคะแนนผลต่างไม่เป็นการแจกแจงปกติ</td></tr>
+              <tr><td>Frequencies (ตัวแปร w1_def / w2_def)</td><td>ตาราง 14 — จำนวนและร้อยละของผู้ปรากฏข้อบกพร่อง 11 ตัวบ่งชี้</td></tr>
+              <tr><td>McNemar Test</td><td>ทดสอบว่าสัดส่วนผู้มีข้อบกพร่องเปลี่ยนอย่างมีนัยสำคัญหรือไม่</td></tr>
+              <tr><td>Intraclass Correlation Coefficient</td><td>ความเที่ยงระหว่างผู้ประเมิน ICC(3,1) และ ICC(3,k)</td></tr>
+              <tr><td>Correlations</td><td>ค่าสหสัมพันธ์ระหว่างผู้ประเมินรายคู่ (Pearson r) ในตาราง 12</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="alert alert-light border rounded-3 small mb-3">
+          <i class="bi bi-check2-square me-1"></i>
+          <strong>ตรวจว่าตรงกับระบบได้ทันที</strong> — ตัวเลขที่ระบบคำนวณไว้แล้ว (M, SD, t, p, d, ICC และตาราง 14
+          ทุกแถว) แนบไว้เป็นคอมเมนต์ในไฟล์คำสั่งด้วย จึงเทียบกับผลที่ SPSS พิมพ์ออกมาได้ทีละบรรทัด
+          ถ้าไม่ตรงกัน มักเป็นเพราะเลือกกลุ่มการวิจัยคนละกลุ่มกับที่ดูอยู่บนหน้าจอ
+        </div>
+
+        <div class="alert alert-warning border-0 rounded-3 small mb-0">
+          <i class="bi bi-shield-exclamation me-1"></i>
+          <strong>ก่อนแนบชุดข้อมูลเป็นภาคผนวก ให้ลบคอลัมน์ <code>stu_name</code> ทิ้งก่อนเสมอ</strong> —
+          บทที่ 4 อ้างถึงนักเรียนด้วยเลขนิรนามในคอลัมน์ <code>stu_no</code> เท่านั้น ·
+          ส่วนคอลัมน์จำนวนคำสะกดผิดเป็นค่าประมาณจากพจนานุกรมอัตโนมัติ ควรสุ่มตรวจก่อนรายงานเป็นตัวเลข
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ 4) เชื่อมต่อ Google ============================ -->
   <div class="tab-pane fade" id="pane-google" role="tabpanel" aria-labelledby="tab-google">
     <div class="card border-0 shadow-sm rounded-4 mb-4">
       <div class="card-header bg-white border-bottom py-3 px-4 rounded-top-4">
@@ -186,7 +301,7 @@ require_once 'header.php';
     </div>
   </div>
 
-  <!-- ============================ 4) การแสดงผลในเครื่องนี้ ============================ -->
+  <!-- ============================ 5) การแสดงผลในเครื่องนี้ ============================ -->
   <div class="tab-pane fade" id="pane-display" role="tabpanel" aria-labelledby="tab-display">
     <div class="card border-0 shadow-sm rounded-4 mb-4">
       <div class="card-header bg-white border-bottom py-3 px-4 rounded-top-4">
@@ -461,7 +576,28 @@ async function saveMeta() {
   }
 }
 
-/* ---------------------------------------------------- 3) เชื่อมต่อ Google */
+/* ---------------------------------------------------- 3) ส่งออกเข้า SPSS */
+function spssDownload(which) {
+  const p = new URLSearchParams({
+    file: which,
+    group: document.getElementById('spssGroup').value,
+    classroom: document.getElementById('spssRoom').value.trim(),
+    dir: document.getElementById('spssDir').value.trim()
+  });
+  // เปิดเป็นการดาวน์โหลดตรง ๆ เพราะไฟล์ zip อาจใหญ่กว่าที่ควรถือไว้ในหน่วยความจำของหน้าเว็บ
+  window.location.href = 'spss_export.php?' + p.toString();
+  showToast('กำลังเตรียมไฟล์ — ถ้าข้อมูลมาก อาจใช้เวลาสักครู่');
+}
+
+/** ตั้งกลุ่มเริ่มต้นให้ตรงกับกลุ่มที่คุณครูเลือกดูอยู่ ตัวเลขที่ส่งออกจะได้ตรงกับหน้าจอ */
+function loadSpssDefaults() {
+  const sel = document.getElementById('spssGroup');
+  if (!sel || !window.TEG) return;
+  const g = TEG.get();
+  sel.value = (g && g !== 'all') ? g : '';
+}
+
+/* ---------------------------------------------------- 4) เชื่อมต่อ Google */
 async function loadGoogleStatus() {
   const box = document.getElementById('stGoogleStatus');
   const act = document.getElementById('stGoogleActions');
@@ -516,7 +652,7 @@ async function googleDisconnect() {
   loadGoogleStatus();
 }
 
-/* ---------------------------------------------------- 4) การแสดงผลในเครื่องนี้ */
+/* ---------------------------------------------------- 5) การแสดงผลในเครื่องนี้ */
 function loadDisplayPrefs() {
   const sel = document.getElementById('stGroupSelect');
   if (sel && window.TEG) sel.value = TEG.get();
@@ -542,7 +678,8 @@ function saveSidebarPref() {
 
 /* ---------------------------------------------------- เปิดแท็บตามลิงก์ที่เข้ามา */
 function openTabFromHash() {
-  const map = { '#ai': 'tab-ai', '#research': 'tab-research', '#google': 'tab-google', '#display': 'tab-display' };
+  const map = { '#ai': 'tab-ai', '#research': 'tab-research', '#spss': 'tab-spss',
+                '#google': 'tab-google', '#display': 'tab-display' };
   const id = map[location.hash];
   if (!id) return;
   const btn = document.getElementById(id);
@@ -555,6 +692,7 @@ window.addEventListener('hashchange', openTabFromHash);
 document.addEventListener('DOMContentLoaded', async function () {
   openTabFromHash();
   loadDisplayPrefs();
+  loadSpssDefaults();
   loadGoogleStatus();
   await loadAiSettings();
   await loadMeta();
