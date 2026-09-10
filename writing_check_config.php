@@ -41,7 +41,9 @@ require_once __DIR__ . '/thai_text_utils.php';
  * - openrouter: รวมหลายโมเดล มีรุ่นลงท้าย :free ให้ใช้ฟรี
  * - groq      : เร็วมาก มีชั้นใช้งานฟรี
  * - claude    : Anthropic Claude — คุณภาพการให้เหตุผลสูง แต่ไม่มีโควตาฟรี ต้องเติมเครดิตเอง
- * - custom    : เซิร์ฟเวอร์อื่นที่ใช้มาตรฐาน OpenAI (กรอก base URL เอง)
+ * - openai    : OpenAI (GPT) — คุณภาพสูง ไม่มีโควตาฟรี ต้องเติมเครดิตเอง
+ * - custom    : เซิร์ฟเวอร์อื่นที่ใช้ "มาตรฐาน OpenAI" (กรอก base URL เอง)
+ *              เช่น DeepSeek, Together, Fireworks หรือเครื่องในโรงเรียนที่รัน Ollama/LM Studio/vLLM
  */
 function ai_providers() {
     return [
@@ -66,6 +68,15 @@ function ai_providers() {
             'model'    => 'claude-opus-5',
             'key_url'  => 'https://console.anthropic.com/settings/keys',
         ],
+        'openai' => [
+            'label'    => 'OpenAI (GPT) — คุณภาพสูง (ไม่มีโควตาฟรี ต้องเติมเครดิต)',
+            'kind'     => 'openai',
+            'base_url' => 'https://api.openai.com/v1',
+            // โมเดลรุ่นกลางของ OpenAI (สมดุลระหว่างคุณภาพกับราคา)
+            // อยากประหยัดกว่านี้ใช้ gpt-5.6-luna / อยากได้คุณภาพสูงสุดใช้ gpt-5.6-sol หรือ gpt-6-astra
+            'model'    => 'gpt-5.6-terra',
+            'key_url'  => 'https://platform.openai.com/api-keys',
+        ],
         'openrouter' => [
             'label'    => 'OpenRouter — มีโมเดลลงท้าย :free',
             'kind'     => 'openai',
@@ -81,7 +92,7 @@ function ai_providers() {
             'key_url'  => 'https://console.groq.com/keys',
         ],
         'custom' => [
-            'label'    => 'อื่น ๆ (เซิร์ฟเวอร์มาตรฐาน OpenAI)',
+            'label'    => 'อื่น ๆ / เซิร์ฟเวอร์ในโรงเรียน (มาตรฐาน OpenAI — กรอก Base URL เอง)',
             'kind'     => 'openai',
             'base_url' => '',
             'model'    => '',
@@ -1420,16 +1431,27 @@ function ai_http_post_json($url, array $headers, array $payload, $timeout = 90) 
     return ['ok' => ($status >= 200 && $status < 300), 'status' => $status, 'body' => (string)$body, 'error' => ''];
 }
 
-/** ดึงข้อความผิดพลาดที่อ่านรู้เรื่องออกจากคำตอบ error ของผู้ให้บริการ */
-function ai_extract_api_error($body, $status) {
+/**
+ * ดึง "ข้อความผิดพลาดดิบ" ที่ผู้ให้บริการส่งกลับมา (ยังไม่แปลเป็นภาษาไทย)
+ * ใช้ทั้งตอนแสดงผลให้ครูอ่าน และตอนที่ระบบอ่านเองว่าโมเดลไม่รับพารามิเตอร์ตัวไหน
+ */
+function ai_api_raw_message($body) {
     $obj = json_decode((string)$body, true);
     $msg = '';
     if (is_array($obj)) {
-        if (isset($obj['error']['message'])) $msg = (string)$obj['error']['message'];
+        if (isset($obj['error']['message']))          $msg = (string)$obj['error']['message'];
         elseif (isset($obj['error']) && is_string($obj['error'])) $msg = $obj['error'];
-        elseif (isset($obj['message'])) $msg = (string)$obj['message'];
+        elseif (isset($obj['message']))               $msg = (string)$obj['message'];
+        // บางเซิร์ฟเวอร์ (vLLM / LM Studio) ส่งรายละเอียดมาในคีย์ detail
+        elseif (isset($obj['detail']) && is_string($obj['detail'])) $msg = $obj['detail'];
     }
     if ($msg === '') $msg = mb_substr(strip_tags((string)$body), 0, 300, 'UTF-8');
+    return $msg;
+}
+
+/** ดึงข้อความผิดพลาดที่อ่านรู้เรื่องออกจากคำตอบ error ของผู้ให้บริการ */
+function ai_extract_api_error($body, $status) {
+    $msg = ai_api_raw_message($body);
 
     if ($status === 401 || $status === 403) {
         return 'API key ไม่ถูกต้องหรือหมดสิทธิ์ใช้งาน (' . $msg . ')';
@@ -1528,40 +1550,121 @@ function ai_call_model(array $s, $systemPrompt, $userPrompt, array $opts = []) {
         return ['ok' => true, 'text' => $text, 'error' => '', 'finish' => $reason];
     }
 
-    // มาตรฐาน OpenAI (typhoon / openrouter / groq / custom)
+    // มาตรฐาน OpenAI (openai / typhoon / openrouter / groq / custom / เซิร์ฟเวอร์ในโรงเรียน)
     $url  = $s['base_url'] . '/chat/completions';
     $head = ['Authorization: Bearer ' . $s['api_key']];
     if ($s['provider'] === 'openrouter') {
         // OpenRouter แนะนำให้ระบุที่มาของคำขอ
         $head[] = 'X-Title: Thai Essay Feedback';
     }
-    $base = [
-        'model'       => $s['model'],
-        'messages'    => [
-            ['role' => 'system', 'content' => $systemPrompt],
-            ['role' => 'user',   'content' => $userPrompt],
-        ],
-        'temperature' => $temp,
-        'max_tokens'  => $maxTok,
+
+    $messages = [
+        ['role' => 'system', 'content' => $systemPrompt],
+        ['role' => 'user',   'content' => $userPrompt],
     ];
 
-    // ลองใช้โหมดบังคับ JSON ก่อน ถ้าโมเดลไม่รองรับค่อยยิงซ้ำแบบธรรมดา
-    // และถ้าขอเพดานโทเคนสูงกว่าค่าปกติแล้วผู้ให้บริการไม่รับ ค่อยลดลงมาเป็นค่าปกติในรอบสุดท้าย
-    $attempts = [array_merge($base, ['response_format' => ['type' => 'json_object']]), $base];
-    if ($maxTok > 8192) $attempts[] = array_merge($base, ['max_tokens' => 8192]);
+    // เดา "ข้อจำกัดของโมเดล" จากชื่อรุ่นก่อน แล้วค่อยปรับตามคำตอบจริงในลูปข้างล่าง
+    $q          = ai_openai_quirks($s['model']);
+    $tokenParam = $q['token_param'];       // max_tokens หรือ max_completion_tokens
+    $sendTemp   = $q['send_temperature'];  // โมเดลที่บังคับค่าเริ่มต้นจะไม่ส่ง temperature ไป
+    $jsonMode   = true;                    // ลองบังคับให้ตอบเป็น JSON ก่อนเสมอ
+    $tokBudget  = $maxTok;
+    $swapped    = false;                   // สลับชื่อพารามิเตอร์เพดานโทเคนไปแล้วหรือยัง
+    $lowered    = false;                   // ลดเพดานโทเคนลงมาแล้วหรือยัง
+
     $res = ['ok' => false, 'status' => 0, 'body' => '', 'error' => ''];
-    foreach ($attempts as $payload) {
+    for ($attempt = 1; $attempt <= 5; $attempt++) {
+        $payload = ['model' => $s['model'], 'messages' => $messages];
+        $payload[$tokenParam] = $tokBudget;
+        if ($sendTemp) $payload['temperature'] = $temp;
+        if ($jsonMode) $payload['response_format'] = ['type' => 'json_object'];
+
         $res = ai_http_post_json($url, $head, $payload, $timeout);
         if ($res['error'] !== '') return ['ok' => false, 'text' => '', 'error' => $res['error']];
-        if ($res['ok'] || $res['status'] !== 400) break;
+        if ($res['ok']) break;
+        // 400/422 = "คำขอผิดรูปแบบ" เท่านั้นที่ปรับแล้วยิงใหม่มีโอกาสผ่าน
+        // (401 คีย์ผิด / 404 ไม่มีโมเดล / 429 โควตาหมด ยิงซ้ำไปก็ได้ผลเดิม)
+        if ($res['status'] !== 400 && $res['status'] !== 422) break;
+
+        $msg = mb_strtolower(ai_api_raw_message($res['body']), 'UTF-8');
+
+        // 1) อ่านสาเหตุจากข้อความที่ผู้ให้บริการบอกมาก่อน
+        if (!$swapped && strpos($msg, 'max_completion_tokens') !== false) {
+            // ฝั่งใหม่ของ OpenAI: "ใช้ max_completion_tokens แทน max_tokens"
+            // ฝั่งเซิร์ฟเวอร์รุ่นเก่า: "ไม่รู้จัก max_completion_tokens" → สลับกลับทางเดิม
+            $tokenParam = ($tokenParam === 'max_tokens') ? 'max_completion_tokens' : 'max_tokens';
+            $swapped    = true;
+        } elseif ($sendTemp && strpos($msg, 'temperature') !== false) {
+            // โมเดลกลุ่มที่ "คิดก่อนตอบ" มักรับ temperature ได้เฉพาะค่าเริ่มต้น
+            $sendTemp = false;
+        } elseif ($jsonMode && (strpos($msg, 'response_format') !== false || strpos($msg, 'json_object') !== false)) {
+            $jsonMode = false;
+        } elseif (!$lowered && $tokBudget > 8192
+                  && (strpos($msg, 'max_tokens') !== false || strpos($msg, 'context length') !== false
+                      || strpos($msg, 'context_length') !== false || strpos($msg, 'too large') !== false)) {
+            $tokBudget = 8192;
+            $lowered   = true;
+
+        // 2) อ่านสาเหตุไม่ออก → ไล่ตัดตัวเลือกที่เซิร์ฟเวอร์เล็ก ๆ มักไม่รองรับทีละอย่าง
+        } elseif ($jsonMode) {
+            $jsonMode = false;
+        } elseif (!$swapped) {
+            $tokenParam = ($tokenParam === 'max_tokens') ? 'max_completion_tokens' : 'max_tokens';
+            $swapped    = true;
+        } elseif ($sendTemp) {
+            $sendTemp = false;
+        } elseif (!$lowered && $tokBudget > 8192) {
+            $tokBudget = 8192;
+            $lowered   = true;
+        } else {
+            break;   // ปรับทุกอย่างที่ปรับได้แล้วยังไม่ผ่าน — ส่งข้อความผิดพลาดจริงกลับไป
+        }
     }
     if (!$res['ok']) return ['ok' => false, 'text' => '', 'error' => ai_extract_api_error($res['body'], $res['status'])];
 
     $obj  = json_decode($res['body'], true);
-    $text   = isset($obj['choices'][0]['message']['content']) ? (string)$obj['choices'][0]['message']['content'] : '';
+    $text = '';
+    if (isset($obj['choices'][0]['message']['content'])) {
+        $c = $obj['choices'][0]['message']['content'];
+        // ส่วนใหญ่เป็นสตริง แต่บางเซิร์ฟเวอร์ส่งเป็นลิสต์ของบล็อก [{type:text,text:...}]
+        if (is_string($c)) {
+            $text = $c;
+        } elseif (is_array($c)) {
+            foreach ($c as $block) {
+                if (is_string($block))                       $text .= $block;
+                elseif (isset($block['text']))               $text .= (string)$block['text'];
+                elseif (isset($block['content']) && is_string($block['content'])) $text .= $block['content'];
+            }
+        }
+    }
     $reason = isset($obj['choices'][0]['finish_reason']) ? (string)$obj['choices'][0]['finish_reason'] : '';
-    if (trim($text) === '') return ['ok' => false, 'text' => '', 'finish' => $reason, 'error' => 'ระบบไม่ได้ส่งเนื้อหากลับมา'];
+    if (trim($text) === '') {
+        // โมเดลที่คิดก่อนตอบอาจใช้โทเคนหมดไปกับการคิดจนไม่เหลือให้ตอบ — บอกสาเหตุให้ครูอ่านออก
+        $hint = ($reason === 'length')
+            ? ' (คำตอบชนเพดานโทเคนตั้งแต่ยังไม่ได้เขียนเนื้อหา ลองใช้โมเดลที่ไม่ใช้โทเคนไปกับการคิดมากนัก)'
+            : ($reason !== '' ? ' (สาเหตุ: ' . $reason . ')' : '');
+        return ['ok' => false, 'text' => '', 'finish' => $reason, 'error' => 'ระบบไม่ได้ส่งเนื้อหากลับมา' . $hint];
+    }
     return ['ok' => true, 'text' => $text, 'error' => '', 'finish' => $reason];
+}
+
+/**
+ * เดา "ข้อจำกัดของพารามิเตอร์" จากชื่อโมเดล เพื่อให้ยิงครั้งแรกผ่านเลยโดยไม่ต้องลองผิดลองถูก
+ * (ถ้าเดาผิด ai_call_model() จะปรับให้เองจากข้อความผิดพลาดที่ผู้ให้บริการตอบกลับมา)
+ *
+ * โมเดลรุ่นใหม่ของ OpenAI (gpt-5 ขึ้นไป และตระกูล o1/o3/o4) ต่างจากรุ่นเดิมสองข้อ
+ *   - ใช้ max_completion_tokens แทน max_tokens
+ *   - รับ temperature ได้เฉพาะค่าเริ่มต้นของโมเดล (ส่งค่าอื่นไปจะถูกปฏิเสธ)
+ * ชื่อโมเดลอาจมีชื่อผู้ให้บริการนำหน้าได้ เช่น openai/gpt-5.6-terra ของ OpenRouter
+ */
+function ai_openai_quirks($model) {
+    $m = strtolower(trim((string)$model));
+    $q = ['token_param' => 'max_tokens', 'send_temperature' => true];
+    if (preg_match('#(^|/)(gpt-[5-9]|gpt-[1-9][0-9]|o[1-9])([.\-]|$)#', $m)) {
+        $q['token_param']      = 'max_completion_tokens';
+        $q['send_temperature'] = false;
+    }
+    return $q;
 }
 
 /**

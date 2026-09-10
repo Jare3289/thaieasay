@@ -138,10 +138,15 @@ require_once 'header.php';
           <button class="btn btn-outline-danger rounded-pill px-3" onclick="clearApiKey()">
             <i class="bi bi-trash me-1"></i>ลบ API key
           </button>
+          <button class="btn btn-outline-primary rounded-pill px-3" id="aiTestBtn" onclick="testAiConnection()"
+                  title="ยิงคำถามสั้น ๆ ไปหาผู้ให้บริการจริง เพื่อดูว่าคีย์และชื่อโมเดลใช้ได้ไหม">
+            <i class="bi bi-plug me-1"></i>ทดสอบการเชื่อมต่อ
+          </button>
           <button class="btn btn-primary rounded-pill px-4 fw-bold" id="aiSaveSettingsBtn" onclick="saveAiSettings()">
             <i class="bi bi-check2-circle me-1"></i>บันทึกการตั้งค่า
           </button>
         </div>
+        <div id="aiTestResult" class="small mt-3"></div>
 
         <div id="aiUsageBox" class="mt-4 small text-muted"></div>
       </div>
@@ -410,6 +415,36 @@ function onProviderChange(initial) {
 function useDefaultModel() {
   document.getElementById('aiModel').value = '';
   showToast('ล้างชื่อโมเดลแล้ว — กด "บันทึกการตั้งค่า" เพื่อใช้โมเดลเริ่มต้นของผู้ให้บริการ');
+}
+
+// ทดสอบว่าคีย์/ชื่อโมเดล/Base URL ที่บันทึกไว้ ใช้เรียกผู้ให้บริการได้จริงหรือไม่
+// (ทดสอบจากค่าที่ "บันทึกแล้ว" ไม่ใช่ค่าที่เพิ่งพิมพ์ค้างไว้ในช่อง)
+async function testAiConnection() {
+  const btn = document.getElementById('aiTestBtn');
+  const box = document.getElementById('aiTestResult');
+  btn.disabled = true;
+  box.innerHTML = '<span class="text-muted"><span class="spinner-border spinner-border-sm me-2"></span>กำลังทดสอบ… (อาจใช้เวลาถึง 1 นาที)</span>';
+  try {
+    const data = await stPost({ action: 'test_ai_connection' });
+    if (!data.success) {
+      box.innerHTML = '<div class="alert alert-danger border-0 rounded-3 mb-0">'
+        + '<i class="bi bi-x-octagon me-1"></i><strong>เชื่อมต่อไม่สำเร็จ</strong><br>' + esc(data.error || 'ไม่ทราบสาเหตุ')
+        + '</div>';
+      return;
+    }
+    const warn = data.json_ok ? ''
+      : '<div class="mt-2 text-warning-emphasis"><i class="bi bi-exclamation-triangle me-1"></i>'
+        + 'โมเดลตอบกลับมาแล้ว แต่ไม่ได้ตอบเป็น JSON — ยังใช้งานได้ แต่ถ้าเจอข้อความ "รูปแบบไม่ใช่ JSON" บ่อย ๆ '
+        + 'ให้เปลี่ยนไปใช้โมเดลที่เก่งกว่านี้</div>';
+    box.innerHTML = '<div class="alert alert-success border-0 rounded-3 mb-0">'
+      + '<i class="bi bi-check2-circle me-1"></i><strong>เชื่อมต่อสำเร็จ</strong> — '
+      + esc(data.provider) + ' · <code>' + esc(data.model) + '</code> · ตอบกลับใน ' + (data.ms / 1000).toFixed(1) + ' วินาที'
+      + warn + '</div>';
+  } catch (err) {
+    box.innerHTML = '<div class="alert alert-danger border-0 rounded-3 mb-0">เชื่อมต่อเซิร์ฟเวอร์ของระบบไม่สำเร็จ</div>';
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 function renderUsage(usage) {

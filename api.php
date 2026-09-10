@@ -2424,6 +2424,45 @@ try {
             echo json_encode(['success' => true]);
             break;
 
+        // ครูกด "ทดสอบการเชื่อมต่อ" — ยิงคำถามสั้น ๆ ไปหาผู้ให้บริการที่ตั้งค่าไว้จริง
+        // มีไว้เพื่อให้รู้ตั้งแต่ก่อนสั่งงานจริงว่าคีย์/ชื่อโมเดล/Base URL ใช้ได้หรือไม่
+        // (สำคัญมากกับผู้ให้บริการที่กรอก Base URL เอง เพราะแต่ละเจ้ารับพารามิเตอร์ไม่เหมือนกัน)
+        case 'test_ai_connection':
+            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+                echo json_encode(['success' => false, 'error' => 'เฉพาะคุณครูเท่านั้น']);
+                exit;
+            }
+            $tSet = ai_settings($pdo);
+            if (!$tSet['configured']) {
+                echo json_encode(['success' => false,
+                    'error' => 'ยังตั้งค่าไม่ครบ (ต้องมีทั้ง API key, ชื่อโมเดล และ Base URL) — กรุณากดบันทึกการตั้งค่าก่อนทดสอบ']);
+                exit;
+            }
+            $tStart = microtime(true);
+            $tRes = ai_call_model(
+                $tSet,
+                'ตอบกลับเป็น JSON เท่านั้น ห้ามมีข้อความอื่นนอกวงเล็บปีกกา',
+                'ตอบกลับด้วย JSON รูปแบบนี้พอดี: {"ok":true,"lang":"ไทย"}',
+                ['temperature' => 0, 'max_tokens' => 1024, 'timeout' => 60]
+            );
+            $tMs = (int)round((microtime(true) - $tStart) * 1000);
+            if (!$tRes['ok']) {
+                echo json_encode(['success' => false, 'error' => $tRes['error'], 'ms' => $tMs]);
+                exit;
+            }
+            // ตอบกลับมาแล้ว — เช็กต่อว่าอ่านเป็น JSON ได้ไหม (ทั้งระบบอ่านคำตอบเป็น JSON)
+            $tJson  = ai_extract_json($tRes['text']);
+            $tProvs = ai_providers();
+            echo json_encode([
+                'success'   => true,
+                'provider'  => isset($tProvs[$tSet['provider']]) ? $tProvs[$tSet['provider']]['label'] : $tSet['provider'],
+                'model'     => $tSet['model'],
+                'ms'        => $tMs,
+                'json_ok'   => is_array($tJson),
+                'sample'    => mb_substr(trim((string)$tRes['text']), 0, 200, 'UTF-8'),
+            ]);
+            break;
+
         // สั่งให้ระบบตรวจเรียงความ 1 ฉบับ แล้วบันทึกผลลงฐานข้อมูล (ตรวจซ้ำจะทับผลเดิม)
         case 'ai_review_essay':
             if (!isset($_SESSION['user'])) {
