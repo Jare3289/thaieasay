@@ -933,7 +933,10 @@ function ch45_mechanics(PDO $pdo, array $ds) {
 
             $occ = 0; $types = [];
             if ($dict) {
-                foreach (thai_word_segments($e['text']) as $seg) {
+                // หัวข้อ 2.4.1 ต้องตรวจจากต้นฉบับดิบเดียวกับที่จะยกเป็นหลักฐาน ไม่ใช้ฉบับที่ระบบ
+                // จัดเว้นวรรคแล้ว เพื่อให้จำนวนคำผิด รายการคำผิด และข้อความตัวอย่างอ้างถึงฉบับเดียวกัน
+                $spellingSource = $e['raw_text'] ?? $e['text'];
+                foreach (thai_word_segments($spellingSource) as $seg) {
                     if (empty($seg['isWord'])) continue;
                     $w = trim((string)$seg['text']);
                     if ($w === '' || mb_strlen($w, 'UTF-8') <= 1) continue;
@@ -1005,10 +1008,14 @@ function ch45_mechanics(PDO $pdo, array $ds) {
  * ========================================================================= */
 
 /** ตัดข้อความให้สั้นลงโดยไม่ตัดกลางคำ (ใช้กันไม่ให้คำสั่งที่ส่งให้ระบบยาวเกินไป) */
-function ch45_trim_text($text, $maxChars = 2200) {
-    $t = trim(preg_replace('/[ \t]+/u', ' ', (string)$text));
+function ch45_trim_text($text, $maxChars = 2200, $preserveOriginalSpacing = false) {
+    $t = $preserveOriginalSpacing
+        ? trim((string)$text)
+        : trim(preg_replace('/[ \t]+/u', ' ', (string)$text));
     if (mb_strlen($t, 'UTF-8') <= $maxChars) return $t;
-    return mb_substr($t, 0, $maxChars, 'UTF-8') . ' …';
+    // ต้นฉบับดิบห้ามเติมแม้แต่เครื่องหมายบอกการตัด เพราะ AI อาจคัดเครื่องหมายนั้นไปเป็นส่วนหนึ่ง
+    // ของตัวอย่าง ทั้งที่ไม่ได้ปรากฏอยู่ในงานของนักเรียนจริง
+    return mb_substr($t, 0, $maxChars, 'UTF-8') . ($preserveOriginalSpacing ? '' : ' …');
 }
 
 /**
@@ -1055,6 +1062,13 @@ function ch45_evidence(array $ds, $indicatorId, array $defects, $perSlot = 3, ar
                 if ($r === null || $r < $minRaw) continue;
             }
             $no = $ds['students'][$sid]['no'];
+            // การสะกดคำ (4.1) ต้องเห็นต้นฉบับที่นักเรียนพิมพ์จริงก่อนระบบจัดเว้นวรรคให้
+            // มิฉะนั้นข้อความตัวอย่างที่นำไปเขียนบทที่ 4 จะไม่ใช่สภาพงานเดิมที่ใช้ประเมินข้อบกพร่อง
+            $useRawEssay = ($indicatorId === '4.1');
+            $sourceIntro = $useRawEssay ? ($essay['raw_intro'] ?? $essay['intro']) : $essay['intro'];
+            $sourceBody = $useRawEssay ? ($essay['raw_body'] ?? $essay['body']) : $essay['body'];
+            $sourceConclusion = $useRawEssay ? ($essay['raw_conclusion'] ?? $essay['conclusion']) : $essay['conclusion'];
+            $sourceText = $useRawEssay ? ($essay['raw_text'] ?? $essay['text']) : $essay['text'];
             $cand[] = [
                 'sid'   => $sid,
                 'no'    => $no,
@@ -1066,11 +1080,12 @@ function ch45_evidence(array $ds, $indicatorId, array $defects, $perSlot = 3, ar
                 'raw'   => $sc ? $sc['raw'][$indicatorId] : null,
                 'used_elsewhere' => in_array($no, $usedNos, true),
                 'tag'   => $tag,
-                'intro' => ch45_trim_text($essay['intro'], 700),
-                'body'  => array_map(function ($p) { return ch45_trim_text($p, 700); }, $essay['body']),
-                'conclusion' => ch45_trim_text($essay['conclusion'], 700),
-                'text'  => ch45_trim_text($essay['text'], 2200),
-                'words' => $essay['word_count'],
+                'intro' => ch45_trim_text($sourceIntro, 700, $useRawEssay),
+                'body'  => array_map(function ($p) use ($useRawEssay) { return ch45_trim_text($p, 700, $useRawEssay); }, $sourceBody),
+                'conclusion' => ch45_trim_text($sourceConclusion, 700, $useRawEssay),
+                'text'  => ch45_trim_text($sourceText, 2200, $useRawEssay),
+                'words' => $useRawEssay ? count_thai_words($sourceText) : $essay['word_count'],
+                'is_raw_original' => $useRawEssay,
             ];
         }
         usort($cand, function ($a, $b) use ($order) {
