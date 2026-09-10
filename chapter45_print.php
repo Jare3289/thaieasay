@@ -325,6 +325,7 @@ $titleChapters = (!$showCh5) ? 'บทที่ 4' : ((!$showCh4) ? 'บทท�
         echo c45quote($pair['excerpt1'] ?? null, $meta['work1_label']);
         echo c45quote($pair['excerpt2'] ?? null, $meta['work2_label']);
         echo c45para('<strong>ตัวอย่าง (' . (int)$ex[0] . ')</strong> '
+            . (trim((string)($pair['transition'] ?? '')) !== '' ? rp_esc($pair['transition']) . ' ' : '')
             . (trim((string)($pair['analysis1'] ?? '')) !== '' ? rp_esc($pair['analysis1'])
                 : '<span class="todo">[ไม่มีบทวิเคราะห์]</span>'));
         echo c45para('<strong>ตัวอย่าง (' . (int)$ex[1] . ')</strong> '
