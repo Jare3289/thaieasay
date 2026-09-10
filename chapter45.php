@@ -705,7 +705,8 @@ function c45RenderPayload(jobKey, payload) {
                      c45ExcerptUsage.w1[(pair.excerpt1 || {}).student_no])
         + c45Excerpt(ex[1], pair.excerpt2, meta.work2_label,
                      c45ExcerptUsage.w2[(pair.excerpt2 || {}).student_no])
-        + c45Para('ตัวอย่าง (' + ex[0] + ') วิเคราะห์', pair.analysis1)
+        + c45Para('ตัวอย่าง (' + ex[0] + ') วิเคราะห์',
+            (pair.transition ? pair.transition + ' ' : '') + (pair.analysis1 || ''))
         + c45Para('ตัวอย่าง (' + ex[1] + ') วิเคราะห์', pair.analysis2);
     });
     out += c45Para('ข้อสรุปจากตัวอย่างทั้งหมด', payload.synthesis)
@@ -1869,7 +1870,8 @@ function buildChapter45ReportHtml(chapter) {
         const ex = exList[i] || [0, 0];
         P.push(c45DocQuote(ex[0], pair.excerpt1, w1));
         P.push(c45DocQuote(ex[1], pair.excerpt2, w2));
-        P.push(c45DocP((String(pair.analysis1 || '').trim() ? 'ตัวอย่าง (' + ex[0] + ') ' + pair.analysis1 : ''),
+        const linkedAnalysis1 = (String(pair.transition || '').trim() ? pair.transition + ' ' : '') + (pair.analysis1 || '');
+        P.push(c45DocP((String(linkedAnalysis1).trim() ? 'ตัวอย่าง (' + ex[0] + ') ' + linkedAnalysis1 : ''),
           'บทวิเคราะห์ตัวอย่าง (' + ex[0] + ')'));
         P.push(c45DocP((String(pair.analysis2 || '').trim() ? 'ตัวอย่าง (' + ex[1] + ') ' + pair.analysis2 : ''),
           'บทวิเคราะห์ตัวอย่าง (' + ex[1] + ')'));
