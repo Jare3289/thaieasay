@@ -724,7 +724,9 @@ function ch45_numbers_in($text) {
 function ch45_ai_search_references(array $settings, array $findings) {
     if ($settings['kind'] !== 'gemini') {
         return ['ok' => false, 'reason' => 'unsupported',
-                'error' => 'ค้นเว็บจริงได้เฉพาะเมื่อตั้งค่าผู้ให้บริการเป็น Google Gemini เท่านั้น'];
+                'error' => 'ค้นเว็บจริงได้เฉพาะเมื่อตั้งค่าผู้ให้บริการเป็น Google Gemini เท่านั้น '
+                         . '(ผู้ให้บริการอื่นยังเขียนบทที่ 4-5 ได้ครบทุกขั้น เพียงแต่ต้องกรอกคลังอ้างอิงเอง '
+                         . 'หรือสลับไปใช้คีย์ Gemini เฉพาะตอนค้นอ้างอิง แล้วสลับกลับ)'];
     }
     if (!$findings) {
         return ['ok' => false, 'reason' => 'error', 'error' => 'ยังไม่มีประเด็นให้ค้นหางานวิจัยประกอบ'];

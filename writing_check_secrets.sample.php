@@ -21,9 +21,15 @@
  *
  * ตัวเลือกคุณภาพสูง (ไม่มีโควตาฟรี ต้องเติมเครดิตเอง)
  *   claude     : https://console.anthropic.com/settings/keys   โมเดล claude-opus-5
+ *   openai     : https://platform.openai.com/api-keys          โมเดล gpt-5.6-terra
+ *
+ * ตัวเลือก custom : เซิร์ฟเวอร์อะไรก็ได้ที่พูด "มาตรฐาน OpenAI" (มี /chat/completions)
+ *   เช่น DeepSeek, Together, Fireworks หรือเครื่องในโรงเรียนที่รัน Ollama / LM Studio / vLLM
+ *   ให้กรอก $ai_base_url เป็น URL ที่ลงท้ายด้วย /v1 เช่น http://192.168.1.10:11434/v1
+ *   (เครื่องในโรงเรียนที่ไม่ต้องใช้คีย์ ให้ใส่ $ai_api_key เป็นข้อความอะไรก็ได้ที่ไม่ว่าง เช่น 'local')
  */
 
-$ai_provider = 'gemini';              // gemini | typhoon | openrouter | groq | claude | custom
+$ai_provider = 'gemini';              // gemini | typhoon | openrouter | groq | claude | openai | custom
 $ai_model    = 'gemini-3.6-flash';    // เว้นว่างไว้ = ใช้โมเดลเริ่มต้นของผู้ให้บริการ
 $ai_api_key  = 'ใส่ API key ของคุณที่นี่';
 $ai_base_url = '';                    // เว้นว่างไว้ = ใช้ค่าเริ่มต้น (ระบุเฉพาะกรณี provider = custom)
