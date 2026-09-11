@@ -666,8 +666,22 @@ function c45ExampleRangeNote(exList) {
   if (!Array.isArray(exList) || !exList.length) return '';
   const first = exList[0][0];
   const last = exList[exList.length - 1][1];
-  const joiner = exList.length > 1 ? 'ถึง' : 'และ';
-  return 'ตัวอย่างที่ยกมาประกอบการอธิบายในหัวข้อนี้ คือ ตัวอย่าง (' + first + ') ' + joiner + ' (' + last + ') ดังนี้';
+  return 'ตัวอย่างที่ยกมาประกอบการอธิบายในหัวข้อนี้ คือ ตัวอย่าง (' + first + ') ถึง (' + last + ') ดังนี้';
+}
+
+// ตั้งแต่คู่ที่ 2 เป็นต้นไป ใส่ประโยคนำที่อธิบายว่าเหตุใดจึงยกคู่เพิ่มเติม
+// สร้างจากหมายเลขจริงหลังจัดลำดับ จึงไม่ปล่อยให้ AI เดาหมายเลขล่วงหน้า
+function c45AdditionalPairNote(pair, ex, ind, index) {
+  if (index < 1 || !Array.isArray(ex)) return '';
+  const n1 = Number(((pair || {}).excerpt1 || {}).student_no || 0);
+  const n2 = Number(((pair || {}).excerpt2 || {}).student_no || 0);
+  let who = '';
+  if (n1 && n2 && n1 !== n2) who = 'นักเรียนคนที่ ' + n1 + ' และนักเรียนคนที่ ' + n2;
+  else if (n1 || n2) who = 'นักเรียนคนที่ ' + (n1 || n2);
+  else who = 'นักเรียนอีกรายหนึ่ง';
+  return 'นอกจากนี้ เพื่อแสดงให้เห็นระดับการปรับปรุงที่แตกต่างกัน ผู้วิจัยนำผลงานของ' + who
+    + ' ซึ่งแสดงถึงการพัฒนาในด้าน' + ((ind || {}).name || 'ที่วิเคราะห์')
+    + ' มาพิจารณาประกอบ ดังปรากฏในตัวอย่าง (' + ex[0] + ') และ (' + ex[1] + ') ต่อไปนี้';
 }
 
 function c45RenderPayload(jobKey, payload) {
@@ -700,13 +714,14 @@ function c45RenderPayload(jobKey, payload) {
     }
     pairs.forEach(function (pair, i) {
       const ex = exList[i] || [0, 0];
+      const additionalNote = c45AdditionalPairNote(pair, ex, ind, i);
+      if (additionalNote) out += '<p class="mb-2"><em>' + c45Esc(additionalNote) + '</em></p>';
       out += '<div class="small fw-bold text-secondary mt-2 mb-1">คู่ตัวอย่างที่ ' + (i + 1) + '</div>'
         + c45Excerpt(ex[0], pair.excerpt1, meta.work1_label,
                      c45ExcerptUsage.w1[(pair.excerpt1 || {}).student_no])
         + c45Excerpt(ex[1], pair.excerpt2, meta.work2_label,
                      c45ExcerptUsage.w2[(pair.excerpt2 || {}).student_no])
-        + c45Para('ตัวอย่าง (' + ex[0] + ') วิเคราะห์',
-            (pair.transition ? pair.transition + ' ' : '') + (pair.analysis1 || ''))
+        + c45Para('ตัวอย่าง (' + ex[0] + ') วิเคราะห์', pair.analysis1)
         + c45Para('ตัวอย่าง (' + ex[1] + ') วิเคราะห์', pair.analysis2);
     });
     out += c45Para('ข้อสรุปจากตัวอย่างทั้งหมด', payload.synthesis)
@@ -1879,10 +1894,11 @@ function buildChapter45ReportHtml(chapter) {
       }
       pairs.forEach(function (pair, i) {
         const ex = exList[i] || [0, 0];
+        const additionalNote = c45AdditionalPairNote(pair, ex, ind, i);
+        if (additionalNote) P.push(c45DocP(additionalNote, ''));
         P.push(c45DocQuote(ex[0], pair.excerpt1, w1));
         P.push(c45DocQuote(ex[1], pair.excerpt2, w2));
-        const linkedAnalysis1 = (String(pair.transition || '').trim() ? pair.transition + ' ' : '') + (pair.analysis1 || '');
-        P.push(c45DocP((String(linkedAnalysis1).trim() ? 'ตัวอย่าง (' + ex[0] + ') ' + linkedAnalysis1 : ''),
+        P.push(c45DocP((String(pair.analysis1 || '').trim() ? 'ตัวอย่าง (' + ex[0] + ') ' + pair.analysis1 : ''),
           'บทวิเคราะห์ตัวอย่าง (' + ex[0] + ')'));
         P.push(c45DocP((String(pair.analysis2 || '').trim() ? 'ตัวอย่าง (' + ex[1] + ') ' + pair.analysis2 : ''),
           'บทวิเคราะห์ตัวอย่าง (' + ex[1] + ')'));
