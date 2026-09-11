@@ -1051,10 +1051,21 @@ async function c45ShowEvidence(indicatorId) {
     h += '<h6 class="fw-bold mt-3">' + c45Esc(p[1]) + '</h6>';
     if (!ev[p[0]] || !ev[p[0]].length) { h += '<div class="text-muted small">ไม่พบผลงานในรอบนี้</div>'; return; }
     ev[p[0]].forEach(function (c) {
+      const ind = (c45Data.indicators || {})[indicatorId] || {};
+      const raw = c.raw === null ? null : Number(c.raw);
+      const actual = raw === null ? null : raw * Number(ind.multiplier || 0);
+      const levelNames = c45Data.levels || {};
+      let level = '—';
+      if (raw !== null) {
+        const lo = Math.floor(raw), hi = Math.ceil(raw);
+        level = lo === hi ? (levelNames[lo] || '—')
+          : 'ระหว่างระดับ' + (levelNames[lo] || lo) + 'และ' + (levelNames[hi] || hi);
+      }
       const who = 'นักเรียนคนที่ ' + c45Esc(c.no)
         + (c45RevealNames && c.name ? ' (ชื่อจริง: ' + c45Esc(c.name) + ')' : '');
       h += '<div class="border rounded-3 p-2 mb-2"><div class="small fw-bold mb-1">' + who
-        + ' · คะแนนดิบ ' + (c.raw === null ? '—' : Number(c.raw).toFixed(1)) + '/4 · ' + c45Esc(c.tag) + '</div>'
+        + ' · คะแนนจริง ' + (actual === null ? '—' : actual.toFixed(2)) + '/' + c45Esc(ind.max || '—')
+        + ' · คะแนนดิบ ' + (raw === null ? '—' : raw.toFixed(1)) + '/4 · ' + c45Esc(level) + ' · ' + c45Esc(c.tag) + '</div>'
         + '<div class="small" style="line-height:2.0;">' + c45Esc(c.text) + '</div></div>';
     });
   });
