@@ -459,11 +459,13 @@ $titleChapters = (!$showCh5) ? 'บทที่ 4' : ((!$showCh4) ? 'บทท�
     $scoreRows = $ir['score_rows'] ?? [];
     if (!$scoreRows) continue; ?>
   <h3 class="sub">คะแนนรายคนที่ใช้คำนวณ ICC — <?php echo rp_esc($ir['label']); ?></h3>
-  <p class="tbl-note">ข้อมูลที่ใช้หา ICC แยกเป็นคะแนนรวมและคะแนนด้านที่ 1–4 ของนักเรียนชุดเดียวกันจากผู้ตรวจทุกคน · <?php
+  <p class="tbl-note">เลข 1, 2 และ 3 หมายถึงผู้ตรวจคนที่ 1, 2 และ 3 ตามลำดับ ข้อมูลที่ใช้หา ICC แยกเป็นคะแนนรวมและคะแนนด้านที่ 1–4
+    ของนักเรียนชุดเดียวกันจากผู้ตรวจทุกคน โดยแสดงค่าเฉลี่ย (M) และส่วนเบี่ยงเบนมาตรฐาน (SD) ก่อนใช้โมเดล two-way mixed effects,
+    absolute agreement หาองค์ประกอบความแปรปรวนและ ICC(3,k) ของคะแนนเฉลี่ยจากผู้ตรวจทั้ง k คน · <?php
     $raterNotes = [];
     foreach ($ir['raters'] as $i => $rater) {
         $parts = explode(':', (string)$rater, 2);
-        $raterNotes[] = 'ผู้ตรวจ ' . ($i + 1) . ': ' . ($parts[1] ?? $rater);
+        $raterNotes[] = ($i + 1) . ' = ' . ($parts[1] ?? $rater);
     }
     echo rp_esc(implode(' · ', $raterNotes));
   ?></p>
@@ -475,7 +477,7 @@ $titleChapters = (!$showCh5) ? 'บทที่ 4' : ((!$showCh4) ? 'บทท�
       <th colspan="<?php echo (int)$ir['k']; ?>">ด้าน 4 อักขรวิธี (6)</th>
       <th rowspan="2">คะแนนรวมเฉลี่ย<br>(60)</th></tr><tr>
       <?php foreach (['d1', 'd2', 'd3', 'd4'] as $_measure):
-        foreach ($ir['raters'] as $i => $_rater): ?><th>ผู้ตรวจ <?php echo $i + 1; ?></th><?php endforeach; endforeach; ?>
+        foreach ($ir['raters'] as $i => $_rater): ?><th><?php echo $i + 1; ?></th><?php endforeach; endforeach; ?>
     </tr></thead>
     <tbody>
       <?php foreach ($scoreRows as $row): ?><tr>
@@ -485,7 +487,18 @@ $titleChapters = (!$showCh5) ? 'บทที่ 4' : ((!$showCh4) ? 'บทท�
         <td class="c"><strong><?php echo number_format((float)$row['means']['overall'], 2); ?></strong></td>
       </tr><?php endforeach; ?>
     </tbody>
-    <tfoot><tr style="font-weight:700;background:#f8fafc"><td class="c">สถิติสำคัญ</td>
+    <tfoot>
+    <tr style="background:#f8fafc"><td class="c"><strong>ค่าเฉลี่ย (M)</strong></td>
+      <?php foreach (['d1', 'd2', 'd3', 'd4'] as $measure):
+        foreach ($ir['measures'][$measure]['rater_descriptives'] as $desc): ?><td class="c"><?php echo number_format((float)$desc['mean'], 2); ?></td><?php endforeach; endforeach; ?>
+      <td class="c"><strong><?php echo number_format((float)$ir['measures']['overall']['mean_descriptive']['mean'], 2); ?></strong></td>
+    </tr>
+    <tr style="background:#f8fafc"><td class="c"><strong>ส่วนเบี่ยงเบนมาตรฐาน (SD)</strong></td>
+      <?php foreach (['d1', 'd2', 'd3', 'd4'] as $measure):
+        foreach ($ir['measures'][$measure]['rater_descriptives'] as $desc): ?><td class="c"><?php echo number_format((float)$desc['sd'], 2); ?></td><?php endforeach; endforeach; ?>
+      <td class="c"><strong><?php echo number_format((float)$ir['measures']['overall']['mean_descriptive']['sd'], 2); ?></strong></td>
+    </tr>
+    <tr style="font-weight:700;background:#f8fafc"><td class="c">สถิติความเที่ยง</td>
       <?php foreach (['d1', 'd2', 'd3', 'd4'] as $measure): $stat = $ir['measures'][$measure]; ?>
       <td colspan="<?php echo (int)$ir['k']; ?>" class="c">ICC(3,k) = <?php echo ch45_fmt_r($stat['icc']['iccK']); ?><br>
         p <?php echo ch45_fmt_p($stat['icc']['p']); ?> · <?php echo rp_esc($stat['icc_label']); ?></td><?php endforeach; ?>

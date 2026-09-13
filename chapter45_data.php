@@ -804,8 +804,17 @@ function ch45_interrater(array $ds) {
                 }
             }
             $measureIcc = ch45_icc($measureMatrix);
+            $raterDescriptives = [];
+            for ($i = 0; $i < count($keys); $i++) {
+                $raterDescriptives[] = ch45_describe(array_column($measureMatrix, $i));
+            }
+            $studentMeans = [];
+            foreach ($measureMatrix as $one) $studentMeans[] = array_sum($one) / count($one);
             $measures[$measure] = ['key' => $measure, 'label' => $measureLabel,
                 'max' => $measureMax[$measure], 'n' => count($measureMatrix), 'pearson' => $measurePairs,
+                // M และ SD ของผู้ตรวจแต่ละคน รวมทั้งคะแนนเฉลี่ยผู้ตรวจ ใช้อธิบายข้อมูลก่อนถึงค่า ICC
+                'rater_descriptives' => $raterDescriptives,
+                'mean_descriptive' => ch45_describe($studentMeans),
                 'icc' => $measureIcc, 'icc_label' => ch45_icc_label($measureIcc['iccK'])];
         }
 
