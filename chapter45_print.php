@@ -454,6 +454,31 @@ $titleChapters = (!$showCh5) ? 'บทที่ 4' : ((!$showCh4) ? 'บทท�
       <?php endforeach; ?>
     </tbody>
   </table>
+  <?php foreach ($quant['interrater'] as $ir):
+    $scoreRows = $ir['score_rows'] ?? [];
+    if (!$scoreRows) continue; ?>
+  <h3 class="sub">คะแนนรายคนที่ใช้คำนวณ ICC — <?php echo rp_esc($ir['label']); ?></h3>
+  <p class="tbl-note">คะแนนเต็ม 60 คะแนน · <?php
+    $raterNotes = [];
+    foreach ($ir['raters'] as $i => $rater) {
+        $parts = explode(':', (string)$rater, 2);
+        $raterNotes[] = 'ผู้ตรวจ ' . ($i + 1) . ': ' . ($parts[1] ?? $rater);
+    }
+    echo rp_esc(implode(' · ', $raterNotes));
+  ?></p>
+  <table class="thesis">
+    <thead><tr><th>นักเรียนคนที่</th>
+      <?php foreach ($ir['raters'] as $i => $_): ?><th>ผู้ตรวจ <?php echo $i + 1; ?></th><?php endforeach; ?>
+      <th>เฉลี่ย</th></tr></thead>
+    <tbody>
+      <?php foreach ($scoreRows as $row): ?><tr>
+        <td class="c"><strong><?php echo (int)$row['student_no']; ?></strong></td>
+        <?php foreach ($row['scores'] as $score): ?><td class="c"><?php echo number_format((float)$score, 2); ?></td><?php endforeach; ?>
+        <td class="c"><?php echo number_format((float)$row['mean'], 2); ?></td>
+      </tr><?php endforeach; ?>
+    </tbody>
+  </table>
+  <?php endforeach; ?>
   <?php endif; ?>
 
   <h2 class="sec-title">ผลทดสอบการแจกแจงปกติของคะแนนผลต่าง (Shapiro-Wilk)</h2>
