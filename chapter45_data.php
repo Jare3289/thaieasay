@@ -744,13 +744,23 @@ function ch45_interrater(array $ds) {
             $common = ($common === null) ? $ids : array_values(array_intersect($common, $ids));
         }
         if (!$common || count($common) < 3) continue;
-        sort($common);
+        // เรียงตามเลขนิรนามที่แสดงในรายงาน (นักเรียนคนที่ 1, 2, ...)
+        // ไม่เรียงตามรหัสนักเรียน เพราะรหัสอาจไม่ได้มีลำดับเดียวกับเลขในตาราง
+        usort($common, function ($a, $b) use ($ds) {
+            return ((int)($ds['students'][$a]['no'] ?? 0)) <=> ((int)($ds['students'][$b]['no'] ?? 0));
+        });
 
         $matrix = [];
+        $scoreRows = [];
         foreach ($common as $sid) {
             $row = [];
             foreach ($keys as $k) $row[] = $raters[$k][$sid];
             $matrix[] = $row;
+            $scoreRows[] = [
+                'student_no' => (int)($ds['students'][$sid]['no'] ?? 0),
+                'scores'     => $row,
+                'mean'       => array_sum($row) / count($row),
+            ];
         }
 
         $pairsR = [];
@@ -768,6 +778,8 @@ function ch45_interrater(array $ds) {
         $out[$phase] = [
             'phase' => $phase, 'label' => $phLabel,
             'raters' => $keys, 'k' => count($keys), 'n' => count($common),
+            // คะแนนดิบที่เป็นฐานคำนวณ ICC แสดงแบบนิรนามเพื่อให้ตรวจย้อนกลับได้ทีละคน
+            'score_rows' => $scoreRows,
             'pearson' => $pairsR,
             'icc' => $icc, 'icc_label' => ch45_icc_label($icc['iccK']),
         ];
