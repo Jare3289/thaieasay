@@ -725,12 +725,17 @@ function ch45_interrater(array $ds) {
               'task2' => 'ภาระงานหน่วยที่ 2', 'posttest' => 'หลังเรียน'] as $phase => $phLabel) {
 
         // รวบรวม "ผู้ตรวจแต่ละคน" (บทบาท + ชื่อผู้ประเมิน) ที่ให้คะแนนในรอบนี้
-        $raters = [];   // [raterKey][sid] = คะแนนรวม
+        $raters = [];   // [raterKey][sid] = คะแนนรวม + คะแนน 4 ด้าน
         foreach ($ds['sids'] as $sid) {
             foreach ($roles as $role) {
                 foreach ($ds['evals'][$sid][$phase][$role] ?? [] as $r) {
                     $key = $role . ':' . $r['rater'];
-                    if ($r['total'] !== null) $raters[$key][$sid] = $r['total'];
+                    if ($r['total'] !== null) {
+                        $raters[$key][$sid] = array_merge(
+                            ['overall' => $r['total']],
+                            ch45_domain_total($r['weighted'])
+                        );
+                    }
                 }
             }
         }
@@ -744,30 +749,74 @@ function ch45_interrater(array $ds) {
             $common = ($common === null) ? $ids : array_values(array_intersect($common, $ids));
         }
         if (!$common || count($common) < 3) continue;
-        sort($common);
+        // เรียงตามเลขนิรนามที่แสดงในรายงาน (นักเรียนคนที่ 1, 2, ...)
+        // ไม่เรียงตามรหัสนักเรียน เพราะรหัสอาจไม่ได้มีลำดับเดียวกับเลขในตาราง
+        usort($common, function ($a, $b) use ($ds) {
+            return ((int)($ds['students'][$a]['no'] ?? 0)) <=> ((int)($ds['students'][$b]['no'] ?? 0));
+        });
+
+        $measureLabels = ['overall' => 'คะแนนรวม', 'd1' => 'ด้านที่ 1 เนื้อหาสาระ',
+            'd2' => 'ด้านที่ 2 องค์ประกอบและการลำดับเรื่อง', 'd3' => 'ด้านที่ 3 การใช้สำนวนภาษา',
+            'd4' => 'ด้านที่ 4 อักขรวิธีและกลไกการเขียน'];
+        $measureMax = ['overall' => 60.0, 'd1' => 27.0, 'd2' => 12.0, 'd3' => 15.0, 'd4' => 6.0];
 
         $matrix = [];
+        $scoreRows = [];
         foreach ($common as $sid) {
             $row = [];
-            foreach ($keys as $k) $row[] = $raters[$k][$sid];
-            $matrix[] = $row;
-        }
-
-        $pairsR = [];
-        for ($i = 0; $i < count($keys); $i++) {
-            for ($j = $i + 1; $j < count($keys); $j++) {
-                $a = []; $b = [];
-                foreach ($common as $sid) { $a[] = $raters[$keys[$i]][$sid]; $b[] = $raters[$keys[$j]][$sid]; }
-                $r = ch45_pearson($a, $b);
-                $pairsR[] = ['rater_a' => $keys[$i], 'rater_b' => $keys[$j],
-                             'r' => $r['r'], 'p' => $r['p'], 'n' => $r['n']];
+            $raterScores = [];
+            foreach ($keys as $k) {
+                $row[] = $raters[$k][$sid]['overall'];
+                $raterScores[] = $raters[$k][$sid];
             }
+            $matrix[] = $row;
+            $means = [];
+            foreach ($measureLabels as $measure => $_label) {
+                $values = array_values(array_filter(array_column($raterScores, $measure), 'is_numeric'));
+                $means[$measure] = $values ? array_sum($values) / count($values) : null;
+            }
+            $scoreRows[] = [
+                'student_no' => (int)($ds['students'][$sid]['no'] ?? 0),
+                'scores'     => $row,
+                'mean'       => $means['overall'],
+                'rater_scores' => $raterScores,
+                'means'      => $means,
+            ];
         }
 
-        $icc = ch45_icc($matrix);
+        // คำนวณซ้ำทั้งคะแนนรวมและ 4 ด้าน เพื่อให้เห็นว่า ICC สรุปจากข้อมูลชุดใด
+        $measures = [];
+        foreach ($measureLabels as $measure => $measureLabel) {
+            $measureMatrix = [];
+            foreach ($common as $sid) {
+                $one = [];
+                foreach ($keys as $key) $one[] = $raters[$key][$sid][$measure];
+                if (count(array_filter($one, 'is_numeric')) === count($keys)) $measureMatrix[] = $one;
+            }
+            $measurePairs = [];
+            for ($i = 0; $i < count($keys); $i++) {
+                for ($j = $i + 1; $j < count($keys); $j++) {
+                    $a = array_column($measureMatrix, $i);
+                    $b = array_column($measureMatrix, $j);
+                    $r = ch45_pearson($a, $b);
+                    $measurePairs[] = ['rater_a' => $keys[$i], 'rater_b' => $keys[$j],
+                        'r' => $r['r'], 'p' => $r['p'], 'n' => $r['n']];
+                }
+            }
+            $measureIcc = ch45_icc($measureMatrix);
+            $measures[$measure] = ['key' => $measure, 'label' => $measureLabel,
+                'max' => $measureMax[$measure], 'n' => count($measureMatrix), 'pearson' => $measurePairs,
+                'icc' => $measureIcc, 'icc_label' => ch45_icc_label($measureIcc['iccK'])];
+        }
+
+        $icc = $measures['overall']['icc'];
+        $pairsR = $measures['overall']['pearson'];
         $out[$phase] = [
             'phase' => $phase, 'label' => $phLabel,
             'raters' => $keys, 'k' => count($keys), 'n' => count($common),
+            // คะแนนดิบที่เป็นฐานคำนวณ ICC แสดงแบบนิรนามเพื่อให้ตรวจย้อนกลับได้ทีละคน
+            'score_rows' => $scoreRows,
+            'measures' => $measures,
             'pearson' => $pairsR,
             'icc' => $icc, 'icc_label' => ch45_icc_label($icc['iccK']),
         ];
