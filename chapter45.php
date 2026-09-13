@@ -533,15 +533,19 @@ function c45PaintQuant() {
       + '</tr></thead><tbody>';
     keys.forEach(function (k) {
       const v = ir[k];
-      x += '<tr><td>' + c45Esc(v.label) + '</td><td class="text-center">' + v.k + '</td>'
-        + '<td class="text-center">' + v.n + '</td>'
-        + '<td class="text-center">' + c45R(v.icc.icc1) + '</td>'
-        + '<td class="text-center fw-bold">' + c45R(v.icc.iccK) + '</td>'
-        + '<td class="text-center">' + c45P(v.icc.p) + '</td>'
-        + '<td class="text-center"><span class="badge bg-primary-subtle text-primary-emphasis">' + c45Esc(v.icc_label) + '</span></td>'
-        + '<td class="small text-muted">'
-        + v.pearson.map(function (p) { return 'r = ' + c45R(p.r); }).join(', ')
-        + '</td></tr>';
+      const measures = v.measures || { overall: v };
+      Object.keys(measures).forEach(function (mk) {
+        const m = measures[mk];
+        x += '<tr><td>' + c45Esc(v.label + ' — ' + (m.label || 'คะแนนรวม')) + '</td><td class="text-center">' + v.k + '</td>'
+          + '<td class="text-center">' + m.n + '</td>'
+          + '<td class="text-center">' + c45R(m.icc.icc1) + '</td>'
+          + '<td class="text-center fw-bold">' + c45R(m.icc.iccK) + '</td>'
+          + '<td class="text-center">' + c45P(m.icc.p) + '</td>'
+          + '<td class="text-center"><span class="badge bg-primary-subtle text-primary-emphasis">' + c45Esc(m.icc_label) + '</span></td>'
+          + '<td class="small text-muted">'
+          + m.pearson.map(function (p, i) { return 'คู่ ' + (i + 1) + ': r = ' + c45R(p.r); }).join(', ')
+          + '</td></tr>';
+      });
     });
     x += '</tbody></table>';
     keys.forEach(function (k) {
@@ -551,14 +555,19 @@ function c45PaintQuant() {
       x += '<div class="mt-3 fw-bold">คะแนนรายคนที่ใช้คำนวณ ICC — ' + c45Esc(v.label) + '</div>'
         + '<div class="text-muted small mb-1">แสดงด้วยเลขนิรนามของนักเรียน คะแนนเต็ม 60 คะแนน · '
         + v.raters.map(function (r, i) { return 'ผู้ตรวจ ' + (i + 1) + ': ' + c45Esc(String(r).split(':').slice(1).join(':') || r); }).join(' · ')
-        + '</div><div class="table-responsive"><table class="table table-sm table-bordered align-middle mb-0"><thead class="table-light"><tr>'
-        + '<th class="text-center">นักเรียนคนที่</th>'
-        + v.raters.map(function (_r, i) { return '<th class="text-center">ผู้ตรวจ ' + (i + 1) + '</th>'; }).join('')
-        + '<th class="text-center">เฉลี่ย</th></tr></thead><tbody>';
+        + '</div><div class="alert alert-light border py-2 small">ข้อมูลที่นำไปหา ICC คือคะแนนของนักเรียนชุดเดียวกันจากผู้ตรวจทุกคน '
+        + 'โดยคำนวณแยก 5 ชุด ได้แก่ คะแนนรวม และคะแนนด้านที่ 1–4 ตารางด้านล่างคือข้อมูลดิบครบทุกชุดที่ใช้คำนวณ</div>'
+        + '<div class="table-responsive"><table class="table table-sm table-bordered align-middle mb-0"><thead class="table-light"><tr>'
+        + '<th class="text-center">นักเรียนคนที่</th><th>ผู้ให้คะแนน</th><th class="text-center">รวม<br><small>(60)</small></th>'
+        + '<th class="text-center">ด้าน 1 เนื้อหา<br><small>(27)</small></th><th class="text-center">ด้าน 2 โครงสร้าง<br><small>(12)</small></th>'
+        + '<th class="text-center">ด้าน 3 ภาษา<br><small>(15)</small></th><th class="text-center">ด้าน 4 อักขรวิธี<br><small>(6)</small></th></tr></thead><tbody>';
       scoreRows.forEach(function (row) {
-        x += '<tr><td class="text-center fw-bold">' + row.student_no + '</td>'
-          + row.scores.map(function (score) { return '<td class="text-center">' + c45Num(score) + '</td>'; }).join('')
-          + '<td class="text-center table-light">' + c45Num(row.mean) + '</td></tr>';
+        (row.rater_scores || []).forEach(function (scores, i) {
+          x += '<tr><td class="text-center fw-bold">' + row.student_no + '</td><td>ผู้ตรวจ ' + (i + 1) + '</td>'
+            + ['overall', 'd1', 'd2', 'd3', 'd4'].map(function (m) { return '<td class="text-center">' + c45Num(scores[m]) + '</td>'; }).join('') + '</tr>';
+        });
+        x += '<tr class="table-light fw-bold"><td class="text-center">' + row.student_no + '</td><td>เฉลี่ยผู้ตรวจ</td>'
+          + ['overall', 'd1', 'd2', 'd3', 'd4'].map(function (m) { return '<td class="text-center">' + c45Num(row.means[m]) + '</td>'; }).join('') + '</tr>';
       });
       x += '</tbody></table></div>';
     });
@@ -2027,23 +2036,31 @@ function buildChapter45ReportHtml(chapter) {
     P.push(c45DocNote('ใช้ ICC แบบสองทางผสม ความสอดคล้องสัมบูรณ์ (two-way mixed effects, absolute agreement) '
       + 'เป็นค่าหลักในการสรุปผล ตามเกณฑ์แปลผลของ Koo & Li (2016) — Pearson r แสดงประกอบเป็นค่าความสัมพันธ์รายคู่เท่านั้น'));
     P.push(c45WrTable(['รอบ', 'ผู้ประเมิน (k)', 'n', 'ICC(3,1)', 'ICC(3,k)', 'p', 'แปลผล (ยึดตาม ICC)', 'Pearson r รายคู่ (ประกอบ)'],
-      irKeys.map(function (k) {
+      irKeys.reduce(function (rows, k) {
         const v = ir[k];
-        return [v.label, v.k, v.n, c45R(v.icc.icc1), c45R(v.icc.iccK), c45P(v.icc.p), v.icc_label,
-          v.pearson.map(function (pp) { return 'r = ' + c45R(pp.r); }).join(', ')];
-      })));
+        Object.keys(v.measures || { overall: v }).forEach(function (mk) {
+          const m = (v.measures || { overall: v })[mk];
+          rows.push([v.label + ' — ' + (m.label || 'คะแนนรวม'), v.k, m.n, c45R(m.icc.icc1), c45R(m.icc.iccK), c45P(m.icc.p), m.icc_label,
+            m.pearson.map(function (pp, i) { return 'คู่ ' + (i + 1) + ': r = ' + c45R(pp.r); }).join(', ')]);
+        });
+        return rows;
+      }, [])));
     irKeys.forEach(function (k) {
       const v = ir[k];
       const scoreRows = Array.isArray(v.score_rows) ? v.score_rows : [];
       if (!scoreRows.length) return;
       P.push('<h3 class="sub">คะแนนรายคนที่ใช้คำนวณ ICC — ' + c45Esc(v.label) + '</h3>');
-      P.push(c45DocNote('คะแนนเต็ม 60 คะแนน · ' + v.raters.map(function (r, i) {
+      P.push(c45DocNote('ข้อมูลที่ใช้หา ICC แยกเป็นคะแนนรวมและคะแนนด้านที่ 1–4 ของนักเรียนชุดเดียวกันจากผู้ตรวจทุกคน · ' + v.raters.map(function (r, i) {
         return 'ผู้ตรวจ ' + (i + 1) + ': ' + (String(r).split(':').slice(1).join(':') || r);
       }).join(' · ')));
-      P.push(c45WrTable(['นักเรียนคนที่'].concat(v.raters.map(function (_r, i) { return 'ผู้ตรวจ ' + (i + 1); }), ['เฉลี่ย']),
-        scoreRows.map(function (row) {
-          return [row.student_no].concat(row.scores.map(function (score) { return c45Num(score); }), [c45Num(row.mean)]);
-        })));
+      P.push(c45WrTable(['นักเรียนคนที่', 'ผู้ให้คะแนน', 'รวม (60)', 'ด้าน 1 เนื้อหา (27)', 'ด้าน 2 โครงสร้าง (12)', 'ด้าน 3 ภาษา (15)', 'ด้าน 4 อักขรวิธี (6)'],
+        scoreRows.reduce(function (rows, row) {
+          (row.rater_scores || []).forEach(function (scores, i) {
+            rows.push([row.student_no, 'ผู้ตรวจ ' + (i + 1), c45Num(scores.overall), c45Num(scores.d1), c45Num(scores.d2), c45Num(scores.d3), c45Num(scores.d4)]);
+          });
+          rows.push([row.student_no, 'เฉลี่ยผู้ตรวจ', c45Num(row.means.overall), c45Num(row.means.d1), c45Num(row.means.d2), c45Num(row.means.d3), c45Num(row.means.d4)]);
+          return rows;
+        }, [])));
     });
   } else {
     P.push(c45DocNote('ยังคำนวณความเที่ยงระหว่างผู้ประเมินไม่ได้ — ต้องมีผู้ประเมินตั้งแต่ 2 คนขึ้นไป'
