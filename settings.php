@@ -302,6 +302,35 @@ require_once 'header.php';
         </div>
         <div id="stGoogleActions" class="d-flex flex-wrap gap-2"></div>
         <div id="stGoogleRedirect" class="mt-4"></div>
+
+        <hr class="my-4">
+        <h6 class="fw-bold"><i class="bi bi-file-earmark-richtext text-primary me-2"></i>สร้าง Google Doc ภาคผนวกข้อมูลดิบ</h6>
+        <p class="text-muted small">
+          รวมคะแนน Pre-test/Post-test รายด้านและรายผู้ตรวจพร้อมค่าเฉลี่ย คะแนนผลงานในแผนที่ 1–2
+          และแบบบันทึกร่องรอยข้อบกพร่องเชิงคุณภาพรายบุคคลไว้ในเอกสารเดียว
+        </p>
+        <div class="row g-3 align-items-end">
+          <div class="col-md-5">
+            <label class="form-label fw-bold small" for="appendixGroup">กลุ่มนักเรียน</label>
+            <select id="appendixGroup" class="form-select border-2 rounded-3">
+              <option value="">ทุกกลุ่มรวมกัน</option>
+              <option value="กลุ่มทดลอง">กลุ่มทดลอง</option>
+              <option value="กลุ่มตัวอย่าง">กลุ่มตัวอย่าง</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-bold small" for="appendixRoom">ห้องเรียน</label>
+            <input id="appendixRoom" class="form-control border-2 rounded-3" placeholder="ไม่ระบุ = ทุกห้อง">
+          </div>
+          <div class="col-md-4">
+            <button id="appendixDocBtn" type="button" class="btn btn-primary rounded-pill px-4 fw-bold w-100" onclick="createAppendixDoc()">
+              <i class="bi bi-google me-1"></i>สร้าง Doc ภาคผนวก
+            </button>
+          </div>
+        </div>
+        <div class="alert alert-light border rounded-3 small mt-3 mb-0">
+          ระบบแสดงจำนวนผู้ตรวจที่มีข้อมูลจริงในแต่ละแถวค่าเฉลี่ย จึงตรวจสอบได้ทันทีว่าคะแนนสำหรับ ICC ครบ 3 ท่านหรือไม่
+        </div>
       </div>
     </div>
   </div>
@@ -685,6 +714,48 @@ async function googleDisconnect() {
     showToast('เชื่อมต่อไม่สำเร็จ', 'error');
   }
   loadGoogleStatus();
+}
+
+async function createAppendixDoc() {
+  const btn = document.getElementById('appendixDocBtn');
+  const original = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>กำลังสร้างเอกสาร...';
+  try {
+    const status = await (await fetch('google_auth.php?action=status&_t=' + Date.now())).json();
+    if (!status.configured) throw new Error('ผู้ดูแลระบบยังไม่ได้ตั้งค่า Google API');
+    if (!status.connected) {
+      showToast('กรุณาเชื่อมต่อบัญชี Google ก่อนสร้างเอกสาร', 'info');
+      googleConnect();
+      return;
+    }
+    const payload = {
+      group: document.getElementById('appendixGroup').value,
+      classroom: document.getElementById('appendixRoom').value.trim()
+    };
+    const buildResponse = await fetch('appendix_doc.php', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const report = await buildResponse.json();
+    if (!report.success) throw new Error(report.error || 'สร้างเนื้อหาเอกสารไม่สำเร็จ');
+    const uploadResponse = await fetch('google_upload_doc.php', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ html: report.html, title: report.title })
+    });
+    const uploaded = await uploadResponse.json();
+    if (!uploaded.success) {
+      if (uploaded.reauth) { googleConnect(); return; }
+      throw new Error(uploaded.error || 'อัปโหลดเอกสารไม่สำเร็จ');
+    }
+    showToast('สร้าง Doc ภาคผนวกสำหรับนักเรียน ' + report.students + ' คนแล้ว', 'success');
+    window.open(uploaded.link, '_blank');
+  } catch (err) {
+    showToast('เกิดข้อผิดพลาด: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = original;
+  }
 }
 
 /* ---------------------------------------------------- 5) การแสดงผลในเครื่องนี้ */
