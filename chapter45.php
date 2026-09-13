@@ -533,17 +533,69 @@ function c45PaintQuant() {
       + '</tr></thead><tbody>';
     keys.forEach(function (k) {
       const v = ir[k];
-      x += '<tr><td>' + c45Esc(v.label) + '</td><td class="text-center">' + v.k + '</td>'
-        + '<td class="text-center">' + v.n + '</td>'
-        + '<td class="text-center">' + c45R(v.icc.icc1) + '</td>'
-        + '<td class="text-center fw-bold">' + c45R(v.icc.iccK) + '</td>'
-        + '<td class="text-center">' + c45P(v.icc.p) + '</td>'
-        + '<td class="text-center"><span class="badge bg-primary-subtle text-primary-emphasis">' + c45Esc(v.icc_label) + '</span></td>'
-        + '<td class="small text-muted">'
-        + v.pearson.map(function (p) { return 'r = ' + c45R(p.r); }).join(', ')
-        + '</td></tr>';
+      const measures = v.measures || { overall: v };
+      Object.keys(measures).forEach(function (mk) {
+        const m = measures[mk];
+        x += '<tr><td>' + c45Esc(v.label + ' — ' + (m.label || 'คะแนนรวม')) + '</td><td class="text-center">' + v.k + '</td>'
+          + '<td class="text-center">' + m.n + '</td>'
+          + '<td class="text-center">' + c45R(m.icc.icc1) + '</td>'
+          + '<td class="text-center fw-bold">' + c45R(m.icc.iccK) + '</td>'
+          + '<td class="text-center">' + c45P(m.icc.p) + '</td>'
+          + '<td class="text-center"><span class="badge bg-primary-subtle text-primary-emphasis">' + c45Esc(m.icc_label) + '</span></td>'
+          + '<td class="small text-muted">'
+          + m.pearson.map(function (p, i) { return 'คู่ ' + (i + 1) + ': r = ' + c45R(p.r); }).join(', ')
+          + '</td></tr>';
+      });
     });
-    x += '</tbody></table></div>';
+    x += '</tbody></table>';
+    keys.forEach(function (k) {
+      const v = ir[k];
+      const scoreRows = Array.isArray(v.score_rows) ? v.score_rows : [];
+      if (!scoreRows.length) return;
+      x += '<div class="mt-3 fw-bold">คะแนนรายคนที่ใช้คำนวณ ICC — ' + c45Esc(v.label) + '</div>'
+        + '<div class="text-muted small mb-1">เลข 1, 2 และ 3 ในหัวตาราง หมายถึงผู้ตรวจคนที่ 1, 2 และ 3 ตามลำดับ · '
+        + v.raters.map(function (r, i) { return (i + 1) + ' = ' + c45Esc(String(r).split(':').slice(1).join(':') || r); }).join(' · ')
+        + '</div><div class="alert alert-light border py-2 small">ข้อมูลที่นำไปหา ICC คือคะแนนของนักเรียนชุดเดียวกันจากผู้ตรวจทุกคน '
+        + 'โดยคำนวณแยก 5 ชุด ได้แก่ คะแนนรวม และคะแนนด้านที่ 1–4 ก่อนคำนวณจะแสดงค่าเฉลี่ย (M) และส่วนเบี่ยงเบนมาตรฐาน (SD) ของผู้ตรวจแต่ละคน '
+        + 'จากนั้นใช้ two-way mixed effects, absolute agreement หาองค์ประกอบความแปรปรวนระหว่างนักเรียน ระหว่างผู้ตรวจ และความคลาดเคลื่อน '
+        + 'แล้วคำนวณ ICC(3,k) สำหรับความเที่ยงของคะแนนเฉลี่ยจากผู้ตรวจทั้ง k คน</div>'
+        + '<div class="table-responsive"><table class="table table-sm table-bordered align-middle mb-0"><thead class="table-light">'
+        + '<tr><th rowspan="2" class="text-center align-middle">นักเรียนคนที่</th>'
+        + '<th colspan="' + v.k + '" class="text-center">ด้าน 1 เนื้อหา <small>(27)</small></th>'
+        + '<th colspan="' + v.k + '" class="text-center">ด้าน 2 โครงสร้าง <small>(12)</small></th>'
+        + '<th colspan="' + v.k + '" class="text-center">ด้าน 3 ภาษา <small>(15)</small></th>'
+        + '<th colspan="' + v.k + '" class="text-center">ด้าน 4 อักขรวิธี <small>(6)</small></th>'
+        + '<th rowspan="2" class="text-center align-middle">คะแนนรวมเฉลี่ย<br><small>(60)</small></th></tr><tr>'
+        + ['d1', 'd2', 'd3', 'd4'].map(function () {
+            return v.raters.map(function (_r, i) { return '<th class="text-center">' + (i + 1) + '</th>'; }).join('');
+          }).join('') + '</tr></thead><tbody>';
+      scoreRows.forEach(function (row) {
+        x += '<tr><td class="text-center fw-bold">' + row.student_no + '</td>'
+          + ['d1', 'd2', 'd3', 'd4'].map(function (m) {
+              return (row.rater_scores || []).map(function (scores) { return '<td class="text-center">' + c45Num(scores[m]) + '</td>'; }).join('');
+            }).join('')
+          + '<td class="text-center table-light fw-bold">' + c45Num(row.means.overall) + '</td></tr>';
+      });
+      x += '</tbody><tfoot class="table-light"><tr><td class="text-center fw-bold">ค่าเฉลี่ย (M)</td>'
+        + ['d1', 'd2', 'd3', 'd4'].map(function (m) {
+            return v.measures[m].rater_descriptives.map(function (d) { return '<td class="text-center">' + c45Num(d.mean) + '</td>'; }).join('');
+          }).join('')
+        + '<td class="text-center fw-bold">' + c45Num(v.measures.overall.mean_descriptive.mean) + '</td></tr>'
+        + '<tr><td class="text-center fw-bold">ส่วนเบี่ยงเบนมาตรฐาน (SD)</td>'
+        + ['d1', 'd2', 'd3', 'd4'].map(function (m) {
+            return v.measures[m].rater_descriptives.map(function (d) { return '<td class="text-center">' + c45Num(d.sd) + '</td>'; }).join('');
+          }).join('')
+        + '<td class="text-center fw-bold">' + c45Num(v.measures.overall.mean_descriptive.sd) + '</td></tr>'
+        + '<tr class="fw-bold"><td class="text-center">สถิติความเที่ยง</td>'
+        + ['d1', 'd2', 'd3', 'd4'].map(function (m) {
+            const stat = v.measures[m];
+            return '<td colspan="' + v.k + '" class="text-center">ICC(3,k) = ' + c45R(stat.icc.iccK)
+              + '<br>p ' + c45P(stat.icc.p) + ' · ' + c45Esc(stat.icc_label) + '</td>';
+          }).join('')
+        + '<td class="text-center">ICC รวม = ' + c45R(v.measures.overall.icc.iccK)
+        + '<br>p ' + c45P(v.measures.overall.icc.p) + '</td></tr></tfoot></table></div>';
+    });
+    x += '</div>';
   } else {
     x += '<div class="alert alert-warning border-0 rounded-3 py-2 mb-0 small">'
       + 'ยังคำนวณความเที่ยงระหว่างผู้ประเมินไม่ได้ — ต้องมีผู้ประเมินตั้งแต่ 2 คนขึ้นไป'
@@ -2008,11 +2060,50 @@ function buildChapter45ReportHtml(chapter) {
     P.push(c45DocNote('ใช้ ICC แบบสองทางผสม ความสอดคล้องสัมบูรณ์ (two-way mixed effects, absolute agreement) '
       + 'เป็นค่าหลักในการสรุปผล ตามเกณฑ์แปลผลของ Koo & Li (2016) — Pearson r แสดงประกอบเป็นค่าความสัมพันธ์รายคู่เท่านั้น'));
     P.push(c45WrTable(['รอบ', 'ผู้ประเมิน (k)', 'n', 'ICC(3,1)', 'ICC(3,k)', 'p', 'แปลผล (ยึดตาม ICC)', 'Pearson r รายคู่ (ประกอบ)'],
-      irKeys.map(function (k) {
+      irKeys.reduce(function (rows, k) {
         const v = ir[k];
-        return [v.label, v.k, v.n, c45R(v.icc.icc1), c45R(v.icc.iccK), c45P(v.icc.p), v.icc_label,
-          v.pearson.map(function (pp) { return 'r = ' + c45R(pp.r); }).join(', ')];
-      })));
+        Object.keys(v.measures || { overall: v }).forEach(function (mk) {
+          const m = (v.measures || { overall: v })[mk];
+          rows.push([v.label + ' — ' + (m.label || 'คะแนนรวม'), v.k, m.n, c45R(m.icc.icc1), c45R(m.icc.iccK), c45P(m.icc.p), m.icc_label,
+            m.pearson.map(function (pp, i) { return 'คู่ ' + (i + 1) + ': r = ' + c45R(pp.r); }).join(', ')]);
+        });
+        return rows;
+      }, [])));
+    irKeys.forEach(function (k) {
+      const v = ir[k];
+      const scoreRows = Array.isArray(v.score_rows) ? v.score_rows : [];
+      if (!scoreRows.length) return;
+      P.push('<h3 class="sub">คะแนนรายคนที่ใช้คำนวณ ICC — ' + c45Esc(v.label) + '</h3>');
+      P.push(c45DocNote('เลข 1, 2 และ 3 หมายถึงผู้ตรวจคนที่ 1, 2 และ 3 ตามลำดับ ข้อมูลที่ใช้หา ICC แยกเป็นคะแนนรวมและคะแนนด้านที่ 1–4 ของนักเรียนชุดเดียวกันจากผู้ตรวจทุกคน ก่อนคำนวณแสดง M และ SD ของผู้ตรวจแต่ละคน แล้วใช้ two-way mixed effects, absolute agreement เพื่อหา ICC ของคะแนนเฉลี่ยจากผู้ตรวจ k คน · ' + v.raters.map(function (r, i) {
+        return (i + 1) + ' = ' + (String(r).split(':').slice(1).join(':') || r);
+      }).join(' · ')));
+      const detailHeaders = ['นักเรียนคนที่'];
+      ['ด้าน 1 เนื้อหา', 'ด้าน 2 โครงสร้าง', 'ด้าน 3 ภาษา', 'ด้าน 4 อักขรวิธี'].forEach(function (name) {
+        v.raters.forEach(function (_r, i) { detailHeaders.push(name + ' — ' + (i + 1)); });
+      });
+      detailHeaders.push('คะแนนรวมเฉลี่ย (60)');
+      const detailRows = scoreRows.map(function (row) {
+        const cells = [row.student_no];
+        ['d1', 'd2', 'd3', 'd4'].forEach(function (m) {
+          (row.rater_scores || []).forEach(function (scores) { cells.push(c45Num(scores[m])); });
+        });
+        cells.push(c45Num(row.means.overall));
+        return cells;
+      });
+      detailRows.push(['ค่าเฉลี่ย (M)'].concat(['d1', 'd2', 'd3', 'd4'].reduce(function (cells, m) {
+        return cells.concat(v.measures[m].rater_descriptives.map(function (desc) { return c45Num(desc.mean); }));
+      }, []), [c45Num(v.measures.overall.mean_descriptive.mean)]));
+      detailRows.push(['ส่วนเบี่ยงเบนมาตรฐาน (SD)'].concat(['d1', 'd2', 'd3', 'd4'].reduce(function (cells, m) {
+        return cells.concat(v.measures[m].rater_descriptives.map(function (desc) { return c45Num(desc.sd); }));
+      }, []), [c45Num(v.measures.overall.mean_descriptive.sd)]));
+      detailRows.push(['สถิติสำคัญ'].concat(['d1', 'd2', 'd3', 'd4'].reduce(function (cells, m) {
+        const stat = v.measures[m];
+        cells.push('ICC(3,k)=' + c45R(stat.icc.iccK) + '; p ' + c45P(stat.icc.p) + '; ' + stat.icc_label);
+        for (let i = 1; i < v.k; i++) cells.push('');
+        return cells;
+      }, []), ['ICC รวม=' + c45R(v.measures.overall.icc.iccK) + '; p ' + c45P(v.measures.overall.icc.p)]));
+      P.push(c45WrTable(detailHeaders, detailRows));
+    });
   } else {
     P.push(c45DocNote('ยังคำนวณความเที่ยงระหว่างผู้ประเมินไม่ได้ — ต้องมีผู้ประเมินตั้งแต่ 2 คนขึ้นไป'
       + 'ให้คะแนนผลงานชุดเดียวกันในรอบเดียวกัน'));
