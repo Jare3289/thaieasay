@@ -468,19 +468,30 @@ $titleChapters = (!$showCh5) ? 'บทที่ 4' : ((!$showCh4) ? 'บทท�
     echo rp_esc(implode(' · ', $raterNotes));
   ?></p>
   <table class="thesis">
-    <thead><tr><th>นักเรียนคนที่</th><th class="l">ผู้ให้คะแนน</th><th>รวม<br>(60)</th>
-      <th>ด้าน 1 เนื้อหา<br>(27)</th><th>ด้าน 2 โครงสร้าง<br>(12)</th>
-      <th>ด้าน 3 ภาษา<br>(15)</th><th>ด้าน 4 อักขรวิธี<br>(6)</th></tr></thead>
+    <thead><tr><th rowspan="2">นักเรียนคนที่</th>
+      <th colspan="<?php echo (int)$ir['k']; ?>">ด้าน 1 เนื้อหา (27)</th>
+      <th colspan="<?php echo (int)$ir['k']; ?>">ด้าน 2 โครงสร้าง (12)</th>
+      <th colspan="<?php echo (int)$ir['k']; ?>">ด้าน 3 ภาษา (15)</th>
+      <th colspan="<?php echo (int)$ir['k']; ?>">ด้าน 4 อักขรวิธี (6)</th>
+      <th rowspan="2">คะแนนรวมเฉลี่ย<br>(60)</th></tr><tr>
+      <?php foreach (['d1', 'd2', 'd3', 'd4'] as $_measure):
+        foreach ($ir['raters'] as $i => $_rater): ?><th>ผู้ตรวจ <?php echo $i + 1; ?></th><?php endforeach; endforeach; ?>
+    </tr></thead>
     <tbody>
-      <?php foreach ($scoreRows as $row):
-        foreach (($row['rater_scores'] ?? []) as $i => $scores): ?><tr>
-        <td class="c"><strong><?php echo (int)$row['student_no']; ?></strong></td><td class="l">ผู้ตรวจ <?php echo $i + 1; ?></td>
-        <?php foreach (['overall', 'd1', 'd2', 'd3', 'd4'] as $measure): ?><td class="c"><?php echo isset($scores[$measure]) && is_numeric($scores[$measure]) ? number_format((float)$scores[$measure], 2) : '—'; ?></td><?php endforeach; ?>
-      </tr><?php endforeach; ?><tr style="font-weight:700;background:#f8fafc">
-        <td class="c"><?php echo (int)$row['student_no']; ?></td><td class="l">เฉลี่ยผู้ตรวจ</td>
-        <?php foreach (['overall', 'd1', 'd2', 'd3', 'd4'] as $measure): ?><td class="c"><?php echo isset($row['means'][$measure]) && is_numeric($row['means'][$measure]) ? number_format((float)$row['means'][$measure], 2) : '—'; ?></td><?php endforeach; ?>
+      <?php foreach ($scoreRows as $row): ?><tr>
+        <td class="c"><strong><?php echo (int)$row['student_no']; ?></strong></td>
+        <?php foreach (['d1', 'd2', 'd3', 'd4'] as $measure):
+          foreach (($row['rater_scores'] ?? []) as $scores): ?><td class="c"><?php echo isset($scores[$measure]) && is_numeric($scores[$measure]) ? number_format((float)$scores[$measure], 2) : '—'; ?></td><?php endforeach; endforeach; ?>
+        <td class="c"><strong><?php echo number_format((float)$row['means']['overall'], 2); ?></strong></td>
       </tr><?php endforeach; ?>
     </tbody>
+    <tfoot><tr style="font-weight:700;background:#f8fafc"><td class="c">สถิติสำคัญ</td>
+      <?php foreach (['d1', 'd2', 'd3', 'd4'] as $measure): $stat = $ir['measures'][$measure]; ?>
+      <td colspan="<?php echo (int)$ir['k']; ?>" class="c">ICC(3,k) = <?php echo ch45_fmt_r($stat['icc']['iccK']); ?><br>
+        p <?php echo ch45_fmt_p($stat['icc']['p']); ?> · <?php echo rp_esc($stat['icc_label']); ?></td><?php endforeach; ?>
+      <td class="c">ICC รวม = <?php echo ch45_fmt_r($ir['measures']['overall']['icc']['iccK']); ?><br>
+        p <?php echo ch45_fmt_p($ir['measures']['overall']['icc']['p']); ?></td>
+    </tr></tfoot>
   </table>
   <?php endforeach; ?>
   <?php endif; ?>

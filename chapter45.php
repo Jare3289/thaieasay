@@ -557,19 +557,31 @@ function c45PaintQuant() {
         + v.raters.map(function (r, i) { return 'ผู้ตรวจ ' + (i + 1) + ': ' + c45Esc(String(r).split(':').slice(1).join(':') || r); }).join(' · ')
         + '</div><div class="alert alert-light border py-2 small">ข้อมูลที่นำไปหา ICC คือคะแนนของนักเรียนชุดเดียวกันจากผู้ตรวจทุกคน '
         + 'โดยคำนวณแยก 5 ชุด ได้แก่ คะแนนรวม และคะแนนด้านที่ 1–4 ตารางด้านล่างคือข้อมูลดิบครบทุกชุดที่ใช้คำนวณ</div>'
-        + '<div class="table-responsive"><table class="table table-sm table-bordered align-middle mb-0"><thead class="table-light"><tr>'
-        + '<th class="text-center">นักเรียนคนที่</th><th>ผู้ให้คะแนน</th><th class="text-center">รวม<br><small>(60)</small></th>'
-        + '<th class="text-center">ด้าน 1 เนื้อหา<br><small>(27)</small></th><th class="text-center">ด้าน 2 โครงสร้าง<br><small>(12)</small></th>'
-        + '<th class="text-center">ด้าน 3 ภาษา<br><small>(15)</small></th><th class="text-center">ด้าน 4 อักขรวิธี<br><small>(6)</small></th></tr></thead><tbody>';
+        + '<div class="table-responsive"><table class="table table-sm table-bordered align-middle mb-0"><thead class="table-light">'
+        + '<tr><th rowspan="2" class="text-center align-middle">นักเรียนคนที่</th>'
+        + '<th colspan="' + v.k + '" class="text-center">ด้าน 1 เนื้อหา <small>(27)</small></th>'
+        + '<th colspan="' + v.k + '" class="text-center">ด้าน 2 โครงสร้าง <small>(12)</small></th>'
+        + '<th colspan="' + v.k + '" class="text-center">ด้าน 3 ภาษา <small>(15)</small></th>'
+        + '<th colspan="' + v.k + '" class="text-center">ด้าน 4 อักขรวิธี <small>(6)</small></th>'
+        + '<th rowspan="2" class="text-center align-middle">คะแนนรวมเฉลี่ย<br><small>(60)</small></th></tr><tr>'
+        + ['d1', 'd2', 'd3', 'd4'].map(function () {
+            return v.raters.map(function (_r, i) { return '<th class="text-center">ผู้ตรวจ ' + (i + 1) + '</th>'; }).join('');
+          }).join('') + '</tr></thead><tbody>';
       scoreRows.forEach(function (row) {
-        (row.rater_scores || []).forEach(function (scores, i) {
-          x += '<tr><td class="text-center fw-bold">' + row.student_no + '</td><td>ผู้ตรวจ ' + (i + 1) + '</td>'
-            + ['overall', 'd1', 'd2', 'd3', 'd4'].map(function (m) { return '<td class="text-center">' + c45Num(scores[m]) + '</td>'; }).join('') + '</tr>';
-        });
-        x += '<tr class="table-light fw-bold"><td class="text-center">' + row.student_no + '</td><td>เฉลี่ยผู้ตรวจ</td>'
-          + ['overall', 'd1', 'd2', 'd3', 'd4'].map(function (m) { return '<td class="text-center">' + c45Num(row.means[m]) + '</td>'; }).join('') + '</tr>';
+        x += '<tr><td class="text-center fw-bold">' + row.student_no + '</td>'
+          + ['d1', 'd2', 'd3', 'd4'].map(function (m) {
+              return (row.rater_scores || []).map(function (scores) { return '<td class="text-center">' + c45Num(scores[m]) + '</td>'; }).join('');
+            }).join('')
+          + '<td class="text-center table-light fw-bold">' + c45Num(row.means.overall) + '</td></tr>';
       });
-      x += '</tbody></table></div>';
+      x += '</tbody><tfoot class="table-light fw-bold"><tr><td class="text-center">สถิติสำคัญ</td>'
+        + ['d1', 'd2', 'd3', 'd4'].map(function (m) {
+            const stat = v.measures[m];
+            return '<td colspan="' + v.k + '" class="text-center">ICC(3,k) = ' + c45R(stat.icc.iccK)
+              + '<br>p ' + c45P(stat.icc.p) + ' · ' + c45Esc(stat.icc_label) + '</td>';
+          }).join('')
+        + '<td class="text-center">ICC รวม = ' + c45R(v.measures.overall.icc.iccK)
+        + '<br>p ' + c45P(v.measures.overall.icc.p) + '</td></tr></tfoot></table></div>';
     });
     x += '</div>';
   } else {
@@ -2053,14 +2065,26 @@ function buildChapter45ReportHtml(chapter) {
       P.push(c45DocNote('ข้อมูลที่ใช้หา ICC แยกเป็นคะแนนรวมและคะแนนด้านที่ 1–4 ของนักเรียนชุดเดียวกันจากผู้ตรวจทุกคน · ' + v.raters.map(function (r, i) {
         return 'ผู้ตรวจ ' + (i + 1) + ': ' + (String(r).split(':').slice(1).join(':') || r);
       }).join(' · ')));
-      P.push(c45WrTable(['นักเรียนคนที่', 'ผู้ให้คะแนน', 'รวม (60)', 'ด้าน 1 เนื้อหา (27)', 'ด้าน 2 โครงสร้าง (12)', 'ด้าน 3 ภาษา (15)', 'ด้าน 4 อักขรวิธี (6)'],
-        scoreRows.reduce(function (rows, row) {
-          (row.rater_scores || []).forEach(function (scores, i) {
-            rows.push([row.student_no, 'ผู้ตรวจ ' + (i + 1), c45Num(scores.overall), c45Num(scores.d1), c45Num(scores.d2), c45Num(scores.d3), c45Num(scores.d4)]);
-          });
-          rows.push([row.student_no, 'เฉลี่ยผู้ตรวจ', c45Num(row.means.overall), c45Num(row.means.d1), c45Num(row.means.d2), c45Num(row.means.d3), c45Num(row.means.d4)]);
-          return rows;
-        }, [])));
+      const detailHeaders = ['นักเรียนคนที่'];
+      ['ด้าน 1 เนื้อหา', 'ด้าน 2 โครงสร้าง', 'ด้าน 3 ภาษา', 'ด้าน 4 อักขรวิธี'].forEach(function (name) {
+        v.raters.forEach(function (_r, i) { detailHeaders.push(name + ' — ผู้ตรวจ ' + (i + 1)); });
+      });
+      detailHeaders.push('คะแนนรวมเฉลี่ย (60)');
+      const detailRows = scoreRows.map(function (row) {
+        const cells = [row.student_no];
+        ['d1', 'd2', 'd3', 'd4'].forEach(function (m) {
+          (row.rater_scores || []).forEach(function (scores) { cells.push(c45Num(scores[m])); });
+        });
+        cells.push(c45Num(row.means.overall));
+        return cells;
+      });
+      detailRows.push(['สถิติสำคัญ'].concat(['d1', 'd2', 'd3', 'd4'].reduce(function (cells, m) {
+        const stat = v.measures[m];
+        cells.push('ICC(3,k)=' + c45R(stat.icc.iccK) + '; p ' + c45P(stat.icc.p) + '; ' + stat.icc_label);
+        for (let i = 1; i < v.k; i++) cells.push('');
+        return cells;
+      }, []), ['ICC รวม=' + c45R(v.measures.overall.icc.iccK) + '; p ' + c45P(v.measures.overall.icc.p)]));
+      P.push(c45WrTable(detailHeaders, detailRows));
     });
   } else {
     P.push(c45DocNote('ยังคำนวณความเที่ยงระหว่างผู้ประเมินไม่ได้ — ต้องมีผู้ประเมินตั้งแต่ 2 คนขึ้นไป'
