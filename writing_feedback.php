@@ -445,6 +445,10 @@ $aiNormPhases = ai_norm_phases();
                     style="background:linear-gradient(135deg,#0f766e,#15803d);" onclick="startNormalizeAll()">
               <i class="bi bi-magic me-1"></i>แก้ทั้งหมด (<?php echo count($aiNormPhases); ?> รอบที่ใช้วิเคราะห์)
             </button>
+            <button id="normDownloadBtn" class="btn btn-outline-success fw-bold rounded-pill px-3"
+                    type="button" onclick="downloadNormalizedEssays()" disabled>
+              <i class="bi bi-filetype-txt me-1"></i>ดาวน์โหลด .txt
+            </button>
             <button id="normStopBtn" class="btn btn-outline-danger rounded-pill px-3 d-none" onclick="stopNormalize()">
               <i class="bi bi-stop-fill me-1"></i>หยุด
             </button>
@@ -452,7 +456,7 @@ $aiNormPhases = ai_norm_phases();
           <div class="small text-muted mt-2">
             ครอบคลุม <strong><?php
               echo htmlspecialchars(implode(' · ', array_map('ai_phase_label', $aiNormPhases)));
-            ?></strong>
+            ?></strong> · ไฟล์ดาวน์โหลดระบุ “นักเรียนคนที่” โดยเรียงจากรหัสนักเรียน และส่งออกเฉพาะฉบับที่ตรงกับต้นฉบับล่าสุด
           </div>
         </div>
       </div>
@@ -2997,6 +3001,14 @@ function paintNormSummary() {
   badge.classList.toggle('d-none', pending === 0);
 
   document.getElementById('normStartBtn').disabled = (queue === 0 || normRunning);
+  document.getElementById('normDownloadBtn').disabled = (done === 0 || normRunning);
+}
+
+function downloadNormalizedEssays() {
+  const params = new URLSearchParams();
+  const room = document.getElementById('normRoom').value;
+  if (room) params.set('classroom', room);
+  window.location.href = 'export_normalized_essays.php' + (params.toString() ? '?' + params.toString() : '');
 }
 
 function normLogLine(icon, cls, name, msg) {
