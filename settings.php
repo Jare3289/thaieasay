@@ -306,7 +306,8 @@ require_once 'header.php';
         <hr class="my-4">
         <h6 class="fw-bold"><i class="bi bi-file-earmark-richtext text-primary me-2"></i>สร้าง Google Doc ภาคผนวกข้อมูลดิบ</h6>
         <p class="text-muted small">
-          รวมคะแนน Pre-test/Post-test รายด้านและรายผู้ตรวจพร้อมค่าเฉลี่ย คะแนนผลงานในแผนที่ 1–2
+          แยกตารางคะแนนดิบรายด้านของ Pre-test, Post-test และผลงานแต่ละหน่วยออกจากกัน
+          พร้อมตารางสรุปที่แสดงเฉพาะคะแนนรวมของแต่ละรอบ
           และแบบบันทึกร่องรอยข้อบกพร่องเชิงคุณภาพรายบุคคลไว้ในเอกสารเดียว
         </p>
         <div class="row g-3 align-items-end">
