@@ -35,59 +35,70 @@ function appendix_quality($score) {
     return function_exists('ai_quality_level') ? ai_quality_level((float)$score) : '—';
 }
 
-/** ตารางสรุปรายคนแบบก่อน–หลังตามรูปแบบภาคผนวก (คะแนนเป็นค่าเฉลี่ยผู้ตรวจที่ตั้งไว้ในงานวิจัย) */
-function appendix_score_table(array $ds, array $phases, $caption) {
+/** ตารางคะแนนรายด้านของรอบ/หน่วยเดียว (คะแนนเป็นค่าเฉลี่ยผู้ตรวจที่ตั้งไว้ในงานวิจัย) */
+function appendix_phase_score_table(array $ds, $phase, $caption) {
     $domains = ch45_domains();
-    $phaseKeys = array_keys($phases);
-    $first = $phaseKeys[0]; $second = $phaseKeys[1];
-    $diffLabel = ($first === 'pretest' && $second === 'posttest') ? 'Post − Pre' : 'แผน 2 − แผน 1';
     $html = '<h2>' . appendix_h($caption) . '</h2>';
-    $html .= '<table class="score-summary"><thead><tr><th rowspan="2">รหัสนักเรียน</th>'
-        . '<th colspan="5">' . appendix_h($phases[$first]) . '</th><th colspan="5">' . appendix_h($phases[$second]) . '</th>'
-        . '<th rowspan="2">ผลต่าง<br>(' . appendix_h($diffLabel) . ')</th><th rowspan="2">ระดับคุณภาพ<br>' . appendix_h($phases[$second]) . '</th></tr><tr>';
-    foreach ([1, 2] as $_) {
-        foreach ($domains as $domain) $html .= '<th>ด้าน ' . $domain['no'] . '<br>(' . $domain['max'] . ')</th>';
-        $html .= '<th>รวม<br>(60)</th>';
-    }
-    $html .= '</tr></thead><tbody>';
+    $html .= '<table class="score-detail"><thead><tr><th>รหัสนักเรียน</th>';
+    foreach ($domains as $domain) $html .= '<th>ด้าน ' . $domain['no'] . '<br>(' . $domain['max'] . ')</th>';
+    $html .= '<th>คะแนนรวม<br>(60)</th><th>จำนวนผู้ตรวจ</th><th>ระดับคุณภาพ</th></tr></thead><tbody>';
     $series = [];
-    foreach ([$first, $second] as $phase) foreach (array_merge(array_keys($domains), ['total']) as $key) $series[$phase][$key] = [];
+    foreach (array_merge(array_keys($domains), ['total']) as $key) $series[$key] = [];
     foreach ($ds['sids'] as $sid) {
-        $scores = [];
-        foreach ([$first, $second] as $phase) {
-            $score = ch45_scores_of($ds, $sid, $phase);
-            $scores[$phase] = $score;
-            $dom = $score ? ch45_domain_total($score['weighted']) : [];
-            foreach ($domains as $key => $domain) {
-                $value = $dom[$key] ?? null;
-                if ($value !== null) $series[$phase][$key][] = $value;
-            }
-            if (($score['total'] ?? null) !== null) $series[$phase]['total'][] = $score['total'];
+        $score = ch45_scores_of($ds, $sid, $phase);
+        $dom = $score ? ch45_domain_total($score['weighted']) : [];
+        foreach ($domains as $key => $domain) {
+            $value = $dom[$key] ?? null;
+            if ($value !== null) $series[$key][] = $value;
         }
+        if (($score['total'] ?? null) !== null) $series['total'][] = $score['total'];
         $html .= '<tr><td>' . str_pad((string)$ds['students'][$sid]['no'], 2, '0', STR_PAD_LEFT) . '</td>';
-        foreach ([$first, $second] as $phase) {
-            $dom = $scores[$phase] ? ch45_domain_total($scores[$phase]['weighted']) : [];
-            foreach ($domains as $key => $domain) $html .= '<td class="num">' . appendix_number($dom[$key] ?? null) . '</td>';
-            $html .= '<td class="num">' . appendix_number($scores[$phase]['total'] ?? null) . '</td>';
-        }
-        $a = $scores[$first]['total'] ?? null; $b = $scores[$second]['total'] ?? null;
-        $html .= '<td class="num">' . appendix_number($a !== null && $b !== null ? $b - $a : null) . '</td>'
-            . '<td>' . appendix_h(appendix_quality($b)) . '</td></tr>';
+        foreach ($domains as $key => $domain) $html .= '<td class="num">' . appendix_number($dom[$key] ?? null) . '</td>';
+        $html .= '<td class="num">' . appendix_number($score['total'] ?? null) . '</td>'
+            . '<td class="num">' . ($score ? (int)$score['raters'] : '—') . '</td>'
+            . '<td>' . appendix_h(appendix_quality($score['total'] ?? null)) . '</td></tr>';
     }
-    if (!$ds['sids']) $html .= '<tr><td colspan="13">ไม่พบนักเรียนในขอบเขตที่เลือก</td></tr>';
+    if (!$ds['sids']) $html .= '<tr><td colspan="8">ไม่พบนักเรียนในขอบเขตที่เลือก</td></tr>';
     foreach (['mean' => 'เฉลี่ย (X̄)', 'sd' => 'S.D.', 'pct' => 'ร้อยละ (%)'] as $stat => $label) {
         $html .= '<tr class="average"><td>' . $label . '</td>';
-        foreach ([$first, $second] as $phase) {
-            foreach ($domains as $key => $domain) {
-                $d = ch45_describe($series[$phase][$key]);
-                $value = $stat === 'mean' ? $d['mean'] : ($stat === 'sd' ? $d['sd'] : ($d['mean'] === null ? null : $d['mean'] * 100 / $domain['max']));
-                $html .= '<td class="num">' . appendix_number($value) . '</td>';
-            }
-            $d = ch45_describe($series[$phase]['total']);
-            $value = $stat === 'mean' ? $d['mean'] : ($stat === 'sd' ? $d['sd'] : ($d['mean'] === null ? null : $d['mean'] * 100 / 60));
+        foreach ($domains as $key => $domain) {
+            $d = ch45_describe($series[$key]);
+            $value = $stat === 'mean' ? $d['mean'] : ($stat === 'sd' ? $d['sd'] : ($d['mean'] === null ? null : $d['mean'] * 100 / $domain['max']));
             $html .= '<td class="num">' . appendix_number($value) . '</td>';
         }
-        $html .= '<td colspan="2">—</td></tr>';
+        $d = ch45_describe($series['total']);
+        $value = $stat === 'mean' ? $d['mean'] : ($stat === 'sd' ? $d['sd'] : ($d['mean'] === null ? null : $d['mean'] * 100 / 60));
+        $html .= '<td class="num">' . appendix_number($value) . '</td><td colspan="2">—</td></tr>';
+    }
+    return $html . '</tbody></table>';
+}
+
+/** ตารางรวมแสดงเฉพาะคะแนนรวมของแต่ละรอบ ไม่ซ้ำคะแนนรายด้าน */
+function appendix_total_comparison_table(array $ds, array $phases, $caption, $diffLabel) {
+    $keys = array_keys($phases);
+    $html = '<h2>' . appendix_h($caption) . '</h2><table class="score-summary"><thead><tr><th>รหัสนักเรียน</th>';
+    foreach ($phases as $label) $html .= '<th>' . appendix_h($label) . '<br>(60)</th>';
+    $html .= '<th>ผลต่าง<br>(' . appendix_h($diffLabel) . ')</th></tr></thead><tbody>';
+    $series = array_fill_keys($keys, []); $differences = [];
+    foreach ($ds['sids'] as $sid) {
+        $totals = [];
+        foreach ($keys as $phase) {
+            $score = ch45_scores_of($ds, $sid, $phase);
+            $totals[$phase] = $score['total'] ?? null;
+            if ($totals[$phase] !== null) $series[$phase][] = $totals[$phase];
+        }
+        $difference = $totals[$keys[0]] !== null && $totals[$keys[1]] !== null
+            ? $totals[$keys[1]] - $totals[$keys[0]] : null;
+        if ($difference !== null) $differences[] = $difference;
+        $html .= '<tr><td>' . str_pad((string)$ds['students'][$sid]['no'], 2, '0', STR_PAD_LEFT) . '</td>';
+        foreach ($keys as $phase) $html .= '<td class="num">' . appendix_number($totals[$phase]) . '</td>';
+        $html .= '<td class="num">' . appendix_number($difference) . '</td></tr>';
+    }
+    if (!$ds['sids']) $html .= '<tr><td colspan="4">ไม่พบนักเรียนในขอบเขตที่เลือก</td></tr>';
+    foreach (['mean' => 'เฉลี่ย (X̄)', 'sd' => 'S.D.'] as $stat => $label) {
+        $html .= '<tr class="average"><td>' . $label . '</td>';
+        foreach ($keys as $phase) { $d = ch45_describe($series[$phase]); $html .= '<td class="num">' . appendix_number($d[$stat]) . '</td>'; }
+        $d = ch45_describe($differences); $html .= '<td class="num">' . appendix_number($d[$stat]) . '</td></tr>';
     }
     return $html . '</tbody></table>';
 }
@@ -223,11 +234,16 @@ try {
     $body = '<h1>ภาคผนวก<br>คะแนนดิบและหลักฐานการประเมินผลงาน</h1>'
         . '<p class="center">ขอบเขตข้อมูล: ' . appendix_h($scope) . ' · นักเรียน ' . count($ds['sids']) . ' คน</p>'
         . '<p class="note">คะแนนรายด้าน ได้แก่ เนื้อหาสาระ 27 คะแนน องค์ประกอบและการลำดับเรื่อง 12 คะแนน การใช้สำนวนภาษา 15 คะแนน และอักขรวิธีและกลไกการเขียน 6 คะแนน รวม 60 คะแนน ค่าเฉลี่ยคำนวณจากผู้ตรวจที่มีข้อมูลจริง โดยแสดงจำนวนผู้ตรวจกำกับทุกแถว</p>';
-    $body .= appendix_score_table($ds, ['pretest' => 'ก่อนเรียน (Pre-test)', 'posttest' => 'หลังเรียน (Post-test)'],
-        'ตารางคะแนนดิบการทดสอบก่อนเรียนและหลังเรียน (Pre-test & Post-test)');
-    $body .= '<div class="pagebreak"></div>' . appendix_score_table($ds,
-        ['task1' => 'แผนการเรียนรู้ที่ 1 (เรียงความเชิงบรรยาย)', 'task2' => 'แผนการเรียนรู้ที่ 2 (เรียงความเชิงวิจารณ์)'],
-        'ตารางคะแนนดิบและการประเมินผลงานระหว่างเรียน');
+    $body .= appendix_phase_score_table($ds, 'pretest', 'ตารางคะแนนดิบก่อนเรียน (Pre-test)');
+    $body .= '<div class="pagebreak"></div>' . appendix_phase_score_table($ds, 'posttest', 'ตารางคะแนนดิบหลังเรียน (Post-test)');
+    $body .= '<div class="pagebreak"></div>' . appendix_total_comparison_table($ds,
+        ['pretest' => 'คะแนนรวมก่อนเรียน', 'posttest' => 'คะแนนรวมหลังเรียน'],
+        'ตารางสรุปคะแนนรวมก่อนเรียนและหลังเรียน', 'Post − Pre');
+    $body .= '<div class="pagebreak"></div>' . appendix_phase_score_table($ds, 'task1', 'ตารางคะแนนดิบหน่วยการเรียนรู้ที่ 1 (เรียงความเชิงบรรยาย)');
+    $body .= '<div class="pagebreak"></div>' . appendix_phase_score_table($ds, 'task2', 'ตารางคะแนนดิบหน่วยการเรียนรู้ที่ 2 (เรียงความเชิงวิจารณ์)');
+    $body .= '<div class="pagebreak"></div>' . appendix_total_comparison_table($ds,
+        ['task1' => 'คะแนนรวมหน่วยที่ 1', 'task2' => 'คะแนนรวมหน่วยที่ 2'],
+        'ตารางสรุปคะแนนรวมแยกตามหน่วยการเรียนรู้', 'หน่วย 2 − หน่วย 1');
     $body .= appendix_icc_section($iccDs);
     $body .= appendix_defect_records($ds);
     $css = '@page{size:A4 landscape;margin:1.2cm}body{font-family:"TH Sarabun New",Tahoma,sans-serif;font-size:14pt;color:#111}h1{text-align:center;font-size:24pt;margin:90pt 0 24pt}h2{font-size:18pt;margin:22pt 0 8pt}h3{font-size:15pt;margin:18pt 0 5pt}.center{text-align:center}.note{color:#444}.pagebreak{page-break-before:always}table{border-collapse:collapse;width:100%;margin:8pt 0 18pt;font-size:10.5pt}th,td{border:1px solid #555;padding:4pt;vertical-align:top}th{background:#e2e8f0;text-align:center}.num{text-align:right}.average{font-weight:bold;background:#f1f5f9}.empty{text-align:center;color:#777}';
