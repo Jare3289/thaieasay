@@ -20,6 +20,23 @@ $room = isset($_GET['classroom']) ? trim((string)$_GET['classroom']) : '';
 $phases = ai_norm_phases();
 $phaseOrder = array_flip($phases);
 
+// ถ้าส่งรายการมา ให้ดาวน์โหลดเฉพาะฉบับที่ครูเลือก รูปแบบแต่ละค่า: student_id|essay_phase
+$selectedItems = null;
+if (isset($_POST['items']) && is_array($_POST['items'])) {
+    $selectedItems = [];
+    foreach ($_POST['items'] as $item) {
+        $parts = explode('|', (string)$item, 2);
+        if (count($parts) !== 2 || $parts[0] === '' || !isset($phaseOrder[$parts[1]])) continue;
+        $selectedItems[$parts[0] . '|' . $parts[1]] = true;
+    }
+    if (!$selectedItems) {
+        http_response_code(400);
+        header('Content-Type: text/plain; charset=utf-8');
+        echo 'กรุณาเลือกเรียงความอย่างน้อย 1 ฉบับ';
+        exit;
+    }
+}
+
 $sql = "
     SELECT se.student_id, se.essay_phase, se.intro_content AS source_intro,
            se.body_content AS source_body, se.conclusion_content AS source_conclusion,
@@ -52,6 +69,8 @@ try {
 // ตัดฉบับที่ล้าสมัยออก และเรียงรอบงานตามลำดับที่ใช้ในการเรียน
 $validRows = [];
 foreach ($rows as $row) {
+    $itemKey = (string)$row['student_id'] . '|' . (string)$row['essay_phase'];
+    if ($selectedItems !== null && !isset($selectedItems[$itemKey])) continue;
     $sourceBody = json_decode((string)($row['source_body'] ?? ''), true);
     if (!is_array($sourceBody)) {
         $sourceBody = (($row['source_body'] ?? '') !== '') ? [(string)$row['source_body']] : [];

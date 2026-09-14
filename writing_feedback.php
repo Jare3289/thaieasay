@@ -446,8 +446,8 @@ $aiNormPhases = ai_norm_phases();
               <i class="bi bi-magic me-1"></i>แก้ทั้งหมด (<?php echo count($aiNormPhases); ?> รอบที่ใช้วิเคราะห์)
             </button>
             <button id="normDownloadBtn" class="btn btn-outline-success fw-bold rounded-pill px-3"
-                    type="button" onclick="downloadNormalizedEssays()" disabled>
-              <i class="bi bi-filetype-txt me-1"></i>ดาวน์โหลด .txt
+                    type="button" onclick="openNormalizedDownloadPicker()" disabled>
+              <i class="bi bi-filetype-txt me-1"></i>เลือกและดาวน์โหลด .txt
             </button>
             <button id="normStopBtn" class="btn btn-outline-danger rounded-pill px-3 d-none" onclick="stopNormalize()">
               <i class="bi bi-stop-fill me-1"></i>หยุด
@@ -557,6 +557,38 @@ $aiNormPhases = ai_norm_phases();
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
       </div>
       <div class="modal-body p-4" id="aiCritBody"></div>
+    </div>
+  </div>
+</div>
+
+<!-- เลือกเฉพาะฉบับจัดวรรคแล้วที่ต้องการรวมในไฟล์ TXT -->
+<div class="modal fade" id="normDownloadModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content border-0 rounded-4">
+      <div class="modal-header border-bottom">
+        <div>
+          <h6 class="fw-bold text-dark mb-0"><i class="bi bi-filetype-txt text-success me-2"></i>เลือกเรียงความที่จะดาวน์โหลด</h6>
+          <div class="text-muted small mt-1">เลือกได้เป็นรายฉบับ แล้วระบบจะรวมรายการที่เลือกไว้ในไฟล์ TXT ไฟล์เดียว</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
+      </div>
+      <div class="modal-body p-4">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+          <div id="normDownloadCount" class="small fw-bold text-success"></div>
+          <div class="btn-group btn-group-sm" role="group" aria-label="เลือกเรียงความ">
+            <button type="button" class="btn btn-outline-success" onclick="setAllNormalizedDownloads(true)">เลือกทั้งหมด</button>
+            <button type="button" class="btn btn-outline-secondary" onclick="setAllNormalizedDownloads(false)">ไม่เลือกทั้งหมด</button>
+          </div>
+        </div>
+        <div id="normDownloadList"></div>
+      </div>
+      <div class="modal-footer border-top">
+        <button type="button" class="btn btn-light rounded-pill px-3" data-bs-dismiss="modal">ยกเลิก</button>
+        <button id="normDownloadConfirmBtn" type="button" class="btn btn-success fw-bold rounded-pill px-4"
+                onclick="downloadNormalizedEssays()">
+          <i class="bi bi-download me-1"></i>ดาวน์โหลดรายการที่เลือก
+        </button>
+      </div>
     </div>
   </div>
 </div>
@@ -3004,11 +3036,71 @@ function paintNormSummary() {
   document.getElementById('normDownloadBtn').disabled = (done === 0 || normRunning);
 }
 
+function normalizedDownloadTargets() {
+  return normTargets.filter(t => t.normalized);
+}
+
+function openNormalizedDownloadPicker() {
+  const targets = normalizedDownloadTargets();
+  const grouped = AI_NORM_PHASES.map(ph => ({
+    phase: ph,
+    items: targets.filter(t => t.essay_phase === ph),
+  })).filter(group => group.items.length);
+
+  document.getElementById('normDownloadList').innerHTML = grouped.map(group => `
+    <div class="border rounded-3 mb-3 overflow-hidden">
+      <div class="bg-light border-bottom px-3 py-2 fw-bold small">
+        ${esc(AI_PHASE_LABELS[group.phase] || group.phase)}
+        <span class="badge bg-white text-dark border ms-1">${group.items.length} ฉบับ</span>
+      </div>
+      <div class="row g-0">
+        ${group.items.map(t => `
+          <label class="col-md-6 px-3 py-2 border-bottom small d-flex gap-2 align-items-start">
+            <input class="form-check-input norm-download-item mt-1" type="checkbox" checked
+                   value="${esc(t.student_id + '|' + t.essay_phase)}" onchange="updateNormalizedDownloadCount()">
+            <span><strong>${esc(t.student_name || t.student_id)}</strong><br>
+              <span class="text-muted">รหัส ${esc(t.student_id)}${t.classroom ? ' · ห้อง ' + esc(t.classroom) : ''}</span>
+            </span>
+          </label>`).join('')}
+      </div>
+    </div>`).join('') || '<div class="text-center text-muted py-4">ยังไม่มีฉบับที่พร้อมดาวน์โหลด</div>';
+
+  updateNormalizedDownloadCount();
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('normDownloadModal')).show();
+}
+
+function setAllNormalizedDownloads(checked) {
+  document.querySelectorAll('.norm-download-item').forEach(box => { box.checked = checked; });
+  updateNormalizedDownloadCount();
+}
+
+function updateNormalizedDownloadCount() {
+  const total = document.querySelectorAll('.norm-download-item').length;
+  const selected = document.querySelectorAll('.norm-download-item:checked').length;
+  document.getElementById('normDownloadCount').textContent = `เลือกแล้ว ${selected} จาก ${total} ฉบับ`;
+  document.getElementById('normDownloadConfirmBtn').disabled = selected === 0;
+}
+
 function downloadNormalizedEssays() {
-  const params = new URLSearchParams();
-  const room = document.getElementById('normRoom').value;
-  if (room) params.set('classroom', room);
-  window.location.href = 'export_normalized_essays.php' + (params.toString() ? '?' + params.toString() : '');
+  const selected = Array.from(document.querySelectorAll('.norm-download-item:checked')).map(box => box.value);
+  if (!selected.length) return;
+
+  // ใช้ POST เพื่อรองรับการเลือกจำนวนมากโดยไม่ติดข้อจำกัดความยาว URL
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = 'export_normalized_essays.php';
+  form.className = 'd-none';
+  selected.forEach(value => {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'items[]';
+    input.value = value;
+    form.appendChild(input);
+  });
+  document.body.appendChild(form);
+  form.submit();
+  form.remove();
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('normDownloadModal')).hide();
 }
 
 function normLogLine(icon, cls, name, msg) {
