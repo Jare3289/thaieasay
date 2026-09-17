@@ -73,6 +73,57 @@ function appendix_phase_score_table(array $ds, $phase, $caption) {
     return $html . '</tbody></table>';
 }
 
+/** ตารางคะแนนถ่วงน้ำหนักรายตัวบ่งชี้ครบทั้ง 11 ข้อของหน่วยการเรียนรู้หนึ่งหน่วย */
+function appendix_indicator_score_table(array $ds, $phase, $caption) {
+    $indicators = ch45_indicators();
+    $html = '<h2>' . appendix_h($caption) . '</h2>'
+        . '<p class="note">คะแนนในตารางเป็นคะแนนหลังถ่วงน้ำหนักตามเกณฑ์ของแต่ละตัวบ่งชี้ และใช้แหล่งคะแนนเดียวกับการวิเคราะห์หลัก</p>'
+        . '<table class="indicator-detail"><thead><tr><th>รหัสนักเรียน</th>';
+    foreach ($indicators as $id => $indicator) {
+        $html .= '<th>' . appendix_h($id) . '<br>(' . appendix_number($indicator['max']) . ')</th>';
+    }
+    $html .= '<th>รวม<br>(60)</th><th>จำนวนผู้ตรวจ</th></tr></thead><tbody>';
+
+    $series = array_fill_keys(array_keys($indicators), []);
+    $series['total'] = [];
+    foreach ($ds['sids'] as $sid) {
+        $score = ch45_scores_of($ds, $sid, $phase);
+        $html .= '<tr><td>' . str_pad((string)$ds['students'][$sid]['no'], 2, '0', STR_PAD_LEFT) . '</td>';
+        foreach ($indicators as $id => $indicator) {
+            $value = $score['weighted'][$id] ?? null;
+            if ($value !== null) $series[$id][] = $value;
+            $html .= '<td class="num">' . appendix_number($value) . '</td>';
+        }
+        $total = $score['total'] ?? null;
+        if ($total !== null) $series['total'][] = $total;
+        $html .= '<td class="num">' . appendix_number($total) . '</td>'
+            . '<td class="num">' . ($score ? (int)$score['raters'] : '—') . '</td></tr>';
+    }
+    if (!$ds['sids']) $html .= '<tr><td colspan="14">ไม่พบนักเรียนในขอบเขตที่เลือก</td></tr>';
+
+    foreach (['mean' => 'เฉลี่ย (X̄)', 'sd' => 'S.D.', 'pct' => 'ร้อยละ (%)'] as $stat => $label) {
+        $html .= '<tr class="average"><td>' . $label . '</td>';
+        foreach ($indicators as $id => $indicator) {
+            $description = ch45_describe($series[$id]);
+            $value = $stat === 'mean' ? $description['mean']
+                : ($stat === 'sd' ? $description['sd']
+                    : ($description['mean'] === null ? null : $description['mean'] * 100 / $indicator['max']));
+            $html .= '<td class="num">' . appendix_number($value) . '</td>';
+        }
+        $description = ch45_describe($series['total']);
+        $value = $stat === 'mean' ? $description['mean']
+            : ($stat === 'sd' ? $description['sd']
+                : ($description['mean'] === null ? null : $description['mean'] * 100 / 60));
+        $html .= '<td class="num">' . appendix_number($value) . '</td><td>—</td></tr>';
+    }
+    $html .= '</tbody></table><div class="indicator-key"><strong>คำอธิบายตัวบ่งชี้:</strong><ol>';
+    foreach ($indicators as $id => $indicator) {
+        $html .= '<li><strong>' . appendix_h($id) . '</strong> ' . appendix_h($indicator['name'])
+            . ' (เต็ม ' . appendix_number($indicator['max']) . ' คะแนน)</li>';
+    }
+    return $html . '</ol></div>';
+}
+
 /** ตารางรวมแสดงเฉพาะคะแนนรวมของแต่ละรอบ ไม่ซ้ำคะแนนรายด้าน */
 function appendix_total_comparison_table(array $ds, array $phases, $caption, $diffLabel) {
     $keys = array_keys($phases);
@@ -240,13 +291,15 @@ try {
         ['pretest' => 'คะแนนรวมก่อนเรียน', 'posttest' => 'คะแนนรวมหลังเรียน'],
         'ตารางสรุปคะแนนรวมก่อนเรียนและหลังเรียน', 'Post − Pre');
     $body .= '<div class="pagebreak"></div>' . appendix_phase_score_table($ds, 'task1', 'ตารางคะแนนดิบหน่วยการเรียนรู้ที่ 1 (เรียงความเชิงบรรยาย)');
+    $body .= '<div class="pagebreak"></div>' . appendix_indicator_score_table($ds, 'task1', 'ตารางคะแนนรายตัวบ่งชี้ หน่วยการเรียนรู้ที่ 1 (ครบ 11 ตัวบ่งชี้)');
     $body .= '<div class="pagebreak"></div>' . appendix_phase_score_table($ds, 'task2', 'ตารางคะแนนดิบหน่วยการเรียนรู้ที่ 2 (เรียงความเชิงวิจารณ์)');
+    $body .= '<div class="pagebreak"></div>' . appendix_indicator_score_table($ds, 'task2', 'ตารางคะแนนรายตัวบ่งชี้ หน่วยการเรียนรู้ที่ 2 (ครบ 11 ตัวบ่งชี้)');
     $body .= '<div class="pagebreak"></div>' . appendix_total_comparison_table($ds,
         ['task1' => 'คะแนนรวมหน่วยที่ 1', 'task2' => 'คะแนนรวมหน่วยที่ 2'],
         'ตารางสรุปคะแนนรวมแยกตามหน่วยการเรียนรู้', 'หน่วย 2 − หน่วย 1');
     $body .= appendix_icc_section($iccDs);
     $body .= appendix_defect_records($ds);
-    $css = '@page{size:A4 landscape;margin:1.2cm}body{font-family:"TH Sarabun New",Tahoma,sans-serif;font-size:14pt;color:#111}h1{text-align:center;font-size:24pt;margin:90pt 0 24pt}h2{font-size:18pt;margin:22pt 0 8pt}h3{font-size:15pt;margin:18pt 0 5pt}.center{text-align:center}.note{color:#444}.pagebreak{page-break-before:always}table{border-collapse:collapse;width:100%;margin:8pt 0 18pt;font-size:10.5pt}th,td{border:1px solid #555;padding:4pt;vertical-align:top}th{background:#e2e8f0;text-align:center}.num{text-align:right}.average{font-weight:bold;background:#f1f5f9}.empty{text-align:center;color:#777}';
+    $css = '@page{size:A4 landscape;margin:1.2cm}body{font-family:"TH Sarabun New",Tahoma,sans-serif;font-size:14pt;color:#111}h1{text-align:center;font-size:24pt;margin:90pt 0 24pt}h2{font-size:18pt;margin:22pt 0 8pt}h3{font-size:15pt;margin:18pt 0 5pt}.center{text-align:center}.note{color:#444}.pagebreak{page-break-before:always}table{border-collapse:collapse;width:100%;margin:8pt 0 18pt;font-size:10.5pt}th,td{border:1px solid #555;padding:4pt;vertical-align:top}th{background:#e2e8f0;text-align:center}.indicator-detail{font-size:9pt}.indicator-detail th,.indicator-detail td{padding:3pt}.indicator-key{font-size:10.5pt;columns:2;column-gap:24pt}.indicator-key ol{margin-top:4pt}.num{text-align:right}.average{font-weight:bold;background:#f1f5f9}.empty{text-align:center;color:#777}';
     $html = '<!doctype html><html lang="th"><head><meta charset="utf-8"><title>ภาคผนวกคะแนนดิบ</title><style>' . $css . '</style></head><body>' . $body . '</body></html>';
     echo json_encode(['success' => true, 'html' => $html, 'title' => 'ภาคผนวก_คะแนนดิบ_' . date('Y-m-d'), 'students' => count($ds['sids'])], JSON_UNESCAPED_UNICODE);
 } catch (Throwable $e) {
