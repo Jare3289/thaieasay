@@ -127,6 +127,7 @@ $titleChapters = (!$showCh5) ? 'บทที่ 4' : ((!$showCh4) ? 'บทท�
   table.thesis td.l, table.thesis th.l { text-align: left; }
   table.thesis td.c { text-align: center; }
   .grp td { font-weight: 700; padding-top: 8px; }
+  tr.sub td { font-size: 12.5pt; color: #475569; }
 </style>
 </head>
 <body>
@@ -198,6 +199,19 @@ $titleChapters = (!$showCh5) ? 'บทที่ 4' : ((!$showCh4) ? 'บทท�
         <td class="c"><?php echo ch45_fmt_p($r['p']); ?></td>
         <td class="c"><?php echo ch45_fmt($r['dz']); ?></td>
       </tr>
+      <?php foreach ($quant['indicator_rows'][$r['key']] ?? [] as $ir): ?>
+      <tr class="sub">
+        <td class="l">&nbsp;&nbsp;&nbsp;&nbsp;<?php echo rp_esc($ir['label']); ?></td>
+        <td class="c"><?php echo rp_num($ir['max'], 0); ?></td>
+        <td class="c"><?php echo rp_num($ir['pre_mean']); ?></td>
+        <td class="c"><?php echo rp_num($ir['pre_sd']); ?></td>
+        <td class="c"><?php echo rp_num($ir['post_mean']); ?></td>
+        <td class="c"><?php echo rp_num($ir['post_sd']); ?></td>
+        <td class="c"><?php echo ch45_fmt($ir['t'], 3) . ($ir['sig'] ? '*' : ''); ?></td>
+        <td class="c"><?php echo ch45_fmt_p($ir['p']); ?></td>
+        <td class="c"><?php echo ch45_fmt($ir['dz']); ?></td>
+      </tr>
+      <?php endforeach; ?>
       <?php endforeach; ?>
     </tbody>
   </table>

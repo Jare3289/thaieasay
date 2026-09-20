@@ -605,6 +605,7 @@ function ch45_domain_total(array $weighted) {
 function ch45_quant(array $ds, ?array $iccDs = null) {
     $meta = $ds['meta'];
     $domains = ch45_domains();
+    $inds = ch45_indicators();
 
     // ---- 1) จับคู่คะแนนก่อน–หลังเรียนรายคน ----
     $pairs = [];
@@ -646,6 +647,25 @@ function ch45_quant(array $ds, ?array $iccDs = null) {
         $rows[] = ch45_quant_row($k, 'ด้านที่ ' . $d['no'] . ' ' . $d['name'], (float)$d['max'], $pre, $post, $tt);
     }
 
+    // ---- 2b) แถวรายตัวบ่งชี้ย่อย (11 ตัวบ่งชี้ แยกตามด้าน) ----
+    // ใช้คะแนนถ่วงน้ำหนักรายตัวบ่งชี้จากชุดคะแนนจริงเดียวกับแถวภาพรวม/รายด้านข้างบน
+    // (ดึงจาก $pairs ที่มาจาก ch45_scores_of() ซึ่งอ่านจากตาราง evaluations เท่านั้น ไม่ใช่ผลตรวจของ AI)
+    // เก็บแยกจาก $rows/ranking ข้างบน เพื่อไม่ให้การจัดอันดับ "รายด้าน" ปนกับตัวบ่งชี้ย่อย
+    $indicatorRows = [];
+    foreach ($domains as $k => $d) {
+        foreach ($d['indicators'] as $id) {
+            $ind = $inds[$id];
+            $pre = []; $post = [];
+            foreach ($pairs as $p) {
+                if ($p['pre']['weighted'][$id] === null || $p['post']['weighted'][$id] === null) continue;
+                $pre[]  = $p['pre']['weighted'][$id];
+                $post[] = $p['post']['weighted'][$id];
+            }
+            $tt = ch45_paired_t($pre, $post);
+            $indicatorRows[$k][] = ch45_quant_row($id, $ind['sub'] . ' ' . $ind['name'], $ind['max'], $pre, $post, $tt);
+        }
+    }
+
     // ---- 3) การแจกแจงปกติของคะแนนผลต่าง (Shapiro-Wilk) ----
     $normality = [];
     foreach ($series as $k => $s) {
@@ -679,6 +699,7 @@ function ch45_quant(array $ds, ?array $iccDs = null) {
         'df'         => max(0, $n - 1),
         'rows'       => $rows,
         'by_key'     => array_column($rows, null, 'key'),
+        'indicator_rows' => $indicatorRows,
         'normality'  => $normality,
         'interrater' => $interrater,
         'ranking'    => $ranking,

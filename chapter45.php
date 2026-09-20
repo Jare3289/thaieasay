@@ -507,6 +507,18 @@ function c45PaintQuant() {
       + '<td class="text-center">' + c45Num(r.dz) + '</td>'
       + '<td class="text-center"><span class="badge bg-light text-dark">' + c45Esc(r.effect) + '</span></td>'
       + '</tr>';
+    ((q.indicator_rows && q.indicator_rows[r.key]) || []).forEach(function (ir) {
+      h += '<tr class="small text-muted">'
+        + '<td class="ps-4">' + c45Esc(ir.label) + '</td>'
+        + '<td class="text-center">' + c45Num(ir.max, 0) + '</td>'
+        + '<td class="text-center">' + c45Num(ir.pre_mean) + '</td><td class="text-center">' + c45Num(ir.pre_sd) + '</td>'
+        + '<td class="text-center">' + c45Num(ir.post_mean) + '</td><td class="text-center">' + c45Num(ir.post_sd) + '</td>'
+        + '<td class="text-center">' + c45Num(ir.t, 3) + (ir.sig ? '*' : '') + '</td>'
+        + '<td class="text-center">' + c45P(ir.p) + '</td>'
+        + '<td class="text-center">' + c45Num(ir.dz) + '</td>'
+        + '<td class="text-center"><span class="badge bg-light text-dark">' + c45Esc(ir.effect) + '</span></td>'
+        + '</tr>';
+    });
   });
   h += '</tbody>';
   document.getElementById('c45QuantTable').innerHTML = h;
