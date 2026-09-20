@@ -248,12 +248,13 @@ $titleChapters = (!$showCh5) ? 'บทที่ 4' : ((!$showCh4) ? 'บทท�
     <thead>
       <tr><th class="l" rowspan="2">ข้อบกพร่องที่พบในผลงานเรียงความ</th>
         <th colspan="2"><?php echo rp_esc($meta['work1_label']); ?></th>
-        <th colspan="2"><?php echo rp_esc($meta['work2_label']); ?></th></tr>
+        <th colspan="2"><?php echo rp_esc($meta['work2_label']); ?></th>
+        <th rowspan="2">แก้ไขได้</th><th rowspan="2">คงเดิม</th><th rowspan="2">เกิดขึ้นใหม่</th></tr>
       <tr><th>n</th><th>%</th><th>n</th><th>%</th></tr>
     </thead>
     <tbody>
       <?php foreach ($doms as $dk => $d): ?>
-        <tr class="grp"><td class="l" colspan="5">ด้าน<?php echo rp_esc($d['name']); ?></td></tr>
+        <tr class="grp"><td class="l" colspan="8">ด้าน<?php echo rp_esc($d['name']); ?></td></tr>
         <?php foreach ($d['indicators'] as $id): $r = $defects['rows'][$id]; ?>
         <tr>
           <td class="l"><?php echo (int)$r['no'] . '. ' . rp_esc($r['defect']); ?></td>
@@ -261,6 +262,9 @@ $titleChapters = (!$showCh5) ? 'บทที่ 4' : ((!$showCh4) ? 'บทท�
           <td class="c"><?php echo rp_num($r['pct1']); ?></td>
           <td class="c"><?php echo (int)$r['n2']; ?></td>
           <td class="c"><?php echo rp_num($r['pct2']); ?></td>
+          <td class="c"><?php echo count($r['resolved']); ?></td>
+          <td class="c"><?php echo count($r['persist']); ?></td>
+          <td class="c"><?php echo count($r['emerged']); ?></td>
         </tr>
         <?php endforeach; ?>
       <?php endforeach; ?>

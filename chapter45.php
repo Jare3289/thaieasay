@@ -614,9 +614,10 @@ function c45PaintDefects() {
   let h = '<thead class="table-light"><tr><th>ข้อบกพร่องที่พบในผลงานเรียงความ</th>'
     + '<th class="text-center">ครั้งที่ 1<br><small>n</small></th><th class="text-center">ครั้งที่ 1<br><small>%</small></th>'
     + '<th class="text-center">ครั้งที่ 2<br><small>n</small></th><th class="text-center">ครั้งที่ 2<br><small>%</small></th>'
+    + '<th class="text-center">แก้ไขได้</th><th class="text-center">คงเดิม</th><th class="text-center">เกิดขึ้นใหม่</th>'
     + '<th class="text-center">เปลี่ยนแปลง</th></tr></thead><tbody>';
   Object.keys(doms).forEach(function (dk) {
-    h += '<tr class="table-light fw-bold"><td colspan="6">ด้าน' + c45Esc(doms[dk].name) + '</td></tr>';
+    h += '<tr class="table-light fw-bold"><td colspan="9">ด้าน' + c45Esc(doms[dk].name) + '</td></tr>';
     doms[dk].indicators.forEach(function (id) {
       const r = d.rows[id];
       if (!r) return;
@@ -627,6 +628,9 @@ function c45PaintDefects() {
         + '</td>'
         + '<td class="text-center">' + r.n1 + '</td><td class="text-center">' + c45Num(r.pct1) + '</td>'
         + '<td class="text-center">' + r.n2 + '</td><td class="text-center">' + c45Num(r.pct2) + '</td>'
+        + '<td class="text-center">' + r.resolved + '</td>'
+        + '<td class="text-center">' + r.persist + '</td>'
+        + '<td class="text-center">' + r.emerged + '</td>'
         + '<td class="text-center ' + cls + '">'
         + (dp === null ? '—' : ((dp > 0 ? '+' : '') + c45Num(dp)))
         + '</td></tr>';
